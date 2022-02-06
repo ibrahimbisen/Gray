@@ -10,7 +10,7 @@
     name="spawn_model"
     pkg="gazebo_ros"
     type="spawn_model"
-    args="-file $(find Main_URDF_Assembly.SLDASM)/urdf/Main_URDF_Assembly.SLDASM.urdf -urdf -model Main_URDF_Assembly.SLDASM"
+    args="-file $(find Main Body URDF)/urdf/Main Body URDF.urdf -urdf -model Main Body URDF"
     output="screen" />
   <node
     name="fake_joint_calibration"

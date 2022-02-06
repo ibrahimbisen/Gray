@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 
-project(Main_URDF_Assembly.SLDASM)
+project(Main Body URDF)
 
 find_package(catkin REQUIRED)
 
