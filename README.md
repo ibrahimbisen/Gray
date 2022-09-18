@@ -1,15 +1,15 @@
 # Gray
 A quadruped robot trained with reinforcement learning.
-##About
+## About:
 
 
-##CAD Modelling
+## CAD Modelling:
 
 
-##Manufacturing
+## Manufacturing:
 
 
-##Simulation
+## Simulation:
 These are couple of Gifs showing the progress that has been done by the machine learning algorithm we are using throughout time.
 
 
