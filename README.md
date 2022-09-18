@@ -1,5 +1,5 @@
 # Gray
-A quadruped robot trained with reinforcement learning.
+A quadruped robot designed and manufactrued by college students from scratch and trained with pyhton reinforcement learning.
 ## About:
 
 
@@ -7,6 +7,15 @@ A quadruped robot trained with reinforcement learning.
 
 
 ## Manufacturing:
+
+This is the picture of the Controller we are desiging for the robot
+<img src="Overview/IMG_5251.jpg" width="250" height="150"/>
+THis is a picture of the legs that we have designed
+<img src="Overview/photo_2022-09-18_12-47-05.jpg" width="250" height="150"/>
+This is a picture of the main body
+<img src="Overview/photo_2022-09-18_12-47-05.jpg" width="250" height="150"/>
+This is a picture of the main body combined with the computer systems for testing
+<img src="Overview/RObot_from_angle.JPG" width="250" height="150"/>
 
 
 ## Simulation:
