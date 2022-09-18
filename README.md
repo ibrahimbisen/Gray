@@ -3,10 +3,10 @@ A quadruped robot trained with reinforcement learning.
 
 ![](Overview/Gifs/1.gif)![](Overview/Gifs/2.gif)![](Overview/Gifs/3.gif)
 
+<img src="Overview/Gifs/1.gif" width="250" height="250"/><img src="Overview/Gifs/2.gif" width="250" height="250"/><img src="Overview/Gifs/3.gif" width="250" height="250"/>
+
 Currently WIP.
 
 ## Contributors:
  - Ibrahim Eren Bisen
-    - Design & assembly
  - Emin Alp Arslan
-    - Simulation & training
