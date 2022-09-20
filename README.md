@@ -2,8 +2,8 @@
 A quadruped robot designed and manufactrued by college students from scratch and trained with pyhton reinforcement learning.
 
 This project is WIP.
-## About:
-
+## Latest Tests:
+<img src="Overview/Test.gif" width="250" height="250"/><br />
 
 ## CAD Modelling:
 This is a rendering of the URDF file<br />
