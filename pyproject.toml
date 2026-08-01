@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gray-quadruped"
+version = "0.3.0"
+description = "Gray - a 12-DOF 3D-printed quadruped: digital twin, classical gait, residual RL"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"     # upper bound is mjlab's; do not raise past 3.13
+
+# Core deps are deliberately tiny: this is exactly what `gray/` needs, and `gray/`
+# is the package that also has to install on the Raspberry Pi in Phase 5. Anything
+# heavier belongs in an extra. Never let this list grow to include MuJoCo.
+dependencies = [
+    "numpy",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+# Running the simulator and scripts/walk.py.
+sim = [
+    "mujoco",
+    "pillow",
+]
+# Regenerating the model from source CAD (tools/).
+tools = [
+    "trimesh",
+    "scipy",
+    "defusedxml",
+    "fast-simplification",
+]
+# Phase 3 residual-RL training. Pulls torch, warp-lang, mujoco-warp, rsl-rl-lib,
+# tensorboard and wandb transitively. Needs an NVIDIA GPU.
+#
+# Pinned low bound on purpose: with NumPy already at 2.5.x, uv will happily resolve
+# an ancient mjlab (1.4.0, on mujoco 3.8) rather than downgrade NumPy. mjlab 1.5.3
+# wants numpy<2.5, and letting it have that is the right trade.
+#
+# torch must come from the CUDA index or you silently get a CPU-only build that
+# ignores the 4070 Ti entirely - the PyPI Windows wheel is CPU-only:
+#     uv pip install torch --index-url https://download.pytorch.org/whl/cu130
+train = [
+    "mjlab>=1.5.3",
+]
+dev = [
+    "pytest",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["gray", "train"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
