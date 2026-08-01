@@ -15,7 +15,10 @@ between them except how much the policy has learned. That is the whole point: a
 side-by-side is then honest evidence of progress rather than a lucky take.
 
 Safe to re-run - existing clips are skipped, so it can be run repeatedly while
-training is still going and it will only pick up what is new.
+training is still going and it will only pick up what is new. summary.csv is
+rewritten each time rather than appended to: there is exactly one row per
+checkpoint, a fresh score replaces the old one for that checkpoint, and the file
+is swapped into place in one go so an interrupted run cannot leave it half written.
 """
 
 from __future__ import annotations
@@ -41,6 +44,104 @@ OUT = "progress"
 FIELDS = ["iteration", "distance_mm", "speed_mms", "drift_mm", "upright_min",
           "height_mm", "fell", "foot_force_p99_n", "joint_acc_rms",
           "power_mean_w", "cost_of_transport", "video"]
+
+
+def _key(tag: str) -> str:
+    """One row per checkpoint: the name a row is filed under.
+
+    "baseline" in any spelling is the hand-written gait; everything else is a
+    checkpoint number, so "50" and "050" are the same row, not two.
+    """
+    tag = (tag or "").strip()
+    if tag.lower() == "baseline":
+        return "baseline"
+    try:
+        return str(int(float(tag)))
+    except ValueError:
+        return tag
+
+
+def _sort_key(row: dict) -> tuple:
+    """Baseline first, then checkpoints in numerical order."""
+    tag = _key(row.get("iteration", ""))
+    if tag == "baseline":
+        return (0, 0.0, "")
+    try:
+        return (1, float(tag), "")
+    except ValueError:
+        return (2, 0.0, tag)          # anything unexpected, kept at the end
+
+
+def _read_summary(csv_path: str) -> list[dict]:
+    """Rows already in summary.csv. A missing or unreadable file means none."""
+    if not os.path.exists(csv_path):
+        return []
+    try:
+        with open(csv_path, "r", encoding="utf-8-sig", newline="") as fh:
+            # Older files may be missing the newer columns; fill those with blanks
+            # so the rewritten file still has every column in every row.
+            return [{f: (raw.get(f) or "") for f in FIELDS}
+                    for raw in csv.DictReader(fh)
+                    if _key(raw.get("iteration", ""))]
+    except (OSError, UnicodeDecodeError, csv.Error) as exc:
+        # A damaged or oddly encoded file must not take the whole run down with
+        # it - say so and carry on, and the rewrite below puts it right.
+        print(f"could not read {csv_path} ({exc}); starting a fresh one")
+        return []
+
+
+def _write_summary(csv_path: str, rows: list[dict]) -> None:
+    """Write the whole file in one go, then swap it in.
+
+    Writing to a temporary file next to the real one and renaming it means the
+    real file is either the old complete version or the new complete version -
+    never a half-written mixture, however the run ends.
+    """
+    tmp_path = csv_path + ".tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=FIELDS, extrasaction="ignore")
+            writer.writeheader()
+            writer.writerows(rows)
+        os.replace(tmp_path, csv_path)
+    except BaseException:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def _merge_summary(csv_path: str, new_rows: list[dict]):
+    """Existing rows plus the new ones, the fresh score winning per checkpoint.
+
+    Returns (rows in display order, how many are brand new, how many replaced an
+    existing row, how many duplicate rows an earlier run had left behind). A
+    re-run therefore updates rows in place instead of piling up copies.
+    """
+    old_rows = _read_summary(csv_path)
+    merged: dict[str, dict] = {}
+    for row in old_rows:
+        merged[_key(row["iteration"])] = row
+    duplicates = len(old_rows) - len(merged)
+
+    added = replaced = 0
+    for row in new_rows:
+        key = _key(row["iteration"])
+        previous = merged.get(key)
+        if previous is not None:
+            replaced += 1
+            # A --no-video run re-scores a checkpoint without rendering, so it has
+            # no clip name to offer. The clip from the earlier run is still sitting
+            # in progress/videos, so keep pointing at it rather than blanking the
+            # link and losing the video from the dashboard.
+            if not row.get("video") and previous.get("video"):
+                row = dict(row, video=previous["video"])
+        else:
+            added += 1
+        merged[key] = row
+
+    return sorted(merged.values(), key=_sort_key), added, replaced, duplicates
 
 
 def _row(tag: str, r: dict, video: str) -> dict:
@@ -122,21 +223,25 @@ def main() -> None:
               f"{r['speed']*1000:>8.1f} mm/s  {r['drift']*1000:>7.1f} mm  "
               f"{r['upright_min']:>7.3f}  {int(r['fell'])}", flush=True)
 
+    csv_path = os.path.join(OUT, "summary.csv")
+
     if not rows:
+        # Nothing new, but tidy away any duplicate rows an earlier run left behind.
+        merged, _, _, duplicates = _merge_summary(csv_path, [])
+        if duplicates:
+            _write_summary(csv_path, merged)
+            print(f"removed {duplicates} duplicate row(s) from {csv_path}")
         print("nothing new to render")
         return
 
-    csv_path = os.path.join(OUT, "summary.csv")
-    exists = os.path.exists(csv_path)
-    with open(csv_path, "a", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=FIELDS)
-        if not exists:
-            writer.writeheader()
-        writer.writerows(rows)
+    merged, added, replaced, duplicates = _merge_summary(csv_path, rows)
+    _write_summary(csv_path, merged)
 
+    tidied = f", {duplicates} duplicate(s) removed" if duplicates else ""
     print(f"\n{len(rows)} clip(s) -> {vid_dir}")
     print(f"policies      -> {pol_dir}  (small enough to commit)")
-    print(f"numbers       -> {csv_path}")
+    print(f"numbers       -> {csv_path}  ({len(merged)} row(s) in total: "
+          f"{added} new, {replaced} re-scored{tidied})")
 
 
 if __name__ == "__main__":

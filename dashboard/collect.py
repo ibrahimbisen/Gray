@@ -10,6 +10,11 @@ Sources, all real files, nothing invented:
   progress/summary.csv                      measured walk scores per checkpoint
   Overview/, sim/models/                    photos, renders and clips
 
+The "scorecard" key is the one derived thing in here: one row per training goal,
+each ranking the evaluated checkpoints on the single column of summary.csv that
+measures that goal, against the hand-written gait. Nothing else is computed -
+everything else is read and passed straight through.
+
 Anything unreadable is reported in the returned "errors" list rather than
 swallowed, so the page can show the user what is missing instead of a blank.
 
@@ -149,7 +154,9 @@ def _downsample(points: list, limit: int = MAX_SERIES_POINTS) -> list:
     """Uniform stride, and the final point is always kept.
 
     Losing the last point would make a live chart look frozen one iteration
-    behind, which is exactly the number the user is watching.
+    behind, which is exactly the number the user is watching. Appending it can
+    push the list one over `limit`, so when that would happen the last strided
+    point is dropped to make room: the result is never longer than `limit`.
     """
     n = len(points)
     if n <= limit:
@@ -157,6 +164,8 @@ def _downsample(points: list, limit: int = MAX_SERIES_POINTS) -> list:
     stride = -(-n // limit)  # ceil division
     out = points[::stride]
     if out[-1] is not points[-1]:
+        if len(out) >= limit:
+            out = out[: limit - 1]
         out.append(points[-1])
     return out
 
@@ -166,7 +175,27 @@ def _downsample(points: list, limit: int = MAX_SERIES_POINTS) -> list:
 # ---------------------------------------------------------------------------
 
 
-def _build_goal(baseline: dict) -> dict:
+def _build_goal(
+    baseline: dict,
+    num_envs: int = 0,
+    total_iterations: int = DEFAULT_TOTAL_ITERATIONS,
+) -> dict:
+    """Plain-English explanation of the job. `num_envs` and `total_iterations`
+    come from the live run's params/*.yaml, never from a hardcoded guess - if
+    they cannot be read the sentences say so rather than inventing a number.
+    """
+    robots_phrase = (
+        f"{num_envs:,} copies of the robot" if num_envs > 0
+        else "Many copies of the robot"
+    )
+    if num_envs > 0:
+        practice_scale = f"{num_envs:,} robots at once, {total_iterations:,} rounds"
+    else:
+        practice_scale = (
+            f"{total_iterations:,} rounds; how many robots run at once could not "
+            f"be read from the run's settings"
+        )
+
     return {
         "headline": (
             "Teach Gray to walk further and straighter in 12 seconds than the "
@@ -181,18 +210,29 @@ def _build_goal(baseline: dict) -> dict:
             "and adds a small correction on top of that existing gait - at most "
             "about 11 degrees at any joint. Think of it as a trim adjustment on "
             "a machine that already runs, not a new machine.",
-            "It learns by practising. 16,384 copies of the robot walk at once on "
-            "one graphics card, each for 12 seconds. Every copy is scored, the "
-            "good behaviour is reinforced, and the whole thing repeats. One "
-            "round of that is one 'iteration' on the charts below.",
+            f"It learns by practising. {robots_phrase} walk at once on one "
+            f"graphics card, each for 12 seconds. Every copy is scored, the "
+            f"good behaviour is reinforced, and the whole thing repeats. One "
+            f"round of that is one 'iteration' on the charts below.",
             "Every copy is built slightly differently on purpose - heavier "
             "parts, a battery sitting off-centre, a more slippery floor, servos "
             "that respond sluggishly. Something that only works on one exact set "
             "of numbers will score badly on average, so the AI is pushed towards "
             "a gait that tolerates the real robot not matching the drawing.",
-            "The scores below are not percentages. They are running totals a "
-            "12-second attempt earns, so they can be any size, and the penalty "
-            "lines are negative on purpose.",
+            "The scores below are not percentages. Each scoring item is added "
+            "up over an attempt and then divided by 12 seconds, so what you "
+            "see is POINTS PER SECOND. It is always the full 12, even for an "
+            "attempt cut short by a fall at 3 seconds - so falling costs the "
+            "score twice, once in points not earned and once in the seconds "
+            "it is still divided by. That also fixes a ceiling: an item can "
+            "never earn more per second than its own weight, so distance "
+            "covered, weighted 2.0, tops out at 2.0. The penalty lines are "
+            "negative on purpose.",
+            "One number on this page is not on that per-second scale: the "
+            "total score for an attempt. That one is the same points added up "
+            "over the whole attempt and never divided, so it runs about twelve "
+            "times larger than the per-second items and the two cannot be "
+            "compared side by side.",
         ],
         "baseline": baseline,
         "targets": [
@@ -235,8 +275,15 @@ def _build_goal(baseline: dict) -> dict:
         ],
         # "good" splits what it is PAID to do from what it is PENALISED for -
         # the sign of the weight is the only thing that decides this.
+        #
+        # "key" is the reward term's name inside the trainer (train/gray_env.py),
+        # which is also the part after the slash in its TensorBoard tag
+        # "Episode_Reward/<key>". The page joins these entries to the charts on
+        # that key, so it must match the trainer exactly - the prose "name" is
+        # for reading, never for looking up.
         "rewards": [
             {
+                "key": "forward_progress",
                 "name": "Distance covered",
                 "weight": 2.0,
                 "plain": "Points for actually getting somewhere, always counted "
@@ -246,14 +293,17 @@ def _build_goal(baseline: dict) -> dict:
                 "good": True,
             },
             {
+                "key": "track_linear_velocity",
                 "name": "Hits the asked-for speed",
                 "weight": 1.5,
-                "plain": "Points for walking at the speed it was told to. Full "
-                         "marks within about 70 mm/s of the target, tailing off "
-                         "either side.",
+                "plain": "Points for walking at the speed it was told to. The "
+                         "score fades away smoothly as it misses: dead on target "
+                         "scores full marks, and being 70 mm/s out scores about a "
+                         "third of them.",
                 "good": True,
             },
             {
+                "key": "track_angular_velocity",
                 "name": "Does not turn",
                 "weight": 1.0,
                 "plain": "Points for not rotating. It is always asked to turn at "
@@ -261,6 +311,7 @@ def _build_goal(baseline: dict) -> dict:
                 "good": True,
             },
             {
+                "key": "upright",
                 "name": "Keeps the body level",
                 "weight": 0.5,
                 "plain": "Points for staying upright rather than leaning, "
@@ -268,6 +319,7 @@ def _build_goal(baseline: dict) -> dict:
                 "good": True,
             },
             {
+                "key": "soft_landing",
                 "name": "Soft landings",
                 "weight": -1e-4,
                 "plain": "Marked down for slamming a foot into the ground. The "
@@ -275,6 +327,7 @@ def _build_goal(baseline: dict) -> dict:
                 "good": False,
             },
             {
+                "key": "joint_acc",
                 "name": "Smooth joint motion",
                 "weight": -5e-7,
                 "plain": "A very small mark-down for snatching a joint from one "
@@ -282,6 +335,7 @@ def _build_goal(baseline: dict) -> dict:
                 "good": False,
             },
             {
+                "key": "action_acc",
                 "name": "Steady corrections",
                 "weight": -0.005,
                 "plain": "Marked down for changing its correction jerkily from "
@@ -289,6 +343,7 @@ def _build_goal(baseline: dict) -> dict:
                 "good": False,
             },
             {
+                "key": "action_rate",
                 "name": "Slow-changing corrections",
                 "weight": -0.05,
                 "plain": "Marked down for changing its correction quickly at "
@@ -297,6 +352,7 @@ def _build_goal(baseline: dict) -> dict:
                 "good": False,
             },
             {
+                "key": "joint_torques",
                 "name": "Easy on the servos",
                 "weight": -1e-4,
                 "plain": "Marked down for pulling hard on the servos. Saves the "
@@ -304,6 +360,7 @@ def _build_goal(baseline: dict) -> dict:
                 "good": False,
             },
             {
+                "key": "dof_pos_limits",
                 "name": "Off the end stops",
                 "weight": -1.0,
                 "plain": "Marked down for driving a joint into the end of its "
@@ -390,7 +447,7 @@ def _build_goal(baseline: dict) -> dict:
             },
             {
                 "name": "Practice scale",
-                "value": "16,384 robots at once, 3000 rounds",
+                "value": practice_scale,
                 "why": "All on a single RTX 4070 Ti. Every robot in the batch "
                        "has slightly different physics.",
             },
@@ -406,15 +463,52 @@ def _build_goal(baseline: dict) -> dict:
 def _empty_training() -> dict:
     return {
         "running": False,
+        # True once every planned round has been done. Without this the page
+        # cannot tell a finished run (no time remaining, correctly) from one
+        # whose rate could not be worked out yet (still estimating).
+        "finished": False,
         "run_name": "",
         "iteration": 0,
         "total_iterations": DEFAULT_TOTAL_ITERATIONS,
         "num_envs": 0,
         "elapsed_seconds": 0.0,
         "eta_seconds": None,
+        # See _fall_rate: the raw Episode_Termination numbers are per simulation
+        # step and are not presentable, this percentage is.
+        "fall_rate_percent": None,
+        "fall_rate_note": "",
         "series": {},
         "latest": {},
     }
+
+
+def _fall_rate(latest: dict) -> tuple[float | None, str]:
+    """Share of attempts that end on the floor, as a percentage.
+
+    Episode_Termination/fell_over and .../time_out are NOT counts of episodes
+    per round. mjlab logs how many robots reset on a single simulation step and
+    rsl_rl then averages that over the 24 steps in a rollout, so each is a rate
+    per step whose absolute size means nothing to a reader. Their ratio,
+    however, is exactly the fraction of finished attempts that ended in a fall,
+    because every attempt ends one way or the other.
+    """
+    fell = _to_float(latest.get("Episode_Termination/fell_over"))
+    timed_out = _to_float(latest.get("Episode_Termination/time_out"))
+    if fell is None or timed_out is None:
+        return None, ""
+    total = fell + timed_out
+    if total <= 0:
+        return None, ""
+
+    percent = round((fell / total) * 100.0, 1)
+    note = (
+        f"About {percent:.0f} attempts in every 100 end with the robot on the "
+        f"floor; the other {100 - percent:.0f} run the full 12 seconds. Worked "
+        f"out from how the attempts ended, which is the only honest way to read "
+        f"those two numbers - on their own they are counted per simulation step, "
+        f"not per attempt."
+    )
+    return percent, note
 
 
 def _read_run_params(run_dir: str, errors: list) -> tuple[int, int]:
@@ -449,6 +543,14 @@ def _read_run_params(run_dir: str, errors: list) -> tuple[int, int]:
                     num_envs = int(match.group(1))
             except OSError:
                 pass
+
+    if num_envs <= 0:
+        # Never let a missing number reach the page as the fact "0 robots".
+        errors.append(
+            f"Could not find how many robots train at once (num_envs) in "
+            f"{params_dir.replace(os.sep, '/')}/env.yaml, so that figure is "
+            f"unknown rather than zero."
+        )
 
     return total, num_envs
 
@@ -534,8 +636,15 @@ def _collect_training(root: str, errors: list) -> dict:
                 reference = [(int(e.step), e.wall_time) for e in events]
 
     out["iteration"] = iteration
+    # Every planned round is done. Without this the page cannot tell a finished
+    # run - which correctly has no time remaining - from one whose rate could
+    # not be worked out yet, and would report a completed run as "estimating".
+    out["finished"] = out["total_iterations"] > 0 and iteration >= out["total_iterations"]
+
     if first_wall is not None and last_wall is not None:
         out["elapsed_seconds"] = round(last_wall - first_wall, 1)
+
+    out["fall_rate_percent"], out["fall_rate_note"] = _fall_rate(out["latest"])
 
     # Seconds-per-iteration over the tail of the run, not the whole thing: the
     # first iterations include warm-up and would flatter the estimate.
@@ -558,6 +667,13 @@ def _collect_training(root: str, errors: list) -> dict:
 
 
 def _walk_row(raw: dict, root: str) -> dict:
+    """One row of summary.csv, with its video resolved to a URL if it exists.
+
+    The first five numbers keep a 0.0 stand-in for a blank column because the
+    page has always drawn them. The four carried through for the scorecard stay
+    None instead - a missing foot force must never be read as a perfect 0 N
+    landing, which would silently win the "lands softly" row.
+    """
     video = (raw.get("video") or "").strip().replace("\\", "/")
     video_url = None
     if video:
@@ -572,42 +688,219 @@ def _walk_row(raw: dict, root: str) -> dict:
         "upright_min": _to_float(raw.get("upright_min"), 0.0),
         "height_mm": _to_float(raw.get("height_mm"), 0.0),
         "fell": int(_to_float(raw.get("fell"), 0) or 0),
+        # Measured per checkpoint by scripts/make_progress_videos.py. Foot force
+        # in particular is the only evidence on the whole page for the stated
+        # goal of softer landings than the hand-written gait, so it has to
+        # travel with the row rather than being dropped here.
+        "foot_force_p99_n": _to_float(raw.get("foot_force_p99_n")),
+        "joint_acc_rms": _to_float(raw.get("joint_acc_rms")),
+        "power_mean_w": _to_float(raw.get("power_mean_w")),
+        "cost_of_transport": _to_float(raw.get("cost_of_transport")),
         "video": video_url,
     }
 
 
-def _read_walks(root: str, errors: list) -> tuple[list, dict | None]:
+def _read_walks(root: str, errors: list) -> tuple[list, dict | None, set]:
+    """(walks, baseline row, column names present in the file).
+
+    Re-measuring a checkpoint adds a second row for the same iteration rather
+    than replacing the first, so rows are collapsed by iteration and the last
+    one in the file wins - it was written by the most recent run.
+
+    The column names are returned so the scorecard can tell "this file predates
+    that measurement" from "that measurement came out as zero".
+    """
     path = os.path.join(root, SUMMARY_CSV)
     if not os.path.isfile(path):
         errors.append(
             "No walk scores yet - progress/summary.csv appears after the first "
             "run of scripts/make_progress_videos.py."
         )
-        return [], None
+        return [], None, set()
 
-    walks: list[dict] = []
+    by_iteration: dict[int, dict] = {}
     baseline: dict | None = None
+    columns: set = set()
     try:
         with open(path, "r", encoding="utf-8", newline="") as fh:
-            for raw in csv.DictReader(fh):
+            reader = csv.DictReader(fh)
+            columns = {name for name in (reader.fieldnames or []) if name}
+            for raw in reader:
                 tag = (raw.get("iteration") or "").strip()
                 row = _walk_row(raw, root)
                 if tag.lower() == "baseline":
                     row["iteration"] = None
-                    baseline = row
+                    baseline = row  # last one wins, same rule as the walks
                     continue
                 number = _to_float(tag)
                 if number is None:
                     errors.append(f"Skipped a summary.csv row with iteration '{tag}'.")
                     continue
                 row["iteration"] = int(number)
-                walks.append(row)
+                by_iteration[row["iteration"]] = row
     except Exception as exc:
         errors.append(f"Could not read {SUMMARY_CSV}: {exc}")
-        return [], None
+        return [], None, set()
 
-    walks.sort(key=lambda r: r["iteration"])
-    return walks, baseline
+    walks = sorted(by_iteration.values(), key=lambda r: r["iteration"])
+    return walks, baseline, columns
+
+
+# ---------------------------------------------------------------------------
+# scorecard - one row per thing the robot is being taught
+# ---------------------------------------------------------------------------
+
+# The robot is taught six things at once and they pull against each other:
+# walking faster means stamping harder, landing softly means going slower. A
+# single overall score hides exactly that tension, so each goal is scored on
+# its own, on the one column of progress/summary.csv that measures it.
+#
+# "column" must be a real column of that file. Nothing here is modelled or
+# estimated - every number in the scorecard is read straight out of it.
+_SCORECARD_GOALS: list[dict] = [
+    {
+        "goal": "Cover ground",
+        "column": "distance_mm",
+        "unit": "mm",
+        "better": "higher",
+        "plain": "How far the robot actually travels in one 12-second attempt, "
+                 "which is the headline number and the whole point of the job.",
+    },
+    {
+        "goal": "Walk straight",
+        "column": "drift_mm",
+        "unit": "mm",
+        "better": "lower",
+        # Drift is signed - left is negative, right is positive - and wandering
+        # off to the left is no better than wandering off to the right.
+        "absolute": True,
+        "plain": "How far it wanders off to one side while being told to go "
+                 "straight ahead, counted the same whether it drifts left or right.",
+    },
+    {
+        "goal": "Stay upright",
+        "column": "upright_min",
+        "unit": "",
+        "better": "higher",
+        "plain": "How level the body stays at its worst moment of the attempt, "
+                 "where 1.000 is perfectly flat and tipping past 60 degrees "
+                 "counts as a fall and ends the attempt.",
+    },
+    {
+        "goal": "Land softly",
+        "column": "foot_force_p99_n",
+        "unit": "N",
+        "better": "lower",
+        "plain": "How hard the feet hit the ground on the worst impacts of the "
+                 "attempt, which matters because the printed resin parts are "
+                 "brittle and chip when they are hammered.",
+    },
+    {
+        "goal": "Move smoothly",
+        "column": "joint_acc_rms",
+        "unit": "rad/s2",
+        "better": "lower",
+        "plain": "How sharply the joints are snatched from one speed to another, "
+                 "averaged over the attempt; smoother motion is easier on the "
+                 "servo gear trains.",
+    },
+    {
+        "goal": "Use less power",
+        "column": "cost_of_transport",
+        "unit": "",
+        "better": "lower",
+        "plain": "How much energy it burns to carry its own weight a given "
+                 "distance, so a smaller figure means more walking out of the "
+                 "same battery.",
+    },
+]
+
+
+def _scorecard_value(row: dict, spec: dict) -> float | None:
+    value = row.get(spec["column"])
+    if value is None:
+        return None
+    return abs(value) if spec.get("absolute") else value
+
+
+def _build_scorecard(
+    walks: list,
+    baseline_walk: dict | None,
+    columns: set,
+    errors: list,
+) -> list:
+    """One row per goal: its best checkpoint so far, where it stands now, and
+    how both compare with the hand-written gait.
+
+    "Best so far" deliberately skips any checkpoint that fell over. A robot
+    that tips onto its side after two seconds lands softly, uses little power
+    and barely drifts - it would win half these rows without walking at all.
+
+    "beats_baseline" is about the BEST checkpoint, not the latest one: the
+    question being answered is "what is the best this has ever managed at this
+    particular job". It is None when there is nothing to compare against, which
+    is honest - the page can say so rather than claim a pass or a fail.
+    """
+    if not walks:
+        return []
+
+    out: list[dict] = []
+    for spec in _SCORECARD_GOALS:
+        column = spec["column"]
+        if columns and column not in columns:
+            errors.append(
+                f"progress/summary.csv has no '{column}' column, so the "
+                f"'{spec['goal']}' goal cannot be scored yet. Re-running "
+                f"scripts/make_progress_videos.py adds it."
+            )
+            continue
+
+        higher_is_better = spec["better"] == "higher"
+
+        # Current = the most recently measured checkpoint, fallen or not. It is
+        # where the robot stands today, so it is reported as it is.
+        current_row = walks[-1]
+
+        best_row: dict | None = None
+        best_value: float | None = None
+        for row in walks:
+            if row["fell"]:
+                continue
+            value = _scorecard_value(row, spec)
+            if value is None:
+                continue
+            better = (
+                value > best_value if higher_is_better else value < best_value
+            ) if best_value is not None else True
+            if better:
+                best_value, best_row = value, row
+
+        baseline_value = (
+            _scorecard_value(baseline_walk, spec) if baseline_walk else None
+        )
+
+        beats = None
+        if best_value is not None and baseline_value is not None:
+            beats = (
+                best_value > baseline_value if higher_is_better
+                else best_value < baseline_value
+            )
+
+        out.append({
+            "goal": spec["goal"],
+            "unit": spec["unit"],
+            "better": spec["better"],
+            "baseline": baseline_value,
+            "best_value": best_value,
+            "best_iteration": best_row["iteration"] if best_row else None,
+            "current_value": _scorecard_value(current_row, spec),
+            "current_iteration": current_row["iteration"],
+            "beats_baseline": beats,
+            "video": best_row["video"] if best_row else None,
+            "plain": spec["plain"],
+        })
+
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -712,6 +1005,15 @@ def _collect_robot(root: str, errors: list) -> dict:
         })
 
     if transmission.get("knee"):
+        # robot.yaml stores this as a YAML true/false. Printing that straight
+        # out puts "calibrated: False" on the page, which is code, not English.
+        measured = bool(transmission.get("calibrated"))
+        status = (
+            "That has now been measured, so servo angle can be converted to "
+            "knee angle."
+            if measured else
+            "It has not been measured yet, and is one of the jobs still open."
+        )
         facts.append({
             "label": "Knee drive",
             "value": "push-rod linkage, not direct drive",
@@ -719,9 +1021,8 @@ def _collect_robot(root: str, errors: list) -> dict:
                 "The knee servo sits on the thigh and pushes a ball-jointed "
                 "rod. Servo angle and knee angle are therefore not the same "
                 "number. Harmless in simulation - a linkage driving a hinge is "
-                "still a hinge - but it must be measured on the real robot "
-                "before any trained gait is deployed. Logged as a blocker; "
-                f"calibrated: {transmission.get('calibrated')}."
+                "still a hinge - but the linkage has to be measured on the "
+                f"real robot before a trained gait is deployed. {status}"
             ),
         })
 
@@ -834,8 +1135,11 @@ _MEDIA_SPEC: dict[str, list[tuple[str, str]]] = {
          "roughly 312 mm of reach when straight. The push-rod and its ball "
          "joints run down the outside of the thigh."),
         ("Overview/photo_2022-09-18_12-46-43.jpg",
-         "Legs waiting for assembly. The honeycomb cut-outs are weight saving - "
-         "each printed leg segment is only about 29 g of resin."),
+         "Finished legs on the bench, each with its knee servo cable-tied to "
+         "the thigh, its push-rod and blue ball joints fitted, and a black "
+         "rubber foot on the end. The honeycomb pockets are weight saving: the "
+         "shank and the shoulder casting come out at about 29 g of resin each, "
+         "and the thigh - the piece that has to carry a servo - about 47 g."),
         ("Overview/photo_2022-09-18_12-46-15.jpg",
          "Frame and legs together for the first time. No electronics yet: at "
          "this point the robot was a complete mechanism with nothing to drive "
@@ -851,15 +1155,21 @@ _MEDIA_SPEC: dict[str, list[tuple[str, str]]] = {
          "The main body and legs assembled, on a cutting mat for scale. This is "
          "the machine the simulation is a copy of."),
         ("Overview/photo_2022-09-18_12-46-26.jpg",
-         "The computer stack on its printed tray: Raspberry Pi 4B underneath, "
-         "the IMU that senses tilt in the middle, and the PCA9685 board on the "
-         "right that fans one signal out to all twelve servos."),
+         "The computer stack, all three boards sitting on the top face of the "
+         "light blue printed tray: the Raspberry Pi 4B on the left with its "
+         "blue heatsinks, the small nine-axis orientation sensor that measures "
+         "tilt in the middle, and the PCA9685 board on the right that fans one "
+         "signal out to all twelve servos. Jumper wires run from the Pi's pin "
+         "header across to both."),
         ("Overview/photo_2022-09-18_12-46-30.jpg",
-         "The same stack from the side. The red and black pair going off to the "
-         "right is servo power, kept separate from the Pi's own supply."),
+         "The same tray from the side. The red and black pair leaving the green "
+         "screw terminal on the servo driver is servo power, kept separate from "
+         "the Pi's own supply."),
         ("Overview/photo_2022-09-18_12-46-32.jpg",
-         "The tray flipped over, showing the Raspberry Pi 4B and the ribbon of "
-         "signal wires running up to the servo driver."),
+         "The same tray again from the opposite end - the same face, not the "
+         "underside - looking straight down on the Raspberry Pi 4 Model B. The "
+         "orientation sensor and the servo driver sit beyond it, with the grey "
+         "signal ribbon heading off to the left."),
         ("Overview/RObot_from_angle.JPG",
          "The robot standing with electronics fitted and the nose shell on. The "
          "push-rods and ball joints running down each thigh are clear here."),
@@ -980,6 +1290,61 @@ def _build_timeline() -> list:
 # ---------------------------------------------------------------------------
 
 
+def _collect_joints(root: str, errors: list) -> dict:
+    """What each joint can do, against what the walk asks of it.
+
+    Written by scripts/render_joint_atlas.py. Worth its own section because the
+    headline finding is counter-intuitive: watching the robot walk, the legs look
+    barely articulated, but the servos have 270 degrees of travel and the crawl gait
+    calls on at most 55 - and asks the four abduction joints for EXACTLY NOTHING.
+    Four of the twelve servos hold one angle for the entire walk.
+    """
+    path = os.path.join(root, "progress", "joints", "ranges.json")
+    empty = {"available": False, "joints": [], "note": "", "widest_used_deg": None,
+             "servo_span_deg": None}
+    if not os.path.exists(path):
+        return empty
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            raw = json.load(fh)
+    except (OSError, ValueError) as exc:
+        errors.append(f"Could not read the joint ranges ({exc}).")
+        return empty
+
+    order = ("hip", "top", "bottom")
+    joints = []
+    for seg in order:
+        entry = raw.get("joints", {}).get(seg)
+        if not entry:
+            continue
+        video = entry.get("video") or ""
+        # Only offer a clip the server can actually serve.
+        rel = video.replace("/media/", "", 1)
+        if rel and not os.path.exists(os.path.join(root, rel.replace("/", os.sep))):
+            video = ""
+        joints.append({
+            "segment": seg,
+            "title": entry.get("title", seg),
+            "how_it_moves": entry.get("how_it_moves", ""),
+            "video": video,
+            "count": entry.get("count", 4),
+            "servo_span_deg": entry.get("servo_span_deg"),
+            "gait_span_deg": entry.get("gait_span_deg"),
+            "percent_used": entry.get("percent_used"),
+        })
+
+    if not joints:
+        return empty
+    spans = [j["gait_span_deg"] for j in joints if j["gait_span_deg"] is not None]
+    return {
+        "available": True,
+        "joints": joints,
+        "note": raw.get("note", ""),
+        "widest_used_deg": max(spans) if spans else None,
+        "servo_span_deg": joints[0].get("servo_span_deg"),
+    }
+
+
 def collect(repo_root: str = ".") -> dict:
     """Read every source on disk and return the dashboard payload."""
     root = os.path.abspath(repo_root)
@@ -992,13 +1357,16 @@ def collect(repo_root: str = ".") -> dict:
             "training": _empty_training(),
             "walks": [],
             "baseline_walk": None,
+            "scorecard": [],
             "robot": _empty_robot(),
+            "joints": {"available": False, "joints": [], "note": "",
+                       "widest_used_deg": None, "servo_span_deg": None},
             "media": {key: [] for key in _MEDIA_SPEC},
             "timeline": _build_timeline(),
             "errors": [f"Repository folder not found: {root}"],
         }
 
-    walks, baseline_walk = _read_walks(root, errors)
+    walks, baseline_walk, walk_columns = _read_walks(root, errors)
 
     # Prefer the measured baseline row once it exists; the constants are only a
     # stand-in for the window before the first evaluation has been run.
@@ -1007,13 +1375,22 @@ def collect(repo_root: str = ".") -> dict:
     else:
         baseline = dict(BASELINE_FALLBACK)
 
+    # Read before the goal is built: how many robots run at once and how many
+    # rounds are planned belong to the live run's params/*.yaml, and the goal
+    # text quotes them rather than repeating a hardcoded guess.
+    training = _collect_training(root, errors)
+
     return {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
-        "goal": _build_goal(baseline),
-        "training": _collect_training(root, errors),
+        "goal": _build_goal(
+            baseline, training["num_envs"], training["total_iterations"]
+        ),
+        "training": training,
         "walks": walks,
         "baseline_walk": baseline_walk,
+        "scorecard": _build_scorecard(walks, baseline_walk, walk_columns, errors),
         "robot": _collect_robot(root, errors),
+        "joints": _collect_joints(root, errors),
         "media": _collect_media(root, errors),
         "timeline": _build_timeline(),
         "errors": errors,

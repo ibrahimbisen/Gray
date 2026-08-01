@@ -54,6 +54,27 @@ def reexec_under_venv() -> None:
     raise SystemExit(subprocess.call([str(target), __file__, *sys.argv[1:]], env=env))
 
 
+def start_watcher(python: str) -> subprocess.Popen | None:
+    """Render a clip for each new checkpoint while training is still going.
+
+    Without this the gallery stays empty until training ends, which for a three-hour
+    run means there is no way to see what the robot can currently do.
+    """
+    script = ROOT / "scripts" / "render_watcher.py"
+    if not script.exists():
+        return None
+    try:
+        proc = subprocess.Popen(
+            [python, str(script)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=str(ROOT),
+        )
+    except OSError as exc:
+        print(f"  Video watcher  could not start: {exc}")
+        return None
+    print("  Video watcher  rendering clips as new checkpoints appear")
+    return proc
+
+
 def start_tensorboard(python: str) -> subprocess.Popen | None:
     """Launch TensorBoard in the background, or explain why it did not start."""
     if not LOG_DIR.exists():
@@ -86,6 +107,8 @@ def main() -> int:
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--no-open", action="store_true")
     ap.add_argument("--no-tensorboard", action="store_true")
+    ap.add_argument("--no-videos", action="store_true",
+                    help="do not render clips for new checkpoints while training runs")
     args = ap.parse_args()
 
     sys.path.insert(0, str(ROOT))
@@ -100,9 +123,11 @@ def main() -> int:
 
     print("\nGray")
     print("-" * 52)
-    tb = None
+    tb = watcher = None
     if not args.no_tensorboard:
         tb = start_tensorboard(sys.executable)
+    if not args.no_videos:
+        watcher = start_watcher(sys.executable)
 
     argv = ["--port", str(args.port), "--host", args.host]
     if args.no_open:
@@ -113,9 +138,10 @@ def main() -> int:
     except KeyboardInterrupt:
         return 0
     finally:
-        if tb is not None and tb.poll() is None:
-            tb.terminate()
-            print("\nTensorBoard stopped.")
+        for name, proc in (("TensorBoard", tb), ("Video watcher", watcher)):
+            if proc is not None and proc.poll() is None:
+                proc.terminate()
+                print(f"{name} stopped.")
 
 
 if __name__ == "__main__":

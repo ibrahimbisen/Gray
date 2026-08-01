@@ -1,0 +1,101 @@
+{
+  "legs": "fl",
+  "joints": {
+    "hip": {
+      "title": "Hip / abduction",
+      "how_it_moves": "swings the whole leg out sideways, about the fore-aft axis",
+      "video": "/media/progress/joints/hip.mp4",
+      "servo_min_deg": -135.0,
+      "servo_max_deg": 135.0,
+      "servo_span_deg": 270.0,
+      "gait_span_deg": 0.0,
+      "percent_used": 0.0,
+      "count": 4
+    },
+    "top": {
+      "title": "Thigh / hip pitch",
+      "how_it_moves": "swings the leg forwards and backwards",
+      "video": "/media/progress/joints/top.mp4",
+      "servo_min_deg": -135.0,
+      "servo_max_deg": 135.0,
+      "servo_span_deg": 270.0,
+      "gait_span_deg": 44.36,
+      "percent_used": 16.4,
+      "count": 4
+    },
+    "bottom": {
+      "title": "Knee",
+      "how_it_moves": "folds the lower leg, sharing the thigh's axis",
+      "video": "/media/progress/joints/bottom.mp4",
+      "servo_min_deg": -135.0,
+      "servo_max_deg": 135.0,
+      "servo_span_deg": 270.0,
+      "gait_span_deg": 27.6,
+      "percent_used": 10.2,
+      "count": 4
+    }
+  },
+  "per_joint": {
+    "fl_hip": {
+      "used_min_deg": -0.0,
+      "used_max_deg": -0.0,
+      "used_span_deg": 0.0
+    },
+    "fl_top": {
+      "used_min_deg": 3.83,
+      "used_max_deg": 48.18,
+      "used_span_deg": 44.36
+    },
+    "fl_bottom": {
+      "used_min_deg": -24.99,
+      "used_max_deg": 2.61,
+      "used_span_deg": 27.6
+    },
+    "fr_hip": {
+      "used_min_deg": 0.0,
+      "used_max_deg": 0.0,
+      "used_span_deg": 0.0
+    },
+    "fr_top": {
+      "used_min_deg": -47.86,
+      "used_max_deg": -3.29,
+      "used_span_deg": 44.57
+    },
+    "fr_bottom": {
+      "used_min_deg": -3.56,
+      "used_max_deg": 23.96,
+      "used_span_deg": 27.52
+    },
+    "br_hip": {
+      "used_min_deg": -0.0,
+      "used_max_deg": -0.0,
+      "used_span_deg": 0.0
+    },
+    "br_top": {
+      "used_min_deg": -31.03,
+      "used_max_deg": 23.97,
+      "used_span_deg": 54.99
+    },
+    "br_bottom": {
+      "used_min_deg": -1.62,
+      "used_max_deg": 22.42,
+      "used_span_deg": 24.05
+    },
+    "bl_hip": {
+      "used_min_deg": 0.0,
+      "used_max_deg": 0.0,
+      "used_span_deg": 0.0
+    },
+    "bl_top": {
+      "used_min_deg": -24.32,
+      "used_max_deg": 30.63,
+      "used_span_deg": 54.95
+    },
+    "bl_bottom": {
+      "used_min_deg": -18.17,
+      "used_max_deg": 5.78,
+      "used_span_deg": 23.95
+    }
+  },
+  "note": "The four abduction servos never move during the walk: the crawl gait only swings feet fore-aft and up-down, so a foot is never asked to move sideways. Four of the twelve servos are currently dead weight."
+}

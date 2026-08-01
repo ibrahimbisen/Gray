@@ -40,6 +40,11 @@ HERE = Path(__file__).resolve().parent          # <repo>/dashboard
 REPO_ROOT = HERE.parent                         # <repo>
 VIDEO_DIR = REPO_ROOT / "progress" / "videos"
 INDEX_HTML = HERE / "index.html"
+# The plan is a second, static page: what was found wrong and what is being changed
+# about it. Deliberately not fed by /api/status - a plan does not change every
+# thirty seconds, and it has to stay readable once the training that prompted it is
+# long finished.
+PLAN_HTML = HERE / "plan.html"
 
 # How long a built status snapshot is reused before it is rebuilt. The TensorBoard
 # event files grow to hundreds of KB, so re-reading them on every browser poll is
@@ -164,6 +169,11 @@ class StatusCache:
                 f"Reading the training data failed: {detail}"
             ), False
 
+        # Say plainly that this snapshot is good, so the page never has to guess
+        # from the HTTP status code what kind of reply it is holding.
+        if isinstance(data, dict):
+            data["ok"] = True
+
         try:
             return json.dumps(data, default=_json_safe).encode("utf-8"), True
         except Exception:
@@ -177,9 +187,14 @@ class StatusCache:
         """A valid, correctly shaped status dict that simply says what went wrong.
 
         The page can render this without special-casing anything - every key it
-        expects is present, just empty.
+        expects is present, just empty. "ok" is false and the reason is in
+        "errors", so the page can show the actual reason rather than a generic
+        "the server is not answering" banner. This body is sent with HTTP 200
+        precisely so the browser hands it to the page instead of the page
+        throwing it away as a failed request.
         """
         skeleton = {
+            "ok": False,
             "generated_at": datetime.now().isoformat(timespec="seconds"),
             "goal": {
                 "headline": "",
@@ -364,6 +379,8 @@ class GrayHandler(http.server.BaseHTTPRequestHandler):
 
             if route.rstrip("/") in ("", "/index.html", "/dashboard"):
                 self._serve_index(include_body)
+            elif route.rstrip("/") in ("/plan", "/plan.html"):
+                self._serve_page(PLAN_HTML, "plan.html", include_body)
             elif route.rstrip("/") == "/api/status":
                 self._serve_status(include_body, fresh="fresh=1" in query)
             elif route.rstrip("/") == "/healthz":
@@ -374,8 +391,9 @@ class GrayHandler(http.server.BaseHTTPRequestHandler):
             elif route.startswith("/videos/"):
                 self._serve_file(VIDEO_DIR, route[len("/videos/"):], include_body)
             else:
-                self._send_text(404, "Not found. This server only has /, /api/status, "
-                                     "/media/<file> and /videos/<file>.", include_body)
+                self._send_text(404, "Not found. This server only has /, /plan, "
+                                     "/api/status, /media/<file> and /videos/<file>.",
+                                include_body)
                 self._note(404)
         except PathRefused as refused:
             self._send_text(refused.status, refused.message, include_body)
@@ -420,10 +438,41 @@ class GrayHandler(http.server.BaseHTTPRequestHandler):
                          extra={"Cache-Control": "no-store"})
         self._note(200, f"{len(body) / 1024:.0f} kB")
 
+    def _serve_page(self, path, label: str, include_body: bool) -> None:
+        """Serve a plain static page, saying plainly what is missing if it is not there.
+
+        No-store on purpose: these files are edited while the server is running, and a
+        cached copy would quietly hide the edit.
+        """
+        if not path.is_file():
+            self._send_bytes(
+                404,
+                (
+                    "<h1>Not built yet</h1>"
+                    f"<p>The page file <code>dashboard/{label}</code> does not exist "
+                    "yet. <a href='/'>Back to the dashboard</a>.</p>"
+                ).encode("utf-8"),
+                "text/html; charset=utf-8",
+                include_body,
+            )
+            self._note(404, f"{label} missing")
+            return
+
+        body = path.read_bytes()
+        self._send_bytes(200, body, "text/html; charset=utf-8", include_body,
+                         extra={"Cache-Control": "no-store"})
+        self._note(200, f"{len(body) / 1024:.0f} kB")
+
     def _serve_status(self, include_body: bool, fresh: bool) -> None:
+        # Always 200 here, even when the collector failed. The reply is still a
+        # complete, readable status document; it just carries "ok": false and the
+        # reason in "errors". Sending 500 made the page discard the body and show
+        # a generic "cannot reach the server" message, hiding the real problem.
+        # Genuine server faults (a crash in this handler) still answer 500 - see
+        # the catch-all in _handle.
         payload, ok, cached = self.status_cache.get(force_fresh=fresh)
         self._send_bytes(
-            200 if ok else 500,
+            200,
             payload,
             "application/json; charset=utf-8",
             include_body,
@@ -431,8 +480,8 @@ class GrayHandler(http.server.BaseHTTPRequestHandler):
         )
         tag = "cached" if cached else "rebuilt"
         if not ok:
-            tag += ", collector failed"
-        self._note(200 if ok else 500, f"{len(payload) / 1024:.0f} kB {tag}")
+            tag += ", collector failed (reply says so)"
+        self._note(200, f"{len(payload) / 1024:.0f} kB {tag}")
 
     def _serve_file(self, base: Path, url_tail: str, include_body: bool) -> None:
         real = resolve_inside(base, url_tail)
