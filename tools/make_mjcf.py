@@ -66,6 +66,10 @@ def build_mjcf(urdf_path: str) -> ET.Element:
 
 SPAWN_HEIGHT_M = 0.25
 
+# MuJoCo's convention: viewers hide group 3 by default, so collision primitives stop
+# obscuring the visual meshes. Purely cosmetic - the solver ignores geom groups.
+COLLISION_GEOM_GROUP = 3
+
 
 def rebuild_trunk(worldbody: ET.Element, cfg: dict) -> ET.Element:
     """Re-create base_link as a real floating body.
@@ -93,9 +97,18 @@ def rebuild_trunk(worldbody: ET.Element, cfg: dict) -> ET.Element:
     })
 
     # Adopt base_link's loose geoms and the promoted leg bodies.
+    #
+    # Every geom sitting loose in <worldbody> got there because MuJoCo welded the
+    # root link to the world, so all of them belong to the trunk - the only geom the
+    # world genuinely owns is the floor added just above. Matching on a "base_link"
+    # name prefix was not enough: the URDF's VISUAL meshes are emitted with no name
+    # attribute at all, so the trunk's visual mesh was left behind and rendered as a
+    # ghost welded at the origin while the robot walked away from it. Harmless to
+    # physics (contype=0, density=0) but wrong, and obvious the moment you open a
+    # viewer.
     adopted_geoms, adopted_bodies = 0, 0
     for child in list(worldbody):
-        if child.tag == "geom" and (child.get("name") or "").startswith("base_link"):
+        if child.tag == "geom" and child.get("name") != "floor":
             worldbody.remove(child)
             trunk.append(child)
             adopted_geoms += 1
@@ -168,6 +181,18 @@ def main() -> None:
 
     trunk = rebuild_trunk(worldbody, cfg)
 
+    # --- separate collision shapes from the ones you look at ---------------------------
+    # Every link carries two geoms: the decimated mesh, and a box/capsule primitive the
+    # solver actually uses for contact. The URDF importer leaves both in group 0, so a
+    # viewer draws the primitives ON TOP of the meshes and the robot appears to be made
+    # of plain boxes. MuJoCo's convention is collision geometry in group 3, which
+    # viewers hide by default; this is purely how it is drawn and changes no physics.
+    hidden = 0
+    for g in root.iter("geom"):
+        if (g.get("name") or "").endswith("_collision"):
+            g.set("group", str(COLLISION_GEOM_GROUP))
+            hidden += 1
+
     # --- joint dynamics --------------------------------------------------------------
     joints = [j for j in root.iter("joint") if j.get("name")]
     for j in joints:
@@ -211,7 +236,8 @@ def main() -> None:
     m = mujoco.MjModel.from_xml_path(args.out)
     print(f"wrote {args.out}")
     print(f"  bodies {m.nbody}  joints {m.njnt}  dofs {m.nv}  actuators {m.nu}  "
-          f"geoms {m.ngeom}")
+          f"geoms {m.ngeom}  ({hidden} collision geoms in group "
+          f"{COLLISION_GEOM_GROUP}, hidden by default)")
     print(f"  total mass {m.body_mass.sum()*1000:.1f} g   "
           f"(robot.yaml says {cfg['total_mass_kg']*1000:.1f} g)")
     print(f"  control {CONTROL_HZ} Hz over {TIMESTEP*1000:.0f} ms physics "

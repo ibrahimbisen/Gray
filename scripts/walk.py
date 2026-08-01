@@ -4,6 +4,7 @@
     python scripts/walk.py --gait crawl --duration 8
     python scripts/walk.py --gait trot --speed 1.0 --render out.png
     python scripts/walk.py --stand-only
+    python scripts/walk.py --view              # live 3D window, orbit with the mouse
 
 The controller here is entirely deterministic: gray.gait decides where each foot
 belongs, gray.kinematics converts that to joint angles, and those go straight to the
@@ -15,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 
 import numpy as np
 
@@ -61,31 +63,62 @@ def run(args) -> dict:
         mujoco.mjv_defaultCamera(cam)
         cam.distance, cam.elevation, cam.azimuth = 0.9, -12, 120
 
+    # Live window. Measurement is unaffected: samples are still only taken over
+    # (SETTLE_S, total], exactly as headless. Once that window has passed the robot
+    # simply keeps walking so it can be watched for as long as the window is open.
+    viewer = None
+    if args.view:
+        import mujoco.viewer
+        viewer = mujoco.viewer.launch_passive(model, data, show_left_ui=False,
+                                              show_right_ui=False)
+        viewer.cam.distance, viewer.cam.elevation, viewer.cam.azimuth = 0.9, -12, 120
+
     t, fell = 0.0, False
     total = SETTLE_S + args.duration
-    while t < total:
-        walk_t = max(0.0, t - SETTLE_S)
-        speed = 0.0 if t < SETTLE_S or args.stand_only else args.speed
-        try:
-            data.ctrl[order] = joint_vector(gait.joint_angles(walk_t, speed))
-        except ValueError as exc:
-            return {"error": str(exc)}
+    wall_start = time.perf_counter()
+    try:
+        while True:
+            if viewer is not None:
+                if not viewer.is_running():
+                    break
+            elif t >= total:
+                break
 
-        for _ in range(steps_per_tick):
-            mujoco.mj_step(model, data)
-        t += steps_per_tick * dt
+            walk_t = max(0.0, t - SETTLE_S)
+            speed = 0.0 if t < SETTLE_S or args.stand_only else args.speed
+            try:
+                data.ctrl[order] = joint_vector(gait.joint_angles(walk_t, speed))
+            except ValueError as exc:
+                return {"error": str(exc)}
 
-        up = _uprightness(mujoco, data)
-        if t > SETTLE_S:
-            samples.append((t - SETTLE_S, data.qpos[0], data.qpos[1], data.qpos[2], up))
-        if up < 0.2:
-            fell = True
-            break
-        if renderer and len(frames) < args.frames and \
-                len(samples) % max(1, int(args.control_hz / 8)) == 0:
-            cam.lookat[:] = [data.qpos[0], data.qpos[1], 0.08]
-            renderer.update_scene(data, cam)
-            frames.append(renderer.render())
+            for _ in range(steps_per_tick):
+                mujoco.mj_step(model, data)
+            t += steps_per_tick * dt
+
+            up = _uprightness(mujoco, data)
+            measuring = t <= total
+            if SETTLE_S < t <= total:
+                samples.append((t - SETTLE_S, data.qpos[0], data.qpos[1],
+                                data.qpos[2], up))
+            if up < 0.2:
+                fell = fell or measuring   # a stumble while spectating is not a result
+                break
+            if renderer and len(frames) < args.frames and \
+                    len(samples) % max(1, int(args.control_hz / 8)) == 0:
+                cam.lookat[:] = [data.qpos[0], data.qpos[1], 0.08]
+                renderer.update_scene(data, cam)
+                frames.append(renderer.render())
+
+            if viewer is not None:
+                viewer.cam.lookat[:] = [data.qpos[0], data.qpos[1], 0.08]
+                viewer.sync()
+                # Play at true speed rather than as fast as the CPU allows.
+                ahead = wall_start + t - time.perf_counter()
+                if ahead > 0:
+                    time.sleep(ahead)
+    finally:
+        if viewer is not None:
+            viewer.close()
 
     if not samples:
         return {"error": "no samples"}
@@ -122,6 +155,8 @@ def main() -> None:
     ap.add_argument("--stand-only", action="store_true")
     ap.add_argument("--render", metavar="PNG", help="write a contact-sheet PNG")
     ap.add_argument("--frames", type=int, default=8)
+    ap.add_argument("--view", action="store_true",
+                    help="open a live 3D window; keeps walking until you close it")
     args = ap.parse_args()
 
     r = run(args)

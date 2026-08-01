@@ -13,3 +13,6 @@ runs/
 logs/
 wandb/
 *.ckpt
+
+# MuJoCo drops this next to whatever invoked it
+MUJOCO_LOG.TXT

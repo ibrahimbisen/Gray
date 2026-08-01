@@ -51,7 +51,11 @@ FOOT_RADIUS_M = 0.012  # refine against the real foot pad during Phase 4
 # under a path with '++' and spaces that does not resolve from sim/models/; and the
 # Windows training box clones with LFS skipped, so it must not depend on them.
 VISUAL_MESH_DIR = "meshes"
-VISUAL_FACE_BUDGET = 4000
+# Per-component, not per-link - see export_visual_mesh. 4000 for a whole link was far
+# too aggressive: base_link is ~130k faces of thin resin frame plus four chunky baked
+# servos, and a 97% cut deleted the frame outright.
+VISUAL_FACE_BUDGET = 9000
+MIN_COMPONENT_FACES = 400   # keep small parts (bearings, servo horns) recognisable
 
 
 @dataclass
@@ -90,14 +94,46 @@ def foot_tip(mesh: trimesh.Trimesh) -> np.ndarray:
 
 
 def export_visual_mesh(mesh: trimesh.Trimesh, name: str, out_dir: str) -> tuple[str, int]:
-    """Decimate a link mesh and write it beside the output URDF."""
+    """Decimate a link mesh and write it beside the output URDF.
+
+    Decimates each connected component SEPARATELY. These are multi-body STLs - the
+    CAD exporter merged every link's sub-assembly (resin frame plus the servos baked
+    into it) into a single file - and running quadric decimation across the union
+    damages them in two distinct ways:
+
+      * The budget is spent where the faces are. base_link's thin 57 cm3 frame was
+        collapsed away entirely while its four chunky baked-in servos survived, so
+        the trunk rendered as four floating blocks with nothing joining them.
+      * Edges get collapsed BETWEEN disconnected components, producing triangles that
+        bridge the gap between them. The thighs came out with 130 mm edges on a 170 mm
+        part against a 0.96 mm median - the spikes visible in any viewer.
+
+    Splitting first fixes both: no edge can span two components, and each component
+    gets a share of the budget in proportion to its own complexity, with a floor so
+    that small parts do not disappear.
+
+    This is cosmetic. Collision geometry is primitive and mass properties come from
+    the undecimated meshes via robot.yaml, so nothing here touches the physics.
+    """
     os.makedirs(out_dir, exist_ok=True)
-    m = mesh
-    if len(m.faces) > VISUAL_FACE_BUDGET:
-        try:
-            m = m.simplify_quadric_decimation(face_count=VISUAL_FACE_BUDGET)
-        except Exception:
-            pass  # decimation backend unavailable; ship the original
+
+    parts = mesh.split(only_watertight=False)
+    if len(parts) == 0:
+        parts = [mesh]
+    total = sum(len(p.faces) for p in parts)
+
+    kept = []
+    for part in parts:
+        budget = max(MIN_COMPONENT_FACES,
+                     int(VISUAL_FACE_BUDGET * len(part.faces) / max(total, 1)))
+        if len(part.faces) > budget:
+            try:
+                part = part.simplify_quadric_decimation(face_count=budget)
+            except Exception:
+                pass  # decimation backend unavailable; ship this component as-is
+        kept.append(part)
+
+    m = trimesh.util.concatenate(kept) if len(kept) > 1 else kept[0]
     path = os.path.join(out_dir, f"{name}.STL")
     m.export(path)
     return path, len(m.faces)
