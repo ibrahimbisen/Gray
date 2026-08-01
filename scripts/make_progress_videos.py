@@ -36,8 +36,11 @@ from train.evaluate import (  # noqa: E402
 )
 
 OUT = "progress"
+# One column per training objective, so the dashboard can rank checkpoints by each
+# goal separately - the fastest walk and the softest walk are rarely the same one.
 FIELDS = ["iteration", "distance_mm", "speed_mms", "drift_mm", "upright_min",
-          "height_mm", "fell", "video"]
+          "height_mm", "fell", "foot_force_p99_n", "joint_acc_rms",
+          "power_mean_w", "cost_of_transport", "video"]
 
 
 def _row(tag: str, r: dict, video: str) -> dict:
@@ -49,6 +52,10 @@ def _row(tag: str, r: dict, video: str) -> dict:
         "upright_min": round(r["upright_min"], 3),
         "height_mm": round(r["height_mean"] * 1000, 1),
         "fell": int(r["fell"]),
+        "foot_force_p99_n": round(r["foot_force_p99"], 2),
+        "joint_acc_rms": round(r["joint_acc_rms"], 2),
+        "power_mean_w": round(r["power_mean_w"], 3),
+        "cost_of_transport": round(r["cost_of_transport"], 2),
         "video": video,
     }
 

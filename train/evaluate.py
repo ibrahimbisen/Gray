@@ -171,6 +171,12 @@ def rollout(policy: Policy | None, *, speed_ms: float = 0.0529, duration: float 
            for i in range(model.nu)}
     order = [act[n] for n in JOINT_ORDER]
 
+    # The robot is taught six things at once and they pull against each other -
+    # walking faster means stomping harder, landing softly means going slower. One
+    # overall score hides that, so each objective gets its own measurement here.
+    foot_bodies = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, f"{leg}_bottom")
+                   for leg in LEGS]
+
     def sensor(name: str) -> np.ndarray:
         sid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SENSOR, name)
         adr = model.sensor_adr[sid]
@@ -205,6 +211,7 @@ def rollout(policy: Policy | None, *, speed_ms: float = 0.0529, duration: float 
     render_every = max(1, int(round(CONTROL_HZ / fps)))
 
     t, fell, samples, tick = 0.0, False, [], 0
+    foot_force, joint_acc, power = [], [], []
     total = SETTLE_S + duration
     while t < total:
         walking = t >= SETTLE_S
@@ -237,6 +244,14 @@ def rollout(policy: Policy | None, *, speed_ms: float = 0.0529, duration: float 
 
         for _ in range(substeps):
             mujoco.mj_step(model, data)
+            if t >= SETTLE_S:
+                # Sampled every PHYSICS step, not every control step: a touchdown
+                # spike lasts a few milliseconds and stepping at 50 Hz would stride
+                # straight over the peak that actually cracks a resin part.
+                foot_force.append(
+                    max(float(np.linalg.norm(data.cfrc_ext[b][3:6])) for b in foot_bodies))
+                joint_acc.append(float(np.sqrt(np.mean(data.qacc[6:] ** 2))))
+                power.append(float(np.abs(data.actuator_force * data.qvel[6:]).sum()))
         t += step_dt
         phase = (phase + step_dt / params.period) % 1.0
 
@@ -260,18 +275,38 @@ def rollout(policy: Policy | None, *, speed_ms: float = 0.0529, duration: float 
         return {"error": "no samples"}
 
     s = np.array(samples)
+    distance = float(s[-1, 1] - s[0, 1])
+    ff = np.array(foot_force) if foot_force else np.zeros(1)
+    ja = np.array(joint_acc) if joint_acc else np.zeros(1)
+    pw = np.array(power) if power else np.zeros(1)
+
     result = {
         "iteration": policy.iteration if policy else -1,
         "fell": fell,
         "elapsed": float(s[-1, 0]),
-        "distance": float(s[-1, 1] - s[0, 1]),
+        "distance": distance,
         "drift": float(s[-1, 2] - s[0, 2]),
-        "speed": float((s[-1, 1] - s[0, 1]) / max(s[-1, 0], 1e-9)),
+        "speed": float(distance / max(s[-1, 0], 1e-9)),
         "height_mean": float(s[:, 3].mean()),
         "height_std": float(s[:, 3].std()),
         "upright_min": float(s[:, 4].min()),
         "support_min": min(gait.support_count(x)
                            for x in np.linspace(0, params.period, 200)),
+        # --- one measurement per training objective ---
+        # Landing softness. The 99th percentile rather than the outright max, which
+        # a single solver artefact can dominate. Standing still is ~5.3 N per foot
+        # (1.625 kg over three feet), so anything far above that is a stomp.
+        "foot_force_p99": float(np.percentile(ff, 99)),
+        "foot_force_mean": float(ff.mean()),
+        # Smoothness, as felt by the gearbox.
+        "joint_acc_rms": float(ja.mean()),
+        # Mechanical power at the joints, and how much it costs to get anywhere.
+        # Cost of transport is dimensionless, so it compares across speeds - a robot
+        # that walks twice as fast for twice the power is no less efficient.
+        "power_mean_w": float(pw.mean()),
+        "cost_of_transport": float(
+            pw.mean() / (1.6247 * 9.81 * abs(distance) / max(s[-1, 0], 1e-9))
+        ) if abs(distance) > 1e-4 else float("nan"),
     }
 
     if video and frames:
