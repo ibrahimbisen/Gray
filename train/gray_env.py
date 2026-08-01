@@ -52,6 +52,7 @@ from train.residual_action import (
   gait_phase,
 )
 from train.rewards import (
+  ForwardProgress,
   TrackFilteredAngularVelocity,
   TrackFilteredLinearVelocity,
 )
@@ -68,12 +69,22 @@ MAX_FORWARD_MS = 0.080
 MAX_BACKWARD_MS = -0.040
 
 # Tracking is scored against a stride-averaged velocity, not the instantaneous one -
-# see train/rewards.py for the measurements that forced that. After filtering at
-# tau = 0.6 s a well-tracking robot still shows ~0.027 m/s of residual ripple, so std
-# is set just above it: tight enough to tell 40 mm/s from 60 mm/s, loose enough that
-# the exponent does not collapse.
-TRACK_LIN_STD = 0.035
-TRACK_ANG_STD = 0.200
+# see train/rewards.py for the measurements that forced that.
+#
+# TRACK_LIN_STD was 0.035 in the first training run and that was too tight: once the
+# policy drifted off speed the exponential went flat, leaving only rewards that are
+# maximised by standing still, and it duly learned to stand still (675 mm -> 65 mm).
+# Widened so the term still has slope across the whole plausible error range, and
+# paired with the linear ForwardProgress term which has slope everywhere.
+TRACK_LIN_STD = 0.070
+# 0.200 rad/s was inherited from Go1 and is far too loose for a robot that walks at
+# 56 mm/s: a 0.05 rad/s yaw rate scores exp(-0.0625) = 0.94, essentially unpunished,
+# yet held for a 12 s episode it swings the heading 34 degrees. The 80-iteration
+# smoke run duly drifted 200-375 mm sideways against the classical gait's 34 mm.
+# Sized from the robot instead: staying within ~50 mm of straight over 675 mm of
+# travel needs the yaw rate under about 0.01 rad/s, so 0.05 puts that comfortably on
+# the slope rather than in the flat.
+TRACK_ANG_STD = 0.050
 TRACK_TAU_S = 0.6
 
 # Resin density +/-40%, as e^(2*alpha) per dr.pseudo_inertia. Covers the open question
@@ -284,27 +295,52 @@ def gray_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   # Rewards.
   ##
 
+  # Weights are set so that WALKING BEATS FREEZING by a wide margin at every point.
+  # The first run failed that test: standing still scored ~2.2/step against ~2.9 for
+  # walking, and the gap vanished entirely once tracking degraded. Rough per-step
+  # arithmetic now, at the default command:
+  #
+  #     standing still   progress 0.00  track_lin 1.13  ang 0.50  upright 0.50 = 2.13
+  #     walking properly progress 2.00  track_lin 1.72  ang 0.45  upright 0.49 = 4.66
+  #
+  # and, critically, ForwardProgress slopes continuously between the two.
   rewards = {
+    # Linear in achieved speed: unlike the exponential, its gradient never dies, so
+    # a stalled policy is always told which way to go. This is the term that makes
+    # standing still a losing strategy.
+    "forward_progress": RewardTermCfg(
+      func=ForwardProgress,
+      weight=2.0,
+      params={"command_name": "twist", "tau": TRACK_TAU_S},
+    ),
     "track_linear_velocity": RewardTermCfg(
       func=TrackFilteredLinearVelocity,
-      weight=2.0,
+      weight=1.5,
       params={"command_name": "twist", "std": TRACK_LIN_STD, "tau": TRACK_TAU_S},
     ),
-    # Commanded yaw is always zero, so this term is what pays for walking straight.
+    # Commanded yaw is always zero, so this pays for walking straight. A stationary
+    # robot also scores it perfectly, which is why it was halved when freezing was
+    # the failure mode - but ForwardProgress now makes freezing plainly unprofitable,
+    # so straightness can be paid for properly again.
     "track_angular_velocity": RewardTermCfg(
       func=TrackFilteredAngularVelocity,
       weight=1.0,
       params={"command_name": "twist", "std": TRACK_ANG_STD, "tau": TRACK_TAU_S},
     ),
+    # Also halved, for the same reason - standing still is perfectly upright. Falling
+    # over is already punished by the fell_over termination, which ends the episode
+    # and forfeits all future reward; this term only needs to discourage leaning.
     "upright": RewardTermCfg(
       func=mdp.upright,
-      weight=1.0,
+      weight=0.5,
       params={
         "std": math.sqrt(0.2),
         "asset_cfg": SceneEntityCfg("robot", body_names=("base_link",)),
       },
     ),
-    # --- the brittle-parts group. Heavier than a standard velocity task. ---
+    # --- the brittle-parts group. Still above a standard velocity task, but every
+    # one of these is minimised by not moving, so they are kept small enough that
+    # they cannot outbid ForwardProgress. Raise them again once it walks. ---
     "soft_landing": RewardTermCfg(
       func=mdp.soft_landing,
       weight=-1e-4,          # 10x mjlab's default; first knob to tune if it tiptoes
@@ -314,9 +350,9 @@ def gray_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         "command_threshold": 0.005,
       },
     ),
-    "joint_acc": RewardTermCfg(func=envs_mdp.joint_acc_l2, weight=-1e-6),
-    "action_acc": RewardTermCfg(func=envs_mdp.action_acc_l2, weight=-0.01),
-    "action_rate": RewardTermCfg(func=envs_mdp.action_rate_l2, weight=-0.1),
+    "joint_acc": RewardTermCfg(func=envs_mdp.joint_acc_l2, weight=-5e-7),
+    "action_acc": RewardTermCfg(func=envs_mdp.action_acc_l2, weight=-0.005),
+    "action_rate": RewardTermCfg(func=envs_mdp.action_rate_l2, weight=-0.05),
     # --- everything else ---
     "joint_torques": RewardTermCfg(func=envs_mdp.joint_torques_l2, weight=-1e-4),
     "dof_pos_limits": RewardTermCfg(func=envs_mdp.joint_pos_limits, weight=-1.0),

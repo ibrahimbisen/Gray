@@ -16,3 +16,8 @@ wandb/
 
 # MuJoCo drops this next to whatever invoked it
 MUJOCO_LOG.TXT
+
+# Progress clips are derived artefacts: the rollout is deterministic, so any of them
+# can be regenerated exactly from the committed policy in progress/policies/.
+# Committing ~90 MB of video to reproduce something already reproducible is waste.
+progress/videos/

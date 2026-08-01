@@ -51,10 +51,15 @@ def gray_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
         "class_name": "GaussianDistribution",
         # The default of 1.0 would emit residuals at the full +/-0.2 rad ceiling on
         # the very first step, which does not perturb the classical gait so much as
-        # obliterate it. Starting at 0.25 means the initial policy is the Phase 2
-        # gait plus noise of a couple of degrees, which is the whole premise: begin
-        # from something that already walks.
-        "init_std": 0.25,
+        # obliterate it. The premise of residual RL is to begin from something that
+        # already walks, so this has to start small.
+        #
+        # 0.25 (residual noise ~0.05 rad = 2.9 deg on every joint, resampled every
+        # tick) was still too much: the first run measured 568 mm at round 0 against
+        # the gait's 675 mm, so a sixth of the gait was destroyed before learning
+        # began, and it never recovered. 0.10 is ~1.1 deg, which leaves the initial
+        # policy essentially the Phase 2 gait.
+        "init_std": 0.10,
         "std_type": "scalar",
       },
     ),

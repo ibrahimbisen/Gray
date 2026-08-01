@@ -101,6 +101,59 @@ class TrackFilteredLinearVelocity(_EmaVelocity):
     return torch.exp(-error / std**2)
 
 
+class ForwardProgress(_EmaVelocity):
+  """Reward for actually covering ground, with a gradient that never dies.
+
+  WHY THIS EXISTS
+  ---------------
+  The exponential tracking reward above has a fatal property when it is the *only*
+  velocity signal: exp(-e^2/std^2) is flat and almost zero once the error is a few
+  std out, so a policy that has stopped walking gets no gradient telling it which way
+  to go. Meanwhile `upright`, `track_angular_velocity` and every smoothness penalty
+  are all *maximised* by standing perfectly still. Standing is therefore a local
+  optimum with a wide basin, and the first training run walked straight into it:
+
+      round   0   568 mm      (starts at the classical gait, as intended)
+      round  50   623 mm
+      round 100   150 mm
+      round 150   -39 mm      (walking backwards)
+      round 450    65 mm      (slowly relearning, uprightness pinned at 0.996)
+
+  It abandoned a working gait to stand still, which is exactly what residual RL is
+  supposed to make impossible.
+
+  This term is linear in achieved velocity, so its gradient is constant and points
+  forward everywhere - including from a dead stop, where the exponential says
+  nothing. Projecting onto the command direction means it also cannot be farmed by
+  running off sideways, and clamping at 1.0 means there is no prize for exceeding
+  the commanded speed, only for reaching it.
+  """
+
+  _WIDTH = 2
+
+  def __call__(
+    self,
+    env: ManagerBasedRlEnv,
+    command_name: str,
+    tau: float = DEFAULT_TAU_S,
+    command_threshold: float = 0.005,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+  ) -> torch.Tensor:
+    asset: Entity = env.scene[asset_cfg.name]
+    command = env.command_manager.get_command(command_name)[:, :2]
+    filtered = self._update(asset.data.root_link_lin_vel_b[:, :2], tau)
+
+    speed = torch.norm(command, dim=1)
+    # velocity projected onto the commanded direction, as a fraction of it: 1.0 means
+    # exactly the commanded speed, negative means going the wrong way.
+    projected = (filtered * command).sum(dim=1) / speed.clamp(min=1e-6).square()
+    # When told to stand, this term says nothing - the exponential term scores that.
+    return torch.where(
+      speed > command_threshold, projected.clamp(-1.0, 1.0),
+      torch.zeros_like(projected),
+    )
+
+
 class TrackFilteredAngularVelocity(_EmaVelocity):
   """Reward tracking commanded yaw rate, averaged over a stride.
 
