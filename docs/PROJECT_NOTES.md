@@ -20,7 +20,7 @@ possible). Everything through Phase 3 is pure software and needs no hardware.
 |---|---|---|---|
 | 1 | Digital twin — URDF repair, mass model, MuJoCo | No | **Done** |
 | 2 | Classical gait — IK, Bézier trajectories, scheduler | No | **Done** |
-| 3 | Residual RL training on the 4070 Ti | No | **← next** |
+| 3 | Residual RL training on the 4070 Ti | No | **In progress** |
 | 4 | Reassemble, weigh, calibrate, build power system | Yes | Blocked |
 | 5 | Sim-to-real deployment | Yes | Pending |
 | 6 | Gamepad control, terrain, perception | Yes | Pending |
@@ -101,6 +101,14 @@ gray/                  package — SHARED by simulator and Raspberry Pi
                        servo specs, hardware notes
 sim/models/            gray.urdf, gray.xml (MJCF), decimated meshes, previews
 scripts/walk.py        run and measure a gait (--sim now, --real in Phase 5)
+train/                 Phase 3 RL. MAY import MuJoCo/torch/mjlab — that is why it
+  gait_table.py        is not inside gray/. Precomputed gait, GPU lookup
+  residual_action.py   policy output -> bounded correction on the gait
+  gray_robot.py        Gray as an mjlab entity (servo specs, collisions)
+  gray_env.py          obs / rewards / randomization / commands
+  rewards.py           stride-averaged velocity tracking (read the docstring)
+  runner.py            checkpoint + ONNX export with Gray-aware metadata
+  tasks.py             registers "Gray-Residual-Flat" with mjlab
 tools/                 model generation pipeline (see below)
 tests/                 pytest — 9 tests, all must pass
 robot/                 original CAD, untouched. Git LFS.
@@ -130,51 +138,88 @@ python scripts/walk.py --gait trot --duration 8
 
 `tools/estimate_masses.py --fill 1.0` re-runs assuming solid parts.
 
-Dependencies: `numpy scipy trimesh pyyaml mujoco defusedxml pytest pillow
-fast-simplification`
+```bash
+# watch it walk - live 3D window, orbit with the mouse
+python scripts/walk.py --view
+
+# Phase 3: train, watch a checkpoint, score one against the Phase 2 baseline
+python scripts/train_residual.py Gray-Residual-Flat
+python scripts/train_residual.py Gray-Residual-Flat --env.scene.num-envs 1024
+python scripts/play_residual.py Gray-Residual-Flat
+tensorboard --logdir logs/rsl_rl          # training curves at localhost:6006
+
+# check the gait lookup table still matches the real GaitGenerator
+python train/gait_table.py
+```
+
+Dependencies live in `pyproject.toml`, split so `gray/` stays installable on the Pi:
+core is only `numpy pyyaml`; `[sim]`, `[tools]`, `[dev]` and `[train]` add the rest.
+**Python 3.10–3.13 only** — mjlab does not support 3.14. Install torch from the CUDA
+index or you get a CPU-only build that silently ignores the GPU:
+`uv pip install torch --index-url https://download.pytorch.org/whl/cu130`.
 
 ---
 
-## Phase 3 — what to build next
+## Phase 3 — built, training
 
-Port the **D²-GMBC** method ([arXiv 2010.12070](https://arxiv.org/pdf/2010.12070)):
-Bézier gait + RL modulating it + domain randomization, validated sim-to-real on
-this exact class of robot. Reference implementation to read (do not fork — it is
-2020-era PyBullet): [OpenQuadruped/spot_mini_mini](https://github.com/OpenQuadruped/spot_mini_mini), MIT.
+Implements **D²-GMBC** ([arXiv 2010.12070](https://arxiv.org/pdf/2010.12070)): Bézier
+gait + RL modulating it + domain randomization, on **mjlab 1.5.3** (Isaac Lab API over
+MuJoCo-Warp) with PPO from rsl_rl. Everything lives in `train/`, deliberately outside
+`gray/` because it imports MuJoCo and torch.
 
-**RL learns residual corrections on top of the Phase 2 gait — never from scratch.**
-Converges in hours instead of days, degrades gracefully toward a working gait
-instead of flailing, and if it underperforms there is still a walking robot.
+**The policy emits a correction, never a joint angle:**
 
-Stack: [mjlab](https://github.com/mujocolab/mjlab) (Isaac Lab API on MuJoCo-Warp,
-one-command install) on the RTX 4070 Ti. Needs an NVIDIA GPU; **macOS is
-evaluation-only**. Fall back to Isaac Lab proper if mjlab proves limiting. Expect
-CUDA/WSL2 setup to be the fiddliest step in the project.
+```
+joint target = classical_gait(phase, stride) + clip(policy, ±0.2 rad)
+```
 
-**Task spec:**
+so a bad or half-trained policy degrades toward a gait that already walks.
 
-- **Control rate 50 Hz** — matches the PWM ceiling. Not negotiable.
-- **Observations:** gravity vector + angular velocity (IMU only), previous action,
-  current joint targets, gait phase clock, commanded velocity. **Deliberately
-  excludes measured joint positions** — the servos cannot report them.
-- **Actions:** residual deltas on `GaitGenerator` output, clipped to ±0.2 rad.
-- **Reward:** track commanded velocity; upright bonus; penalize energy, action
-  rate, joint-limit violations; **and foot-contact impulse plus joint jerk weighted
-  higher than standard** — the parts are SLA resin, which is brittle under repeated
-  impact, and walking is nothing but repeated impact. Shape toward soft footfalls
-  from the start rather than after parts crack.
-- **Domain randomization:** resin density ±40% (covers the solid-vs-hollow
-  ambiguity), COM offset ±2 cm, ground friction 0.4–1.2, servo latency 10–40 ms
-  plus gain/deadband variance, armature (currently an *estimated* 0.003 kg·m² —
-  randomize it hard), IMU noise and bias.
-- **Algorithm:** PPO via rsl_rl.
+**The one non-obvious piece — `train/gait_table.py`.** Training runs thousands of
+robots per GPU step, and `GaitGenerator.joint_angles` is per-leg NumPy that solves IK
+four times per call. Calling it per-robot per-tick would have made the gait, not the
+physics, the entire cost of training. But the Phase 2 gait is **open loop** —
+`foot_targets(t, speed)` reads only `t` and `speed`, never robot state — so it is a
+pure function of (phase, stride scale) and can be tabulated exactly, once, using the
+unmodified `GaitGenerator`. Verified: **1.6e-07 rad** at the phases the 50 Hz
+controller actually visits (`N_PHASE` is a multiple of the 30 ticks per cycle, so
+every lookup lands on a grid point), 7.1e-05 rad on the interpolated speed axis. This
+is a precomputation, not an approximation, and `gray/` stays the single code path
+shared with the Pi.
 
-**Before any hardware rollout: dual-sim validation.** Re-score the best checkpoint
-in plain MuJoCo. The two engines fail in uncorrelated ways, so passing both is real
-evidence of transfer.
+**Task as configured** (`train/gray_env.py`):
 
-Success bar: beat the Phase 2 gait on distance and fall rate under full
-randomization.
+- **50 Hz** — 0.005 s timestep × decimation 4. Not negotiable; it is the PWM ceiling.
+- **Actor observes IMU only** — projected gravity, angular velocity, commanded
+  velocity, gait phase as (cos, sin), the gait's current targets, and its own last
+  action. **No measured joint positions**, because the servos cannot report them. The
+  critic gets the true joint state as privileged information and is discarded after
+  training.
+- **Commands** are Gray-scale: **−0.04 to +0.08 m/s** forward, lateral and yaw
+  commanded to zero. The classical gait cannot strafe or turn, so commanding zero yaw
+  makes the tracking reward pay for walking *straight* — absorbing the few-mm CAD
+  asymmetry Phase 2 could not tune out.
+- **Randomization:** resin density ±40% via `dr.pseudo_inertia(alpha_range=...)`
+  (scales mass *and* inertia — `dr.body_mass` alone would not), trunk COM ±2 cm,
+  ground friction 0.4–1.2, armature ×0.35–3.0, servo gains ±30–40%, servo zero-offset
+  ±0.03 rad, command latency 2–8 physics steps (10–40 ms).
+
+**Velocity tracking had to be rewritten — see `train/rewards.py`.** mjlab's stock
+`track_linear_velocity` scores *instantaneous* trunk velocity. Measured over a steady
+crawl, Gray's is `vx mean 0.055, sd 0.205` — the stride ripple from each footfall is
+**four times the mean**. Any std tight enough to be meaningful drove the exponent to
+≈ −6 and the reward and its gradient to exactly zero, which is what the first smoke
+run showed. Tracking is now scored against a velocity low-pass filtered at
+τ = one gait period, which cuts the ripple 12× (sd 0.205 → 0.016) and leaves the mean
+untouched. **If you add a reward here, check it against the ripple before trusting it.**
+
+**Still to do:**
+
+- **Dual-sim validation before any hardware rollout.** `scripts/eval_policy.py` —
+  re-score the best checkpoint in plain MuJoCo and compare against the Phase 2
+  baseline on the same metrics. Note the two sims deliberately differ (mjlab steps at
+  0.005 s, `walk.py` at 0.002 s), which is what makes it an independent check.
+- Success bar: beat Phase 2 on distance and fall rate **under full randomization**.
 
 ---
 
@@ -188,9 +233,9 @@ Minimal clone for the training box (tested — full clone is 133 MB because of
 `Overview/` and non-LFS assemblies):
 
 ```bash
-git clone --branch sim-phase-1-2-digital-twin-and-gait --depth 1 \
-  --filter=blob:none --sparse https://github.com/ibrahimbisen/Gray.git Gray
-cd Gray && git sparse-checkout set gray sim scripts tools tests   # 6.3 MB
+git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/ibrahimbisen/Gray.git Gray
+cd Gray && git sparse-checkout set gray sim scripts tools tests train docs
 ```
 
 `sim/models/meshes/*.STL` are deliberately excluded from LFS in `.gitattributes`

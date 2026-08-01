@@ -215,3 +215,160 @@ Recorded because the reasoning matters more than the conclusions:
 - Armature is an *estimate* (0.003 kg·m², from a ~6e-8 kg·m² rotor behind ~245:1).
   It dominates link inertia at ~8e-5, so it matters — randomize it hard.
 - The pushrod linkage ratio is unmeasured and unmeasurable until reassembly.
+
+---
+
+Session 2 — 1 Aug 2026. Phase 3 built and training on the 4070 Ti.
+
+---
+
+## Getting the training box running
+
+Four things blocked the first command, all pre-existing:
+
+**The documented clone command was broken.** Both `cloninig instructions.txt` and
+PROJECT_NOTES said to clone `--branch sim-phase-1-2-digital-twin-and-gait`. That
+branch does not exist on the remote — Phases 1–2 went straight onto `main`, against
+the stated convention. Anyone following the instructions got "Remote branch not
+found". Fixed in both files.
+
+**Python 3.14 was the only interpreter.** mjlab requires `>=3.10,<3.14`.
+
+**Smart App Control blocked MuJoCo.** Windows 11 refused to load
+`_specs.cp313-win_amd64.pyd`: *"did not meet the Enterprise signing level
+requirements"*. It is reputation-based, not correctness-based — NumPy and SciPy loaded
+fine, MuJoCo 3.11.0 was too newly released to have accrued reputation. The user
+elected to disable Smart App Control (one-way; re-enabling needs a Windows reinstall).
+Worth recording that **it turned out not to be necessary**: mjlab pins `mujoco~=3.10.0`,
+and 3.10.0 loads under Smart App Control without complaint. A version pin would have
+been the cheaper fix.
+
+**Torch from PyPI on Windows is CPU-only.** The wheel is 122 MB; the CUDA build is
+~2 GB and lives on `download.pytorch.org/whl/cu130`. Installing the obvious way
+produces a training stack that silently ignores the GPU.
+
+One resolver trap: `uv pip install -e ".[train]"` selected **mjlab 1.4.0** (on MuJoCo
+3.8) rather than 1.5.3, purely to avoid downgrading an already-installed NumPy 2.5.1.
+Nothing errors; you just quietly get a year-old library. Pinned `mjlab>=1.5.3`.
+
+## Three defects in the model, all cosmetic, all real
+
+Found by opening a viewer — which had never been done, because `walk.py` was headless.
+
+**base_link's visual mesh was welded to the world.** `rebuild_trunk` adopted loose
+`<worldbody>` geoms by matching names starting with `"base_link"`, but URDF *visual*
+meshes are emitted with no name attribute at all. So the collision box moved into the
+trunk and the visual mesh stayed at the origin: a ghost trunk sitting still while the
+robot walked away from it, invisible until rendered.
+
+**Collision primitives were hiding the meshes.** Both visual and collision geoms sat
+in group 0, so viewers drew the boxes on top of the real geometry and the robot
+appeared to be made of crates. MuJoCo's convention is collision in group 3, which
+viewers hide by default.
+
+**Decimation destroyed thin features.** `simplify_quadric_decimation(face_count=4000)`
+ran across each link's *whole* multi-body mesh. base_link is a thin ~57 cm³ resin frame
+plus four baked-in servos; a 97% cut spent the budget on the servos and deleted the
+frame outright, so the trunk rendered as four floating blocks with nothing joining
+them. Fixed by splitting into connected components and giving each a proportional
+budget with a floor. Cost: `sim/models/meshes/` grew 3.6 MB → 6.7 MB, still small
+enough to stay out of LFS, which `.gitattributes` requires.
+
+A caution: the long-triangle-edge metric that first suggested "corrupted" thighs was a
+**red herring**. A flat rectangular face is legitimately two large triangles, so a
+120 mm edge on a 170 mm part is normal. The genuine symptom was thin-wall collapse.
+Verify a mesh complaint by rendering it, not by measuring edges.
+
+None of the three touched physics: collision geometry is primitive and mass properties
+come from the undecimated meshes via `robot.yaml`. The gait is bit-identical across all
+of it — 422.9 mm, 52.9 mm/s, drift 6.4 mm, 9/9 tests — which is how each fix was
+checked.
+
+## Phase 3
+
+### Making the classical gait affordable on a GPU
+
+The obstacle: training runs thousands of robots per step, and `joint_angles` is
+per-leg NumPy with four IK solves per call and state carried between calls. Called
+per-robot per-tick, the gait — not the physics, not the network — becomes the entire
+cost of training.
+
+The way out is a property of the Phase 2 design rather than a trick.
+`foot_targets(t, speed)` reads `t` and `speed` and **nothing else**; it never touches
+robot state. An open-loop function of two bounded inputs can simply be tabulated.
+Filling the table with the real, unmodified `GaitGenerator` keeps `gray/` the single
+code path shared with the Pi.
+
+Two details decide whether it is exact. Phase must be **walked**, not sampled:
+`Leg.inverse` resolves against the previous pose, so jumping to a phase can land on a
+different IK branch than arriving at it. And the phase grid is a multiple of the 30
+control ticks per cycle, so every lookup the controller performs lands on a grid point:
+**1.6e-07 rad**, i.e. exact. Only the speed axis is interpolated, at 7.1e-05 rad.
+
+Off-grid phases show 2.6e-02 rad, entirely at four specific phases — the stance/swing
+transitions, where `foot_offset` genuinely steps the foot by `stance_dip`. The first
+attempt to characterise this masked only two transition phases and looked broken;
+**each leg transitions at its own phase offset**, so the crawl has four. Worth
+remembering that per-leg offsets make "the" gait phase four different things.
+
+### The reward that did nothing
+
+First smoke run: every reward term alive except the one that matters —
+`track_linear_velocity: 0.0000` exactly.
+
+mjlab's tracking reward scores `exp(-|v_cmd - v|²/std²)` on **instantaneous** trunk
+velocity. Measured over a steady crawl:
+
+```
+vx  mean +0.0549   sd 0.2050
+vy  mean -0.0084   sd 0.1430
+```
+
+The stride ripple is **four times the mean**. Every footfall of a stiff,
+position-controlled hobby servo jolts a 1.6 kg trunk, so the quantity being scored is
+buried under its own gait. Any std tight enough to distinguish 40 from 60 mm/s drove
+the exponent past −6, and the reward and its gradient to zero. Raising std until it
+responded would have turned it into a ripple-smoothness reward, paying the policy to
+fight the Bézier profile Phase 2 chose deliberately.
+
+Fixed by tracking a low-pass-filtered velocity at τ = one gait period, chosen by
+measurement rather than taste:
+
+```
+raw          vx sd 0.2050
+tau = 0.3 s  vx sd 0.0315
+tau = 0.6 s  vx sd 0.0162     mean unchanged at 0.0566
+tau = 1.0 s  vx sd 0.0098
+```
+
+12× attenuation, mean preserved. `track_linear_velocity` went 0.0000 → 0.167 in the
+same smoke test and 0.53 an hour into training.
+
+**General lesson for this robot: it is slow enough that its own gait dominates most
+instantaneous signals. Check any new reward against the ripple before trusting it.**
+
+### Two silent mismatches
+
+**`<option>` does not survive `MjSpec.attach()`.** `gray.xml` sets
+`integrator="implicitfast" cone="elliptic" impratio="10"`; mjlab warns and drops them.
+Training was running pyramidal friction at impratio 1 while `walk.py` ran elliptic at
+10 — the gait tuned against one contact model, learned against another. Now set
+explicitly via `MujocoCfg`. The timestep is still deliberately different (0.005 vs
+0.002), which is what makes `eval_policy.py` an independent check rather than a rerun.
+
+**ONNX metadata is hardcoded to a term named `joint_pos`.** mjlab's exporter asserts
+the action term is a `JointPositionAction`; Gray's is a `ResidualGaitAction` named
+`residual`, so it raised KeyError and the runner logged it as a warning. The weights
+still exported — only the metadata was missing, which would have surfaced in Phase 5 as
+a policy nobody could interpret. `train/runner.py` writes Gray-aware metadata instead,
+including the fact that the output is a residual and which gait it is a residual *of*.
+
+## Open
+
+- The Phase 2 gait cannot strafe or turn, so lateral and yaw are commanded to zero and
+  only forward velocity is trained. Turning is a Phase 6 question and probably needs a
+  gait that can turn, not a bigger residual.
+- `soft_landing` weight is 10× mjlab's default on the argument that SLA resin is
+  brittle. That is a judgement, not a measurement — it is the first knob to check if
+  the robot learns to tiptoe instead of walk.
+- Dual-sim validation (`scripts/eval_policy.py`) is specified but not yet written.

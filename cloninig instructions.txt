@@ -1,3 +1,23 @@
-git clone --branch sim-phase-1-2-digital-twin-and-gait --depth 1 \
-  --filter=blob:none --sparse https://github.com/ibrahimbisen/Gray.git Gray
-cd Gray && git sparse-checkout set gray sim scripts tools tests
+# Minimal clone (~6 MB instead of ~133 MB).
+#
+# The branch this file used to name, sim-phase-1-2-digital-twin-and-gait, does not
+# exist on the remote - Phases 1-2 were committed straight to main - so the old
+# command failed outright with "Remote branch not found". Clone main.
+
+git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/ibrahimbisen/Gray.git Gray
+cd Gray && git sparse-checkout set gray sim scripts tools tests train docs
+
+# Skipping Git LFS is fine and intended: .gitattributes deliberately excludes
+# sim/models/meshes/*.STL from LFS so the simulation model still loads without it.
+# Only the original CAD under robot/ needs LFS, and sparse-checkout omits it.
+
+# Then, to run anything (needs Python 3.10-3.13; 3.14 is too new for mjlab):
+#   uv venv --python 3.13
+#   uv pip install -e ".[sim,tools,dev]"
+#
+# For Phase 3 training you also need an NVIDIA GPU, and torch must come from the
+# CUDA index - the default PyPI wheel on Windows is CPU-only and will silently
+# ignore the graphics card:
+#   uv pip install torch --index-url https://download.pytorch.org/whl/cu130
+#   uv pip install -e ".[train]"
