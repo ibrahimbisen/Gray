@@ -1,0 +1,388 @@
+<?xml version="1.0" ?>
+<robot name="gray">
+  <mujoco>
+    <compiler meshdir="." discardvisual="false" balanceinertia="true" strippath="false"/>
+  </mujoco>
+  <link name="base_link">
+    <inertial>
+      <origin xyz="-0.000000000 0.000000000 -0.003023600" rpy="1.570796327 -0.000000000 0.000000000"/>
+      <mass value="0.723180"/>
+      <inertia ixx="1.274255707e-04" ixy="-6.558570651e-22" ixz="-5.072049529e-21" iyy="4.291599532e-04" iyz="2.085469317e-20" izz="5.217520436e-04"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.000000000 0.000000000 0.000000000" rpy="1.570796327 -0.000000000 0.000000000"/>
+      <geometry>
+        <mesh filename="meshes/base_link.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision name="base_link_collision">
+      <origin xyz="0.000000000 0.000000000 -0.003000000" rpy="0.000000327 1.570796000 0.000000000"/>
+      <geometry>
+        <box size="0.025000 0.157562 0.196800"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="fl_hip">
+    <inertial>
+      <origin xyz="0.0272971333033659 1.75159621585708E-05 0.00247430441137858" rpy="0 0 0"/>
+      <mass value="0.089316"/>
+      <inertia ixx="4.095139730e-05" ixy="-1.421953676e-08" ixz="-7.320029296e-07" iyy="6.141149443e-05" iyz="3.111072109e-07" izz="8.031087397e-05"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/fl_hip.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision name="fl_hip_collision">
+      <origin xyz="0.028311 0.000021 0.001500" rpy="-1.599086 1.555804 -1.599089"/>
+      <geometry>
+        <box size="0.045024 0.058762 0.067233"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="fl_hip" type="revolute">
+    <origin xyz="0.098400000 0.060681000 -0.003029200" rpy="1.570796327 -0.000000000 0.000000000"/>
+    <parent link="base_link"/>
+    <child link="fl_hip"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-2.356200" upper="2.356200" effort="1.96" velocity="6.54"/>
+    <dynamics damping="0.02" friction="0.01"/>
+  </joint>
+  <link name="fl_top">
+    <inertial>
+      <origin xyz="-0.0327093590748004 -0.0129114746104738 0.00626100034714228" rpy="0 0 0"/>
+      <mass value="0.106742"/>
+      <inertia ixx="2.793836667e-05" ixy="-3.713513193e-05" ixz="1.487764120e-06" iyy="9.582909881e-05" iyz="9.648675720e-07" izz="1.136563762e-04"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/fl_top.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision name="fl_top_collision">
+      <origin xyz="-0.060420 -0.027111 0.011157" rpy="1.577896 0.013155 2.065427"/>
+      <geometry>
+        <box size="0.041200 0.070300 0.169826"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="fl_top" type="revolute">
+    <origin xyz="0.0386 -0.011483 -0.032232" rpy="0 0 0"/>
+    <parent link="fl_hip"/>
+    <child link="fl_top"/>
+    <axis xyz="0 0 -1"/>
+    <limit lower="-2.356200" upper="2.356200" effort="1.96" velocity="6.54"/>
+    <dynamics damping="0.02" friction="0.01"/>
+  </joint>
+  <link name="fl_bottom">
+    <inertial>
+      <origin xyz="0.078482158861255 -0.0448672466577361 0.00348748963952544" rpy="0 0 0"/>
+      <mass value="0.029326"/>
+      <inertia ixx="1.617060595e-05" ixy="2.227411118e-05" ixz="-3.329047077e-07" iyy="3.764353943e-05" iyz="2.189105757e-07" izz="5.228718213e-05"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/fl_bottom.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision name="fl_bottom_collision">
+      <origin xyz="0.137671 -0.100124 0.004461" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.012"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="fl_bottom" type="revolute">
+    <origin xyz="-0.12132 -0.072387 -0.013569" rpy="0 0 0"/>
+    <parent link="fl_top"/>
+    <child link="fl_bottom"/>
+    <axis xyz="0 0 -1"/>
+    <limit lower="-2.356200" upper="2.356200" effort="1.96" velocity="6.54"/>
+    <dynamics damping="0.02" friction="0.01"/>
+  </joint>
+  <link name="fr_hip">
+    <inertial>
+      <origin xyz="0.027297131982034 9.90275998717094E-05 -0.00247238563061042" rpy="0 0 0"/>
+      <mass value="0.089316"/>
+      <inertia ixx="4.095140130e-05" ixy="-2.027365783e-08" ixz="7.318621947e-07" iyy="6.142413677e-05" iyz="-5.794929742e-07" izz="8.029824309e-05"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/fr_hip.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision name="fr_hip_collision">
+      <origin xyz="0.028314 0.000050 -0.001499" rpy="1.570796 1.538626 1.570796"/>
+      <geometry>
+        <box size="0.045000 0.058762 0.067227"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="fr_hip" type="revolute">
+    <origin xyz="0.098400000 -0.060681000 -0.003029200" rpy="1.570796327 -0.000000000 0.000000000"/>
+    <parent link="base_link"/>
+    <child link="fr_hip"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-2.356200" upper="2.356200" effort="1.96" velocity="6.54"/>
+    <dynamics damping="0.02" friction="0.01"/>
+  </joint>
+  <link name="fr_top">
+    <inertial>
+      <origin xyz="-0.0327864495707164 -0.0126313769769459 -0.00647693886353867" rpy="0 0 0"/>
+      <mass value="0.106736"/>
+      <inertia ixx="2.749548560e-05" ixy="-3.672121852e-05" ixz="-2.118720958e-06" iyy="9.630271503e-05" iyz="-1.251466700e-06" izz="1.136123180e-04"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/fr_top.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision name="fr_top_collision">
+      <origin xyz="-0.060519 -0.026677 -0.011610" rpy="1.556207 -0.022048 2.059529"/>
+      <geometry>
+        <box size="0.041307 0.070440 0.169852"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="fr_top" type="revolute">
+    <origin xyz="0.0381 -0.012136 0.032026" rpy="0 0 0"/>
+    <parent link="fr_hip"/>
+    <child link="fr_top"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-2.356200" upper="2.356200" effort="1.96" velocity="6.54"/>
+    <dynamics damping="0.02" friction="0.01"/>
+  </joint>
+  <link name="fr_bottom">
+    <inertial>
+      <origin xyz="0.0791469661032436 -0.0433740165808617 -0.0042133669017476" rpy="0 0 0"/>
+      <mass value="0.029326"/>
+      <inertia ixx="1.537425300e-05" ixy="2.186364395e-05" ixz="7.037265688e-07" iyy="3.845087934e-05" iyz="-4.454517367e-07" izz="5.227603807e-05"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/fr_bottom.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision name="fr_bottom_collision">
+      <origin xyz="0.138941 -0.097521 -0.006355" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.012"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="fr_bottom" type="revolute">
+    <origin xyz="-0.121749494844511 -0.0718844345331731 0.0123443050311544" rpy="0 0 0"/>
+    <parent link="fr_top"/>
+    <child link="fr_bottom"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-2.356200" upper="2.356200" effort="1.96" velocity="6.54"/>
+    <dynamics damping="0.02" friction="0.01"/>
+  </joint>
+  <link name="br_hip">
+    <inertial>
+      <origin xyz="-0.0272971344226925 -6.43744326411511E-05 -0.00247351850938268" rpy="0 0 0"/>
+      <mass value="0.089316"/>
+      <inertia ixx="4.095140568e-05" ixy="-1.001516279e-08" ixz="-7.320731040e-07" iyy="6.141161404e-05" iyz="3.147822850e-07" izz="8.031078511e-05"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/br_hip.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision name="br_hip_collision">
+      <origin xyz="-0.028313 -0.000029 -0.001500" rpy="-1.572805 1.552642 -1.572806"/>
+      <geometry>
+        <box size="0.045002 0.058762 0.067228"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="br_hip" type="revolute">
+    <origin xyz="-0.098400000 -0.060681000 -0.003029200" rpy="1.570796327 -0.000000000 0.000000000"/>
+    <parent link="base_link"/>
+    <child link="br_hip"/>
+    <axis xyz="-1 0 0"/>
+    <limit lower="-2.356200" upper="2.356200" effort="1.96" velocity="6.54"/>
+    <dynamics damping="0.02" friction="0.01"/>
+  </joint>
+  <link name="br_top">
+    <inertial>
+      <origin xyz="-0.0331307458806611 -0.0121448427162066 -0.00584779936915039" rpy="0 0 0"/>
+      <mass value="0.106736"/>
+      <inertia ixx="2.550971079e-05" ixy="-3.494767959e-05" ixz="-3.209564378e-07" iyy="9.820681899e-05" iyz="-3.859691251e-07" izz="1.136939891e-04"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/br_top.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision name="br_top_collision">
+      <origin xyz="-0.061286 -0.025409 -0.010290" rpy="1.578872 0.016260 2.031790"/>
+      <geometry>
+        <box size="0.041200 0.070300 0.169865"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="br_top" type="revolute">
+    <origin xyz="-0.0186000000001146 -0.0104099959720499 0.0325943550920316" rpy="0 0 0"/>
+    <parent link="br_hip"/>
+    <child link="br_top"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-2.356200" upper="2.356200" effort="1.96" velocity="6.54"/>
+    <dynamics damping="0.02" friction="0.01"/>
+  </joint>
+  <link name="br_bottom">
+    <inertial>
+      <origin xyz="0.0791720299116837 -0.043485483448343 -0.00202700123300074" rpy="0 0 0"/>
+      <mass value="0.029326"/>
+      <inertia ixx="1.534908537e-05" ixy="2.185810545e-05" ixz="-3.967457411e-07" iyy="3.846634171e-05" iyz="2.509216629e-07" izz="5.228589860e-05"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/br_bottom.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision name="br_bottom_collision">
+      <origin xyz="0.138997 -0.097637 -0.001443" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.012"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="br_bottom" type="revolute">
+    <origin xyz="-0.12368 -0.067775 0.015883" rpy="0 0 0"/>
+    <parent link="br_top"/>
+    <child link="br_bottom"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-2.356200" upper="2.356200" effort="1.96" velocity="6.54"/>
+    <dynamics damping="0.02" friction="0.01"/>
+  </joint>
+  <link name="bl_hip">
+    <inertial>
+      <origin xyz="-0.0272971324067885 -3.03826091760384E-05 0.00247418544860611" rpy="0 0 0"/>
+      <mass value="0.089316"/>
+      <inertia ixx="4.095139440e-05" ixy="-1.802623651e-08" ixz="7.319192811e-07" iyy="6.141524003e-05" iyz="-4.093877867e-07" izz="8.030711694e-05"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/bl_hip.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision name="bl_hip_collision">
+      <origin xyz="-0.028303 -0.000029 0.001499" rpy="-1.508820 1.550468 1.632786"/>
+      <geometry>
+        <box size="0.045072 0.058762 0.067248"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="bl_hip" type="revolute">
+    <origin xyz="-0.098400000 0.060681193 -0.003029221" rpy="1.570796327 -0.000000000 0.000000000"/>
+    <parent link="base_link"/>
+    <child link="bl_hip"/>
+    <axis xyz="-1 0 0"/>
+    <limit lower="-2.356200" upper="2.356200" effort="1.96" velocity="6.54"/>
+    <dynamics damping="0.02" friction="0.01"/>
+  </joint>
+  <link name="bl_top">
+    <inertial>
+      <origin xyz="-0.0332919917737501 -0.011761405740684 0.00583145711228239" rpy="0 0 0"/>
+      <mass value="0.106742"/>
+      <inertia ixx="2.457241824e-05" ixy="-3.400856326e-05" ixz="2.791506981e-07" iyy="9.914972168e-05" iyz="3.612376097e-07" izz="1.137017029e-04"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/bl_top.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision name="bl_top_collision">
+      <origin xyz="-0.061615 -0.024574 0.010253" rpy="1.562842 -0.017575 2.018182"/>
+      <geometry>
+        <box size="0.041191 0.070426 0.169849"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="bl_top" type="revolute">
+    <origin xyz="-0.0181000000001183 -0.0103448839199625 -0.0326150789771615" rpy="0 0 0"/>
+    <parent link="bl_hip"/>
+    <child link="bl_top"/>
+    <axis xyz="0 0 -1"/>
+    <limit lower="-2.356200" upper="2.356200" effort="1.96" velocity="6.54"/>
+    <dynamics damping="0.02" friction="0.01"/>
+  </joint>
+  <link name="bl_bottom">
+    <inertial>
+      <origin xyz="0.0817269974185858 -0.0387448949191614 0.00203600565191636" rpy="0 0 0"/>
+      <mass value="0.029326"/>
+      <inertia ixx="1.285659686e-05" ixy="2.034567330e-05" ixz="4.102109456e-07" iyy="4.095880482e-05" iyz="-2.284664256e-07" izz="5.228577005e-05"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/bl_bottom.STL"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision name="bl_bottom_collision">
+      <origin xyz="0.145190 -0.089077 0.001410" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="0.012"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="bl_bottom" type="revolute">
+    <origin xyz="-0.124595939429202 -0.0660533751871663 -0.0159842670738399" rpy="0 0 0"/>
+    <parent link="bl_top"/>
+    <child link="bl_bottom"/>
+    <axis xyz="0 0 -1"/>
+    <limit lower="-2.356200" upper="2.356200" effort="1.96" velocity="6.54"/>
+    <dynamics damping="0.02" friction="0.01"/>
+  </joint>
+</robot>

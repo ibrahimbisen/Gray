@@ -1,0 +1,96 @@
+<mujoco model="gray">
+  <option timestep="0.002" integrator="implicitfast" cone="elliptic" impratio="10" /><compiler angle="radian" meshdir="./" autolimits="true" />
+
+  <asset>
+    <mesh name="base_link" content_type="model/stl" file="meshes/base_link.STL" />
+    <mesh name="fl_hip" content_type="model/stl" file="meshes/fl_hip.STL" />
+    <mesh name="fl_top" content_type="model/stl" file="meshes/fl_top.STL" />
+    <mesh name="fl_bottom" content_type="model/stl" file="meshes/fl_bottom.STL" />
+    <mesh name="fr_hip" content_type="model/stl" file="meshes/fr_hip.STL" />
+    <mesh name="fr_top" content_type="model/stl" file="meshes/fr_top.STL" />
+    <mesh name="fr_bottom" content_type="model/stl" file="meshes/fr_bottom.STL" />
+    <mesh name="br_hip" content_type="model/stl" file="meshes/br_hip.STL" />
+    <mesh name="br_top" content_type="model/stl" file="meshes/br_top.STL" />
+    <mesh name="br_bottom" content_type="model/stl" file="meshes/br_bottom.STL" />
+    <mesh name="bl_hip" content_type="model/stl" file="meshes/bl_hip.STL" />
+    <mesh name="bl_top" content_type="model/stl" file="meshes/bl_top.STL" />
+    <mesh name="bl_bottom" content_type="model/stl" file="meshes/bl_bottom.STL" />
+  <texture name="grid" type="2d" builtin="checker" rgb1=".18 .20 .23" rgb2=".22 .24 .27" width="512" height="512" /><material name="grid" texture="grid" texrepeat="8 8" reflectance="0.1" /></asset>
+
+  <worldbody>
+    <light pos="0 0 2" dir="0 0 -1" directional="true" /><geom name="floor" type="plane" size="0 0 0.05" material="grid" condim="3" friction="0.8 0.005 0.0001" /><geom quat="0.707107 0.707107 0 0" type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="base_link" />
+    <body name="base_link" pos="0 0 0.25"><freejoint name="root" /><inertial pos="-0.00000000 -0.00302360 -0.00000000" mass="0.723180" fullinertia="1.274255707e-04 5.217520436e-04 4.291599532e-04 -5.072049529e-21 6.558570651e-22 -2.085469317e-20" /><geom name="base_link_collision" size="0.0125 0.078781 0.0984" pos="0 0 -0.003" quat="0.707107 1.15612e-07 0.707107 -1.15612e-07" type="box" rgba="1 1 1 1" />
+    <body name="fl_hip" pos="0.0984 0.060681 -0.0030292" quat="0.707107 0.707107 0 0">
+      <inertial pos="0.0272971 1.7516e-05 0.0024743" quat="0.00572702 0.70048 0.0059102 0.713624" mass="0.089316" diaginertia="8.03296e-05 6.14064e-05 4.09378e-05" />
+      <joint name="fl_hip" pos="0 0 0" axis="1 0 0" range="-2.356200 2.356200" actuatorfrcrange="-1.96 1.96" damping="0.05" frictionloss="0.01" armature="0.003" />
+      <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="fl_hip" />
+      <geom name="fl_hip_collision" size="0.022512 0.029381 0.0336165" pos="0.028311 2.1e-05 0.0015" quat="0.706937 -0.00529736 0.707237 -0.00529948" type="box" rgba="1 1 1 1" />
+      <body name="fl_top" pos="0.0386 -0.011483 -0.032232">
+        <inertial pos="-0.0327094 -0.0129115 0.006261" quat="-0.0817632 0.681653 0.209568 0.696236" mass="0.106742" diaginertia="0.000113738 0.000112144 1.15416e-05" />
+        <joint name="fl_top" pos="0 0 0" axis="0 0 -1" range="-2.356200 2.356200" actuatorfrcrange="-1.96 1.96" damping="0.05" frictionloss="0.01" armature="0.003" />
+        <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="fl_top" />
+        <geom name="fl_top_collision" size="0.0206 0.03515 0.084913" pos="-0.06042 -0.027111 0.011157" quat="0.365097 0.359682 0.611701 0.602623" type="box" rgba="1 1 1 1" />
+        <body name="fl_bottom" pos="-0.12132 -0.072387 -0.013569">
+          <inertial pos="0.0784822 -0.0448672 0.00348749" quat="0.200781 0.678002 -0.190626 0.680927" mass="0.029326" diaginertia="5.22905e-05 5.16336e-05 2.17725e-06" />
+          <joint name="fl_bottom" pos="0 0 0" axis="0 0 -1" range="-2.356200 2.356200" actuatorfrcrange="-1.96 1.96" damping="0.05" frictionloss="0.01" armature="0.003" />
+          <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="fl_bottom" />
+          <geom name="fl_bottom_collision" size="0.012" pos="0.137671 -0.100124 0.004461" rgba="1 1 1 1" />
+        </body>
+      </body>
+    </body>
+    <body name="fr_hip" pos="0.0984 -0.060681 -0.0030292" quat="0.707107 0.707107 0 0">
+      <inertial pos="0.0272971 9.90276e-05 -0.00247239" quat="-0.0109028 0.713566 -0.0107763 0.700421" mass="0.089316" diaginertia="8.03296e-05 6.14064e-05 4.09378e-05" />
+      <joint name="fr_hip" pos="0 0 0" axis="1 0 0" range="-2.356200 2.356200" actuatorfrcrange="-1.96 1.96" damping="0.05" frictionloss="0.01" armature="0.003" />
+      <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="fr_hip" />
+      <geom name="fr_hip_collision" size="0.0225 0.029381 0.0336135" pos="0.028314 5e-05 -0.001499" quat="0.707015 0.0113734 0.707015 0.0113734" type="box" rgba="1 1 1 1" />
+      <body name="fr_top" pos="0.0381 -0.012136 0.032026">
+        <inertial pos="-0.0327864 -0.0126314 -0.00647694" quat="-0.214268 0.69476 0.0731701 0.682674" mass="0.106736" diaginertia="0.000113732 0.000112157 1.15212e-05" />
+        <joint name="fr_top" pos="0 0 0" axis="0 0 1" range="-2.356200 2.356200" actuatorfrcrange="-1.96 1.96" damping="0.05" frictionloss="0.01" armature="0.003" />
+        <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="fr_top" />
+        <geom name="fr_top_collision" size="0.0206535 0.03522 0.084926" pos="-0.060519 -0.026677 -0.01161" quat="0.360166 0.368217 0.597598 0.61447" type="box" rgba="1 1 1 1" />
+        <body name="fr_bottom" pos="-0.121749 -0.0718844 0.0123443">
+          <inertial pos="0.079147 -0.043374 -0.00421337" quat="0.178591 0.684182 -0.200508 0.678083" mass="0.029326" diaginertia="5.22904e-05 5.16335e-05 2.17725e-06" />
+          <joint name="fr_bottom" pos="0 0 0" axis="0 0 1" range="-2.356200 2.356200" actuatorfrcrange="-1.96 1.96" damping="0.05" frictionloss="0.01" armature="0.003" />
+          <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="fr_bottom" />
+          <geom name="fr_bottom_collision" size="0.012" pos="0.138941 -0.097521 -0.006355" rgba="1 1 1 1" />
+        </body>
+      </body>
+    </body>
+    <body name="br_hip" pos="-0.0984 -0.060681 -0.0030292" quat="0.707107 0.707107 0 0">
+      <inertial pos="-0.0272971 -6.43744e-05 -0.00247352" quat="0.00586797 0.700479 0.00590231 0.713624" mass="0.089316" diaginertia="8.03296e-05 6.14064e-05 4.09378e-05" />
+      <joint name="br_hip" pos="0 0 0" axis="-1 0 0" range="-2.356200 2.356200" actuatorfrcrange="-1.96 1.96" damping="0.05" frictionloss="0.01" armature="0.003" />
+      <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="br_hip" />
+      <geom name="br_hip_collision" size="0.022501 0.029381 0.033614" pos="-0.028313 -2.9e-05 -0.0015" quat="0.707065 -0.00641807 0.707091 -0.00641878" type="box" rgba="1 1 1 1" />
+      <body name="br_top" pos="-0.0186 -0.01041 0.0325944">
+        <inertial pos="-0.0331307 -0.0121448 -0.0058478" quat="-0.190835 0.701296 0.077611 0.682453" mass="0.106736" diaginertia="0.000113735 0.000112243 1.14326e-05" />
+        <joint name="br_top" pos="0 0 0" axis="0 0 1" range="-2.356200 2.356200" actuatorfrcrange="-1.96 1.96" damping="0.05" frictionloss="0.01" armature="0.003" />
+        <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="br_top" />
+        <geom name="br_top_collision" size="0.0206 0.03515 0.0849325" pos="-0.061286 -0.025409 -0.01029" quat="0.375932 0.369168 0.606426 0.595515" type="box" rgba="1 1 1 1" />
+        <body name="br_bottom" pos="-0.12368 -0.067775 0.015883">
+          <inertial pos="0.079172 -0.0434855 -0.002027" quat="0.195553 0.679529 -0.183188 0.682966" mass="0.029326" diaginertia="5.22905e-05 5.16336e-05 2.17725e-06" />
+          <joint name="br_bottom" pos="0 0 0" axis="0 0 1" range="-2.356200 2.356200" actuatorfrcrange="-1.96 1.96" damping="0.05" frictionloss="0.01" armature="0.003" />
+          <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="br_bottom" />
+          <geom name="br_bottom_collision" size="0.012" pos="0.138997 -0.097637 -0.001443" rgba="1 1 1 1" />
+        </body>
+      </body>
+    </body>
+    <body name="bl_hip" pos="-0.0984 0.0606812 -0.00302922" quat="0.707107 0.707107 0 0">
+      <inertial pos="-0.0272971 -3.03826e-05 0.00247419" quat="-0.00776602 0.713607 -0.00754867 0.700463" mass="0.089316" diaginertia="8.03296e-05 6.14064e-05 4.09378e-05" />
+      <joint name="bl_hip" pos="0 0 0" axis="-1 0 0" range="-2.356200 2.356200" actuatorfrcrange="-1.96 1.96" damping="0.05" frictionloss="0.01" armature="0.003" />
+      <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="bl_hip" />
+      <geom name="bl_hip_collision" size="0.022536 0.029381 0.033624" pos="-0.028303 -2.9e-05 0.001499" quat="0.00716851 -0.706625 -0.00717794 0.707515" type="box" rgba="1 1 1 1" />
+      <body name="bl_top" pos="-0.0181 -0.0103449 -0.0326151">
+        <inertial pos="-0.033292 -0.0117614 0.00583146" quat="-0.0719708 0.683247 0.187305 0.702076" mass="0.106742" diaginertia="0.000113743 0.00011229 1.13915e-05" />
+        <joint name="bl_top" pos="0 0 0" axis="0 0 -1" range="-2.356200 2.356200" actuatorfrcrange="-1.96 1.96" damping="0.05" frictionloss="0.01" armature="0.003" />
+        <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="bl_top" />
+        <geom name="bl_top_collision" size="0.0205955 0.035213 0.0849245" pos="-0.061615 -0.024574 0.010253" quat="0.372869 0.380391 0.592728 0.604107" type="box" rgba="1 1 1 1" />
+        <body name="bl_bottom" pos="-0.124596 -0.0660534 -0.0159843">
+          <inertial pos="0.081727 -0.0387449 0.00203601" quat="0.16228 0.688234 -0.176119 0.684822" mass="0.029326" diaginertia="5.22904e-05 5.16336e-05 2.17721e-06" />
+          <joint name="bl_bottom" pos="0 0 0" axis="0 0 -1" range="-2.356200 2.356200" actuatorfrcrange="-1.96 1.96" damping="0.05" frictionloss="0.01" armature="0.003" />
+          <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="bl_bottom" />
+          <geom name="bl_bottom_collision" size="0.012" pos="0.14519 -0.089077 0.00141" rgba="1 1 1 1" />
+        </body>
+      </body>
+    </body>
+  <site name="imu" pos="0 0 0" size="0.01" /></body></worldbody>
+<visual><global offwidth="1920" offheight="1080" /></visual><actuator><position name="fl_hip" joint="fl_hip" kp="20.0" kv="0.5" ctrlrange="-2.356200 2.356200" forcerange="-1.96 1.96" /><position name="fl_top" joint="fl_top" kp="20.0" kv="0.5" ctrlrange="-2.356200 2.356200" forcerange="-1.96 1.96" /><position name="fl_bottom" joint="fl_bottom" kp="20.0" kv="0.5" ctrlrange="-2.356200 2.356200" forcerange="-1.96 1.96" /><position name="fr_hip" joint="fr_hip" kp="20.0" kv="0.5" ctrlrange="-2.356200 2.356200" forcerange="-1.96 1.96" /><position name="fr_top" joint="fr_top" kp="20.0" kv="0.5" ctrlrange="-2.356200 2.356200" forcerange="-1.96 1.96" /><position name="fr_bottom" joint="fr_bottom" kp="20.0" kv="0.5" ctrlrange="-2.356200 2.356200" forcerange="-1.96 1.96" /><position name="br_hip" joint="br_hip" kp="20.0" kv="0.5" ctrlrange="-2.356200 2.356200" forcerange="-1.96 1.96" /><position name="br_top" joint="br_top" kp="20.0" kv="0.5" ctrlrange="-2.356200 2.356200" forcerange="-1.96 1.96" /><position name="br_bottom" joint="br_bottom" kp="20.0" kv="0.5" ctrlrange="-2.356200 2.356200" forcerange="-1.96 1.96" /><position name="bl_hip" joint="bl_hip" kp="20.0" kv="0.5" ctrlrange="-2.356200 2.356200" forcerange="-1.96 1.96" /><position name="bl_top" joint="bl_top" kp="20.0" kv="0.5" ctrlrange="-2.356200 2.356200" forcerange="-1.96 1.96" /><position name="bl_bottom" joint="bl_bottom" kp="20.0" kv="0.5" ctrlrange="-2.356200 2.356200" forcerange="-1.96 1.96" /></actuator><sensor><framequat name="imu_quat" objtype="site" objname="imu" /><gyro name="imu_gyro" site="imu" /><accelerometer name="imu_acc" site="imu" /></sensor></mujoco>
