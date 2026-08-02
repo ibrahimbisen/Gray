@@ -42,6 +42,7 @@ from mjlab.envs import mdp as envs_mdp
 from mjlab.envs.mdp import dr
 from mjlab.managers.action_manager import ActionTermCfg
 from mjlab.managers.command_manager import CommandTermCfg
+from mjlab.managers.curriculum_manager import CurriculumTermCfg
 from mjlab.managers.event_manager import EventTermCfg
 from mjlab.managers.metrics_manager import MetricsTermCfg
 from mjlab.managers.observation_manager import ObservationGroupCfg, ObservationTermCfg
@@ -182,6 +183,140 @@ BASE_HEIGHT_FLOOR_M = 0.150
 DENSITY_ALPHA = (math.log(0.6) / 2.0, math.log(1.4) / 2.0)
 
 FOOT_CONTACT_SENSOR = "feet_ground_contact"
+
+
+##
+# THE RANDOMISATION ENVELOPE, AND THE RAMP THAT LETS THE GAIT SURVIVE IT.
+#
+# =================================================================================
+# THE MEASUREMENT THAT FORCED THIS. Classical crawl, no policy, 10 s, 256 robots per
+# point, commanded 52.9 mm/s, mean along-track distance. The envelope below scaled by
+# a single factor s, every range interpolated from its nominal value toward its full
+# width:
+#
+#     s = 0.00      703 mm     the Phase 2 gait, intact
+#     s = 0.25      613 mm     -13%
+#     s = 0.50      451 mm     -36%
+#     s = 0.75      269 mm     -62%
+#     s = 1.00      131 mm     -81%
+#
+# There is no cliff. The gait degrades smoothly and is already half destroyed by
+# s = 0.5, which is why no single event looked guilty when they were tested one at a
+# time and why the full envelope annihilated the gait: the losses compound.
+#
+# s = 0.3 is the starting point. It holds 84% of the nominal distance (590 mm),
+# which leaves a gait that unambiguously walks for the policy to improve on, while
+# still being a genuinely varied fleet of robots rather than one nominal one.
+# =================================================================================
+#
+# Each entry is (VALUE WITH NO RANDOMISATION, FULL RANGE). At scale s each bound is
+# interpolated linearly from the first toward the second, so s = 0 is a fleet of
+# identical nominal robots and s = 1 is the envelope as designed. Linear rather than
+# log interpolation, which is the plain reading of "scale the envelope" and keeps the
+# nominal value inside the range at every s; for the multiplicative entries a
+# geometric interpolation would also be defensible and gives a slightly narrower band
+# at intermediate s.
+#
+# THE NOMINAL VALUES ARE NOT FREE PARAMETERS. 1.0 for anything applied with
+# operation="scale", 0.0 for anything additive (COM shift, servo zero offset, and the
+# pseudo-inertia alpha, which enters as e^(2*alpha)), and 0.8 for foot friction
+# because that is the absolute value train/gray_robot.py compiles into the MJCF. Get
+# one of these wrong and s = 0 is not "no randomisation", it is a silent constant
+# offset applied to every robot in the fleet.
+DR_ENVELOPE: dict[str, dict[str, tuple[float, tuple[float, float]]]] = {
+  "resin_density_legs": {"alpha_range": (0.0, DENSITY_ALPHA)},
+  "trunk_inertia": {
+    "alpha_range": (0.0, DENSITY_ALPHA),
+    "t_range": (0.0, (-0.02, 0.02)),
+  },
+  "foot_friction": {"ranges": (0.8, (0.4, 1.2))},
+  "servo_armature": {"ranges": (1.0, (0.35, 3.0))},
+  "knee_pushrod_inertia": {"ranges": (1.0, (0.224, 4.69))},
+  "servo_gains": {"kp_range": (1.0, (0.5, 4.0)), "kd_range": (1.0, (0.5, 4.0))},
+  "servo_zero_offset": {"bias_range": (0.0, (-0.03, 0.03))},
+}
+
+# Where the ramp starts, and when it reaches full width.
+#
+# START comes from the table above: 0.3 is the largest scale at which the classical
+# gait still covers most of its nominal distance, i.e. the largest envelope that still
+# leaves something that walks for the residual to be a residual OF. It is not a taste
+# judgement and it should be re-derived, not nudged, if the gait or the servo model
+# changes - the throwaway that produced the table is a twenty-line loop over
+# `scaled_dr_params`.
+#
+# RAMP_END_STEPS is one third of training. train/tasks.py runs max_iterations 3000 x
+# num_steps_per_env 24 = 72000 environment steps, and `env.common_step_counter` counts
+# exactly those. So the envelope reaches full width at step 24000 and THE FINAL TWO
+# THIRDS OF TRAINING RUN AT FULL RANDOMISATION, which is the part that is not
+# negotiable: a policy polished at reduced randomisation looks brilliant in sim and
+# falls over on the floor. There is deliberately no anneal back down, and nothing here
+# ever lowers the scale - it is a max() against the previous value away from being
+# monotone, and it is monotone by construction because it reads only the step counter.
+DR_SCALE_START = 0.3
+DR_RAMP_END_STEPS = 24_000
+
+
+def scaled_dr_params(scale: float) -> dict[str, dict[str, tuple[float, float]]]:
+  """The randomisation ranges at envelope scale ``scale``, keyed by event term name.
+
+  scale = 0 collapses every range to its nominal value (a fleet of identical nominal
+  robots); scale = 1 returns the ranges exactly as `DR_ENVELOPE` declares them.
+  """
+  out: dict[str, dict[str, tuple[float, float]]] = {}
+  for term_name, params in DR_ENVELOPE.items():
+    out[term_name] = {
+      param: (
+        nominal + scale * (full[0] - nominal),
+        nominal + scale * (full[1] - nominal),
+      )
+      for param, (nominal, full) in params.items()
+    }
+  return out
+
+
+def randomisation_ramp(
+  env: ManagerBasedRlEnv,
+  env_ids: torch.Tensor,
+  start: float = DR_SCALE_START,
+  full_at_step: int = DR_RAMP_END_STEPS,
+) -> dict[str, torch.Tensor]:
+  """Widen the domain-randomisation envelope from ``start`` to 1.0, then leave it.
+
+  WHY A CURRICULUM AND NOT A NARROWER ENVELOPE. Measured, the full envelope destroys
+  96% of the classical gait before a single gradient step is taken, and the whole
+  premise of residual RL is that training starts from something that already walks. But
+  the envelope is also what makes the policy work on the real robot, and
+  docs/PROJECT_NOTES.md sets the bar at "beat Phase 2 UNDER FULL RANDOMISATION". Both
+  are true at once, so the envelope has to move: the policy learns to walk first, then
+  learns to walk on any robot.
+
+  WHY THE DR EVENTS ARE NOW "reset" AND NOT "startup". A startup event fires exactly
+  once, in `ManagerBasedRlEnv.__init__`, before any curriculum term has ever been
+  computed (manager_based_rl_env.py: `event_manager.apply(mode="startup")` at the end
+  of `__init__`; `curriculum_manager.compute` only ever runs inside `_reset_idx`).
+  Mutating a startup term's params afterwards therefore does nothing at all - it would
+  be a ramp that does not ramp. In "reset" mode the same events are re-drawn per
+  episode and the curriculum lands. `_reset_idx` computes the curriculum BEFORE it
+  applies reset events, so the ranges written here are the ranges the next draw uses.
+
+  This is safe to do per episode because every `dr.*` function used here samples
+  against the model's DEFAULTS rather than its current values (`_select_default_values`
+  in mjlab/envs/mdp/dr/_core.py, and the `operation="scale"` path in `pd_gains`), so
+  repeated application does not compound. The one real cost is that `pseudo_inertia`
+  and `joint_armature` trigger a `recompute_constants` on every reset; mjlab's own
+  docs name "startup or reset" as the modes to use for exactly these terms.
+
+  It also changes the character of the randomisation slightly, for the better: each
+  environment is now a fresh robot every episode rather than one fixed robot for the
+  whole run, so the policy meets far more of the envelope than 16384 fixed draws.
+  """
+  del env_ids  # this term is global; it edits configs, not per-env state.
+  progress = min(1.0, env.common_step_counter / max(1, full_at_step))
+  scale = start + (1.0 - start) * progress
+  for term_name, params in scaled_dr_params(scale).items():
+    env.event_manager.get_term_cfg(term_name).params.update(params)
+  return {"scale": torch.tensor(scale)}
 
 
 ##
@@ -370,7 +505,7 @@ def gray_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # Legs: density only. Physics-consistent - mass AND inertia scale together, which
     # dr.body_mass would not do.
     "resin_density_legs": EventTermCfg(
-      mode="startup",
+      mode="reset",
       func=dr.pseudo_inertia,
       params={
         "alpha_range": DENSITY_ALPHA,
@@ -382,7 +517,7 @@ def gray_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # and electronics - 447 g that robot.yaml models as a lump - so where its COM
     # actually sits is genuinely uncertain until the robot is reassembled.
     "trunk_inertia": EventTermCfg(
-      mode="startup",
+      mode="reset",
       func=dr.pseudo_inertia,
       params={
         "alpha_range": DENSITY_ALPHA,
@@ -397,7 +532,7 @@ def gray_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # shared draw cannot generate it at all. It also interacts with the per-leg CAD
     # asymmetry that Phase 2 could not tune out.
     "foot_friction": EventTermCfg(
-      mode="startup",
+      mode="reset",
       func=dr.geom_friction,
       params={
         "asset_cfg": SceneEntityCfg("robot", geom_names=(FOOT_GEOM_REGEX,)),
@@ -415,7 +550,7 @@ def gray_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # multiplies the DEFAULT field rather than the current one, so two events covering
     # the same joint would overwrite each other instead of composing.
     "servo_armature": EventTermCfg(
-      mode="startup",
+      mode="reset",
       func=dr.joint_armature,
       params={
         "asset_cfg": SceneEntityCfg(
@@ -448,7 +583,7 @@ def gray_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # hip/thigh config, which this change does not own. Until then the mapping error
     # stays a deployment blocker rather than a solved problem.
     "knee_pushrod_inertia": EventTermCfg(
-      mode="startup",
+      mode="reset",
       func=dr.joint_armature,
       params={
         "asset_cfg": SceneEntityCfg("robot", joint_names=("^(fl|fr|br|bl)_bottom$",)),
@@ -472,7 +607,7 @@ def gray_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # band is containment, not a fix, and it should not be mistaken for one: if the
     # real servo turns out to be far outside 0.5-4.0 the policy still will not transfer.
     "servo_gains": EventTermCfg(
-      mode="startup",
+      mode="reset",
       func=dr.pd_gains,
       params={
         "asset_cfg": SceneEntityCfg("robot"),
@@ -484,7 +619,7 @@ def gray_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # Not an encoder - Gray has none. This is the per-servo zero-offset error from
     # horn spline misalignment: real, permanent, and roughly one spline tooth.
     "servo_zero_offset": EventTermCfg(
-      mode="startup",
+      mode="reset",
       func=dr.encoder_bias,
       params={
         "asset_cfg": SceneEntityCfg("robot"),
@@ -881,6 +1016,26 @@ def gray_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     ),
   }
 
+  ##
+  # Curriculum. Exactly one term, and it is load-bearing rather than a refinement:
+  # under the full envelope the classical gait covers 131 mm of the 703 mm it walks on
+  # a nominal robot, and residual RL on a starting point that cannot walk has nothing
+  # to be a residual OF. See `randomisation_ramp` above for the mechanism and
+  # DR_ENVELOPE for the measurement.
+  #
+  # NOTE WHAT THE EVENT TERMS ABOVE ARE CONFIGURED WITH: the FULL ranges. The
+  # curriculum narrows them for the first third of training and then hands them back.
+  # That ordering is deliberate - anything that builds this config and ignores the
+  # curriculum (play mode below, scripts/eval_policy.py, a bare env in a notebook) gets
+  # full randomisation by default rather than a quietly easier robot.
+  ##
+  curriculum = {
+    "randomisation_ramp": CurriculumTermCfg(
+      func=randomisation_ramp,
+      params={"start": DR_SCALE_START, "full_at_step": DR_RAMP_END_STEPS},
+    ),
+  }
+
   cfg = ManagerBasedRlEnvCfg(
     scene=SceneCfg(
       terrain=TerrainEntityCfg(terrain_type="plane"),
@@ -896,7 +1051,7 @@ def gray_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     events=events,
     rewards=rewards,
     terminations=terminations,
-    curriculum={},
+    curriculum=curriculum,
     metrics=metrics,
     viewer=ViewerConfig(
       origin_type=ViewerConfig.OriginType.ASSET_BODY,
@@ -936,5 +1091,11 @@ def gray_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     cfg.episode_length_s = int(1e9)
     cfg.observations["actor"].enable_corruption = False
     cfg.events.pop("push_robot", None)
+    # NO RAMP IN PLAY MODE, and this is not an oversight. common_step_counter starts
+    # at zero in a fresh viewer, so leaving the curriculum in would show every
+    # checkpoint - including a finished one - on a 0.3x fleet and flatter it. The
+    # events keep the full ranges they are configured with, so play shows the robot
+    # the policy actually has to survive.
+    cfg.curriculum = {}
 
   return cfg
