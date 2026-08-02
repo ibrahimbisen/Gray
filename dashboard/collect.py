@@ -62,15 +62,37 @@ DEFAULT_TOTAL_ITERATIONS = 3000
 # 28 tags is fine to plot but wasteful to ship in full on every poll.
 MAX_SERIES_POINTS = 400
 
-# The Phase 2 hand-written gait, measured and recorded in docs/PROJECT_NOTES.md
-# and docs/DEVLOG.md. These are used ONLY until progress/summary.csv exists;
-# once it does, its "baseline" row wins (see _read_walks).
+# The Phase 2 hand-written gait. Written by
+# `python scripts/eval_policy.py --measure-baseline`, which walks it 30 seeds x 5
+# commands and records the whole DISTRIBUTION. Used only until progress/summary.csv
+# exists; once it does, its "baseline" row wins (see _read_walks).
+BASELINE_JSON = "progress/baseline.json"
+
+# Last-resort constants, and they are a warning rather than a benchmark: this is the
+# single-seed figure that was quoted as "the baseline" everywhere until it was
+# re-measured. The distribution it came from has a standard deviation of about 71 mm,
+# so this one draw sits two thirds of a standard deviation off the mean and two
+# single-seed runs can differ by 200 mm without either policy having changed.
 BASELINE_FALLBACK = {
     "distance_mm": 675.4,
     "speed_mms": 56.3,
     "drift_mm": 33.8,
     "upright_min": 0.976,
 }
+
+
+def _read_baseline_json(root: str, errors: list) -> dict | None:
+    """The measured baseline distribution, reduced to the four keys the page uses."""
+    path = os.path.join(root, BASELINE_JSON)
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            blob = json.load(fh)
+        return {key: float(blob[key]) for key in BASELINE_FALLBACK}
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        errors.append(f"Could not read {BASELINE_JSON}: {exc}")
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -1368,12 +1390,13 @@ def collect(repo_root: str = ".") -> dict:
 
     walks, baseline_walk, walk_columns = _read_walks(root, errors)
 
-    # Prefer the measured baseline row once it exists; the constants are only a
-    # stand-in for the window before the first evaluation has been run.
+    # Prefer the measured baseline row once it exists, then progress/baseline.json,
+    # then the constants. The constants are the single-seed figure and are only a
+    # stand-in for the window before anything has been measured.
     if baseline_walk:
         baseline = {key: baseline_walk[key] for key in BASELINE_FALLBACK}
     else:
-        baseline = dict(BASELINE_FALLBACK)
+        baseline = _read_baseline_json(root, errors) or dict(BASELINE_FALLBACK)
 
     # Read before the goal is built: how many robots run at once and how many
     # rounds are planned belong to the live run's params/*.yaml, and the goal

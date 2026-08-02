@@ -1,0 +1,1923 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gray — the plan: four problems, four stages, one decision</title>
+<style>
+/* ============================================================
+   Gray — plan page. Single file, no external resources.
+   Variables, type scale, spacing, cards and tags are copied
+   verbatim from dashboard/index.html so the two pages are
+   obviously the same product.
+
+   Structure rule for this page: the first screen is a DECISION.
+   Everything that is evidence lives inside a <details>. Nothing
+   above ever depends on something the reader has to open.
+   ============================================================ */
+:root{
+  color-scheme: dark;
+
+  --plane:      #0d0d0f;   /* page plane            */
+  --panel:      #16161a;   /* chart / card surface  */
+  --panel-2:    #1c1c21;   /* nested surface        */
+  --hair:       rgba(255,255,255,0.09);
+  --hair-solid: #26262b;
+
+  --ink:        #ffffff;   /* primary text   */
+  --ink-2:      #c3c2b7;   /* secondary text */
+  --ink-3:      #898781;   /* muted / axes   */
+
+  --grid:       #2c2c2a;
+  --axis:       #383835;
+
+  --s1:         #3987e5;   /* categorical 1 — blue   */
+  --s2:         #d95926;   /* categorical 2 — orange */
+  --s3:         #199e70;   /* categorical 3 — aqua   */
+
+  --good:       #0ca30c;
+  --warning:    #fab219;
+  --serious:    #ec835a;
+  --critical:   #d03b3b;
+
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", monospace;
+
+  --r: 14px;
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+body{
+  background: var(--plane);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  /* Deliberately NO overflow-x:hidden. Hiding overflow does not make content fit,
+     it silently cuts it off. Anything too wide is given its own scroller instead
+     (.scroll-x), so nothing is ever truncated without the reader knowing. */
+}
+h1,h2,h3,h4{ margin:0; font-weight:600; line-height:1.25; letter-spacing:-0.01em; }
+p{ margin:0; }
+a{ color: var(--s1); }
+
+.wrap{ max-width: 1200px; margin:0 auto; padding: 0 20px; }
+@media (max-width: 560px){ .wrap{ padding: 0 14px; } }
+
+/* ---------- generic bits ---------- */
+.mono{ font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.num{ font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing:-0.02em; }
+.unit{ font-family: var(--sans); font-size: 0.60em; color: var(--ink-3); font-weight:500; letter-spacing:0; margin-left:.28em; }
+.muted{ color: var(--ink-3); }
+.sec-ink{ color: var(--ink-2); }
+
+.card{
+  background: var(--panel);
+  border: 1px solid var(--hair);
+  border-radius: var(--r);
+  padding: 20px;
+  min-width: 0;
+}
+.card.tight{ padding:16px; }
+
+.grid{ display:grid; gap:14px; }
+/* min(Npx,100%) is the whole trick: the track never asks for more width than the
+   container actually has, so a 320px phone wraps to one column instead of pushing
+   the card off the side of the screen. */
+.g-auto{ grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); }
+.g-auto-wide{ grid-template-columns: repeat(auto-fit, minmax(min(290px, 100%), 1fr)); }
+.g-auto-chart{ grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); }
+.g-stages{ grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); }
+.grid > *{ min-width:0; }
+
+.scroll-x{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.scroll-x table{ min-width: 640px; }
+.scroll-x.wide table{ min-width: 780px; }
+
+table{ border-collapse: collapse; width:100%; font-size:13.5px; }
+th,td{ text-align:left; padding:9px 12px; border-bottom:1px solid var(--hair); white-space:nowrap; }
+th{ color: var(--ink-3); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.07em; }
+td.n, th.n{ text-align:right; font-family:var(--mono); font-variant-numeric:tabular-nums; }
+td.wrapcell{ white-space:normal; color: var(--ink-2); min-width:250px; }
+tbody tr:last-child td{ border-bottom:none; }
+tbody tr:hover td{ background: rgba(255,255,255,0.025); }
+
+.chip{
+  display:inline-flex; align-items:center; gap:7px;
+  padding: 4px 10px; border-radius: 999px;
+  border:1px solid var(--hair); background: var(--panel-2);
+  font-size:12px; color: var(--ink-2); white-space:nowrap;
+}
+.dot{ width:8px; height:8px; border-radius:50%; flex:none; }
+
+/* ===== SITE NAV (keep identical on plan.html) =====
+   Sticky, because on a page this long the way back to the other tab should never
+   be a scroll away. */
+.sitenav{ position:sticky; top:0; z-index:60; background:rgba(10,10,10,.94);
+          backdrop-filter:saturate(150%) blur(8px);
+          border-bottom:1px solid var(--hair); }
+.sitenav .wrap{ display:flex; align-items:center; gap:22px; height:52px; }
+.navbrand{ font-weight:650; letter-spacing:.2px; color:var(--ink-1);
+           text-decoration:none; font-size:15px; flex:none; }
+.navtabs{ display:flex; gap:4px; flex:1 1 auto; min-width:0; overflow-x:auto;
+          scrollbar-width:none; }
+.navtabs::-webkit-scrollbar{ display:none; }
+.navtab{ display:inline-block; padding:7px 13px; border-radius:8px; font-size:14px;
+         color:var(--ink-2); text-decoration:none; white-space:nowrap;
+         border:1px solid transparent; }
+.navtab:hover{ color:var(--ink-1); background:rgba(255,255,255,.05); }
+.navtab[data-here]{ color:var(--ink-1); background:rgba(57,135,229,.14);
+                    border-color:rgba(57,135,229,.32); }
+.navout{ flex:none; font-size:13px; color:var(--ink-2); text-decoration:none;
+         white-space:nowrap; }
+.navout:hover{ color:var(--ink-1); }
+@media (max-width:560px){
+  .sitenav .wrap{ gap:12px; }
+  .navout{ display:none; }          /* the tabs matter more than the outbound link */
+}
+
+/* ---------- 1. the first screen ----------
+   One screen, no scrolling: a title, one sentence, four tiles, one cost line.
+   svh as well as vh, because on a phone the browser chrome eats the difference
+   and vh alone would push the cost line under the fold. */
+header.hero{
+  border-bottom: 1px solid var(--hair);
+  background: linear-gradient(180deg, #131318 0%, var(--plane) 100%);
+}
+.heroinner{
+  min-height: calc(100vh - 52px);
+  min-height: calc(100svh - 52px);
+  display:flex; flex-direction:column; justify-content:center;
+  padding-top: 26px; padding-bottom: 30px;
+}
+h1{ font-size: clamp(28px, 6vw, 44px); letter-spacing:-0.03em; }
+.onesentence{
+  margin-top: 10px; margin-bottom: 22px;
+  font-size: clamp(16px, 2.7vw, 20px); color: var(--ink-2); max-width: 46ch;
+}
+
+.tiles{ display:grid; gap:12px;
+        grid-template-columns: repeat(auto-fit, minmax(min(215px, 100%), 1fr)); }
+@media (max-width: 760px){ .tiles{ grid-template-columns: 1fr 1fr; gap:10px; } }
+.ptile{
+  display:block; text-decoration:none; color:inherit;
+  background: var(--panel); border:1px solid var(--hair);
+  border-radius: 12px; padding: 14px 15px; min-width:0;
+}
+.ptile:hover{ border-color: rgba(57,135,229,.5); background: var(--panel-2); }
+.ptile .pname{ font-size:11.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-3); }
+.ptile .pnum{
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: clamp(25px, 5.6vw, 33px); line-height:1.15; letter-spacing:-0.03em; margin-top:5px;
+}
+.ptile .pnum .u{ font-family: var(--sans); font-size:.48em; color: var(--ink-3); margin-left:.28em; letter-spacing:0; }
+.ptile .psay{ font-size:12.5px; color: var(--ink-2); margin-top:6px; line-height:1.45; }
+
+.costline{
+  margin-top: 22px; font-size: clamp(14px, 2.2vw, 16px); color: var(--ink-2);
+  display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+}
+.costline .ch{
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: 1.5em; color: var(--ink); letter-spacing:-0.02em;
+}
+
+/* ---------- sections ---------- */
+section{ padding: 46px 0 6px; scroll-margin-top: 60px; }
+section + section{ border-top: 1px solid var(--hair); }
+.sechead{ margin-bottom: 20px; }
+.eyebrow{ font-family:var(--mono); font-size:12px; color: var(--ink-3); letter-spacing:.1em; }
+.sechead h2{ font-size: clamp(21px, 3.4vw, 27px); margin-top:4px; }
+.sechead .sub{ margin-top:7px; color: var(--ink-2); max-width: 62ch; font-size: clamp(15px,2.3vw,17px); }
+h3.subhead{ font-size:17px; margin: 30px 0 12px; }
+h3.subhead:first-child{ margin-top:0; }
+
+.note{
+  border-left: 3px solid var(--hair-solid);
+  padding: 2px 0 2px 14px; color: var(--ink-2); font-size:13.5px; max-width:80ch;
+}
+
+/* ---------- 2. the four problems ---------- */
+.prob{ }
+.probhead{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+.probno{ font-family:var(--mono); font-size:13px; color:var(--ink-3); letter-spacing:.1em; }
+.prob h2{ font-size: clamp(22px, 3.6vw, 29px); }
+.bigline{ display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-top:14px; }
+.bigline .bn{
+  font-family:var(--mono); font-variant-numeric:tabular-nums;
+  font-size: clamp(34px, 7vw, 48px); line-height:1; letter-spacing:-0.04em;
+}
+.bigline .bn .u{ font-family:var(--sans); font-size:.44em; color:var(--ink-3); margin-left:.28em; letter-spacing:0; }
+.bigline .bt{ font-size: clamp(14px,2.3vw,16px); color: var(--ink-2); flex:1 1 200px; min-width:0; }
+.says{ margin-top: 12px; font-size: clamp(15px,2.3vw,17px); color: var(--ink); max-width: 58ch; }
+.why{
+  margin-top: 14px; padding: 12px 15px; border-radius: 11px;
+  background: var(--panel); border:1px solid var(--hair); border-left:3px solid var(--s1);
+  font-size: 14.5px; color: var(--ink-2); max-width: 74ch;
+}
+.why b{ color: var(--ink); }
+
+/* ---------- collapsed detail ---------- */
+details.d{
+  margin-top: 16px;
+  background: var(--panel); border:1px solid var(--hair); border-radius: 12px;
+}
+details.d + details.d{ margin-top: 10px; }
+details.d > summary{
+  cursor:pointer; list-style:none; padding: 13px 16px;
+  font-size: 14px; color: var(--s1); display:flex; align-items:center; gap:10px;
+}
+details.d > summary::-webkit-details-marker{ display:none; }
+details.d > summary::before{
+  content:"+"; font-family: var(--mono); font-size:13px; line-height:1;
+  width:20px; height:20px; flex:none; border-radius:5px;
+  border:1px solid rgba(57,135,229,.4); background: rgba(57,135,229,.14);
+  display:flex; align-items:center; justify-content:center;
+}
+details.d[open] > summary::before{ content:"\2212"; }
+details.d > summary:hover{ color:#8fbdf3; }
+details.d .dbody{
+  padding: 4px 16px 18px; border-top:1px solid var(--hair); margin-top:0;
+}
+details.d .dbody > *:first-child{ margin-top:14px; }
+.wordsused{
+  font-size:12.5px; color: var(--ink-3); background: var(--panel-2);
+  border:1px solid var(--hair); border-radius:9px; padding:9px 12px; max-width:82ch;
+}
+.wordsused b{ color: var(--ink-2); font-family: var(--mono); font-size:12px; }
+
+/* ---------- banners ---------- */
+.banner{
+  display:flex; gap:12px; align-items:flex-start;
+  border-radius: 12px; padding: 13px 16px; font-size:13.5px;
+  border:1px solid var(--hair); background: var(--panel);
+  margin-top: 14px;
+}
+.banner .flag{ font-family:var(--mono); font-size:11px; letter-spacing:.09em; text-transform:uppercase; padding:2px 8px; border-radius:6px; flex:none; }
+.banner.warn .flag{ background: rgba(250,178,25,.14); color: var(--warning); border:1px solid rgba(250,178,25,.35); }
+.banner.bad  .flag{ background: rgba(208,59,59,.14); color: var(--critical); border:1px solid rgba(208,59,59,.4); }
+.banner.ok   .flag{ background: rgba(57,135,229,.14); color: #8fbdf3; border:1px solid rgba(57,135,229,.35); }
+.banner ul{ margin:6px 0 0; padding-left:18px; color: var(--ink-2); }
+.banner .btext{ color: var(--ink-2); }
+
+.tag-good, .tag-cost{
+  display:inline-block; font-size:11px; font-family:var(--mono);
+  padding:1px 7px; border-radius:5px; letter-spacing:.02em;
+}
+.tag-good{ background: rgba(57,135,229,.14); color:#8fbdf3; border:1px solid rgba(57,135,229,.32); }
+.tag-cost{ background: rgba(217,89,38,.14); color:#f0a184; border:1px solid rgba(217,89,38,.32); }
+
+/* ---------- charts ---------- */
+.chartcard{ background: var(--panel); border:1px solid var(--hair); border-radius: var(--r); padding: 16px 16px 12px; min-width:0; }
+.charttitle{ font-size:15px; font-weight:600; }
+.chartsub{ font-size:12.5px; color: var(--ink-3); margin-top:3px; margin-bottom:8px; }
+.chart{ position:relative; width:100%; }
+.chart svg{ display:block; width:100%; height:auto; }
+.legend{ display:flex; flex-wrap:wrap; gap:14px; margin: 8px 0 2px; font-size:12.5px; color: var(--ink-2); }
+.legend .item{ display:inline-flex; align-items:center; gap:7px; }
+.legend .swatch{ width:11px; height:11px; border-radius:3px; flex:none; }
+.legend .swatch.dash{ height:0; width:16px; border-top:2px dashed var(--ink-2); border-radius:0; }
+.chartwide{ max-width: 760px; }
+
+/* Used-against-available travel. The EMPTY part of the bar is the point: it is
+   capability the robot has and the walk never calls on. */
+.jbar{ position:relative; height:10px; border-radius:5px; background:rgba(255,255,255,.07);
+       border:1px solid var(--hair); overflow:hidden; }
+.jbar-fill{ position:absolute; inset:0 auto 0 0; background:var(--s1); border-radius:5px 0 0 5px; }
+.jbar-legend{ display:flex; justify-content:space-between; gap:10px; margin-top:6px;
+              font-size:12px; color:var(--ink-2); flex-wrap:wrap; }
+.jrow{ padding:13px 0; border-bottom:1px solid var(--hair); }
+.jrow:last-child{ border-bottom:none; }
+.jrow .jname{ font-size:14.5px; font-weight:600; margin-bottom:8px; }
+
+/* ---------- evidence blocks (inside details) ---------- */
+.splitbar{ height:22px; border-radius:6px; overflow:hidden; display:flex; border:1px solid var(--hair); background:var(--panel-2); }
+.splitbar i{ display:block; height:100%; }
+.hero-cap{ font-size:12px; text-transform:uppercase; letter-spacing:.09em; color:var(--ink-3); margin-bottom:8px; }
+
+/* The two losses inside the foot-slip evidence. Loss A is amber because it may not
+   be real; Loss B is red because it is. Colour is never the only signal — each
+   panel is titled with the word as well. */
+.loss{ background: var(--panel-2); border:1px solid var(--hair); border-radius:12px; padding:16px 18px; min-width:0; }
+.loss.a{ border-left:3px solid var(--warning); }
+.loss.b{ border-left:3px solid var(--critical); }
+.loss .lhead{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+.loss .lid{ font-family:var(--mono); font-size:11.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); }
+.loss .lfig{ font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:23px; letter-spacing:-.03em; }
+.loss .lfig .fu{ font-family:var(--sans); font-size:.5em; color:var(--ink-3); margin-left:.3em; letter-spacing:0; }
+.loss h4{ font-size:15.5px; margin-top:9px; }
+.loss p{ color: var(--ink-2); font-size:13.5px; margin-top:9px; max-width:82ch; }
+
+.bfgrid{ display:grid; gap:16px; margin-top:16px; grid-template-columns: minmax(240px, 340px) 1fr; align-items:start; }
+@media (max-width: 780px){ .bfgrid{ grid-template-columns: 1fr; } }
+.figs{ display:grid; gap:12px; }
+.fig{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+.fig .fv{ font-family:var(--mono); font-variant-numeric:tabular-nums; font-size: clamp(24px,4.4vw,30px); line-height:1.05; letter-spacing:-.03em; min-width:135px; }
+.fig .fk{ font-size:13px; color: var(--ink-2); flex:1 1 140px; min-width:0; }
+.fig .fu{ font-family:var(--sans); font-size:.52em; color: var(--ink-3); margin-left:.3em; letter-spacing:0; }
+
+/* ---------- problem cards (the other nine) ---------- */
+.pb{ background: var(--panel-2); border:1px solid var(--hair); border-radius: var(--r); padding:17px 18px; min-width:0; }
+/* Problem reference tag (B1…B13). Used inside problem cards and in chart titles,
+   so it is deliberately NOT scoped to .pb. */
+.pbid{
+  display:inline-block; font-family:var(--mono); font-size:11px; letter-spacing:.08em;
+  padding:1px 7px; border-radius:5px; border:1px solid var(--hair);
+  color: var(--ink-3); background: var(--panel); vertical-align:middle;
+}
+.pb h4{ font-size:15.5px; margin-top:9px; }
+.pb .say{ color: var(--ink-2); font-size:13.5px; margin-top:6px; }
+.pb .ev{
+  margin-top:11px; padding:10px 12px; border-radius:9px;
+  background: var(--panel); border:1px solid var(--hair);
+  font-family:var(--mono); font-size:12.5px; color: var(--ink);
+  font-variant-numeric: tabular-nums; line-height:1.55;
+}
+.pb .ev b{ font-weight:600; }
+.pb .cost{ margin-top:10px; font-size:13px; color: var(--ink-2); }
+.pb .cost .lbl{ font-size:10.5px; font-family:var(--mono); text-transform:uppercase; letter-spacing:.08em; color:var(--serious); margin-right:7px; }
+.pb .cost .lbl.status{ color: var(--ink-3); }
+
+/* ---------- glossary ---------- */
+.gloss{ display:grid; gap:11px 22px; grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr)); }
+.gloss div{ font-size:13.5px; color: var(--ink-2); }
+.gloss b{ color: var(--ink); font-family:var(--mono); font-size:13px; font-weight:600; }
+
+/* ---------- 3. the stages ---------- */
+.stagecard{ background: var(--panel); border:1px solid var(--hair); border-radius: var(--r); padding:18px; min-width:0; }
+.stagecard .sthead{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+.stagecard .stid{ font-family:var(--mono); font-size:12px; letter-spacing:.12em; color: var(--s1); text-transform:uppercase; }
+.stagecard h3{ font-size:17px; margin-top:6px; }
+.s3{ margin:14px 0 0; }
+.s3 .row{ padding: 10px 0; border-top:1px solid var(--hair); }
+.s3 dt{ font-size:10.5px; font-family:var(--mono); text-transform:uppercase; letter-spacing:.08em; color:var(--ink-3); }
+.s3 dd{ margin:4px 0 0; font-size:14px; color:var(--ink-2); }
+.s3 dd b{ color: var(--ink); font-family:var(--mono); font-variant-numeric:tabular-nums; font-weight:600; }
+.stagecard ul{ margin:10px 0 0; padding-left:19px; color: var(--ink-2); font-size:13.5px; }
+.stagecard ul li{ margin-bottom:6px; }
+.stagecard ul li:last-child{ margin-bottom:0; }
+.blk{ margin-top:14px; }
+.blk .lbl{ font-size:10.5px; font-family:var(--mono); text-transform:uppercase; letter-spacing:.08em; color:var(--ink-3); }
+.blk p{ color: var(--ink-2); font-size:13.5px; margin-top:4px; max-width:82ch; }
+.blk.risk .lbl{ color: var(--serious); }
+
+.gate{
+  border-radius: var(--r);
+  border:2px solid var(--critical);
+  background: linear-gradient(180deg, rgba(208,59,59,.10) 0%, var(--panel) 62%);
+  padding: 22px; margin-top: 20px;
+}
+.gate .gflag{
+  display:inline-block; font-family:var(--mono); font-size:12px; letter-spacing:.14em;
+  text-transform:uppercase; padding:4px 11px; border-radius:6px;
+  background: rgba(208,59,59,.18); color:#f28d8d; border:1px solid rgba(208,59,59,.5);
+}
+.gate h3{ font-size: clamp(18px,2.9vw,22px); margin-top:11px; max-width:46ch; }
+.gate p{ color: var(--ink-2); margin-top:9px; max-width:62ch; font-size:14.5px; }
+.gate ol{ margin:12px 0 0; padding-left:20px; color: var(--ink); font-size:14.5px; max-width:62ch; }
+.gate ol li{ margin-bottom:6px; }
+.gate .stop{ margin-top:14px; font-weight:600; color:#f28d8d; font-size:15px; }
+
+/* ---------- 4. scoring ---------- */
+.rules{ list-style:none; margin:16px 0 0; padding:0; max-width: 78ch; }
+.rules li{
+  display:flex; gap:12px; align-items:flex-start;
+  padding:10px 0; border-bottom:1px solid var(--hair); font-size:14.5px; color:var(--ink);
+}
+.rules li:last-child{ border-bottom:none; }
+.sgn{
+  font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.06em;
+  text-transform:uppercase; padding:2px 8px; border-radius:5px; flex:none; margin-top:3px;
+  min-width:46px; text-align:center;
+}
+.sgn.lose{ background: rgba(208,59,59,.13); color:#e88b8b; border:1px solid rgba(208,59,59,.42); }
+.sgn.gain{ background: rgba(57,135,229,.14); color:#8fbdf3; border:1px solid rgba(57,135,229,.38); }
+.sgn.drop{ background: rgba(255,255,255,.05); color:var(--ink-2); border:1px solid var(--hair-solid); }
+.sgn.chg { background: rgba(250,178,25,.12); color:#e5b449; border:1px solid rgba(250,178,25,.36); }
+
+/* reward table tags */
+.t{ display:inline-block; font-family:var(--mono); font-size:10.5px; font-weight:600;
+    letter-spacing:.08em; text-transform:uppercase; padding:2px 8px; border-radius:5px; }
+.t-add  { background: rgba(57,135,229,.15);  color:#8fbdf3; border:1px solid rgba(57,135,229,.4); }
+.t-raise{ background: rgba(25,158,112,.15);  color:#5fc9a4; border:1px solid rgba(25,158,112,.45); }
+.t-lower{ background: rgba(250,178,25,.13);  color:#e5b449; border:1px solid rgba(250,178,25,.4); }
+.t-del  { background: rgba(208,59,59,.13);   color:#e88b8b; border:1px solid rgba(208,59,59,.42); }
+.t-defer{ background: rgba(255,255,255,.05); color:var(--ink-2); border:1px solid var(--hair-solid); }
+tr.r-add  td:first-child{ box-shadow: inset 3px 0 0 var(--s1); }
+tr.r-raise td:first-child{ box-shadow: inset 3px 0 0 var(--s3); }
+tr.r-lower td:first-child{ box-shadow: inset 3px 0 0 var(--warning); }
+tr.r-del   td:first-child{ box-shadow: inset 3px 0 0 var(--critical); }
+tr.r-defer td:first-child{ box-shadow: inset 3px 0 0 var(--hair-solid); }
+
+/* ---------- 5. never ---------- */
+.never{ list-style:none; margin:0; padding:0; max-width: 76ch; }
+.never li{
+  display:flex; gap:13px; align-items:flex-start;
+  padding:13px 0; border-bottom:1px solid var(--hair); font-size:15px;
+}
+.never li:last-child{ border-bottom:none; }
+.never .x{ color: var(--critical); font-family:var(--mono); font-size:15px; flex:none; margin-top:1px; }
+.never b{ color: var(--ink); }
+.never span.w{ color: var(--ink-2); }
+
+/* ---------- not-doing / limits (inside details) ---------- */
+.nd{ background: var(--panel-2); border:1px solid var(--hair); border-radius: var(--r);
+     border-left:3px solid var(--hair-solid); padding:16px 18px; }
+.nd h4{ font-size:15px; }
+.nd h4 .strike{ font-family:var(--mono); font-size:13px; color: var(--ink-3); }
+.nd p{ color: var(--ink-2); font-size:13.5px; margin-top:7px; }
+
+.constraint{ display:grid; grid-template-columns: 1fr; gap:4px; padding:15px 0; border-bottom:1px solid var(--hair); }
+.constraint:last-child{ border-bottom:none; }
+.constraint .cn{ font-weight:600; font-size:14.5px; }
+.constraint .cv{ font-family:var(--mono); font-size:13px; color: var(--s1); }
+.constraint .cw{ color: var(--ink-2); font-size:13.5px; max-width:82ch; }
+
+/* ---------- footer ---------- */
+footer{ padding: 40px 0 60px; color: var(--ink-3); font-size:12.5px; border-top:1px solid var(--hair); margin-top:44px; }
+
+.stack{ display:grid; gap:14px; }
+.stack-lg{ display:grid; gap:26px; }
+</style>
+</head>
+<body>
+
+<!-- ===== SITE NAV (keep identical on plan.html; only data-here differs) ===== -->
+<nav class="sitenav">
+  <div class="wrap">
+    <a class="navbrand" href="/">Gray</a>
+    <div class="navtabs">
+      <a class="navtab" href="/">Live dashboard</a>
+      <a class="navtab" href="/plan" data-here="1">The plan</a>
+    </div>
+    <a class="navout" href="http://localhost:6006" target="_blank" rel="noopener">Raw charts &#8599;</a>
+  </div>
+</nav>
+<!-- ===== END SITE NAV ===== -->
+
+<!-- ================================================================
+     1. THE FIRST SCREEN — the decision. Nothing else belongs here.
+     ================================================================ -->
+<header class="hero">
+  <div class="wrap heroinner">
+
+    <h1>The plan</h1>
+    <p class="onesentence">Four things are wrong with the way Gray walks, and this plan fixes them.</p>
+
+    <div class="tiles">
+      <a class="ptile" href="#p1">
+        <div class="pname">Feet slide</div>
+        <div class="pnum" style="color:var(--critical)">68<span class="u">mm/s</span></div>
+        <div class="psay">the foot skids instead of gripping</div>
+      </a>
+      <a class="ptile" href="#p2">
+        <div class="pname">Back feet scrape</div>
+        <div class="pnum" style="color:var(--critical)">0.8<span class="u">mm</span></div>
+        <div class="psay">they barely leave the ground</div>
+      </a>
+      <a class="ptile" href="#p3">
+        <div class="pname">4 servos unused</div>
+        <div class="pnum" style="color:var(--serious)">0<span class="u">deg</span></div>
+        <div class="psay">they never move at all</div>
+      </a>
+      <a class="ptile" href="#p4">
+        <div class="pname">Safety limit hit</div>
+        <div class="pnum" style="color:var(--serious)">28<span class="u">%</span></div>
+        <div class="psay">the AI is fighting its own limit</div>
+      </a>
+    </div>
+
+    <p class="costline">
+      <span class="ch">220 hours</span>
+      <span>of graphics-card time, spread over four stages.</span>
+    </p>
+
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ================================================================
+     2. THE FOUR PROBLEMS
+     ================================================================ -->
+
+<!-- ---------------- problem 1 ---------------- -->
+<section class="prob" id="p1">
+  <div class="probhead">
+    <span class="probno">01</span>
+    <h2>The feet slide</h2>
+  </div>
+
+  <div class="bigline">
+    <div class="bn" style="color:var(--critical)">68<span class="u">mm/s</span></div>
+    <div class="bt">how fast a planted foot slides backwards across the floor</div>
+  </div>
+
+  <p class="says">A planted foot should stay still while the body moves over it. Gray's does not.</p>
+
+  <div class="chartcard chartwide" style="margin-top:16px">
+    <div class="charttitle">Where the step goes</div>
+    <div class="chartsub">Four speeds measured on the same walk, all drawn on one scale.</div>
+    <div class="chart">
+<svg viewBox="0 0 480 216" role="img" aria-label="Horizontal bar chart, all bars on one scale in millimetres per second: commanded sweep 267, sweep achieved 163 with 104 short of the command, foot skid on floor 68, body forward travel 57">
+            <!-- vertical gridlines at 0, 100, 200, 300 mm/s -->
+            <line x1="250" y1="14" x2="250" y2="160" stroke="var(--grid)" stroke-width="1"/>
+            <line x1="350" y1="14" x2="350" y2="160" stroke="var(--grid)" stroke-width="1"/>
+            <line x1="450" y1="14" x2="450" y2="160" stroke="var(--grid)" stroke-width="1"/>
+            <line x1="150" y1="14" x2="150" y2="160" stroke="var(--axis)" stroke-width="1"/>
+
+            <!-- row 1 — commanded 267 -->
+            <rect x="150" y="20" width="267" height="24" rx="4" fill="var(--ink-3)" fill-opacity="0.5"/>
+            <text x="142" y="36.5" text-anchor="end" fill="var(--ink-2)" font-size="12.5" font-family="var(--sans)">commanded sweep</text>
+            <text x="425" y="36.5" fill="var(--ink-2)" font-size="13.5" font-family="var(--mono)">267</text>
+
+            <!-- row 2 — achieved 163, with the 104 shortfall drawn to the same scale -->
+            <rect x="150" y="56" width="163" height="24" rx="4" fill="var(--s2)" fill-opacity="0.9"/>
+            <rect x="313" y="56" width="104" height="24" rx="4" fill="var(--s2)" fill-opacity="0.10"
+                  stroke="var(--s2)" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <text x="142" y="72.5" text-anchor="end" fill="var(--ink-2)" font-size="12.5" font-family="var(--sans)">sweep achieved</text>
+            <text x="305" y="72.5" text-anchor="end" fill="#ffffff" font-size="13.5" font-family="var(--mono)">163</text>
+            <text x="365" y="72.5" text-anchor="middle" fill="var(--s2)" font-size="11.5" font-family="var(--mono)">104 short</text>
+
+            <!-- row 3 — skid 68 -->
+            <rect x="150" y="92" width="68" height="24" rx="4" fill="var(--critical)"/>
+            <text x="142" y="108.5" text-anchor="end" fill="var(--ink-2)" font-size="12.5" font-family="var(--sans)">foot skid on floor</text>
+            <text x="226" y="108.5" fill="var(--critical)" font-size="13.5" font-family="var(--mono)">68</text>
+
+            <!-- row 4 — body 57 -->
+            <rect x="150" y="128" width="57" height="24" rx="4" fill="var(--s1)"/>
+            <text x="142" y="144.5" text-anchor="end" fill="var(--ink-2)" font-size="12.5" font-family="var(--sans)">body forward travel</text>
+            <text x="215" y="144.5" fill="var(--s1)" font-size="13.5" font-family="var(--mono)">57</text>
+
+            <!-- scale -->
+            <text x="150" y="176" text-anchor="middle" fill="var(--ink-3)" font-size="11.5" font-family="var(--mono)">0</text>
+            <text x="250" y="176" text-anchor="middle" fill="var(--ink-3)" font-size="11.5" font-family="var(--mono)">100</text>
+            <text x="350" y="176" text-anchor="middle" fill="var(--ink-3)" font-size="11.5" font-family="var(--mono)">200</text>
+            <text x="450" y="176" text-anchor="middle" fill="var(--ink-3)" font-size="11.5" font-family="var(--mono)">300</text>
+            <text x="300" y="198" text-anchor="middle" fill="var(--ink-3)" font-size="12" font-family="var(--sans)">millimetres per second</text>
+          </svg>
+    </div>
+  </div>
+
+  <p class="why"><b>Why it matters.</b> Most of the leg's effort scrubs the floor instead of moving the robot.</p>
+
+  <details class="d">
+    <summary>Show me the evidence</summary>
+    <div class="dbody">
+
+      <p class="muted" style="font-size:12.5px">Listed as <span class="pbid">B1</span> in the full set of thirteen findings.</p>
+
+      <div class="wordsused">
+        Words used here: <b>the AI</b> — the learned layer that adds a small correction on top of
+        the walk we wrote by hand. <b>a saved copy</b> — the AI's behaviour saved at one point in
+        training, so we can go back to it. Full list at the bottom of the page.
+      </div>
+
+      <div class="banner bad" style="margin-top:14px">
+        <span class="flag">read this first</span>
+        <div class="btext">
+          This problem is <b>two separate losses</b>, not one. Loss&nbsp;B is real and we can act on
+          it. Loss&nbsp;A is larger, but it may be a fault in the simulation rather than in the robot,
+          and no amount of training can fix that. Read Loss&nbsp;B first.
+        </div>
+      </div>
+
+      <p class="sec-ink" style="font-size:13.5px; margin-top:14px; max-width:82ch">
+        In a walk, a planted foot is supposed to stay put while the body moves over it. Gray's planted
+        feet do not. Four things were measured on the same walk: what the gait <em>commands</em> the leg
+        to do, what the leg <em>actually does</em>, how fast the planted foot <em>skids</em> on the floor,
+        and how fast the body <em>ends up going</em>. Between the first and the last, roughly four fifths
+        of the commanded stride disappears &mdash; and it disappears in two quite different ways, which
+        have to be separated before anything is spent on either.
+      </p>
+      <p class="sec-ink" style="font-size:13.5px; margin-top:10px; max-width:82ch">
+        These are four independent measurements of one walk, not four lines of a balance sheet. They do
+        not subtract neatly into one another, and this page does not pretend they do: no figure below is
+        obtained by taking one of them away from another. In the chart above, the dashed outline on the
+        second bar is Loss&nbsp;A and the third bar is Loss&nbsp;B; they are measured separately and are
+        not two halves of one total.
+      </p>
+
+      <div class="bfgrid">
+        <div class="figs">
+          <div class="fig">
+            <div class="fv" style="color:var(--ink-2)">267<span class="fu">mm/s</span></div>
+            <div class="fk">Commanded backward sweep of each planted foot, relative to the body</div>
+          </div>
+          <div class="fig">
+            <div class="fv" style="color:var(--s2)">163<span class="fu">mm/s</span></div>
+            <div class="fk">Sweep the leg actually achieves</div>
+          </div>
+          <div class="fig">
+            <div class="fv" style="color:var(--critical)">68<span class="fu">mm/s</span></div>
+            <div class="fk">Measured speed of each planted foot skidding across the floor</div>
+          </div>
+          <div class="fig">
+            <div class="fv" style="color:var(--s1)">57<span class="fu">mm/s</span></div>
+            <div class="fk">Forward speed the robot actually achieves</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="hero-cap">Commanded sweep against forward travel</div>
+          <div class="splitbar">
+            <i style="width:21%; background:var(--s1)"></i>
+            <i style="width:79%; background:rgba(208,59,59,.55)"></i>
+          </div>
+          <div class="jbar-legend">
+            <span>21% becomes forward travel</span>
+            <span style="color:#e88b8b">79% does not</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="stack" style="margin-top:18px">
+
+        <div class="loss b">
+          <div class="lhead">
+            <span class="lid">Loss B &mdash; the one we can act on</span>
+            <span class="lfig" style="color:var(--critical)">68<span class="fu">mm/s</span></span>
+            <span class="muted" style="font-size:12.5px">measured at the foot, against the ground</span>
+          </div>
+          <h4>The planted foot skids along the floor</h4>
+          <p>
+            A planted foot is meant to be a fixed point that the body pulls itself over. Gray's slides
+            backwards across the floor at <span class="mono">68&nbsp;mm/s</span> while it is carrying
+            load. This one is real <em>whatever</em> the servo model turns out to be: it is measured from
+            the foot's movement against the ground, not inferred from a torque, so a stiffer servo would
+            not make it go away. It is also the only one of the two that the proposed stance-anchoring
+            reward actually targets. Stage B is a test of Loss B and of nothing else.
+          </p>
+        </div>
+
+        <div class="loss a">
+          <div class="lhead">
+            <span class="lid">Loss A &mdash; the larger one</span>
+            <span class="lfig" style="color:var(--s2)">104<span class="fu">mm/s</span></span>
+            <span class="muted" style="font-size:12.5px">39% of what was commanded</span>
+          </div>
+          <h4>The leg never achieves what it is told</h4>
+          <p>
+            The gait asks each planted leg for <span class="mono">267&nbsp;mm/s</span> of backward sweep
+            and gets <span class="mono">163</span>. Nothing is slipping in this one &mdash; the leg simply
+            does not get there. In simulation the hip-pitch servo sits at its torque limit
+            <span class="mono">72.6%</span> of the time and finishes <span class="mono">25&deg;</span>
+            away from the angle it was commanded. That is the signature of a servo being asked for more
+            than it has.
+          </p>
+          <div class="banner warn" style="margin-top:14px">
+            <span class="flag">may not be real</span>
+            <div class="btext">
+              <b>Loss A may be an artefact of the simulation rather than a fault in the robot.</b>
+              The servo model is the single largest unquantified risk in the whole project (finding
+              <span class="mono">B13</span>): it models each DS3218MG as
+              <span class="mono">20&nbsp;N&middot;m/rad</span>, which works out as a proportional band
+              (how far the servo has to be pushed off its commanded angle before it is giving all the
+              torque it has) of only <span class="mono">5.6&deg;</span> &mdash; a distinctly soft servo.
+              A modern digital servo is likely to be a good deal stiffer than that. If it is, then much
+              of Loss A does not exist on the real machine at all, and the simulated robot has been
+              learning to compensate for a sag that is not there.
+              <br><br>
+              It cannot be checked either way today, because <b>the robot is disassembled</b> and there is
+              no bench measurement to check it against.
+              <br><br>
+              <b>So do not chase this one first.</b> No reward and no amount of training can fix a wrong
+              servo model; only a servo, a bench and a torque measurement at reassembly can. Until then
+              the plan merely contains it: servo stiffness randomisation (deliberately varying the
+              stiffness between simulated robots) widens from
+              <span class="mono">0.7&ndash;1.4&times;</span> to <span class="mono">0.5&ndash;4.0&times;</span>,
+              which costs nothing and forces the learned behaviour to work across every plausible servo.
+              That contains the risk. It does not resolve it.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="subhead">Loss B in detail &mdash; what it is not</h3>
+      <div class="grid g-auto-wide">
+        <div class="card tight" style="background:var(--panel-2)">
+          <div class="hero-cap">It is not a grip problem</div>
+          <p class="sec-ink" style="font-size:13.5px">
+            There is <span class="mono">16&nbsp;N</span> of traction available against a
+            <span class="mono">0.1&nbsp;N</span> demand &mdash; a margin of more than a hundred times.
+            The feet are not sliding because they cannot hold. They are sliding because four open-loop
+            legs (commanded blind, with no feedback of any kind) are each running their own fixed
+            pattern with no knowledge of what the other three are doing, so they pull against each other
+            and something has to give.
+          </p>
+        </div>
+        <div class="card tight" style="background:var(--panel-2)">
+          <div class="hero-cap">It is not a speed limit</div>
+          <p class="sec-ink" style="font-size:13.5px">
+            The same skid shows up at every stride length from <span class="mono">60</span> to
+            <span class="mono">160&nbsp;mm</span> and every gait period from <span class="mono">0.6</span>
+            to <span class="mono">1.2&nbsp;s</span>. It does not go away when you slow down or shorten
+            the step, which makes it structural &mdash; built into how the gait is generated, not a
+            symptom of pushing the servos too hard.
+          </p>
+        </div>
+        <div class="card tight" style="background:var(--panel-2)">
+          <div class="hero-cap">What fixing it buys, stated honestly</div>
+          <p class="sec-ink" style="font-size:13.5px">
+            Loss B is <span class="mono">68&nbsp;mm/s</span> of foot movement going into scrubbing the
+            floor rather than into travel, on the same servos, the same stride length and the same
+            landing impact &mdash; no extra load on any part. Recovering it is worth real speed. It is
+            deliberately not quoted as an "after" figure: the four measurements above do not subtract
+            into one another, so any single resulting speed would be invented. Stage B measures slip
+            directly, before and after, and that measurement is what decides it. Loss&nbsp;A is not in
+            this number, and no reward will fix Loss&nbsp;A.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </details>
+</section>
+
+<!-- ---------------- problem 2 ---------------- -->
+<section class="prob" id="p2">
+  <div class="probhead">
+    <span class="probno">02</span>
+    <h2>The back feet scrape</h2>
+  </div>
+
+  <div class="bigline">
+    <div class="bn" style="color:var(--critical)">0.8<span class="u">mm</span></div>
+    <div class="bt">how far the back feet lift off the floor</div>
+  </div>
+
+  <p class="says">The walk asks every foot to lift 34 mm. The back feet manage 0.8 mm.</p>
+
+  <div class="chartcard chartwide" style="margin-top:16px">
+    <div class="charttitle">How high each foot lifts</div>
+    <div class="chartsub">Asked for 34.0 mm. Front feet reach 21.6 mm, back feet 0.8 mm.</div>
+    <div class="chart">
+<svg viewBox="0 0 440 240" role="img" aria-label="Bar chart: commanded lift 34 mm, front feet 21.6 mm, back feet 0.8 mm">
+          <!-- y grid -->
+          <line x1="58" y1="180" x2="424" y2="180" stroke="var(--axis)" stroke-width="1"/>
+          <line x1="58" y1="135.9" x2="424" y2="135.9" stroke="var(--grid)" stroke-width="1"/>
+          <line x1="58" y1="91.8"  x2="424" y2="91.8"  stroke="var(--grid)" stroke-width="1"/>
+          <line x1="58" y1="47.6"  x2="424" y2="47.6"  stroke="var(--grid)" stroke-width="1"/>
+          <text x="50" y="184" text-anchor="end" fill="var(--ink-3)" font-size="12" font-family="var(--mono)">0</text>
+          <text x="50" y="140" text-anchor="end" fill="var(--ink-3)" font-size="12" font-family="var(--mono)">10</text>
+          <text x="50" y="96"  text-anchor="end" fill="var(--ink-3)" font-size="12" font-family="var(--mono)">20</text>
+          <text x="50" y="52"  text-anchor="end" fill="var(--ink-3)" font-size="12" font-family="var(--mono)">30</text>
+          <text x="16" y="112" fill="var(--ink-3)" font-size="12" text-anchor="middle" transform="rotate(-90 16 112)">mm of lift</text>
+
+          <!-- commanded reference -->
+          <line x1="58" y1="30" x2="424" y2="30" stroke="var(--ink-2)" stroke-width="1.5" stroke-dasharray="6 5"/>
+
+          <!-- bars -->
+          <rect x="82"  y="30"    width="74" height="150" rx="4" fill="var(--ink-3)" fill-opacity="0.55"/>
+          <rect x="192" y="84.7"  width="74" height="95.3" rx="4" fill="var(--s1)" fill-opacity="0.9"/>
+          <rect x="302" y="176.5" width="74" height="3.5"  rx="1.5" fill="var(--critical)"/>
+
+          <!-- values -->
+          <text x="119" y="22"  text-anchor="middle" fill="var(--ink-2)"  font-size="15" font-family="var(--mono)">34.0</text>
+          <text x="229" y="77"  text-anchor="middle" fill="var(--s1)"      font-size="15" font-family="var(--mono)">21.6</text>
+          <text x="339" y="169" text-anchor="middle" fill="var(--critical)" font-size="15" font-family="var(--mono)">0.8</text>
+
+          <!-- labels -->
+          <text x="119" y="202" text-anchor="middle" fill="var(--ink-3)" font-size="13" font-family="var(--sans)">commanded</text>
+          <text x="229" y="202" text-anchor="middle" fill="var(--ink-3)" font-size="13" font-family="var(--sans)">front feet</text>
+          <text x="339" y="202" text-anchor="middle" fill="var(--ink-3)" font-size="13" font-family="var(--sans)">back feet</text>
+          <text x="241" y="228" text-anchor="middle" fill="var(--ink-3)" font-size="12.5" font-family="var(--sans)">measured over a full walk cycle</text>
+        </svg>
+    </div>
+  </div>
+
+  <p class="why"><b>Why it matters.</b> On carpet, or a door strip, a foot that low catches and the robot trips.</p>
+
+  <details class="d">
+    <summary>Show me the evidence</summary>
+    <div class="dbody">
+      <p class="muted" style="font-size:12.5px">Listed as <span class="pbid">B2</span> in the full set of thirteen findings.</p>
+      <p class="sec-ink" style="font-size:13.5px; max-width:82ch; margin-top:12px">
+        The back feet clear the floor by <span class="mono">0.8&nbsp;mm</span> &mdash; they are shuffled
+        forward, not stepped. On a flat hard floor it gets away with it. On carpet, or a threshold
+        strip, it trips. This is also why the front legs look like they are doing all the work: they are.
+      </p>
+      <p class="sec-ink" style="font-size:13.5px; margin-top:12px; max-width:82ch">
+        It is measured over a full walk cycle, as the highest point each foot reaches. The front feet
+        reach <span class="mono">21.6&nbsp;mm</span> of the <span class="mono">34.0&nbsp;mm</span>
+        commanded, which is already short; the back feet reach
+        <span class="mono">2.4%</span> of it.
+      </p>
+      <div class="banner warn">
+        <span class="flag">connected</span>
+        <div class="btext">
+          This is the direct cause of finding <span class="mono">B3</span> below: the rear legs carry
+          <span class="mono">67%</span> of the weight but supply only <span class="mono">28%</span> of
+          the push. A foot that never lifts cannot be placed anywhere useful, so it cannot push. The
+          two are one fault, seen from two ends.
+        </div>
+      </div>
+      <div class="blk">
+        <div class="lbl">how it is fixed</div>
+        <p>Stage C, together with the hips. Two parts: pay the robot for lifting a swinging foot clear
+          of the ground, and keep the body level front-to-back &mdash; levelling the body raises the
+          back feet without asking any servo for more travel than it already has.</p>
+      </div>
+    </div>
+  </details>
+</section>
+
+<!-- ---------------- problem 3 ---------------- -->
+<section class="prob" id="p3">
+  <div class="probhead">
+    <span class="probno">03</span>
+    <h2>Four servos never move</h2>
+  </div>
+
+  <div class="bigline">
+    <div class="bn" style="color:var(--serious)">0<span class="u">deg</span></div>
+    <div class="bt">what the four hip servos are asked to do, ever</div>
+  </div>
+
+  <p class="says">Every servo can turn 270 deg. The four hip servos turn 0 deg, never once.</p>
+
+  <div class="chartcard chartwide" style="margin-top:16px">
+    <div class="charttitle">How much of each servo the walk uses</div>
+    <div class="chartsub">The filled part is used. The empty part is movement you built and we never ask for.</div>
+
+    <div style="margin-top:14px">
+      <div class="jrow">
+        <div class="jname">Thigh joints &mdash; 4 servos</div>
+        <div class="jbar" title="44 to 55 degrees used of 270 available">
+          <div class="jbar-fill" style="width:20.4%"></div>
+        </div>
+        <div class="jbar-legend"><span class="mono">44&ndash;55&deg; used &middot; 16&ndash;20%</span><span class="mono muted">270&deg; available</span></div>
+      </div>
+      <div class="jrow">
+        <div class="jname">Knee joints &mdash; 4 servos</div>
+        <div class="jbar" title="24 to 28 degrees used of 270 available">
+          <div class="jbar-fill" style="width:10.4%"></div>
+        </div>
+        <div class="jbar-legend"><span class="mono">24&ndash;28&deg; used &middot; 9&ndash;10%</span><span class="mono muted">270&deg; available</span></div>
+      </div>
+      <div class="jrow">
+        <div class="jname">Hip / abduction joints &mdash; 4 servos</div>
+        <div class="jbar" title="0.0 degrees used of 270 available">
+          <div class="jbar-fill" style="width:0%"></div>
+        </div>
+        <div class="jbar-legend"><span class="mono" style="color:#e88b8b">0.0&deg; used &middot; exactly zero, never once</span><span class="mono muted">270&deg; available</span></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="why"><b>Why it matters.</b> The robot cannot turn and cannot step sideways, because of one number in one file.</p>
+
+  <details class="d">
+    <summary>Show me the evidence</summary>
+    <div class="dbody">
+      <p class="muted" style="font-size:12.5px">Listed as <span class="pbid">B4</span> in the full set of thirteen findings.</p>
+      <div class="banner bad">
+        <span class="flag">cause</span>
+        <div class="btext">
+          <span class="mono">gray/gait.py</span> builds every foot target as
+          <span class="mono">neutral + [forward, 0.0, up]</span>. That hardcoded
+          <span class="mono">0.0</span> is the sideways component &mdash; it is written in as zero and
+          never computed. It is the only reason the robot cannot turn or strafe. The legs can already
+          reach a <span class="mono">140&nbsp;mm</span> sideways stride, so the hardware is not the
+          limit. One number in one file is.
+        </div>
+      </div>
+      <div class="blk">
+        <div class="lbl">what the fix actually is</div>
+        <p>For a commanded body movement (forward, sideways, turn), each foot must travel through its
+          stance along <span class="mono">&minus;(v + &omega; &times; r)</span>. That one expression
+          automatically gives every leg its own stride length <em>and</em> its own direction, which is
+          what turning is. Turning, sideways walking and variable ride height are therefore not three
+          features &mdash; they are the same change, made once.</p>
+      </div>
+      <div class="blk">
+        <div class="lbl">measured travel, against what each servo has</div>
+        <p>Thigh joints use <span class="mono">44&ndash;55&deg;</span> of
+          <span class="mono">270&deg;</span>. Knee joints use <span class="mono">24&ndash;28&deg;</span>.
+          Hip joints use <span class="mono">0.0&deg;</span> &mdash; not a small number, exactly zero, in
+          every sample of every run.</p>
+      </div>
+    </div>
+  </details>
+</section>
+
+<!-- ---------------- problem 4 ---------------- -->
+<section class="prob" id="p4">
+  <div class="probhead">
+    <span class="probno">04</span>
+    <h2>The AI is fighting its own safety limit</h2>
+  </div>
+
+  <div class="bigline">
+    <div class="bn" style="color:var(--serious)">28<span class="u">%</span></div>
+    <div class="bt">how often its correction is stopped by the safety limit</div>
+  </div>
+
+  <p class="says">The AI may bend each joint by up to 11 deg, for safety. It now asks for more than that 28% of the time.</p>
+
+  <div class="chartcard chartwide" style="margin-top:16px">
+    <div class="charttitle">How often the safety limit has to stop it</div>
+    <div class="chartsub">Measured at three points during one training run. It is going the wrong way.</div>
+    <div class="chart">
+<svg viewBox="0 0 440 264" role="img" aria-label="Bar chart: 1.7 percent at round 500, 20.2 percent at round 950, 27.9 percent at round 1100">
+          <line x1="58" y1="180" x2="424" y2="180" stroke="var(--axis)" stroke-width="1"/>
+          <line x1="58" y1="130" x2="424" y2="130" stroke="var(--grid)" stroke-width="1"/>
+          <line x1="58" y1="80"  x2="424" y2="80"  stroke="var(--grid)" stroke-width="1"/>
+          <line x1="58" y1="30"  x2="424" y2="30"  stroke="var(--grid)" stroke-width="1"/>
+          <text x="50" y="184" text-anchor="end" fill="var(--ink-3)" font-size="12" font-family="var(--mono)">0</text>
+          <text x="50" y="134" text-anchor="end" fill="var(--ink-3)" font-size="12" font-family="var(--mono)">10</text>
+          <text x="50" y="84"  text-anchor="end" fill="var(--ink-3)" font-size="12" font-family="var(--mono)">20</text>
+          <text x="50" y="34"  text-anchor="end" fill="var(--ink-3)" font-size="12" font-family="var(--mono)">30</text>
+          <text x="16" y="105" fill="var(--ink-3)" font-size="12" text-anchor="middle" transform="rotate(-90 16 105)">% at the limit</text>
+
+          <rect x="86"  y="171.5" width="74" height="8.5"   rx="3" fill="var(--s1)" fill-opacity="0.9"/>
+          <rect x="196" y="79"    width="74" height="101"   rx="4" fill="var(--serious)"/>
+          <rect x="306" y="40.5"  width="74" height="139.5" rx="4" fill="var(--critical)"/>
+
+          <text x="123" y="163" text-anchor="middle" fill="var(--s1)"       font-size="15" font-family="var(--mono)">1.7%</text>
+          <text x="233" y="71"  text-anchor="middle" fill="var(--serious)"  font-size="15" font-family="var(--mono)">20.2%</text>
+          <text x="343" y="33"  text-anchor="middle" fill="var(--critical)" font-size="15" font-family="var(--mono)">27.9%</text>
+
+          <text x="123" y="202" text-anchor="middle" fill="var(--ink-3)" font-size="13" font-family="var(--mono)">round 500</text>
+          <text x="233" y="202" text-anchor="middle" fill="var(--ink-3)" font-size="13" font-family="var(--mono)">round 950</text>
+          <text x="343" y="202" text-anchor="middle" fill="var(--ink-3)" font-size="13" font-family="var(--mono)">round 1100</text>
+          <!-- Three short lines. As one line at 12.5px this caption was wider than the
+               viewBox and was being silently clipped at the right-hand edge. -->
+          <text x="241" y="222" text-anchor="middle" fill="var(--ink-3)" font-size="12" font-family="var(--sans)">the noise itself, never turning over:</text>
+          <text x="241" y="240" text-anchor="middle" fill="var(--ink-3)" font-size="12" font-family="var(--mono)">0.101 &rarr; 0.191 &rarr; 0.286 &rarr; 0.313</text>
+          <text x="241" y="256" text-anchor="middle" fill="var(--ink-3)" font-size="11.5" font-family="var(--sans)">at rounds 0, 300, 700 and 1150</text>
+        </svg>
+    </div>
+  </div>
+
+  <p class="why"><b>Why it matters.</b> The safe fallback only holds while the corrections stay small, and they no longer are.</p>
+
+  <details class="d">
+    <summary>Show me the evidence</summary>
+    <div class="dbody">
+      <p class="muted" style="font-size:12.5px">Listed as <span class="pbid">B10</span> in the full set of thirteen findings.</p>
+
+      <div class="wordsused">
+        Words used here: <b>the policy</b> — the AI, the learned layer that adds a small correction on
+        top of the walk we wrote by hand. <b>clipped</b> — cut down to a limit: a correction of
+        0.31&nbsp;rad against a &plusmn;0.2&nbsp;rad ceiling is clipped to 0.2, and the trainer is never
+        told that 0.11 of what it asked for was thrown away.
+      </div>
+      <p class="sec-ink" style="font-size:13.5px; margin-top:14px; max-width:82ch">
+        While training, the robot deliberately adds a random wobble to its corrections so it can
+        discover things &mdash; and that wobble is supposed to shrink as it settles on an answer.
+        It is doing the opposite: <span class="mono">0.101</span> at the start, then
+        <span class="mono">0.191</span> at round 300, <span class="mono">0.286</span> at round 700,
+        <span class="mono">0.313</span> at round 1150, never turning over. The safety argument for
+        this whole design is that a bad policy falls back toward a gait that already walks &mdash; and
+        that only holds while the correction stays small. At round 1100 the policy is fighting the
+        safety limit rather than nudging the gait.
+      </p>
+      <p class="sec-ink" style="font-size:13.5px; margin-top:12px; max-width:82ch">
+        It also feeds itself: a correction that gets clipped teaches nothing, so nothing pushes the
+        wobble back down, while a separate bonus for "keep your options open" keeps paying for it to
+        widen.
+      </p>
+      <div class="blk">
+        <div class="lbl">how it is fixed</div>
+        <p>Stage A, three parts, none of which costs any graphics-card time. Start logging the share of
+          corrections hitting the limit &mdash; today it is not recorded anywhere, which is why it ran
+          this far unnoticed. Add a small penalty on the size of the correction <em>before</em> the
+          limit clips it, so there is finally something pushing back. Fade the "keep your options open"
+          bonus from <span class="mono">0.005</span> to <span class="mono">0.0005</span> over the first
+          third of a run.</p>
+      </div>
+    </div>
+  </details>
+</section>
+
+<!-- ================================================================
+     3. THE PLAN
+     ================================================================ -->
+<section id="plan">
+  <div class="sechead">
+    <div class="eyebrow">the plan</div>
+    <h2>Four stages, in this order</h2>
+    <p class="sub">Cheapest and most certain first. There is a hard stop between the first and the second.</p>
+  </div>
+
+  <div class="grid g-stages">
+
+    <!-- STAGE A -->
+    <div class="stagecard">
+      <div class="sthead"><span class="stid">Stage A</span></div>
+      <h3>Fix the measuring first</h3>
+      <dl class="s3">
+        <div class="row">
+          <dt>what we do</dt>
+          <dd>Repair how we measure, before spending any card time.</dd>
+        </div>
+        <div class="row">
+          <dt>what it costs</dt>
+          <dd><b>0 hours</b> of card time. About 2 hours of my time.</dd>
+        </div>
+        <div class="row">
+          <dt>what you get</dt>
+          <dd>Numbers you can trust when we ask "did that help?"</dd>
+        </div>
+      </dl>
+      <details class="d">
+        <summary>Show me the detail</summary>
+        <div class="dbody">
+          <p class="sec-ink" style="font-size:13.5px">
+            Nothing here trains anything. It is entirely about making sure that when we later ask "did
+            that help?", the answer we get back is true. We have already lost a full run to a scoring bug,
+            so this comes first. <span class="muted">Fixes B6, B7, B8, B10, B12.</span>
+          </p>
+          <ul>
+            <li><b>A1 &mdash; rebuild the scoring harness</b> (the separate program that scores a saved
+              copy after the fact, and decides which one is best). Five random starts, five commanded
+              speeds spanning <span class="mono">&minus;40</span> to <span class="mono">+80 mm/s</span>
+              including zero (where a robot that has learned to freeze can hide), and eight
+              randomisation draws per attempt. <span class="muted">Fixes B8.</span></li>
+            <li><b>A2 &mdash; re-measure the classical gait properly.</b> Thirty random starts &times; five
+              commands, quoted as a range rather than a single number, and replace that single number
+              everywhere it appears. <span class="muted">Fixes B7.</span></li>
+            <li><b>A3 &mdash; stop the noise runaway.</b> Start logging the share of corrections hitting
+              the safety limit (currently invisible); add a small penalty, at weight
+              <span class="mono">&minus;0.002</span>, on the size of the correction <em>before</em> the
+              safety limit clips it; and fade the "keep your options open" bonus from
+              <span class="mono">0.005</span> to <span class="mono">0.0005</span> over the first third
+              of a run. <span class="muted">Fixes B10.</span></li>
+            <li><b>A4 &mdash; delete two dead scoring items.</b> One accounts for 0.05% of the total score
+              and points the wrong way; the other cannot ever fire, because a different limit always acts
+              first.</li>
+            <li><b>A5 &mdash; fix the straightness reward.</b> Widen <span class="mono">0.050 &rarr; 0.150</span>,
+              halve its weight <span class="mono">1.0 &rarr; 0.5</span>, and add a term that measures how
+              far sideways of the intended line the robot ended up. That measure is immune to footfall
+              ripple by construction rather than by tuning. <span class="muted">Fixes B12.</span></li>
+            <li><b>A6 &mdash; only count a foot as down if it is carrying more than 1 N.</b> Stops us
+              paying for bounce. <span class="muted">Fixes B6.</span></li>
+            <li><b>A7 &mdash; housekeeping for a long run.</b> Disk retention (currently unmanaged: a month
+              writes about <span class="mono">160 GB</span> of checkpoints and video, and the machine has
+              <span class="mono">78 GB</span> free), an automatic restart from the newest saved copy after
+              a crash, alarms, and a graphics-card power cap at 85% &mdash; on this card the last 15% buys
+              3&ndash;5% throughput and roughly doubles fan duty over 700 hours.</li>
+          </ul>
+          <div class="blk risk">
+            <div class="lbl">what could go wrong</div>
+            <p>The new harness is slower to run than the old one, because it does 200 times as much work
+              per saved copy. That is the price of an answer you can rely on. Nothing in Stage A can make
+              the robot worse; the worst case is that it costs two hours and tells us the old numbers were
+              fine.</p>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- STAGE B -->
+    <div class="stagecard">
+      <div class="sthead"><span class="stid">Stage B</span></div>
+      <h3>Stop the feet sliding</h3>
+      <dl class="s3">
+        <div class="row">
+          <dt>what we do</dt>
+          <dd>Take points away from any loaded foot that slides.</dd>
+        </div>
+        <div class="row">
+          <dt>what it costs</dt>
+          <dd><b>8 hours</b> of card time. None of my time.</dd>
+        </div>
+        <div class="row">
+          <dt>what you get</dt>
+          <dd>A straight answer on whether the 68 mm/s skid can be trained away.</dd>
+        </div>
+      </dl>
+      <details class="d">
+        <summary>Show me the detail</summary>
+        <div class="dbody">
+          <p class="sec-ink" style="font-size:13.5px">
+            Add one scoring item: any foot that is carrying load gets penalised for moving sideways across
+            the floor, at weight <span class="mono">&minus;8.0</span> &mdash; a large weight, because the
+            skid is the largest loss we are confident is real. Then log the measured slip directly against
+            the <span class="mono">68 mm/s</span> baseline, so we can see whether it actually fell.
+            <span class="muted">Addresses Loss B of B1, and nothing else.</span>
+          </p>
+          <div class="blk">
+            <div class="lbl">what it buys</div>
+            <p>The target is the <span class="mono">68 mm/s</span> the planted foot currently spends
+              scrubbing the floor. Recovering that is worth real speed, on the same servos, the same stride
+              and the same landing impact. No resulting speed is quoted here on purpose: the four
+              measurements in B1 are independent and do not subtract into one another, so the only honest
+              answer comes from measuring slip before and after &mdash; which is exactly what this stage
+              does. Eight hours is a cheap test of the most valuable hypothesis we have.</p>
+          </div>
+          <div class="blk">
+            <div class="lbl">what it explicitly does not buy</div>
+            <p>Loss A &mdash; the <span class="mono">104 mm/s</span> the leg is told to sweep and does not
+              &mdash; is untouched by this stage and by every other stage in the plan. A reward cannot make
+              a servo stronger, and it certainly cannot correct a servo <em>model</em> that may be wrong.
+              Loss A is closed by a bench measurement at reassembly (B13), not here.</p>
+          </div>
+          <div class="blk risk">
+            <div class="lbl">what could go wrong</div>
+            <p>Weighted too hard, the robot finds the lazy way out: it shortens its stride until there is
+              barely any foot movement to penalise. That would score well and walk worse. This is exactly
+              why the plan logs slip as a measured quantity in its own right rather than inferring success
+              from the score. If stride length collapses, we will see it immediately and back the weight off.</p>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- STAGE C -->
+    <div class="stagecard">
+      <div class="sthead"><span class="stid">Stage C</span></div>
+      <h3>Unlock the hips</h3>
+      <dl class="s3">
+        <div class="row">
+          <dt>what we do</dt>
+          <dd>Fix the one number that keeps the hip servos at zero.</dd>
+        </div>
+        <div class="row">
+          <dt>what it costs</dt>
+          <dd><b>12 hours</b> of card time. About 1 day of my time.</dd>
+        </div>
+        <div class="row">
+          <dt>what you get</dt>
+          <dd>Turning, sideways steps, and back feet that lift.</dd>
+        </div>
+      </dl>
+      <details class="d">
+        <summary>Show me the detail</summary>
+        <div class="dbody">
+          <p class="sec-ink" style="font-size:13.5px">
+            One edit to <span class="mono">gray/gait.py</span> delivers turning, sideways walking and
+            variable ride height together. These are not three features &mdash; they are the same change.
+            For a commanded body movement (forward, sideways, turn), each foot must travel through its
+            stance along <span class="mono">&minus;(v + &omega; &times; r)</span>, which automatically
+            gives every leg its own stride length <em>and</em> its own direction. Right now that
+            calculation is replaced by a hardcoded zero. <span class="muted">Fixes B4, B2.</span>
+          </p>
+          <ul>
+            <li>Also in this stage: fix the back feet that only clear 0.8 mm (B2), and add a scoring item
+              that pays for lifting a swinging foot clear of the ground.</li>
+          </ul>
+          <div class="banner warn">
+            <span class="flag">flagged</span>
+            <div class="btext">
+              <span class="mono">gray/gait.py</span> is imported unchanged by the Raspberry Pi on the robot
+              and may only use numpy and pyyaml. This edit is pure trigonometry &mdash; no new imports.
+              The old way of calling it keeps working, and a test proves that a forward-only command
+              reproduces today's walk bit for bit.
+            </div>
+          </div>
+          <div class="blk risk">
+            <div class="lbl">what could go wrong</div>
+            <p>Turning needs its own scoring item to stop the robot freezing, or it recreates the failure
+              that already cost us a full run. The existing "distance covered" reward returns exactly zero
+              when no forward speed is commanded &mdash; so for a pure turn-on-the-spot command, every
+              remaining scoring item is maximised by standing perfectly still. Adding turning without
+              adding a reason to turn would teach it to do nothing, very smoothly.</p>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- STAGE D -->
+    <div class="stagecard">
+      <div class="sthead"><span class="stid">Stage D</span></div>
+      <h3>The long runs</h3>
+      <dl class="s3">
+        <div class="row">
+          <dt>what we do</dt>
+          <dd>Try 48 settings, keep the best 8, then train for real.</dd>
+        </div>
+        <div class="row">
+          <dt>what it costs</dt>
+          <dd><b>200 hours</b> of card time. None of my time.</dd>
+        </div>
+        <div class="row">
+          <dt>what you get</dt>
+          <dd>The finished walk, judged on its worst run, not its best.</dd>
+        </div>
+      </dl>
+      <details class="d">
+        <summary>Show me the detail</summary>
+        <div class="dbody">
+          <p class="sec-ink" style="font-size:13.5px">
+            Settings first, then the real runs. A sweep of 48 configurations &times; 800 rounds
+            (about 24 hours), then the best 8 of those repeated with 3 different random starts each
+            (another 24 hours). That is 7% of the month spent locking down the settings used for the
+            other 93% &mdash; and it is the difference between one long run that happens to work and
+            knowing why it worked.
+          </p>
+          <div class="blk">
+            <div class="lbl">the most promising single setting to test</div>
+            <p>The trainer currently learns from <span class="mono">0.48 s</span> chunks of experience.
+              That is shorter than one <span class="mono">0.6 s</span> gait cycle, and shorter than the
+              <span class="mono">0.6 s</span> smoothing its own reward uses. Every learning step is
+              therefore looking at less than a full stride &mdash; it is being asked to judge a walk
+              without ever seeing a complete step.</p>
+          </div>
+          <div class="blk">
+            <div class="lbl">how a winner is chosen</div>
+            <p>Real runs at full randomisation with 5 random starts. A configuration counts as better
+              only if it wins on its <b>worst</b> seed, not its average. This is going onto brittle
+              printed parts &mdash; the bad day is the one that matters.</p>
+          </div>
+          <div class="blk risk">
+            <div class="lbl">what could go wrong</div>
+            <p>This is where the time is, and it is only worth spending if Stage A passed its gate. If the
+              harness is wrong, 200 hours of selection is 200 hours of coin-flipping. That is precisely
+              the failure this ordering is designed to prevent.</p>
+          </div>
+        </div>
+      </details>
+    </div>
+
+  </div>
+
+  <!-- THE GATE -->
+  <div class="gate">
+    <span class="gflag">Stop &mdash; hard stop</span>
+    <h3>Stage A only passes if the new measuring method gets two known answers right</h3>
+    <p>We already know these two answers, from careful measurement by hand. The new method has to find
+      both on its own, without being told:</p>
+    <ol>
+      <li>The older saved copy walks better than the walk we wrote by hand, at all five speeds.</li>
+      <li>The newer saved copy is worse than the older one.</li>
+    </ol>
+    <p>If it cannot re-judge two answers we already know, it cannot pick the best from thousands.</p>
+    <p class="stop">If it fails, we spend 0 hours of card time and fix the measuring method instead.</p>
+    <details class="d" style="background:rgba(0,0,0,.2)">
+      <summary>Show me the evidence</summary>
+      <div class="dbody">
+        <p class="sec-ink" style="font-size:13.5px">
+          The two known answers are: checkpoint 950 beats the classical gait at <b>all five</b> commanded
+          speeds, and checkpoint 1100 is <b>worse</b> than checkpoint 950. Both were established by hand,
+          outside the harness. A checkpoint is a saved copy of the learned behaviour at one training round.
+        </p>
+        <p class="sec-ink" style="font-size:13.5px; margin-top:12px">
+          This is the only honest test available. If the harness cannot separate three checkpoints whose
+          answer we already know, it certainly cannot pick the best out of the thousands a long run
+          produces &mdash; and every hour of Stage B, C and D would be spent selecting at random while
+          believing otherwise. It is a stop-work condition, not a preference.
+        </p>
+      </div>
+    </details>
+  </div>
+
+  <details class="d">
+    <summary>Show me where the 220 hours go</summary>
+    <div class="dbody">
+      <div class="chartcard chartwide" style="background:var(--panel-2)">
+        <div class="charttitle">Where the graphics-card time goes</div>
+        <div class="chartsub">Stage A costs no graphics-card time at all. Stage D is essentially the whole bill.</div>
+        <div class="chart">
+<svg viewBox="0 0 460 228" role="img" aria-label="Bar chart of graphics card hours per stage: A zero, B eight, C twelve, D two hundred">
+        <line x1="52" y1="160" x2="446" y2="160" stroke="var(--axis)" stroke-width="1"/>
+        <line x1="52" y1="127.5" x2="446" y2="127.5" stroke="var(--grid)" stroke-width="1"/>
+        <line x1="52" y1="95" x2="446" y2="95" stroke="var(--grid)" stroke-width="1"/>
+        <line x1="52" y1="62.5" x2="446" y2="62.5" stroke="var(--grid)" stroke-width="1"/>
+        <line x1="52" y1="30" x2="446" y2="30" stroke="var(--grid)" stroke-width="1"/>
+        <text x="44" y="164" text-anchor="end" fill="var(--ink-3)" font-size="12" font-family="var(--mono)">0</text>
+        <text x="44" y="99"  text-anchor="end" fill="var(--ink-3)" font-size="12" font-family="var(--mono)">100</text>
+        <text x="44" y="34"  text-anchor="end" fill="var(--ink-3)" font-size="12" font-family="var(--mono)">200</text>
+
+        <!-- Height is the only encoding: 0.65 px per hour throughout.
+             All four slots are the same width and evenly spaced, so width carries
+             no meaning and cannot be misread as one. -->
+        <!-- A: 0 h -->
+        <line x1="76" y1="160" x2="146" y2="160" stroke="var(--ink-3)" stroke-width="3" stroke-dasharray="5 4"/>
+        <text x="111" y="152" text-anchor="middle" fill="var(--ink-3)" font-size="14" font-family="var(--mono)">0 h</text>
+        <!-- B: 8 h -->
+        <rect x="175" y="154.8" width="70" height="5.2" rx="2" fill="var(--s1)"/>
+        <text x="210" y="147" text-anchor="middle" fill="var(--s1)" font-size="14" font-family="var(--mono)">8 h</text>
+        <!-- C: 12 h -->
+        <rect x="274" y="152.2" width="70" height="7.8" rx="2" fill="var(--s3)"/>
+        <text x="309" y="144" text-anchor="middle" fill="var(--s3)" font-size="14" font-family="var(--mono)">12 h</text>
+        <!-- D: 200 h -->
+        <rect x="373" y="30" width="70" height="130" rx="4" fill="var(--s2)"/>
+        <text x="408" y="23" text-anchor="middle" fill="var(--s2)" font-size="14" font-family="var(--mono)">200 h</text>
+
+        <text x="111" y="182" text-anchor="middle" fill="var(--ink-2)" font-size="14" font-family="var(--sans)">A &mdash; fixes</text>
+        <text x="210" y="182" text-anchor="middle" fill="var(--ink-2)" font-size="14" font-family="var(--sans)">B &mdash; slip</text>
+        <text x="309" y="182" text-anchor="middle" fill="var(--ink-2)" font-size="14" font-family="var(--sans)">C &mdash; hips</text>
+        <text x="408" y="182" text-anchor="middle" fill="var(--ink-2)" font-size="14" font-family="var(--sans)">D &mdash; runs</text>
+        <text x="249" y="203" text-anchor="middle" fill="var(--ink-3)" font-size="12.5" font-family="var(--sans)">engineering time: A ~2 h &middot; B none &middot; C ~1 day &middot; D none</text>
+        <text x="249" y="220" text-anchor="middle" fill="var(--ink-3)" font-size="12.5" font-family="var(--sans)">0 + 8 + 12 + 200 = 220 graphics-card hours</text>
+      </svg>
+        </div>
+      </div>
+    </div>
+  </details>
+</section>
+
+<!-- ================================================================
+     4. SCORING
+     ================================================================ -->
+<section id="scoring">
+  <div class="sechead">
+    <div class="eyebrow">the scoring</div>
+    <h2>What changes in the scoring</h2>
+    <p class="sub">
+      The robot gets points for doing things right and loses points for doing them wrong.
+      We are adding ten new rules, deleting two, and changing four.
+    </p>
+  </div>
+
+  <h3 class="subhead">The ten new rules</h3>
+  <ul class="rules">
+    <li><span class="sgn lose">lose</span><span>Lose points for sliding a foot along the ground.</span></li>
+    <li><span class="sgn lose">lose</span><span>Lose points for dragging a foot that should be swinging forward.</span></li>
+    <li><span class="sgn lose">lose</span><span>Lose points for landing far more times than the walk asked for.</span></li>
+    <li><span class="sgn lose">lose</span><span>Lose points for pushing a servo as hard as it will go.</span></li>
+    <li><span class="sgn lose">lose</span><span>Lose points for letting the body tip nose-up or nose-down.</span></li>
+    <li><span class="sgn lose">lose</span><span>Lose a lot of points, once, for falling over.</span></li>
+    <li><span class="sgn lose">lose</span><span>Lose points for asking for a big correction, even if we cut it down.</span></li>
+    <li><span class="sgn lose">lose</span><span>Lose a huge number of points for letting the body sink too low.</span></li>
+    <li><span class="sgn gain">gain</span><span>Gain points for keeping three feet properly on the ground.</span></li>
+    <li><span class="sgn gain">gain</span><span>Gain points for ending up on the line it was aiming for.</span></li>
+  </ul>
+
+  <h3 class="subhead">The two we delete</h3>
+  <ul class="rules">
+    <li><span class="sgn drop">drop</span><span>Go easy on the servos. It is 0.05% of the score and points the wrong way.</span></li>
+    <li><span class="sgn drop">drop</span><span>Stay off the joint end stops. Another limit always acts first, so it never fires.</span></li>
+  </ul>
+
+  <h3 class="subhead">The four we change</h3>
+  <ul class="rules">
+    <li><span class="sgn chg">change</span><span>The prize for covering ground goes up by half.</span></li>
+    <li><span class="sgn chg">change</span><span>The penalty for hard landings goes up 200 times. It was switched off before.</span></li>
+    <li><span class="sgn chg">change</span><span>The "walk straight" rule is halved and loosened, so normal rocking is not punished.</span></li>
+    <li><span class="sgn chg">change</span><span>The "move joints smoothly" rule is trimmed a little to make room.</span></li>
+  </ul>
+
+  <p class="why" style="margin-top:20px">
+    <b>The bigger prize is not optional.</b> It is what stops the robot deciding that standing still
+    pays better than walking.
+  </p>
+
+  <details class="d">
+    <summary>Show me the numbers</summary>
+    <div class="dbody">
+      <p class="sec-ink" style="font-size:13.5px">
+        Sixteen items change. A seventeenth is listed and explicitly deferred, so that a fault we have
+        diagnosed but chosen not to act on yet is visible rather than absent. The scoring items are the
+        only instruction the robot ever receives &mdash; anything not scored does not exist to it.
+      </p>
+      <div class="card scroll-x wide" style="padding:0; background:var(--panel-2); margin-top:14px">
+        <table>
+          <thead>
+            <tr>
+              <th>Change</th>
+              <th>Scoring item</th>
+              <th class="n">Weight</th>
+              <th>What it does, in plain English</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="r-add">
+              <td><span class="t t-add">Add</span></td>
+              <td>Stance foot anchoring</td>
+              <td class="n">&minus;8.0</td>
+              <td class="wrapcell">Penalises a loaded foot for sliding across the floor. This is the term that attacks the 68 mm/s skid &mdash; Loss B of B1, and only Loss B.</td>
+            </tr>
+            <tr class="r-add">
+              <td><span class="t t-add">Add</span></td>
+              <td>Cross-track drift</td>
+              <td class="n">+0.5</td>
+              <td class="wrapcell">Pays for ending up on the intended line. Straightness measured as distance off-course, which cannot be fooled by footfall ripple.</td>
+            </tr>
+            <tr class="r-add">
+              <td><span class="t t-add">Add</span></td>
+              <td>Servo saturation penalty</td>
+              <td class="n">&minus;0.20</td>
+              <td class="wrapcell">Discourages living at the servo's torque limit &mdash; the region where the simulation and the real hardware are least likely to agree.</td>
+            </tr>
+            <tr class="r-add">
+              <td><span class="t t-add">Add</span></td>
+              <td>Swing clearance</td>
+              <td class="n">&minus;0.6</td>
+              <td class="wrapcell">Penalises a foot that is supposed to be swinging forward but is still scraping the ground. Aimed squarely at the back feet and their 0.8 mm.</td>
+            </tr>
+            <tr class="r-add">
+              <td><span class="t t-add">Add</span></td>
+              <td>Excess touchdowns</td>
+              <td class="n">&minus;0.5</td>
+              <td class="wrapcell">Penalises making far more footfalls than the gait asked for. This is the real protection for brittle printed parts &mdash; 262 landings where 80 were intended.</td>
+            </tr>
+            <tr class="r-add">
+              <td><span class="t t-add">Add</span></td>
+              <td>Fall penalty (charged once)</td>
+              <td class="n">&minus;250</td>
+              <td class="wrapcell">A single large charge at the moment it falls over. Replaces the usual approach of paying a little every step for still being upright &mdash; which can be collected by standing still.</td>
+            </tr>
+            <tr class="r-add">
+              <td><span class="t t-add">Add</span></td>
+              <td>Pre-clip correction size</td>
+              <td class="n">&minus;0.002</td>
+              <td class="wrapcell">Penalises how big the correction was <em>before</em> the safety limit chopped it. Without this there is nothing pushing the exploration noise back down.</td>
+            </tr>
+            <tr class="r-add">
+              <td><span class="t t-add">Add</span></td>
+              <td>Support count &ge; 3</td>
+              <td class="n">+0.25</td>
+              <td class="wrapcell">Pays for keeping three feet genuinely on the ground &mdash; the stability the crawl gait was chosen for in the first place, and which we found holds only 36% of the time.</td>
+            </tr>
+            <tr class="r-add">
+              <td><span class="t t-add">Add</span></td>
+              <td>Base height floor</td>
+              <td class="n">&minus;2000</td>
+              <td class="wrapcell">A very large penalty for letting the body sink below a set height. Necessary because paying for three feet down invites the obvious cheat: crouch until nothing ever lifts.</td>
+            </tr>
+            <tr class="r-add">
+              <td><span class="t t-add">Add</span></td>
+              <td>Pitch regulation</td>
+              <td class="n">&minus;1.5</td>
+              <td class="wrapcell">Keeps the body level front-to-back. Levelling the body raises the back feet without asking for any more servo travel.</td>
+            </tr>
+            <tr class="r-raise">
+              <td><span class="t t-raise">Raise</span></td>
+              <td>Distance covered <span class="muted mono">(forward_progress)</span></td>
+              <td class="n">2.0 &rarr; 3.0</td>
+              <td class="wrapcell">The prize for actually walking. It must rise, or the ten new penalties above swamp it &mdash; see the freeze arithmetic below.</td>
+            </tr>
+            <tr class="r-raise">
+              <td><span class="t t-raise">Raise</span></td>
+              <td>Soft landings</td>
+              <td class="n">&minus;1e-4 &rarr; &minus;0.02</td>
+              <td class="wrapcell">200&times; the weight it had &mdash; real protection against hard foot impacts. At its old weight it was effectively switched off.</td>
+            </tr>
+            <tr class="r-lower">
+              <td><span class="t t-lower">Lower</span></td>
+              <td>Does not turn</td>
+              <td class="n">1.0 &rarr; 0.5</td>
+              <td class="wrapcell">Halved, and its tolerance widened from 0.050 to 0.150, so it stops marking down a perfectly straight walk for the rocking every footfall causes.</td>
+            </tr>
+            <tr class="r-lower">
+              <td><span class="t t-lower">Lower</span></td>
+              <td>Smooth joint motion</td>
+              <td class="n">&minus;5e-7 &rarr; &minus;3e-7</td>
+              <td class="wrapcell">Trimmed to make room in the penalty budget for the new terms that do real work.</td>
+            </tr>
+            <tr class="r-del">
+              <td><span class="t t-del">Delete</span></td>
+              <td>Easy on the servos <span class="muted mono">(joint_torques)</span></td>
+              <td class="n">&mdash;</td>
+              <td class="wrapcell">0.05% of the total score, and pointing the wrong way. Negligible and wrong is a bad combination.</td>
+            </tr>
+            <tr class="r-del">
+              <td><span class="t t-del">Delete</span></td>
+              <td>Off the end stops <span class="muted mono">(dof_pos_limits)</span></td>
+              <td class="n">&mdash;</td>
+              <td class="wrapcell">Structurally dead: the correction limit always clamps first, so this term has never once fired in any run.</td>
+            </tr>
+            <tr class="r-defer">
+              <td><span class="t t-defer">Defer</span></td>
+              <td>Slow-changing corrections <span class="muted mono">(action_rate)</span></td>
+              <td class="n">&minus;0.05 <span class="muted">unchanged</span></td>
+              <td class="wrapcell">Listed so it is not silently dropped. B11 shows this penalty is currently measuring the exploration noise rather than any real jerkiness &mdash; but the noise itself is running away (B10), so the measurement is not yet worth acting on. Re-measure once Stage A has stopped the runaway, then decide whether to retune or delete it. Deliberately not changed in this plan.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+</section>
+
+<!-- ================================================================
+     5. NEVER
+     ================================================================ -->
+<section id="never">
+  <div class="sechead">
+    <div class="eyebrow">the ceiling</div>
+    <h2>What this robot will never do</h2>
+    <p class="sub">None of these is fixable by training. Approve the plan knowing where the ceiling is.</p>
+  </div>
+
+  <ul class="never">
+    <li><span class="x">&#10005;</span><span><b>No stairs.</b> <span class="w">The riser is taller than its hips.</span></span></li>
+    <li><span class="x">&#10005;</span><span><b>No feedback from any joint, ever.</b> <span class="w">The servos cannot report where they ended up.</span></span></li>
+    <li><span class="x">&#10005;</span><span><b>No sense of place.</b> <span class="w">It never knows where it is, or which way it points.</span></span></li>
+    <li><span class="x">&#10005;</span><span><b>No sight.</b> <span class="w">The camera and lidar in the drawing are not wired up.</span></span></li>
+    <li><span class="x">&#10005;</span><span><b>No answer on the servos until you rebuild it.</b> <span class="w">That needs a bench and a torque measurement.</span></span></li>
+    <li><span class="x">&#10005;</span><span><b>No exact figure for the knee pushrod ratio.</b> <span class="w">We train across a range instead.</span></span></li>
+    <li><span class="x">&#10005;</span><span><b>220 hours is not a month of training.</b> <span class="w">Expect repeats: one full run has already been lost.</span></span></li>
+  </ul>
+</section>
+
+<!-- ================================================================
+     6. EVERYTHING ELSE
+     ================================================================ -->
+<section id="more">
+  <div class="sechead">
+    <div class="eyebrow">the rest</div>
+    <h2>More detail, if you want it</h2>
+    <p class="sub">Nothing above depends on anything in here. Open it only to check the working.</p>
+  </div>
+
+  <details class="d">
+    <summary>The other nine problems we found</summary>
+    <div class="dbody">
+      <p class="sec-ink" style="font-size:13.5px">
+        Thirteen faults were found in total: three reviews plus a round of my own measurements. The four
+        at the top of this page are the ones worth deciding on. These nine are real, measured, and
+        mostly fixed as a side effect of the same four stages.
+      </p>
+      <div class="grid g-auto-wide" style="margin-top:14px">
+
+        <div class="pb">
+          <span class="pbid">B3</span>
+          <h4>The load is backwards from a real animal</h4>
+          <p class="say">The front legs carry the least weight but do most of the pushing, and the rear
+            legs carry the most weight but barely push. The robot is being pulled along by its front
+            legs instead of driven by its rear.</p>
+          <div class="ev">
+            front legs &nbsp;<b>33%</b> of weight &rarr; <b>72%</b> of push<br>
+            rear legs &nbsp;&nbsp;<b>67%</b> of weight &rarr; <b>28%</b> of push
+          </div>
+          <div class="cost"><span class="lbl">cost</span>The push is coming from the legs with the least
+            weight on them, which is exactly the condition for slipping &mdash; and follows directly from
+            the back feet not lifting (B2).</div>
+        </div>
+
+        <div class="pb">
+          <span class="pbid">B5</span>
+          <h4>The gait is statically unstable</h4>
+          <p class="say">Sampled at twenty points around the walk cycle, the body's centre sits outside
+            the triangle formed by the planted feet at eighteen of them.</p>
+          <div class="ev">
+            outside the support triangle at <b>18 of 20</b> points<br>
+            worst excursion &nbsp;<b>29.8 mm</b>
+          </div>
+          <div class="cost"><span class="lbl">cost</span>It stays upright only because it is moving and
+            the servos are stiff. Stop it mid-stride, or put it on an uneven surface, and there is
+            nothing holding it up.</div>
+        </div>
+
+        <div class="pb">
+          <span class="pbid">B6</span>
+          <h4>The "three feet down at all times" guarantee is not true</h4>
+          <p class="say">The whole point of choosing a crawl was that three feet are always planted. That
+            holds about a third of the time. The feet are bouncing, and the software is counting what it
+            <em>asked for</em> rather than what happened.</p>
+          <div class="ev">
+            three feet down &nbsp;<b>36%</b> of the time<br>
+            footfalls commanded &nbsp;<b>80</b> in 12 s<br>
+            footfalls actually made &nbsp;<b>262</b>
+          </div>
+          <div class="cost"><span class="lbl">cost</span><span class="mono">scripts/walk.py</span> reports
+            the commanded count, so the number we have been reading is not a measurement. Any scoring item
+            that asks "is this foot touching?" is currently being paid for bounce.</div>
+        </div>
+
+        <div class="pb">
+          <span class="pbid">B7</span>
+          <h4>The baseline number is one lucky draw</h4>
+          <p class="say">The project has been quoting a single run as the gait's performance. Run it six
+            times with different random starts and the spread is enormous &mdash; and the number we quote
+            is the best of the six on drift and below average on distance.</p>
+          <div class="ev">
+            quoted &nbsp;<b>675.4 mm</b>, drift <b>33.8 mm</b><br>
+            over 6 seeds: distance <b>711.0 &plusmn; 86.3 mm</b><br>
+            drift <b>&minus;52.6 &plusmn; 162.1 mm</b><br>
+            drift range &nbsp;<b>+33.8</b> to <b>&minus;358.7 mm</b>
+          </div>
+          <div class="cost"><span class="lbl">cost</span>Drift is essentially random over &plusmn;360 mm.
+            We have been comparing everything against a number that was luck, so every "better than
+            baseline" claim to date is unsafe.</div>
+        </div>
+
+        <div class="pb">
+          <span class="pbid">B8</span>
+          <h4>The scoring harness gives wrong answers</h4>
+          <p class="say">The program that decides which saved checkpoint is best uses one random start,
+            one commanded speed, and none of the variation that training itself uses. It has already
+            rejected a checkpoint that is actually better.</p>
+          <div class="ev">
+            harness: <b>1</b> seed, <b>1</b> speed (<b>52.9 mm/s</b>), <b>no</b> randomisation<br>
+            training randomises <b>10&ndash;40 ms</b> of servo lag<br>
+            checkpoint 950 beats the gait at <b>all 5</b> speeds<br>
+            reaches <b>82.1 mm/s</b>; gait caps at <b>59.7 mm/s</b>
+          </div>
+          <div class="cost"><span class="lbl">cost</span>The gait cannot go faster than 59.7 mm/s no
+            matter what you ask of it. Checkpoint 950 can, and the harness called it a loser. A selection
+            tool that picks the wrong winner makes a long training run worthless.</div>
+        </div>
+
+        <div class="pb">
+          <span class="pbid">B9</span>
+          <h4>Training is finished in about twenty minutes, then gets worse</h4>
+          <p class="say">Almost all the improvement happens early. After that the score keeps creeping up
+            because it falls over less often, not because it walks better &mdash; and the later checkpoint
+            is measurably worse than the earlier one.</p>
+          <div class="ev">
+            distance score <b>1.026 &rarr; 1.110</b> (rounds 500&ndash;1100)<br>
+            that is <b>+8%</b> for <b>236 million</b> simulated steps<br>
+            checkpoint <b>1100 is worse than 950</b><br>
+            one 3000-round run = <b>1.18 billion</b> steps = <b>273 robot-days</b>
+          </div>
+          <div class="cost"><span class="lbl">cost</span>Left running in this configuration it degrades
+            while its own training score hits an all-time high. Longer is not better here; it is worse.</div>
+        </div>
+
+        <div class="pb">
+          <span class="pbid">B11</span>
+          <h4>One smoothness penalty is measuring its own random wobble</h4>
+          <p class="say">The item called <span class="mono">action_rate</span> &mdash; "slow-changing
+            corrections" &mdash; is meant to discourage jerky joint movement. What it is actually measuring
+            is the deliberate random noise added during training: noise that does not exist on the real
+            robot, where the behaviour is fixed. One penalty, not two &mdash; this is the only one that was
+            measured.</p>
+          <div class="ev">
+            <b>action_rate</b> contributes &nbsp;<b>&minus;0.104</b><br>
+            implies a step-to-step change of <b>0.415</b> per joint<br>
+            pure random sampling, at today's noise level, alone gives <b>0.44</b>
+          </div>
+          <div class="cost"><span class="lbl">cost</span>We are paying a penalty every step for something
+            that buys nothing on hardware. It is real budget spent on nothing.</div>
+          <div class="cost"><span class="lbl status">status</span>Diagnosed, not acted on. The scoring
+            table changes <span class="mono">joint_acc</span> but deliberately leaves
+            <span class="mono">action_rate</span> exactly where it is &mdash; because the noise level is
+            the very thing being measured here, and it is currently running away (B10). Re-measure after
+            Stage A stops the runaway, then decide. It has its own row in the scoring table, marked
+            <em>Defer</em>, so it cannot be quietly forgotten.</div>
+        </div>
+
+        <div class="pb">
+          <span class="pbid">B12</span>
+          <h4>The straightness reward is scoring its own footfall ripple</h4>
+          <p class="say">Every footfall rocks the body slightly, which registers as a tiny turn. The
+            setting that decides "how much turning is acceptable" is set tighter than that unavoidable
+            rocking, so even a perfectly straight walk is marked down.</p>
+          <div class="ev">
+            turn rate, raw &nbsp;<b>sd 0.532 rad/s</b><br>
+            smoothed over 0.6 s &nbsp;<b>sd 0.080 rad/s</b><br>
+            setting in use &nbsp;<b>0.050</b> &mdash; tighter than the ripple<br>
+            a perfectly straight walk scores <b>0.08&ndash;0.28</b>
+          </div>
+          <div class="cost"><span class="lbl">cost</span>This is the same class of bug that already cost
+            us a complete training run, reappearing in the turning channel. It teaches the robot to chase
+            noise it cannot control.</div>
+        </div>
+
+        <div class="pb" style="border-left:3px solid var(--warning)">
+          <span class="pbid">B13</span>
+          <h4>The servo model may be wrong &mdash; the largest risk we cannot yet close</h4>
+          <p class="say">The simulation models each DS3218MG as far softer than a modern digital servo
+            probably is. If that is wrong, every simulated robot is learning to compensate for a sag that
+            does not exist on the real machine.</p>
+          <div class="ev">
+            modelled <b>20 N&middot;m/rad</b> against a <b>1.96 N&middot;m</b> limit<br>
+            &rarr; a proportional band of only <b>5.6&deg;</b><br>
+            hip-pitch servo at its torque limit <b>72.6%</b> of the time<br>
+            and ends up <b>25&deg;</b> from where it was commanded
+          </div>
+          <div class="cost"><span class="lbl">cost</span>The robot is disassembled, so this cannot be
+            bench-measured yet. The plan widens the servo stiffness randomisation from
+            <span class="mono">0.7&ndash;1.4&times;</span> to <span class="mono">0.5&ndash;4.0&times;</span>,
+            which costs nothing and forces the learned behaviour to work across every plausible servo.
+            That contains the risk; it does not resolve it. It is resolved at reassembly.</div>
+        </div>
+
+      </div>
+    </div>
+  </details>
+
+  <details class="d">
+    <summary>Why the new rules do not teach the robot to stand still</summary>
+    <div class="dbody">
+      <p class="note" style="margin-top:14px">
+        Standing perfectly still has already destroyed one training run. Any time you add penalties, you
+        make doing nothing relatively more attractive, because a robot that does nothing collects no
+        penalties. So the whole set has to be checked against exactly one question: is walking still
+        clearly worth more than freezing?
+      </p>
+
+      <div class="grid g-auto-chart" style="margin-top:16px">
+        <div class="chartcard" style="background:var(--panel-2)">
+          <div class="charttitle">Score per control step: walking against frozen</div>
+          <div class="chartsub">At the default commanded speed. The gap between the two bars is the robot's reason to move.</div>
+          <div class="chart">
+<svg viewBox="0 0 460 240" role="img" aria-label="Grouped bars: today walking 4.66 frozen 2.13; proposed walking 4.55 frozen 1.92">
+          <line x1="52" y1="180" x2="446" y2="180" stroke="var(--axis)" stroke-width="1"/>
+          <line x1="52" y1="150" x2="446" y2="150" stroke="var(--grid)" stroke-width="1"/>
+          <line x1="52" y1="120" x2="446" y2="120" stroke="var(--grid)" stroke-width="1"/>
+          <line x1="52" y1="90"  x2="446" y2="90"  stroke="var(--grid)" stroke-width="1"/>
+          <line x1="52" y1="60"  x2="446" y2="60"  stroke="var(--grid)" stroke-width="1"/>
+          <line x1="52" y1="30"  x2="446" y2="30"  stroke="var(--grid)" stroke-width="1"/>
+          <text x="44" y="184" text-anchor="end" fill="var(--ink-3)" font-size="12" font-family="var(--mono)">0</text>
+          <text x="44" y="124" text-anchor="end" fill="var(--ink-3)" font-size="12" font-family="var(--mono)">2</text>
+          <text x="44" y="64"  text-anchor="end" fill="var(--ink-3)" font-size="12" font-family="var(--mono)">4</text>
+
+          <rect x="86"  y="40.2"  width="58" height="139.8" rx="4" fill="var(--s1)" fill-opacity="0.9"/>
+          <rect x="152" y="116.1" width="58" height="63.9"  rx="4" fill="var(--ink-3)" fill-opacity="0.7"/>
+          <rect x="276" y="43.5"  width="58" height="136.5" rx="4" fill="var(--s1)" fill-opacity="0.9"/>
+          <rect x="342" y="122.4" width="58" height="57.6"  rx="4" fill="var(--ink-3)" fill-opacity="0.7"/>
+
+          <text x="115" y="33"  text-anchor="middle" fill="var(--s1)"   font-size="14" font-family="var(--mono)">4.66</text>
+          <text x="181" y="109" text-anchor="middle" fill="var(--ink-2)" font-size="14" font-family="var(--mono)">2.13</text>
+          <text x="305" y="36"  text-anchor="middle" fill="var(--s1)"   font-size="14" font-family="var(--mono)">4.55</text>
+          <text x="371" y="115" text-anchor="middle" fill="var(--ink-2)" font-size="14" font-family="var(--mono)">1.92</text>
+
+          <text x="148" y="202" text-anchor="middle" fill="var(--ink-2)" font-size="14" font-family="var(--sans)">today</text>
+          <text x="338" y="202" text-anchor="middle" fill="var(--ink-2)" font-size="14" font-family="var(--sans)">proposed</text>
+          <text x="148" y="222" text-anchor="middle" fill="var(--s3)" font-size="13" font-family="var(--mono)">gap 2.53</text>
+          <text x="338" y="222" text-anchor="middle" fill="var(--s3)" font-size="13" font-family="var(--mono)">gap 2.63</text>
+        </svg>
+          </div>
+          <div class="legend">
+            <span class="item"><span class="swatch" style="background:var(--s1)"></span>walking</span>
+            <span class="item"><span class="swatch" style="background:var(--ink-3)"></span>frozen (standing still)</span>
+          </div>
+        </div>
+
+        <div class="card" style="background:var(--panel-2)">
+          <h4 style="font-size:15.5px">Why the whole set only works because the walking prize rises</h4>
+          <p class="sec-ink" style="font-size:14px; margin-top:10px">
+            With the full proposed set, walking is worth <span class="mono">+4.55</span> per control step
+            and freezing <span class="mono">+1.92</span>, a gap of <span class="mono">+2.63</span>. Today
+            the same figures are <span class="mono">4.66</span>, <span class="mono">2.13</span> and
+            <span class="mono">2.53</span>. So the margin is preserved &mdash; slightly improved, even.
+          </p>
+          <div class="banner bad" style="margin-top:14px">
+            <span class="flag">but only because</span>
+            <div class="btext">
+              the walking prize rises from <span class="mono">2.0</span> to <span class="mono">3.0</span>.
+              Leave it at <span class="mono">2.0</span> and the identical set of changes gives a gap of
+              <span class="mono">1.63</span> &mdash; the safety margin eroded by
+              <span class="mono">36%</span>. The two changes are not separable. Approving the new penalties
+              without the raised prize would be approving the failure that already cost a run.
+            </div>
+          </div>
+          <div class="banner warn" style="margin-top:12px">
+            <span class="flag">rule to carry forward</span>
+            <div class="btext">
+              Keep the sum of all penalties at good behaviour under
+              <span class="mono">0.35 &times;</span> the walking prize. Today it is
+              <span class="mono">0.14</span>. This proposal puts it at <span class="mono">0.37</span>
+              &mdash; just above its own line. That makes it the first number to watch once Stage B starts,
+              and the first thing to trim if the robot starts looking reluctant to move.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <details class="d">
+    <summary>Things we are deliberately not doing</summary>
+    <div class="dbody">
+      <p class="sec-ink" style="font-size:13.5px">
+        Each of these is standard practice somewhere, and each is wrong for this machine. Listed so the
+        plan reads as a set of choices rather than a wish list.
+      </p>
+      <div class="grid g-auto-wide" style="margin-top:14px">
+        <div class="nd">
+          <h4>Rewarding time in the air <span class="strike mono">(feet_air_time)</span></h4>
+          <p>The signature reward in essentially every legged-robot project. It is designed for trotting
+            and running, where more time in the air means a longer stride. Gray does a crawl, and a crawl
+            wants feet <em>down</em>. Adding it would invert the gait we chose on purpose.</p>
+        </div>
+        <div class="nd">
+          <h4>A survival bonus</h4>
+          <p>Paying a small amount every step for still being upright. At the usual weight that is
+            <span class="mono">+6.0</span> for a full attempt of standing perfectly still &mdash; a quarter
+            of the walking prize, for doing nothing. That is the exact failure that already cost us a run,
+            rebuilt from parts. The one-shot fall penalty does the same job without being farmable.</p>
+        </div>
+        <div class="nd">
+          <h4>Cost of transport as a reward</h4>
+          <p>Wrong physics for a hobby servo, whose current draw is dominated by holding torque rather than
+            motion &mdash; a stalled servo would score as free. It stays as a displayed metric, because it
+            is interesting; it does not become an instruction.</p>
+        </div>
+        <div class="nd">
+          <h4>A gait symmetry reward</h4>
+          <p>Rewarding the left and right sides for moving identically. The learned layer exists partly to
+            absorb the few-millimetre differences between legs in the CAD. A symmetry term forbids exactly
+            the compensation we are asking for.</p>
+        </div>
+        <div class="nd">
+          <h4>Posture regularisation</h4>
+          <p>The usual term that pulls joints back toward a nominal standing pose. On this architecture the
+            gait already <em>is</em> the nominal, so a posture term drags the whole trajectory back toward
+            standing. It is a freeze term in disguise.</p>
+        </div>
+        <div class="nd">
+          <h4>Stair climbing, and the pace gait</h4>
+          <p>Not in this plan. Stairs are ruled out by the geometry (see the limits below); the pace gait is
+            a different project.</p>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <details class="d">
+    <summary>The limits in full, with the numbers</summary>
+    <div class="dbody">
+      <div class="card" style="background:var(--panel-2); margin-top:14px">
+        <div class="constraint">
+          <div class="cn">A month of continuous training is not the right frame</div>
+          <div class="cv">everything in this plan &asymp; 220 graphics-card hours</div>
+          <div class="cw">The rest of a month should be re-runs and repeat seeds &mdash; and they will be
+            needed, because one full run has already been lost to a scoring bug that took a full run to
+            detect. Budgeting for repeats is not pessimism; it is the observed failure rate.</div>
+        </div>
+        <div class="constraint">
+          <div class="cn">The robot is currently disassembled</div>
+          <div class="cv">servo stiffness randomised 0.7&ndash;1.4&times; &rarr; 0.5&ndash;4.0&times;</div>
+          <div class="cw">The largest unquantified risk (B13) is whether the simulated servo is anywhere
+            near the real one. It cannot be bench-measured until reassembly. The plan therefore trains
+            across an eight-fold range of stiffness so the behaviour cannot depend on the answer. That
+            contains the risk at no cost. It does not remove it, and it is not a substitute for
+            measurement &mdash; it is resolved at reassembly.</div>
+        </div>
+        <div class="constraint">
+          <div class="cn">No stairs</div>
+          <div class="cv">riser is taller than the hips</div>
+          <div class="cw">Not a software limitation and not fixable by training.</div>
+        </div>
+        <div class="constraint">
+          <div class="cn">No closed-loop control at the joint, ever</div>
+          <div class="cv">the servos cannot report their position</div>
+          <div class="cw">Every joint command is fired blind. The robot never finds out whether a joint
+            arrived where it was sent. This is a property of the servos, not of the code, and it bounds
+            everything else on this page.</div>
+        </div>
+        <div class="constraint">
+          <div class="cn">No absolute position or heading on the real robot</div>
+          <div class="cv">no odometry, no magnetometer</div>
+          <div class="cw">Straightness and speed can be scored in simulation, where we know exactly where
+            the robot is. On hardware they can only be executed open-loop and then measured from outside.
+            The robot itself has no idea where it is or which way it is pointing.</div>
+        </div>
+        <div class="constraint">
+          <div class="cn">No terrain perception</div>
+          <div class="cv">camera and lidar in the CAD are not wired up</div>
+          <div class="cw">Everything here is blind walking. Nothing in this plan looks at the ground.</div>
+        </div>
+        <div class="constraint">
+          <div class="cn">The knee pushrod ratio is still unmeasured</div>
+          <div class="cv">randomised 0.8&ndash;1.25&times;</div>
+          <div class="cw">Randomising it buys robustness across the range. It does not buy knowledge of the
+            actual value, and should not be reported as though it did.</div>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <details class="d">
+    <summary>What the words mean</summary>
+    <div class="dbody">
+      <div class="gloss" style="margin-top:14px">
+        <div><b>the gait</b> &mdash; the fixed, hand-written walking pattern. It plays back like a cam
+          profile: same motion every cycle, no reaction to anything.</div>
+        <div><b>the policy</b> &mdash; the AI. The learned layer sitting on top of the gait. It does not
+          replace the gait; it adds a small correction to each joint, capped at &plusmn;0.2 rad
+          (about 11&deg;).</div>
+        <div><b>a reward</b> &mdash; a scoring item. Training has no goal except to make the total score
+          as large as possible, so the rewards are the <em>only</em> instruction the robot ever gets.
+          Anything not scored does not exist to it.</div>
+        <div><b>a round</b> &mdash; one cycle of training: simulate for a while, then adjust. A long run
+          is thousands of rounds.</div>
+        <div><b>an episode</b> &mdash; one practice run, from standing to either falling over or running
+          out of time.</div>
+        <div><b>a checkpoint</b> &mdash; a saved copy of the learned behaviour at one round, so you can
+          go back to it. Checkpoint 950 means "as it was at round 950".</div>
+        <div><b>a seed</b> &mdash; the starting number for the simulator's random choices. Change the
+          seed and you get a different run of the same thing. One seed is one sample, not an answer.</div>
+        <div><b>randomisation</b> &mdash; deliberately varying things we are unsure of (servo lag, servo
+          stiffness) between simulated robots, so the learned behaviour cannot depend on any one value.</div>
+        <div><b>the harness</b> &mdash; the measuring method: the separate program that scores a saved
+          copy after the fact. It is how we decide which saved copy is best. It is not the trainer.</div>
+        <div><b>clipped</b> &mdash; cut down to a limit. A correction of 0.31 rad asked for against a
+          &plusmn;0.2 rad ceiling is clipped to 0.2. The robot obeys 0.2; the trainer is never told that
+          0.11 of what it asked for was thrown away.</div>
+        <div><b>sd</b> &mdash; standard deviation: the typical size of the wobble either side of the
+          average. Roughly two thirds of the readings land within one sd of it.</div>
+        <div><b>proportional band</b> &mdash; how far a servo has to be pushed off its commanded angle
+          before it is producing all the torque it has. A 5.6&deg; band means 5.6&deg; of droop and the
+          servo is already flat out; beyond that it just gives way.</div>
+        <div><b>open-loop</b> &mdash; commanded without any feedback. Gray's servos cannot report where
+          they actually ended up, so every joint command is fired and forgotten. Nothing in the robot
+          ever finds out whether it arrived.</div>
+        <div><b>saturated</b> &mdash; at the limit and unable to give any more. A saturated servo is
+          already producing all the torque it has.</div>
+      </div>
+    </div>
+  </details>
+
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Gray &mdash; 3D-printed four-legged robot, 12 servos, designed and built 2021&ndash;22 by Ibrahim Bisen.</p>
+    <p style="margin-top:6px">Every number here was measured first. Nothing in the code has been changed yet.</p>
+  </div>
+</footer>
+
+</body>
+</html>

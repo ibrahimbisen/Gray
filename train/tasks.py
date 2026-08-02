@@ -59,6 +59,13 @@ def gray_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
         # the gait's 675 mm, so a sixth of the gait was destroyed before learning
         # began, and it never recovered. 0.10 is ~1.1 deg, which leaves the initial
         # policy essentially the Phase 2 gait.
+        #
+        # DELIBERATELY UNCHANGED. The last run's noise problem was not where the
+        # distribution STARTED - 0.101 at round 0 is exactly this value, so the
+        # initialisation was doing its job - but that it grew from there and never came
+        # back: 0.191 by round 300, 0.286 by 700, 0.313 by 1150, never turning over.
+        # Lowering init_std would not have touched that. The fix is entropy_coef below
+        # and the pre-clip action penalty in gray_env.py.
         "init_std": 0.10,
         "std_type": "scalar",
       },
@@ -73,7 +80,35 @@ def gray_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
       value_loss_coef=1.0,
       use_clipped_value_loss=True,
       clip_param=0.2,
-      entropy_coef=0.005,
+      # STOPPING THE NOISE RUNAWAY. At 0.005 the policy's action distribution widened
+      # monotonically for the whole of the last run - Policy/mean_std 0.101 -> 0.191
+      # (r300) -> 0.286 (r700) -> 0.313 (r1150) - and never turned over. The mechanism
+      # is specific to a CLIPPED action space: ResidualGaitAction discards anything
+      # past |action| = 1.0, a clipped sample contributes no gradient, so once the
+      # distribution has spread past the clip there is nothing pulling it back while
+      # the entropy bonus keeps pushing it out. The fraction of actions being clipped
+      # went 1.7% (r500) -> 20.2% (r950) -> 27.9% (r1100) unnoticed, because nothing
+      # logged it. gray_env.py now logs it as Episode_Metrics/clip_fraction and adds a
+      # small penalty on the pre-clip magnitude to restore the missing restoring force.
+      #
+      # THE INTENDED FIX WAS AN ANNEAL, 0.005 -> 0.0005 over the first third of the
+      # run. RSL-RL 5.4.0 CANNOT DO THAT, and the API to do it does not exist rather
+      # than being merely awkward: in .venv/Lib/site-packages/rsl_rl/algorithms/ppo.py
+      # entropy_coef arrives as a float (l.45), is stored once (l.105) and is read once
+      # in the loss (l.278). Nothing ever writes back to it, there is no callback and
+      # no schedule field, and mjlab's RslRlPpoAlgorithmCfg exposes only the scalar.
+      # (The `schedule="adaptive"` two lines down is the LEARNING RATE schedule and has
+      # nothing to do with entropy.) Annealing would mean mutating
+      # runner.alg.entropy_coef from a per-iteration hook in train/runner.py, which
+      # this change does not own.
+      #
+      # So: a lower FIXED value, chosen nearer the anneal's endpoint than its start.
+      # 0.001 is a 5x cut. Not the full 10x to 0.0005, because the run genuinely does
+      # need exploration early and a fixed coefficient has to serve the whole run
+      # rather than just its tail. If Policy/mean_std still fails to turn over by
+      # ~round 300, drop this to 0.0005 rather than reaching for anything else -
+      # mean_std and clip_fraction are now both visible, so this is a one-look decision.
+      entropy_coef=0.001,
       num_learning_epochs=5,
       num_mini_batches=4,
       learning_rate=1.0e-3,
