@@ -21,11 +21,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 # What the robot is supposed to be. The names are load-bearing: everything
-# downstream indexes legs by these prefixes.
+# downstream indexes legs by them.
+#
+# Links and joints use different orders, which is what the SolidWorks exporter is
+# set up with:  link "thighbl"  is moved by joint "bl_thigh".
 LEGS = ("fl", "fr", "bl", "br")
-SEGMENTS = ("hip", "top", "bottom")
-EXPECTED_LINKS = ("base_link",) + tuple(f"{l}_{s}" for l in LEGS for s in SEGMENTS)
+SEGMENTS = ("hip", "thigh", "calf")
+EXPECTED_LINKS = ("base_link",) + tuple(f"{s}{l}" for l in LEGS for s in SEGMENTS)
 EXPECTED_JOINTS = tuple(f"{l}_{s}" for l in LEGS for s in SEGMENTS)
+FOOT_LINKS = tuple(f"calf{l}" for l in LEGS)
 
 # Mass bounds, kg. Printed structure plus 12 servos plus battery, Pi and wiring.
 # Anything outside this means the CAD is missing components or double-counting.
@@ -330,7 +334,7 @@ def check_zup(root, checks):
             rot = _mat_mul(rot, rot_of[node])
         return pos
 
-    feet = [world_xyz(f"{l}_bottom") for l in LEGS]
+    feet = [world_xyz(name) for name in FOOT_LINKS if name in parent_of]
     if len(feet) < 4:
         c.detail = "could not locate the four foot links"
         checks.append(c)
