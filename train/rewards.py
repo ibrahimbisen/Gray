@@ -34,8 +34,8 @@ so std can be tight enough to actually discriminate 40 mm/s from 60 mm/s.
 The filter is per-environment state, so these are stateful ManagerTermBase classes
 rather than plain functions - mjlab instantiates a term whose `func` is a class.
 
-THE SAME PROBLEM IN THE YAW CHANNEL
------------------------------------
+THE SAME PROBLEM IN THE YAW CHANNEL, AND THEN AGAIN IN THE CROSS-TRACK ONE
+--------------------------------------------------------------------------
 Yaw was measured the same way: raw sd 0.532 rad/s, filtered at tau = 0.6 s sd 0.080.
 `TrackFilteredAngularVelocity` was originally configured with std = 0.050, which is
 TIGHTER THAN THE RESIDUAL NOISE - a perfectly straight walk still scores only
@@ -43,6 +43,15 @@ exp(-0.080^2/0.050^2) = 0.08, and a very good stride reaches ~0.28. The term spe
 its whole life in the flat part of the exponential, which is failure mode #2 recurring
 in a second channel. std is now 0.150, and straightness is paid for by `CrossTrackDrift`
 below, which is immune to ripple by construction rather than by tuning.
+
+It then happened a THIRD time in `CrossTrackDrift` itself, at std 0.03 m against a
+per-step cross-track distance of 37-119 mm depending on the randomisation - a walking
+policy scored 7% of the term's ceiling. std is now 0.10 m, derived from the measured
+per-step distance rather than from an end-of-run drift figure. The pattern is worth
+naming, because it has now cost three terms: THE STD MUST BE SIZED AGAINST THE SPREAD
+OF THE QUANTITY THE TERM ACTUALLY SAMPLES, at the point in training where the term has
+to have slope. Sizing it against the target, or against a summary statistic collected
+somewhere else, produces a dead term every time.
 
 WHAT ELSE IS IN THIS FILE
 -------------------------
@@ -115,81 +124,75 @@ CONTACT_FORCE_N = 1.0
 FOOT_RADIUS_M = 0.012
 
 ##
-# THE FREEZE ARITHMETIC - MEASURED, NOT ESTIMATED.
+# THE FREEZE ARITHMETIC - MEASURED AT THE START OF TRAINING, NOT ESTIMATED.
 #
-# Per-step reward RATE (before the reward manager's dt scaling), 64 envs x 500 steps,
-# commanded 55 mm/s, zero residual so the robot is running the unmodified Phase 2 crawl.
-# Domain randomisation OFF - see the note at the end, which is the important one.
+# Per-step reward RATE (value x weight, before the reward manager's dt scaling), 1024
+# envs x 1200 steps, in the training environment exactly as train/gray_env.py configures
+# it: commands drawn from the real range, pushes on, CURRICULUM ACTIVE so the
+# randomisation envelope is at its 0.3 starting scale, and the actions are the STARTING
+# POLICY's rather than zeros - samples from N(0, 0.10), the init_std in train/tasks.py.
 #
-#   WALKING = the classical crawl (777 mm in 10 s, which is the Phase 2 baseline).
+#   WALKING = the classical crawl with that exploration noise on top.
 #   FROZEN  = identical, with the stride scale forced to ~0. Note that this is NOT a
 #             statue: `foot_targets` scales step_LENGTH only, so a zero-stride robot
 #             still lifts each foot the full 35 mm and sets it down in place. It marches
-#             on the spot. That is exactly failure #1 as it actually happened (675 mm ->
-#             65 mm with the legs still cycling), and it is the only freeze this
-#             architecture can even reach, since a +/-0.2 rad residual cannot cancel the
-#             gait.
+#             on the spot, under a command that still says walk. That is failure #1 as
+#             it actually happened (675 mm -> 65 mm with the legs still cycling), and it
+#             is the only freeze this architecture can reach, since a +/-0.2 rad
+#             residual cannot cancel the gait.
 #
 #                              WALKING     FROZEN      delta
-#     forward_progress         +2.5956    -0.3087    +2.9043
-#     track_linear_velocity    +0.7464    +0.6224    +0.1240
-#     track_angular_velocity   +0.3731    +0.4505    -0.0774
-#     upright                  +0.4533    +0.4671    -0.0138
-#     cross_track_drift        +0.0350    +0.0831    -0.0480
-#     support_count            +0.0339    +0.0585    -0.0245
-#     soft_landing             -0.2095    -0.1784    -0.0311
-#     excess_touchdowns        -0.3506    -0.3757    +0.0251
-#     joint_acc                -0.0993    -0.0643    -0.0350
-#     stance_foot_anchoring    -0.3207    -0.1411    -0.1795
-#     swing_clearance          -0.1395    -0.0919    -0.0476
-#     base_height_floor        -0.0001    -0.0006    +0.0005
-#     pitch_regulation         -0.0040    -0.0023    -0.0016
-#     servo_tracking_error     -0.2493    -0.2238    -0.0255
-#     fall_penalty             -0.0703    -0.0547    -0.0156
-#     action_acc/rate/pre-clip  0.0000     0.0000     0.0000   (zero residual)
+#     forward_progress         +0.8903    -0.2254    +1.1157
+#     track_linear_velocity    +0.9290    +0.8377    +0.0913
+#     track_angular_velocity   +0.3903    +0.4109    -0.0205
+#     upright                  +0.4699    +0.4668    +0.0031
+#     cross_track_drift        +0.1779    +0.2150    -0.0371
+#     support_count            +0.0337    +0.0366    -0.0029
+#     soft_landing             -0.1826    -0.1692    -0.0134
+#     joint_acc                -0.1150    -0.0974    -0.0176
+#     stance_foot_anchoring    -0.3338    -0.1979    -0.1359
+#     swing_clearance          -0.1011    -0.0831    -0.0181
+#     servo_tracking_error     -0.2303    -0.2224    -0.0079
+#     pitch_regulation         -0.0052    -0.0051    -0.0001
+#     base_height_floor        -0.0006    -0.0010    +0.0003
+#     action_rate              -0.0120    -0.0120     0.0000
+#     action_acc               -0.0036    -0.0036     0.0000
+#     preclip_action_mag       -0.0002    -0.0002     0.0000
+#     fall_penalty             -0.0348    -0.0385    +0.0037
 #                              -------    -------    -------
-#     penalties only           -1.4432    -1.4415
-#     TOTAL                    +2.7942    +0.2401    +2.5542
+#     penalties only           -1.0194    -1.0558
+#     TOTAL                    +1.8718    +0.9112    +0.9606
 #
-#   THE GAP IS +2.55, against a design target of +2.63 - it holds, within 3%.
+#   WALKING WINS BY +0.96, scoring 2.05x what freezing scores.
 #
-# ONE TERM CARRIES IT. forward_progress supplies +2.90 of the +2.55 gap; every other
-# term in the set nets out NEGATIVE against walking, by -0.35 combined. Standing still
-# genuinely is better on almost everything else, exactly as failure #1 predicted. At
-# weight 2.0 instead of 3.0 that column drops to +1.73 and the gap falls to +1.38, which
-# is worse than the reward set this one replaces. The 2.0 -> 3.0 change is load-bearing,
-# not cosmetic.
+# ONE TERM CARRIES IT. forward_progress supplies +1.12 of the +0.96 gap; every other
+# term in the set nets out NEGATIVE against walking, by -0.155 combined. Standing still
+# genuinely is better on almost everything else, exactly as failure #1 predicted. The
+# 2.0 -> 3.0 weight change on that one term is load-bearing, not cosmetic: at 2.0 the
+# gap is +0.66.
 #
-# WHERE THE BUDGET IS BREACHED. Penalties measure -1.44 at the classical gait against a
-# ceiling of 0.35 x 3.0 = -1.05, i.e. 37% over. The four largest are excess_touchdowns
-# -0.35, stance_foot_anchoring -0.32, servo_tracking_error -0.25 and soft_landing -0.21.
-# All four are measured on UNTRAINED behaviour and all four are things training should
-# reduce (fewer bounces, less skid, less saturation), so the good-behaviour figure will
-# be lower than this - but the starting point is over budget and that is worth knowing
-# before, not after, a run. If it has to come down, excess_touchdowns and soft_landing
-# are the pair to cut: they price the same physical event twice, once by count and once
-# by force.
+# WHAT THIS REPLACES, AND WHY THE COMPARISON MATTERS. Under the previous configuration -
+# full randomisation from step 0, CROSS_TRACK_STD 0.03 m, excess_touchdowns priced
+# alongside soft_landing, reset joint offset +/-0.05 rad - the same arithmetic INVERTED:
+# frozen beat walking. Not because the reward set was wrong but because the randomisation
+# envelope had destroyed 89% of the classical gait before the first gradient step, so
+# there was no walking left to reward and the reward was correctly reporting it. The fix
+# was the randomisation ramp in train/gray_env.py, not a weight.
 #
-# THE RANDOMISATION IS THE REAL BLOCKER, AND IT IS NOT A REWARD PROBLEM. The same
-# classical gait, same 10 s window, measured travel:
+# THE PENALTY BUDGET FITS, AND ONLY JUST. -1.019 against the 1.05 ceiling, 3% of
+# headroom, measured on the untrained gait. It fits because the double charge was
+# resolved: with excess_touchdowns priced alongside soft_landing the same measurement
+# gives -1.42, 35% over. Every large item left (stance_foot_anchoring -0.33,
+# servo_tracking_error -0.23, soft_landing -0.18) is something training should reduce,
+# so good behaviour sits below the starting figure.
 #
-#     no randomisation                    777 mm      <- the Phase 2 baseline, intact
-#     + resin_density_legs                863 mm
-#     + trunk_inertia                     819 mm
-#     + foot_friction                     728 mm
-#     + servo_zero_offset                 620 mm
-#     + servo_armature                    593 mm
-#     + servo_gains                       354 mm      <- worst single event
-#     ALL of them together                 32 mm      <- 96% of the gait destroyed
-#
-# No single event breaks the gait; the combination annihilates it. Under the full
-# envelope the starting policy travels 32-46 mm and scores forward_progress +0.22 to
-# +0.42 out of +3.00, so the walking column above collapses and the measured gap goes to
-# -0.09 - FROZEN BEATS WALKING. That is failure #1 waiting to happen again, and no
-# reward weight can fix it, because the reward is correctly reporting that the robot is
-# not walking. The randomisation envelope in train/gray_env.py has to be narrowed or
-# curriculum'd in before this reward set can do its job. Re-measure the table above
-# after that change.
+# THE LARGEST REMAINING DEFECT IS NOT IN THIS FILE. forward_progress reads +0.89 of a
+# possible +3.00 partly because every episode opens with a spawn transient that throws
+# the trunk ~330 mm BACKWARD in its first half second: mjlab spawns Gray in the standing
+# pose while `ResidualGaitAction.reset` randomises the gait phase, so step 1 commands
+# every joint to jump 0.2-0.5 rad at once and twelve saturated servos launch the robot.
+# See the note at reset_robot_joints in train/gray_env.py. Fixing that is worth more to
+# this table than any reward change available here.
 #
 # RULE, unchanged: keep the sum of all penalties at good behaviour under 0.35 x the
 # forward_progress weight - at weight 3.0, under 1.05.
@@ -608,7 +611,8 @@ class CrossTrackDrift(ManagerTermBase):
   """Reward staying on the straight line the robot was told to walk. Weight +0.5.
 
   exp(-d^2 / std^2) on d, the perpendicular distance from the line through the pose the
-  robot reset into, along the heading it reset with. std 0.03 m.
+  robot reset into, along the heading it reset with. std 0.10 m - see the derivation in
+  train/gray_env.py at CROSS_TRACK_STD, and the paragraph on 0.03 m below.
 
   WHY POSITION AND NOT YAW RATE
   -----------------------------
@@ -641,21 +645,33 @@ class CrossTrackDrift(ManagerTermBase):
        straightness by zero, and a robot that walks 200 mm and then stops watches its
        cap decay as the denominator keeps growing.
 
-  MEASURED, the cap helps a great deal and still does not fully fix it: +0.0350 walking
-  against +0.0831 frozen, on a term whose ceiling is +0.50. Uncapped the frozen column
-  would be near the full +0.50; the cap cuts it to +0.08. It remains a weak failure and
-  is counted as one.
+  THE std WAS 0.03 m AND THAT WAS FAILURE #2 IN A THIRD CHANNEL. First TRACK_LIN_STD at
+  0.035, then TRACK_ANG_STD at 0.050, then this: a std tighter than the quantity it is
+  measuring, leaving the exponential flat exactly where it needs slope. At 0.03 m a
+  walking policy scored +0.035 of a possible +0.50 - seven percent - because the drift
+  the robot actually produces (64 mm on the run that was measured) scores exp(-4.5) =
+  0.011. There was no gradient toward straightness until the policy was already straight.
 
-  A SECOND PROBLEM, AND IT IS THE BIGGER ONE. Walking scores +0.035 out of a possible
-  +0.50 - seven percent. std = 0.03 m is tighter than the drift the robot actually
-  produces: the classical baseline is -52.6 mm with sd 162.1 over 6 seeds, and the run
-  measured here drifted 64 mm, which scores exp(-4.5) = 0.011. THIS IS THE SAME MISTAKE
-  THE YAW CHANNEL MADE - a std tighter than the noise floor, leaving the term flat
-  exactly where it needs slope, which is failure #2 in a third channel. The term is not
-  wrong, its std is: nothing in the reachable range scores meaningfully above zero, so
-  there is no gradient toward straightness until the policy is already straight. Widen
-  std toward the observed drift (0.08-0.10 m) or ramp it down on a curriculum. Left as
-  configured it will contribute almost nothing.
+  std IS NOW 0.10 m, DERIVED FROM WHAT THIS TERM ACTUALLY SAMPLES. It is charged every
+  step, on a cross-track distance that starts at zero and grows, so the quantity that
+  has to sit on the slope is the PER-STEP MEAN |cross-track| over an episode, not the
+  end-of-run drift. Measured on the classical crawl over 10 s, 1024 robots:
+
+      nominal robot                        37.4 mm
+      the fleet training starts on         68.9 mm
+      the full randomisation envelope     118.6 mm
+
+  exp(-d^2/std^2) is steepest at d = std/sqrt(2), so putting the maximum-slope point on
+  the envelope training begins with gives std = sqrt(2) x 68.9 mm = 97 mm. Rounded to
+  0.10 m, the term reads 0.87 / 0.62 / 0.24 across those three rows and 1.00 at zero
+  drift - nearly the whole range in use, with the steepest part where the untrained
+  policy sits. At 0.03 m the same rows read 0.22 / 0.005 / 1e-7.
+
+  MEASURED WALKING vs FROZEN, at the start of training and at std 0.10: +0.187 walking
+  against +0.221 frozen. It is worth 5x what it was worth at 0.03 (+0.035 / +0.083) and
+  the freeze deficit is SMALLER in absolute terms (-0.034 against -0.048), so widening
+  the std bought slope without buying freeze incentive. It is still a weak failure and
+  is still counted as one; the progress cap is what keeps it weak.
 
   The origin and heading are latched lazily on the first call after a reset rather than
   inside reset(), so this does not depend on whether the reset events have already
@@ -899,12 +915,30 @@ class SwingClearance(_GaitPhasedFootTerm):
 
 
 class ExcessTouchdowns(_GaitPhasedFootTerm):
-  """Count footfalls the gait never asked for. Weight -0.5.
+  """Count footfalls the gait never asked for. NOW A METRIC, NOT A REWARD.
+
+  DEMOTED, and the reason is the whole point of the term. It and `soft_landing` priced
+  the SAME PHYSICAL EVENT - a foot's first contact - and between them measured -0.40 of
+  a -1.05 penalty budget. `soft_landing` sums (contact force x first_contact) over the
+  feet, so it already fires on every one of these events and already charges 3.3x for a
+  robot that lands 262 times instead of 80. What it adds is the SEVERITY of each
+  landing, which this term cannot see at all: a 0.5 N re-graze and a 40 N stomp both
+  cost it exactly 0.5. The containment runs one way only.
+
+  Severity is also the quantity that actually breaks the parts. Fatigue life of a
+  brittle thermoset goes roughly as S^-m with m of order 10, so halving the landing
+  force buys three orders of magnitude of life where halving the number of landings
+  buys a factor of two. The count matters, but only at a given stress amplitude, and
+  amplitude is where the S-N curve is steep. Pricing force is pricing the physics.
+
+  It is still COMPUTED, as Episode_Metrics/excess_touchdowns, because the count is the
+  clearest single read on whether the robot is bouncing and the 262-against-80
+  measurement is what motivated both terms in the first place. Everything below still
+  describes what it measures; only its weight is gone.
 
   The crawl commands exactly one touchdown per leg per cycle: 4 legs x 20 cycles = 80
   footfalls in a 12 s episode. The robot makes 262. Each of those extra 182 is an
-  unplanned impact on a brittle SLA resin part. This is the term that prices them -
-  `soft_landing` prices how HARD each landing is, this one prices how MANY there are.
+  unplanned impact on a brittle SLA resin part.
 
   HOW "EXCESS" IS DEFINED, AND WHY IT MATTERS
   -------------------------------------------
@@ -930,21 +964,13 @@ class ExcessTouchdowns(_GaitPhasedFootTerm):
 
   RIPPLE CHECK: counts discrete events, reads no velocity. Not applicable.
 
-  FREEZE TEST: PASSES, and by a wider margin than expected. The design argument was
-  that it would merely TIE - a frozen robot makes no touchdowns and scores 0.00, a
-  perfect gait spends exactly its commanded budget and also scores 0.00. Measured, it
-  does better than tie: -0.3506 walking against -0.3757 frozen, so the frozen robot
-  scores WORSE. A robot marching on the spot re-lands each foot in the same place and
-  bounces more, not less.
-
-  Both columns are far from zero (0.67 excess touchdowns per step measured, against 0.30
-  implied by the 262-vs-80 count) because they are measured on the untrained gait. This
-  is the largest single penalty in the set at the starting point, which is worth
-  watching: it and `soft_landing` price the same physical event twice, once by count and
-  once by force.
-
-  It only passes at all because the budget is per commanded cycle. Under a flat-rate
-  definition this term would have failed.
+  FREEZE TEST: PASSED, and that is what it cost to drop it. Measured -0.3506 walking
+  against -0.3757 frozen, so the frozen robot scored WORSE - a robot marching on the
+  spot re-lands each foot in the same place and bounces more, not less. `soft_landing`,
+  the term that survives, fails the freeze test weakly instead (-0.2095 against
+  -0.1784). Removing the anti-freeze half of the pair and keeping the freeze-shaped half
+  costs about 0.025 of walking-vs-frozen margin, roughly 1% of the measured gap. That is
+  the price of pricing the right quantity.
   """
 
   def __init__(self, cfg, env: ManagerBasedRlEnv) -> None:

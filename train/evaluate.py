@@ -77,6 +77,9 @@ from datetime import datetime
 
 import numpy as np
 
+# For the archived policies only. Where a run's results live is progress_store's
+# to say, and this file used to have its own stale copy of that answer.
+import progress_store
 from gray.gait import GaitGenerator, GaitParams
 from gray.kinematics import LEGS, joint_vector, load_legs
 

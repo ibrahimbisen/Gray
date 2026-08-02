@@ -104,6 +104,23 @@ def ensure_run_dirs(root: str, name: str) -> dict:
     return paths
 
 
+def _scored_mtime(run_dir: str) -> float:
+    """When this run was last scored (0.0 if that cannot be told).
+
+    summary.csv is rewritten in full by every scoring pass, so its mtime is that
+    moment in a single stat - `_newest_mtime` would walk every clip and policy
+    in the run to learn the same thing, on every dashboard poll. Falls back to
+    the folder, which `ensure_run_dirs` stamps when it creates videos/ and
+    policies/, so a run that exists but has not been scored yet still sorts.
+    """
+    for path in (os.path.join(run_dir, "summary.csv"), run_dir):
+        try:
+            return os.path.getmtime(path)
+        except OSError:
+            continue
+    return 0.0
+
+
 def list_runs(root: str = ".") -> list[str]:
     """Run names that have scored results on disk, newest first.
 
@@ -118,10 +135,15 @@ def list_runs(root: str = ".") -> list[str]:
         name for name in os.listdir(runs_dir)
         if os.path.isdir(os.path.join(runs_dir, name))
     ]
-    # Names are timestamps (2026-08-01_20-14-14), so a plain reverse sort is
-    # newest-first for every run this project has made. mtime is the tie-break
-    # for anything hand-named that does not follow the pattern.
-    names.sort(key=lambda n: (n, _newest_mtime(os.path.join(runs_dir, n))),
+    # Newest by mtime, which is the rule `newest_run_name` uses: the dashboard
+    # falls back to list_runs()[0] when the training logs are gone, and the two
+    # must not disagree about which run is current. Sorting by name looked
+    # equivalent because names are timestamps (2026-08-01_20-14-14), but names
+    # are unique within a directory, so a name-first key never reaches its
+    # tie-break: one hand-named run ('2026-08-01_first-attempt') sorted ahead of
+    # every timestamped one and the page reported that dead run's scores as the
+    # live run's. Name breaks ties so the order is stable when mtimes match.
+    names.sort(key=lambda n: (_scored_mtime(os.path.join(runs_dir, n)), n),
                reverse=True)
     return names
 

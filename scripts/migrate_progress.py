@@ -234,9 +234,13 @@ def main() -> int:
                 print(f"  {cell}")
 
     if args.apply:
-        with open(paths["summary_csv"], "rb") as fh:
-            lines = sum(1 for _ in fh)
-        print(f"summary.csv lines: {lines}")
+        # progress/ can hold videos/ and policies/ with no top-level summary.csv,
+        # and moving just those two is a success: counted like everything else,
+        # not reported as a traceback over files that arrived safely.
+        if os.path.exists(paths["summary_csv"]):
+            with open(paths["summary_csv"], "rb") as fh:
+                lines = sum(1 for _ in fh)
+            print(f"summary.csv lines: {lines}")
         print(f"videos:            {len(_files_in(paths['videos_dir']))}")
         print(f"policies:          {len(_files_in(paths['policies_dir']))}")
     return 0
