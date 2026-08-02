@@ -9,7 +9,13 @@ venv/
 *.egg-info/
 
 # Training artifacts (policies are committed deliberately, logs are not)
-runs/
+#
+# LEADING SLASH IS LOAD-BEARING. Bare `runs/` matches a directory of that name at
+# ANY depth, so when results moved to progress/runs/<run>/ it silently swallowed the
+# whole archive - a commit deleted 48 tracked policies and added nothing back, and
+# `git status` showed nothing wrong because ignored files are not reported. This
+# anchors the pattern to the repo root, where the trainer's own runs/ dir would sit.
+/runs/
 logs/
 wandb/
 *.ckpt
