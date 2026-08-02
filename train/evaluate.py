@@ -98,6 +98,10 @@ TRUNK_BODY = "base_link"
 LEG_BODY_RE = re.compile(r"^(fl|fr|br|bl)_")
 FOOT_GEOMS = tuple(f"{leg}_bottom_collision" for leg in LEGS)
 FLOOR_GEOM = "floor"
+# The four knee joints, which carry their own inertia randomisation because they are
+# push-rod driven. Must stay in step with the joint_names regex on the
+# knee_pushrod_inertia event in train/gray_env.py.
+KNEE_JOINTS = tuple(f"{leg}_bottom" for leg in LEGS)
 
 MASS_KG = 1.6247        # robot.yaml total; used for cost of transport
 
@@ -275,6 +279,12 @@ class Draw:
     kp_scale: float = 1.0
     kv_scale: float = 1.0
     armature_scale: float = 1.0
+    # The knee gets its OWN armature draw, because training gives it one: the knee is
+    # driven through a push-rod, so the inertia the servo feels is the shank's divided
+    # by an unmeasured linkage ratio. train/gray_env.py randomises `_bottom` over
+    # 0.224-4.69 on top of the 0.35-3.0 every joint gets. Scoring the knee on the
+    # narrow range would test a robot whose hardest unknown had been quietly removed.
+    knee_armature_scale: float = 1.0
     zero_offset: tuple[float, ...] = ()  # per-joint servo horn misalignment, rad
     latency_s: float = 0.0
 
@@ -283,7 +293,8 @@ class Draw:
         return (self.leg_density == 1.0 and self.trunk_density == 1.0
                 and self.com_offset == (0.0, 0.0, 0.0) and self.friction is None
                 and self.kp_scale == 1.0 and self.kv_scale == 1.0
-                and self.armature_scale == 1.0 and not any(self.zero_offset)
+                and self.armature_scale == 1.0 and self.knee_armature_scale == 1.0
+                and not any(self.zero_offset)
                 and self.latency_s == 0.0)
 
     def describe(self) -> str:
@@ -291,6 +302,7 @@ class Draw:
                 f"trunk x{self.trunk_density:.2f}  mu {self.friction or 1.0:.2f}  "
                 f"kp x{self.kp_scale:.2f}  kv x{self.kv_scale:.2f}  "
                 f"armature x{self.armature_scale:.2f}  "
+                f"knee x{self.knee_armature_scale:.2f}  "
                 f"lag {self.latency_s*1000:.0f} ms")
 
 
@@ -321,9 +333,16 @@ def sample_draws(n: int = N_DRAWS, seed: int = DRAW_SEED) -> tuple[Draw, ...]:
             trunk_density=_log_uniform(rng, 0.6, 1.4),
             com_offset=tuple(float(v) for v in rng.uniform(-0.02, 0.02, 3)),
             friction=float(rng.uniform(0.4, 1.2)),
-            kp_scale=float(rng.uniform(0.7, 1.4)),
-            kv_scale=float(rng.uniform(0.7, 1.4)),
+            # 0.5-4.0, NOT the 0.7-1.4 this used to draw. Training widened the servo
+            # gain envelope and this harness did not follow, so the dual-sim check -
+            # the one that is supposed to prove a policy survives reality before it
+            # touches the robot - was grading against a materially easier world than
+            # the policy trained on. A validation set weaker than the training set
+            # cannot validate anything.
+            kp_scale=float(rng.uniform(0.5, 4.0)),
+            kv_scale=float(rng.uniform(0.5, 4.0)),
             armature_scale=float(rng.uniform(0.35, 3.0)),
+            knee_armature_scale=float(rng.uniform(0.224, 4.69)),
             zero_offset=tuple(float(v) for v in rng.uniform(-0.03, 0.03, 12)),
             latency_s=float(rng.uniform(0.010, 0.040)),
         ))
@@ -381,6 +400,24 @@ def _model_for(draw: Draw | None):
     model.actuator_biasprm[:, 2] *= draw.kv_scale
 
     model.dof_armature[6:] *= draw.armature_scale     # skip the free joint's 6 DOF
+
+    # The knee draw multiplies ON TOP of the global one, which is what training does:
+    # gray_env.py applies servo_armature to `.*` and then knee_pushrod_inertia to
+    # `^(fl|fr|br|bl)_bottom$` as a second scale event, so the knee's total factor is
+    # the product. Applying it as a replacement here would have made the knee LESS
+    # variable than every other joint at the low end.
+    if draw.knee_armature_scale != 1.0:
+        for jname in KNEE_JOINTS:
+            jid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, jname)
+            if jid < 0:
+                # Silence here would restore the exact defect being fixed: a knee
+                # scored on the narrow envelope while the report claims otherwise.
+                raise RuntimeError(
+                    f"joint '{jname}' not in the model, so the knee push-rod inertia "
+                    f"cannot be randomised. Fix KNEE_JOINTS rather than scoring "
+                    f"against an envelope narrower than training's."
+                )
+            model.dof_armature[model.jnt_dofadr[jid]] *= draw.knee_armature_scale
 
     return model
 
