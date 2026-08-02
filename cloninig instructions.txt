@@ -1,3 +1,0 @@
-git clone --branch sim-phase-1-2-digital-twin-and-gait --depth 1 \
-  --filter=blob:none --sparse https://github.com/ibrahimbisen/Gray.git Gray
-cd Gray && git sparse-checkout set gray sim scripts tools tests
