@@ -7,9 +7,12 @@
 <style>
 /* ============================================================
    Gray dashboard — single file, no external resources.
-   Palette: validated dark categorical set (blue / orange / aqua)
-   against surface #16161a. Status colours are reserved and
-   always ship with a word, never colour alone.
+
+   Reading order is the whole design: verdict, six goals, videos,
+   joints, then everything else folded away. Only two colours mean
+   anything on the open page — better than the hand-written walk,
+   and worse than it. Charts that are visible by default draw in
+   plain ink so those two colours stay the only signal.
    ============================================================ */
 :root{
   color-scheme: dark;
@@ -17,23 +20,28 @@
   --plane:      #0d0d0f;   /* page plane            */
   --panel:      #16161a;   /* chart / card surface  */
   --panel-2:    #1c1c21;   /* nested surface        */
-  --hair:       rgba(255,255,255,0.09);
+  --hair:       rgba(255,255,255,0.08);
   --hair-solid: #26262b;
 
   --ink:        #ffffff;   /* primary text   */
+  --ink-1:      #ffffff;
   --ink-2:      #c3c2b7;   /* secondary text */
   --ink-3:      #898781;   /* muted / axes   */
 
   --grid:       #2c2c2a;
   --axis:       #383835;
+  --data:       #e6e5dd;   /* single-series chart ink, open page */
 
-  --s1:         #3987e5;   /* categorical 1 — blue   */
-  --s2:         #d95926;   /* categorical 2 — orange */
-  --s3:         #199e70;   /* categorical 3 — aqua   */
+  /* categorical set — used ONLY inside collapsed panels */
+  --s1:         #3987e5;
+  --s2:         #d95926;
+  --s3:         #199e70;
 
-  --good:       #0ca30c;
+  /* the only two colours that carry meaning above the fold */
+  --better:     #4ec06a;
+  --worse:      #e2794a;
+
   --warning:    #fab219;
-  --serious:    #ec835a;
   --critical:   #d03b3b;
 
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -55,31 +63,34 @@ body{
 }
 h1,h2,h3,h4{ margin:0; font-weight:600; line-height:1.25; letter-spacing:-0.01em; }
 p{ margin:0; }
-a{ color: var(--s1); }
+a{ color: var(--ink); }
 
-.wrap{ max-width: 1200px; margin:0 auto; padding: 0 20px; }
-@media (max-width: 560px){ .wrap{ padding: 0 14px; } }
+.wrap{ max-width: 1180px; margin:0 auto; padding: 0 22px; }
+@media (max-width: 560px){ .wrap{ padding: 0 16px; } }
 
 /* ---------- generic bits ---------- */
 .mono{ font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .num{ font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing:-0.02em; }
-.unit{ font-family: var(--sans); font-size: 0.60em; color: var(--ink-3); font-weight:500; letter-spacing:0; margin-left:.28em; }
+.unit{ font-family: var(--sans); font-size: 0.56em; color: var(--ink-3); font-weight:500; letter-spacing:0; margin-left:.3em; }
+.unit.deg{ margin-left:.02em; }   /* the degree sign is written tight against the number */
 .muted{ color: var(--ink-3); }
 .sec-ink{ color: var(--ink-2); }
 
+/* Cards keep a surface only where something is nested inside them. Most of the
+   open page is now bare text on the plane. */
 .card{
   background: var(--panel);
-  border: 1px solid var(--hair);
   border-radius: var(--r);
   padding: 20px;
   min-width: 0;
 }
-.card.tight{ padding:16px; }
 
 .grid{ display:grid; gap:14px; }
-.g-auto{ grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
-.g-auto-wide{ grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); }
-.g-auto-chart{ grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+/* min() so a narrow phone gets one full-width column instead of a sideways
+   scroll — the track never demands more room than the screen has. */
+.g-auto{ grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); }
+.g-auto-wide{ grid-template-columns: repeat(auto-fit, minmax(min(290px, 100%), 1fr)); }
+.g-auto-chart{ grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); }
 .grid > *{ min-width:0; }
 
 .scroll-x{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
@@ -92,96 +103,105 @@ td.n, th.n{ text-align:right; font-family:var(--mono); font-variant-numeric:tabu
 tbody tr:last-child td{ border-bottom:none; }
 tbody tr:hover td{ background: rgba(255,255,255,0.025); }
 
-.chip{
-  display:inline-flex; align-items:center; gap:7px;
-  padding: 4px 10px; border-radius: 999px;
-  border:1px solid var(--hair); background: var(--panel-2);
-  font-size:12px; color: var(--ink-2); white-space:nowrap;
-}
-.dot{ width:8px; height:8px; border-radius:50%; flex:none; }
+.dot{ width:9px; height:9px; border-radius:50%; flex:none; display:inline-block; }
 
-/* ---------- header ---------- */
-header.top{
-  border-bottom: 1px solid var(--hair);
-  background: linear-gradient(180deg, #131318 0%, var(--plane) 100%);
-  padding: 30px 0 24px;
+/* ---------- header: three things, nothing else ----------
+   Where it stands now, the one sentence saying what that is measured against,
+   and whether anything is training. Everything that used to sit up here pushed
+   the goal cards off the bottom of the screen, so it went. */
+header.top{ padding: 20px 0 20px; }
+
+h1.verdict{
+  font-size: clamp(27px, 4.6vw, 44px);
+  line-height: 1.06; letter-spacing:-0.03em;
+  margin: 0; max-width: 26ch;
 }
-.brandline{ display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
-h1{ font-size: clamp(28px, 5vw, 40px); letter-spacing:-0.03em; }
-.brandsub{ color: var(--ink-3); font-size:13px; letter-spacing:.16em; text-transform:uppercase; }
-.lede{ margin-top:12px; max-width: 68ch; color: var(--ink-2); font-size: clamp(15px,2.4vw,17px); }
-.statusbar{
-  margin-top: 22px;
-  display:grid; gap:10px;
-  grid-template-columns: repeat(auto-fit, minmax(170px,1fr));
+h1.verdict .cnt{ color: var(--better); }
+h1.verdict .cnt.bad{ color: var(--worse); }   /* a losing count is never green */
+h1.verdict.behind{ color: var(--worse); }
+h1.verdict.blank{ color: var(--ink-3); }
+.subverdict{ color: var(--ink-2); font-size:14.5px; margin-top:9px; max-width:64ch; }
+
+/* The run state. A stopped run is the most actionable thing on the page, so it
+   is a line of plain words, not a grey dot. */
+.runstate{
+  display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+  margin-top:16px; padding:11px 15px; border-radius:12px;
+  background: var(--panel); font-size:14.5px; color: var(--ink-2);
 }
-.tile{
-  background: var(--panel); border:1px solid var(--hair);
-  border-radius: 12px; padding: 13px 15px;
-}
-.tile .k{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-3); }
-.tile .v{ font-family:var(--mono); font-variant-numeric:tabular-nums; font-size: 25px; line-height:1.25; margin-top:4px; letter-spacing:-0.02em; }
-.tile .sub{ font-size:12px; color: var(--ink-3); margin-top:2px; }
-.bar{ height:5px; border-radius:3px; background: var(--panel-2); overflow:hidden; margin-top:9px; border:1px solid var(--hair); }
-.bar > i{ display:block; height:100%; background: var(--s1); }
+.runstate .flag{ font-family:var(--mono); font-size:11px; letter-spacing:.09em; text-transform:uppercase;
+                 padding:2px 8px; border-radius:6px; flex:none; }
+.runstate .rs-text{ min-width:0; }
+.runstate .rs-text b{ color: var(--ink); font-weight:600; }
+.runstate .rs-pct{ font-family:var(--mono); font-size:12.5px; color: var(--ink-3); flex:none; }
+.runstate .bar{ margin-top:0; width:150px; max-width:38vw; flex:none; }
+.runstate.stop{ border-left:3px solid var(--warning); }
+.runstate.stop .flag{ background: rgba(250,178,25,.14); color: var(--warning); }
+.runstate.go   .flag{ background: rgba(78,192,106,.14); color: var(--better); }
+.runstate.done .flag, .runstate.idle .flag{ background: rgba(255,255,255,.06); color: var(--ink-2); }
+
+.bar{ height:4px; border-radius:2px; background: var(--hair-solid); overflow:hidden;
+      margin-top:10px; max-width:260px; }
+.bar > i{ display:block; height:100%; background: var(--ink-2); }
 
 /* ---------- sections ---------- */
-section{ padding: 46px 0 6px; }
-section + section{ border-top: 1px solid var(--hair); }
-.sechead{ margin-bottom: 20px; }
-.eyebrow{ font-family:var(--mono); font-size:12px; color: var(--ink-3); letter-spacing:.1em; }
-.sechead h2{ font-size: clamp(21px, 3.4vw, 27px); margin-top:4px; }
-.sechead .sub{ margin-top:7px; color: var(--ink-2); max-width: 76ch; font-size:15px; }
+section{ padding: 58px 0 0; }
+/* The first section is the six goals, and it has to start above the fold. */
+section#goals{ padding-top: 24px; }
+.sechead{ margin-bottom: 26px; }
+.sechead h2{ font-size: clamp(20px, 3vw, 25px); }
+.sechead .sub{ margin-top:8px; color: var(--ink-2); max-width: 62ch; font-size:14.5px; }
 
 .note{
-  border-left: 3px solid var(--hair-solid);
+  border-left: 2px solid var(--hair-solid);
   padding: 2px 0 2px 14px; color: var(--ink-2); font-size:13.5px; max-width:80ch;
 }
 
-/* ---------- banners ---------- */
+/* ---------- banners (only ever appear when something is wrong) ---------- */
 .banner{
   display:flex; gap:12px; align-items:flex-start;
   border-radius: 12px; padding: 13px 16px; font-size:13.5px;
-  border:1px solid var(--hair); background: var(--panel);
-  margin-top: 14px;
+  background: var(--panel); margin-top: 22px;
 }
-.banner .flag{ font-family:var(--mono); font-size:11px; letter-spacing:.09em; text-transform:uppercase; padding:2px 8px; border-radius:6px; flex:none; }
-.banner.warn .flag{ background: rgba(250,178,25,.14); color: var(--warning); border:1px solid rgba(250,178,25,.35); }
-.banner.bad  .flag{ background: rgba(208,59,59,.14); color: var(--critical); border:1px solid rgba(208,59,59,.4); }
+.banner .flag{ font-family:var(--mono); font-size:11px; letter-spacing:.09em; text-transform:uppercase;
+               padding:2px 8px; border-radius:6px; flex:none; }
+.banner.warn .flag{ background: rgba(250,178,25,.14); color: var(--warning); }
+.banner.bad  .flag{ background: rgba(208,59,59,.14); color: var(--critical); }
 .banner ul{ margin:6px 0 0; padding-left:18px; color: var(--ink-2); }
 
-/* ---------- goal ---------- */
-.hero-baseline{
-  display:grid; gap:18px; align-items:center;
-  grid-template-columns: minmax(220px, 300px) 1fr;
-  background: var(--panel); border:1px solid var(--hair);
-  border-radius: var(--r); padding: 22px;
+/* ---------- the six goals ---------- */
+.goals{
+  display:grid; gap: 32px 30px;
+  grid-template-columns: repeat(auto-fit, minmax(min(214px, 100%), 1fr));
 }
-@media (max-width: 720px){ .hero-baseline{ grid-template-columns: 1fr; } }
-.hero-fig{ font-family:var(--mono); font-variant-numeric:tabular-nums; font-size: clamp(40px, 8vw, 58px); line-height:1; letter-spacing:-0.04em; }
-.hero-cap{ font-size:12px; text-transform:uppercase; letter-spacing:.09em; color:var(--ink-3); margin-bottom:8px; }
-.hero-stats{ display:grid; gap:12px; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); }
-.hero-stats .v{ font-family:var(--mono); font-size:20px; letter-spacing:-.02em; }
-.hero-stats .k{ font-size:11.5px; color: var(--ink-3); text-transform:uppercase; letter-spacing:.07em; }
-
-.teach{ display:grid; gap:12px; grid-template-columns: repeat(auto-fit, minmax(250px,1fr)); }
-.teach .card{ display:flex; flex-direction:column; gap:6px; }
-.teach .idx{ font-family:var(--mono); font-size:11px; color:var(--ink-3); }
-.teach h3{ font-size:16px; }
-.teach .tgt{ font-family:var(--mono); font-size:13.5px; color: var(--s1); }
-.teach p{ color: var(--ink-2); font-size:13.5px; }
-
-.tag-good, .tag-cost{
-  display:inline-block; font-size:11px; font-family:var(--mono);
-  padding:1px 7px; border-radius:5px; letter-spacing:.02em;
+.goal .gname{ font-size:15px; font-weight:600; }
+.goal .gbig{
+  font-family:var(--mono); font-variant-numeric:tabular-nums;
+  font-size: clamp(30px, 4.4vw, 40px); line-height:1.08; letter-spacing:-0.04em; margin-top:7px;
 }
-.tag-good{ background: rgba(57,135,229,.14); color:#8fbdf3; border:1px solid rgba(57,135,229,.32); }
-.tag-cost{ background: rgba(217,89,38,.14); color:#f0a184; border:1px solid rgba(217,89,38,.32); }
+.goal .gmark{ font-size:13px; margin-top:6px; }
+.goal .gmark.better{ color: var(--better); }
+.goal .gmark.worse { color: var(--worse); }
+.goal .gmark.same, .goal .gmark.none{ color: var(--ink-3); }
+/* The personal best sits beside the current number, never instead of it, and
+   always carries the round it was set on. Muted, because it is not what the
+   robot does today. */
+.goal .gbest{ color: var(--ink-3); font-size:12.5px; margin-top:6px; line-height:1.45; }
+.goal .gplain{ color: var(--ink-2); font-size:13.5px; margin-top:8px; max-width:32ch; }
+.goal .btn{ margin-top:12px; }
+
+.btn{
+  display:inline-flex; align-items:center; gap:7px; text-decoration:none;
+  border:1px solid var(--hair-solid); background: transparent; color: var(--ink);
+  border-radius:9px; padding:6px 12px; font-size:13px; cursor:pointer; white-space:nowrap;
+}
+.btn:hover{ border-color: var(--ink-3); }
 
 /* ---------- charts ---------- */
-.chartcard{ background: var(--panel); border:1px solid var(--hair); border-radius: var(--r); padding: 16px 16px 12px; min-width:0; }
+.chartcard{ background: var(--panel); border-radius: var(--r); padding: 16px 16px 12px; min-width:0; }
+.chartcard.bare{ background: transparent; padding: 0 0 8px; }
 .charttitle{ font-size:15px; font-weight:600; }
-.chartsub{ font-size:12.5px; color: var(--ink-3); margin-top:3px; margin-bottom:8px; }
+.chartsub{ font-size:12.5px; color: var(--ink-3); margin-top:3px; margin-bottom:8px; max-width:56ch; }
 .chart{ position:relative; width:100%; }
 .chart svg{ display:block; width:100%; height:auto; touch-action: pan-y; }
 .chart .empty{
@@ -192,7 +212,6 @@ section + section{ border-top: 1px solid var(--hair); }
 .legend{ display:flex; flex-wrap:wrap; gap:14px; margin: 8px 0 2px; font-size:12.5px; color: var(--ink-2); }
 .legend .item{ display:inline-flex; align-items:center; gap:7px; }
 .legend .swatch{ width:11px; height:11px; border-radius:3px; flex:none; }
-.legend .swatch.dash{ height:0; width:16px; border-top:2px dashed var(--ink-2); border-radius:0; }
 
 #tooltip{
   position:fixed; z-index:60; pointer-events:none; opacity:0;
@@ -206,21 +225,59 @@ section + section{ border-top: 1px solid var(--hair); }
 #tooltip .row + .row{ margin-top:3px; }
 #tooltip b{ font-family:var(--mono); font-variant-numeric:tabular-nums; font-weight:600; margin-left:auto; padding-left:14px; }
 
+/* ===== SITE NAV (keep identical on plan.html) =====
+   Sticky, because on a page this long the way back to the other tab should never
+   be a scroll away. */
+.sitenav{ position:sticky; top:0; z-index:60; background:rgba(10,10,10,.94);
+          backdrop-filter:saturate(150%) blur(8px);
+          border-bottom:1px solid var(--hair); }
+.sitenav .wrap{ display:flex; align-items:center; gap:22px; height:52px; }
+.navbrand{ font-weight:650; letter-spacing:.2px; color:var(--ink-1);
+           text-decoration:none; font-size:15px; flex:none; }
+.navtabs{ display:flex; gap:4px; flex:1 1 auto; min-width:0; overflow-x:auto;
+          scrollbar-width:none; }
+.navtabs::-webkit-scrollbar{ display:none; }
+.navtab{ display:inline-block; padding:7px 13px; border-radius:8px; font-size:14px;
+         color:var(--ink-2); text-decoration:none; white-space:nowrap;
+         border:1px solid transparent; }
+.navtab:hover{ color:var(--ink-1); background:rgba(255,255,255,.05); }
+.navtab[data-here]{ color:var(--ink-1); background:rgba(57,135,229,.14);
+                    border-color:rgba(57,135,229,.32); }
+.navout{ flex:none; font-size:13px; color:var(--ink-2); text-decoration:none;
+         white-space:nowrap; }
+.navout:hover{ color:var(--ink-1); }
+@media (max-width:560px){
+  .sitenav .wrap{ gap:12px; }
+  .navout{ display:none; }          /* the tabs matter more than the outbound link */
+}
+
 /* ---------- videos ---------- */
-.vidgrid{ display:grid; gap:16px; grid-template-columns: repeat(auto-fit, minmax(290px,1fr)); }
-.vidcard{ background: var(--panel); border:1px solid var(--hair); border-radius: var(--r); overflow:hidden; }
+.vidgrid{ display:grid; gap:18px; grid-template-columns: repeat(auto-fit, minmax(min(290px, 100%), 1fr)); }
+/* scroll-margin so a jump to #walk-1600 lands below the sticky nav, not under it. */
+.vidcard{ background: var(--panel); border-radius: var(--r); overflow:hidden; scroll-margin-top: 68px; }
 .vidcard video{ display:block; width:100%; aspect-ratio: 16/9; background:#000; object-fit:contain; }
 .vidcard .vhead{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:13px 15px 0; }
 .vidcard .vtitle{ font-family:var(--mono); font-size:15px; }
 .vidcard .vbody{ padding: 10px 15px 15px; }
-.vstats{ display:grid; grid-template-columns: repeat(auto-fit, minmax(78px,1fr)); gap:9px; margin-top:4px; }
+.vstats{ display:grid; grid-template-columns: repeat(auto-fit, minmax(78px,1fr)); gap:10px; margin-top:4px; }
 .vstats .k{ font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-3); }
 .vstats .v{ font-family:var(--mono); font-size:15px; }
-.vmissing{ padding:14px 15px; font-size:12.5px; color: var(--ink-3); border-top:1px solid var(--hair); }
+.vmissing{ padding:14px 15px; font-size:12.5px; color: var(--ink-3); }
+.vtag{ font-size:11px; font-family:var(--mono); color:var(--ink-3); white-space:nowrap; }
+
+details.morevids{ margin-top:20px; }
+details.morevids > summary{ cursor:pointer; font-size:14px; color:var(--ink-2); }
+
+/* Used-against-available travel. The EMPTY part of the bar is the point: it is
+   capability the robot has and the walk never calls on. */
+.jbar{ position:relative; height:10px; border-radius:5px; background:rgba(255,255,255,.07); overflow:hidden; }
+.jbar-fill{ position:absolute; inset:0 auto 0 0; background:var(--ink-2); border-radius:5px 0 0 5px; }
+.jbar-legend{ display:flex; justify-content:space-between; gap:10px; margin-top:6px;
+              font-size:12px; color:var(--ink-2); }
 
 /* ---------- gallery ---------- */
-.gal{ display:grid; gap:12px; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); }
-.gal figure{ margin:0; background: var(--panel); border:1px solid var(--hair); border-radius:12px; overflow:hidden; }
+.gal{ display:grid; gap:12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.gal figure{ margin:0; background: var(--panel); border-radius:12px; overflow:hidden; }
 .gal img{ display:block; width:100%; height: 170px; object-fit:cover; background:#000; cursor: zoom-in; }
 .gal figcaption{ padding:9px 12px; font-size:12.5px; color: var(--ink-2); }
 .gal.tall img{ height: 230px; object-fit:contain; }
@@ -232,54 +289,93 @@ section + section{ border-top: 1px solid var(--hair); }
 #lightbox.on{ display:flex; }
 #lightbox img{ max-width: min(1100px, 94vw); max-height: 80vh; object-fit:contain; border-radius:10px; }
 #lightbox .cap{ color: var(--ink-2); font-size:13.5px; text-align:center; max-width:70ch; }
-#lightbox .close{ position:absolute; top:16px; right:20px; background:none; border:1px solid var(--hair); color:var(--ink-2); border-radius:8px; padding:6px 12px; font-family:var(--mono); font-size:13px; cursor:pointer; }
+#lightbox .close{ position:absolute; top:16px; right:20px; background:none; border:1px solid var(--hair);
+                  color:var(--ink-2); border-radius:8px; padding:6px 12px; font-family:var(--mono); font-size:13px; cursor:pointer; }
 
-/* ---------- constraints ---------- */
+/* ---------- inside the folded panels ---------- */
+.tile{ background: var(--panel); border-radius: 12px; padding: 14px 16px; }
+.tile .k{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-3); }
+.tile .v{ font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:23px; line-height:1.25; margin-top:4px; letter-spacing:-0.02em; }
+.tile .sub{ font-size:12px; color: var(--ink-3); margin-top:2px; }
+
+.tag-good, .tag-cost{
+  display:inline-block; font-size:11px; font-family:var(--mono);
+  padding:1px 7px; border-radius:5px; letter-spacing:.02em;
+}
+.tag-good{ background: rgba(57,135,229,.14); color:#8fbdf3; }
+.tag-cost{ background: rgba(217,89,38,.14); color:#f0a184; }
+
+/* reward panels: colour AND a border edge AND a word — never colour alone */
+.chartcard.rew{ border-left:3px solid var(--s1); }
+.chartcard.pen{ border-left:3px solid var(--s2); }
+.ceil{ display:flex; align-items:center; gap:9px; margin:6px 0 2px; font-size:11.5px; color:var(--ink-3); }
+.ceil .bar{ flex:1; margin-top:0; max-width:110px; }
+
+.teach{ display:grid; gap:12px; grid-template-columns: repeat(auto-fit, minmax(250px,1fr)); }
+.teach .card{ display:flex; flex-direction:column; gap:6px; background: var(--panel-2); }
+.teach h3{ font-size:16px; }
+.teach .tgt{ font-family:var(--mono); font-size:13.5px; color: var(--ink-2); }
+.teach p{ color: var(--ink-2); font-size:13.5px; }
+
 .constraint{ display:grid; grid-template-columns: 1fr; gap:4px; padding:14px 0; border-bottom:1px solid var(--hair); }
 .constraint:last-child{ border-bottom:none; }
 .constraint .cn{ font-weight:600; font-size:14.5px; }
-.constraint .cv{ font-family:var(--mono); font-size:13px; color: var(--s1); }
+.constraint .cv{ font-family:var(--mono); font-size:13px; color: var(--ink-2); }
 .constraint .cw{ color: var(--ink-2); font-size:13.5px; }
 
-/* ---------- timeline ---------- */
 .tl{ position:relative; margin-left: 8px; padding-left: 26px; border-left: 1px solid var(--hair-solid); }
 .tl .ev{ position:relative; padding: 0 0 26px 0; }
 .tl .ev::before{
   content:""; position:absolute; left:-32px; top:6px; width:11px; height:11px;
   border-radius:50%; background: var(--ink-3); border:2px solid var(--plane);
 }
-.tl .ev.milestone::before{ background: var(--s1); }
-.tl .ev.problem::before{ background: var(--critical); }
-.tl .ev.fix::before{ background: var(--good); }
 .tl .when{ font-family:var(--mono); font-size:12px; color: var(--ink-3); }
-.tl .kind{ font-size:10.5px; font-family:var(--mono); text-transform:uppercase; letter-spacing:.08em; padding:1px 7px; border-radius:5px; margin-left:8px; border:1px solid var(--hair); color:var(--ink-3); }
-.tl .ev.milestone .kind{ color:#8fbdf3; border-color: rgba(57,135,229,.35); }
-.tl .ev.problem .kind{ color:#e88b8b; border-color: rgba(208,59,59,.4); }
-.tl .ev.fix .kind{ color:#63c463; border-color: rgba(12,163,12,.4); }
+.tl .kind{ font-size:10.5px; font-family:var(--mono); text-transform:uppercase; letter-spacing:.08em;
+           padding:1px 7px; border-radius:5px; margin-left:8px; color:var(--ink-3); background: var(--panel-2); }
 .tl h3{ font-size:16px; margin-top:3px; }
 .tl p{ color: var(--ink-2); font-size:14px; margin-top:4px; max-width:80ch; }
 
-/* ---------- footer ---------- */
-footer{ padding: 40px 0 60px; color: var(--ink-3); font-size:12.5px; border-top:1px solid var(--hair); margin-top:44px; }
-
-details.more{ margin-top:18px; border:1px solid var(--hair); border-radius: var(--r); background: var(--panel); }
+/* ---------- folded panels ---------- */
+details.more{ margin-top:14px; background: var(--panel); border-radius: var(--r); }
 details.more > summary{
-  cursor:pointer; list-style:none; padding:15px 18px; font-size:14.5px; font-weight:600;
+  cursor:pointer; list-style:none; padding:16px 20px; font-size:15px; font-weight:600;
   display:flex; align-items:center; justify-content:space-between; gap:10px;
 }
 details.more > summary::-webkit-details-marker{ display:none; }
 details.more > summary::after{ content:"+"; font-family:var(--mono); color:var(--ink-3); font-size:18px; }
 details.more[open] > summary::after{ content:"–"; }
-details.more .inner{ padding: 0 18px 18px; }
+details.more .inner{ padding: 0 20px 20px; }
+details.more .inner > .lead{ color:var(--ink-2); font-size:13.5px; margin-bottom:14px; max-width:82ch; }
+details.sub{ margin-top:16px; background: var(--panel-2); border-radius: 12px; }
+details.sub > summary{ cursor:pointer; list-style:none; padding:12px 16px; font-size:13.5px; color:var(--ink-2); }
+details.sub > summary::-webkit-details-marker{ display:none; }
+details.sub .inner{ padding: 0 16px 16px; }
+
+/* ---------- footer ---------- */
+footer{ padding: 46px 0 60px; color: var(--ink-3); font-size:12.5px; margin-top:52px; }
+
+/* ---------- "newer numbers are waiting" notice ---------- */
+.holdnote{
+  position: fixed; z-index:70; left:50%; transform:translateX(-50%);
+  bottom: 18px; max-width: min(560px, calc(100vw - 24px));
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  background:#0a0a0c; border:1px solid var(--hair-solid); border-radius:12px;
+  padding:11px 14px; font-size:13px; color: var(--ink-2);
+  box-shadow: 0 10px 34px rgba(0,0,0,.6);
+}
+.holdnote[hidden]{ display:none; }
 
 .stack{ display:grid; gap:14px; }
-.stack-lg{ display:grid; gap:26px; }
-.hidden{ display:none !important; }
 </style>
 </head>
 <body>
 
 <div id="tooltip" role="status" aria-live="off"></div>
+
+<div id="holdnote" class="holdnote" role="status" hidden>
+  <span>Newer numbers have arrived. They are held back so your clip is not interrupted.</span>
+  <button class="btn" type="button" id="holdApply">Show them now</button>
+</div>
 
 <div id="lightbox" aria-modal="true" role="dialog">
   <button class="close" type="button" id="lbClose">Close</button>
@@ -287,33 +383,45 @@ details.more .inner{ padding: 0 18px 18px; }
   <div class="cap" id="lbCap"></div>
 </div>
 
+<!-- ===== SITE NAV (keep identical on plan.html; only data-here differs) ===== -->
+<nav class="sitenav">
+  <div class="wrap">
+    <a class="navbrand" href="/">Gray</a>
+    <div class="navtabs">
+      <a class="navtab" href="/" data-here="1">Live dashboard</a>
+      <a class="navtab" href="/plan">The plan</a>
+    </div>
+    <a class="navout" href="http://localhost:6006" target="_blank" rel="noopener">Raw charts &#8599;</a>
+  </div>
+</nav>
+<!-- ===== END SITE NAV ===== -->
+
 <header class="top">
   <div class="wrap">
-    <div class="brandline">
-      <h1>Gray</h1>
-      <span class="brandsub">12-DOF quadruped &middot; residual walking trainer</span>
-    </div>
-    <p class="lede" id="headLede">Loading&hellip;</p>
-    <div class="statusbar" id="statusbar"></div>
+    <h1 class="verdict blank" id="verdict">Reading the training files&hellip;</h1>
+    <p class="subverdict" id="subverdict">Gray, your 3D-printed four-legged robot, against the walk you wrote by hand.</p>
+    <div id="runstate"></div>
     <div id="headBanners"></div>
   </div>
 </header>
 
 <main class="wrap" id="main">
-  <div class="card" id="bootstrap" style="margin-top:34px">
-    <h2 style="font-size:19px">Waiting for the dashboard server</h2>
+  <div class="card" id="bootstrap" style="margin-top:30px">
+    <h2 style="font-size:18px">Waiting for the dashboard server</h2>
     <p class="sec-ink" style="margin-top:8px">
-      This page asks the local server for <span class="mono">/api/status</span> every 30 seconds.
-      Nothing has come back yet. If the server is not running, start it and this page will fill itself in
-      on its own &mdash; no need to reload.
+      This page asks the server for new numbers every 30 seconds. Nothing has come back yet.
+      Start the server and the page fills itself in &mdash; no need to reload.
     </p>
   </div>
 </main>
 
 <footer>
   <div class="wrap">
-    Gray &mdash; 3D-printed 12-DOF quadruped, designed and built 2021&ndash;22 by Ibrahim Bisen.
-    This page reads live files from the training run; it holds no data of its own.
+    <div id="updatedNote">&nbsp;</div>
+    <div style="margin-top:6px">
+      Gray &mdash; 3D-printed 12-DOF quadruped, designed and built 2021&ndash;22 by Ibrahim Bisen.
+      This page reads live files from the training run; it holds no data of its own.
+    </div>
   </div>
 </footer>
 
@@ -348,9 +456,6 @@ function nfSmart(v){
   if (a >= 0.01) return nf(v, 3);
   return v.toPrecision(2);
 }
-function bigNum(v, unit, d){
-  return '<span class="num">' + esc(nf(v, d)) + '</span>' + (unit ? '<span class="unit">' + esc(unit) + '</span>' : '');
-}
 function hms(sec){
   if (!isNum(sec) || sec < 0) return "—";
   sec = Math.round(sec);
@@ -358,6 +463,16 @@ function hms(sec){
   if (h > 0) return h + " h " + String(m).padStart(2,"0") + " m";
   if (m > 0) return m + " m " + String(s).padStart(2,"0") + " s";
   return s + " s";
+}
+/* Time is quoted in the units he would use out loud: minutes, or hours and
+   minutes once it runs past the hour. */
+function timeLeft(sec){
+  if (!isNum(sec) || sec < 0) return "—";
+  const mins = Math.round(sec/60);
+  if (mins < 1) return "under a minute";
+  if (mins < 90) return mins + (mins === 1 ? " minute" : " minutes");
+  const h = Math.floor(mins/60), m = mins % 60;
+  return h + " h " + String(m).padStart(2,"0") + " m";
 }
 function agoText(d){
   if (!d) return "never";
@@ -367,11 +482,6 @@ function agoText(d){
   const m = Math.round(s/60);
   if (m < 90) return m + " min ago";
   return Math.round(m/60) + " h ago";
-}
-function clockText(iso){
-  const d = parseTime(iso);
-  if (!d) return "—";
-  return d.toLocaleTimeString("en-GB", {hour:"2-digit", minute:"2-digit", second:"2-digit"});
 }
 function parseTime(iso){
   if (!iso) return null;
@@ -388,16 +498,39 @@ function titleCase(s){
   return String(s).replace(/[_\-]+/g, " ").replace(/\s+/g," ").trim()
     .replace(/^./, c => c.toUpperCase());
 }
+/* Uprightness is logged as the cosine of the body's lean — 1.000 is dead level
+   and 0.5 is the 60° tip that ends an attempt. Degrees is the version he would
+   actually use, so every visible uprightness figure is converted. */
+function leanDeg(v){
+  if (!isNum(v)) return null;
+  const c = Math.max(-1, Math.min(1, v));
+  return Math.acos(c) * 180 / Math.PI;
+}
+/* Cut a long collector sentence down to one short clause. Only used as a
+   fallback: the six goals have hand-written lines below. */
+function shortLine(text, maxWords){
+  if (!text) return "";
+  let s = String(text).split(/[.;,]/)[0].trim();
+  const w = s.split(/\s+/);
+  if (w.length > (maxWords || 12)) s = w.slice(0, maxWords || 12).join(" ");
+  return s.charAt(0).toUpperCase() + s.slice(1) + ".";
+}
 
 /* ============================================================
    1.  Chart engine — hand-drawn inline SVG, no libraries
    ============================================================ */
 const PENDING = [];   /* charts queued during an innerHTML build */
-let   CHART_UID = 0;
+
+/* Chart ids are numbered per section and reset each time that section is built,
+   so building the same section from the same numbers produces byte-identical
+   HTML. The renderer relies on that to tell "nothing changed" from "changed",
+   which is what stops it tearing down panels the reader is using. */
+let CHART_NS = "x", CHART_N = 0;
+function chartReset(ns){ CHART_NS = ns; CHART_N = 0; }
 
 /* Queue a chart. Returns the HTML placeholder to drop into the string. */
 function chartSlot(cfg){
-  const id = "chart_" + (++CHART_UID);
+  const id = "chart_" + CHART_NS + "_" + (++CHART_N);
   PENDING.push({id: id, cfg: cfg});
   return '<div class="chart" id="' + id + '"></div>';
 }
@@ -459,11 +592,11 @@ function drawChart(el){
 
   const W  = Math.max(220, Math.floor(el.clientWidth || el.parentNode.clientWidth || 320));
   const H  = cfg.height || 210;
-  const m  = cfg.compact ? {t:10, r:12, b:24, l:48} : {t:14, r:16, b:36, l:58};
-  if (!cfg.compact){
-    if (!cfg.yLabel) m.l -= 14;
-    if (!cfg.xLabel) m.b -= 12;
-  }
+  /* Axis titles get their own room in every size, so a compact panel can still
+     say what its numbers are. */
+  const m  = cfg.compact ? {t:10, r:12, b:23, l:43} : {t:14, r:16, b:24, l:44};
+  if (cfg.yLabel) m.l += 14;
+  if (cfg.xLabel) m.b += 14;
   const pw = Math.max(20, W - m.l - m.r);
   const ph = Math.max(20, H - m.t - m.b);
 
@@ -482,6 +615,17 @@ function drawChart(el){
   if (cfg.yZero || hasBars){ ylo = Math.min(ylo, 0); yhi = Math.max(yhi, 0); }
   if (!isFinite(xlo)) { xlo = 0; xhi = 1; }
   if (!isFinite(ylo)) { ylo = 0; yhi = 1; }
+  /* Bars are drawn centred on their x value, so the domain needs half a slot of
+     head-room at each end — otherwise the first and last bar hang half outside
+     the plot area. */
+  if (hasBars && xhi > xlo){
+    let nb = 0;
+    cfg.series.forEach(s => {
+      if (s.kind !== "bar" || !s.points) return;
+      nb = Math.max(nb, s.points.filter(p => isNum(p[0]) && isNum(p[1])).length);
+    });
+    if (nb > 1){ const st = (xhi - xlo) / (nb - 1); xlo -= st/2; xhi += st/2; }
+  }
   if (xhi === xlo){ xlo -= 0.5; xhi += 0.5; }
   if (yhi === ylo){ const pad = Math.abs(yhi) * 0.1 || 1; ylo -= pad; yhi += pad; }
   else {
@@ -530,7 +674,7 @@ function drawChart(el){
   (cfg.refLines || []).forEach(r => {
     if (!isNum(r.y)) return;
     const y = Y(r.y);
-    const col = r.color || "var(--ink-2)";
+    const col = r.color || "var(--ink-3)";
     sv += '<line x1="' + m.l + '" x2="' + (m.l+pw) + '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) +
           '" stroke="' + col + '" stroke-width="1.5" stroke-dasharray="6 5"/>';
     if (r.label && pw > 200){
@@ -543,7 +687,7 @@ function drawChart(el){
   cfg.series.forEach((s, si) => {
     const pts = (s.points || []).filter(p => isNum(p[0]) && isNum(p[1]));
     if (!pts.length) return;
-    const col = s.color || "var(--s1)";
+    const col = s.color || "var(--data)";
 
     if (s.kind === "bar"){
       const n = pts.length;
@@ -564,14 +708,14 @@ function drawChart(el){
       if (s.area){
         const a = "M" + X(pts[0][0]).toFixed(1) + " " + (m.t+ph) + " " + d.slice(1) +
                   "L" + X(pts[pts.length-1][0]).toFixed(1) + " " + (m.t+ph) + " Z";
-        sv += '<path d="' + a + '" fill="' + col + '" fill-opacity="0.09"/>';
+        sv += '<path d="' + a + '" fill="' + col + '" fill-opacity="0.08"/>';
       }
       sv += '<path d="' + d.trim() + '" fill="none" stroke="' + col + '" stroke-width="2" ' +
             'stroke-linejoin="round" stroke-linecap="round"/>';
       if (pts.length <= 60){
         pts.forEach(p => {
           sv += '<circle cx="' + X(p[0]).toFixed(1) + '" cy="' + Y(p[1]).toFixed(1) + '" r="4" fill="' + col +
-                '" stroke="var(--panel)" stroke-width="2"/>';
+                '" stroke="var(--plane)" stroke-width="2"/>';
         });
       }
     }
@@ -632,7 +776,7 @@ function attachHover(el){
       let m2 = null, md = Infinity;
       s.points.forEach(p => { const d = Math.abs(p[0] - best[0]); if (d < md){ md = d; m2 = p; } });
       if (!m2 || md > (P.xhi - P.xlo) * 0.06) return;
-      html += '<div class="row"><span class="dot" style="background:' + (s.color || "var(--s1)") + '"></span>' +
+      html += '<div class="row"><span class="dot" style="background:' + (s.color || "var(--data)") + '"></span>' +
               '<span>' + esc(s.name || "value") + '</span><b>' + esc(P.yFmt(m2[1])) +
               (s.unit ? " " + esc(s.unit) : "") + '</b></div>';
     });
@@ -670,8 +814,9 @@ window.addEventListener("resize", () => {
    2.  Plain-English names for the logged signals
    ============================================================ */
 const TAG_META = {
-  "Train/mean_reward":              {label:"Total score per episode", unit:"points", group:"progress",
-    note:"Every scoring term added up over one 12-second attempt. Rising is good; the number has no natural ceiling."},
+  "Train/mean_reward":              {label:"Total score for a whole attempt", unit:"points", group:"progress",
+    note:"Every scoring item added up over one complete 12-second attempt. This is a total, not a rate — " +
+         "the ten panels above are per-second averages, so they add up to roughly a thirteenth of this."},
   "Train/mean_episode_length":      {label:"How long it stays up", unit:"control steps", group:"progress",
     note:"600 steps is the full 12 seconds. Lower means it tipped over early."},
   "Metrics/twist/error_vel_xy":     {label:"Speed error", unit:"m/s", group:"progress",
@@ -682,12 +827,18 @@ const TAG_META = {
     note:"How hard the feet hit the ground. The parts are brittle resin, so lower is better."},
   "Episode_Metrics/mean_action_acc":{label:"Jerkiness of the corrections", unit:"", group:"progress",
     note:"How abruptly the corrections change from step to step. Smoother is easier on the servos."},
-  "Episode_Termination/fell_over":  {label:"Attempts ending in a fall", unit:"episodes", group:"progress",
-    note:"Counted per training round. Lower is better."},
-  "Episode_Termination/time_out":   {label:"Attempts that ran the full 12 s", unit:"episodes", group:"progress",
-    note:"Counted per training round. Higher is better."},
-  "Policy/mean_std":                {label:"How much it is still experimenting", unit:"rad", group:"internals",
-    note:"The size of the random wobble it adds while exploring. It should shrink as it settles on an answer."},
+  "Episode_Termination/fell_over":  {label:"Robots falling, per simulation step", unit:"robots per step", group:"progress",
+    note:"Raw bookkeeping: how many of the robots hit the floor on an average single step of the simulation, " +
+         "not how many attempts ended in a fall. The readable version is the fall rate chart."},
+  "Episode_Termination/time_out":   {label:"Robots finishing the 12 s, per simulation step", unit:"robots per step", group:"progress",
+    note:"The same bookkeeping for attempts that ran the full 12 seconds. Only useful next to the line above."},
+  /* NOT radians. The action space is dimensionless; the trainer multiplies an
+     action by 0.2 before it becomes a joint offset, so 0.28 here is 0.056 rad —
+     well inside the ±0.2 rad ceiling, which reading it as radians would breach. */
+  "Policy/mean_std":                {label:"How much it is still experimenting", unit:"", group:"internals",
+    note:"The size of the random wobble it adds while exploring, in the trainer's own unit-less numbers. " +
+         "It should shrink as it settles on an answer.",
+    alt: v => isNum(v) ? ("= " + nf(v * 0.2, 3) + " rad of actual joint movement, since every correction is scaled by 0.2.") : ""},
   "Loss/value":                     {label:"Prediction error", unit:"", group:"internals",
     note:"How wrong its own guess about future score was. Internal training bookkeeping."},
   "Loss/surrogate":                 {label:"Update size", unit:"", group:"internals",
@@ -702,17 +853,68 @@ const TAG_META = {
   "Perf/learning_time":             {label:"Time spent learning", unit:"s per round", group:"machine", note:""}
 };
 
+/* The scoring items are logged as Episode_Reward/<key>. The collector describes
+   them in plain English and carries the same <key> on each entry, so the two
+   sides line up. This table is the safety net: it keeps the titles readable and
+   — more importantly — keeps a penalty looking like a penalty even if the
+   collector sends no key at all. Weights are the ones in the training config. */
+const REWARD_FALLBACK = {
+  forward_progress:       {label:"Distance covered",           weight: 2.0,    good:true},
+  track_linear_velocity:  {label:"Hits the asked-for speed",    weight: 1.5,    good:true},
+  track_angular_velocity: {label:"Does not turn",               weight: 1.0,    good:true},
+  upright:                {label:"Keeps the body level",        weight: 0.5,    good:true},
+  soft_landing:           {label:"Soft landings",               weight:-1e-4,   good:false},
+  joint_acc:              {label:"Smooth joint motion",         weight:-5e-7,   good:false},
+  action_acc:             {label:"Steady corrections",          weight:-0.005,  good:false},
+  action_rate:            {label:"Slow-changing corrections",   weight:-0.05,   good:false},
+  joint_torques:          {label:"Easy on the servos",          weight:-1e-4,   good:false},
+  dof_pos_limits:         {label:"Off the end stops",           weight:-1.0,    good:false}
+};
+
+/* Build the lookup the charts use: keyed by the tag suffix, never by prose. */
+function rewardIndex(goal){
+  const out = {};
+  Object.keys(REWARD_FALLBACK).forEach(k => {
+    out[k] = {pretty: REWARD_FALLBACK[k].label, plain: "", good: REWARD_FALLBACK[k].good,
+              weight: REWARD_FALLBACK[k].weight};
+  });
+  ((goal && goal.rewards) || []).forEach(r => {
+    if (!r) return;
+    const k = r.key || GUESS_KEY[r.name];
+    if (!k) return;
+    const fb = REWARD_FALLBACK[k] || {};
+    const weight = isNum(r.weight) ? r.weight : (isNum(fb.weight) ? fb.weight : null);
+    out[k] = {
+      pretty: r.name || fb.label || titleCase(k),
+      plain:  r.plain || "",
+      good:   (typeof r.good === "boolean") ? r.good
+              : (isNum(weight) ? weight >= 0 : (fb.good !== false)),
+      weight: weight
+    };
+  });
+  return out;
+}
+/* Only used if an older collector sends no key field. */
+const GUESS_KEY = {
+  "Distance covered":"forward_progress", "Hits the asked-for speed":"track_linear_velocity",
+  "Does not turn":"track_angular_velocity", "Keeps the body level":"upright",
+  "Soft landings":"soft_landing", "Smooth joint motion":"joint_acc",
+  "Steady corrections":"action_acc", "Slow-changing corrections":"action_rate",
+  "Easy on the servos":"joint_torques", "Off the end stops":"dof_pos_limits"
+};
+
 function metaFor(tag, rewardPlain){
   if (tag.indexOf("Episode_Reward/") === 0){
     const key = tag.split("/").pop();
-    const r = rewardPlain[key];
+    const r = rewardPlain[key] || REWARD_FALLBACK[key];
     return {
-      label: r ? r.pretty : titleCase(key),
-      unit: "points",
+      key: key,
+      label: r ? (r.pretty || r.label) : titleCase(key),
+      unit: "points per second",
       group: "reward",
-      note: r ? r.plain : "",
-      good: r ? !!r.good : true,
-      weight: r ? r.weight : null
+      note: (r && r.plain) ? r.plain : "",
+      good: r ? (r.good !== false) : true,
+      weight: (r && isNum(r.weight)) ? r.weight : null
     };
   }
   const m = TAG_META[tag];
@@ -725,6 +927,9 @@ function metaFor(tag, rewardPlain){
    ============================================================ */
 const STATE = {
   data: null,
+  sig: null,           /* raw text of the last good reply — the change detector */
+  renderedSig: null,   /* what the page below the header is currently showing   */
+  held: false,         /* newer numbers are waiting on a video finishing        */
   lastGood: null,      /* Date of last successful fetch */
   lastError: null,     /* string */
   fetching: false
@@ -735,10 +940,26 @@ async function poll(){
   STATE.fetching = true;
   try {
     const res = await fetch("/api/status", {cache:"no-store"});
-    if (!res.ok) throw new Error("server replied " + res.status);
-    const json = await res.json();
-    if (!json || typeof json !== "object") throw new Error("reply was not readable");
+    /* The server answers a failed collection with HTTP 500 and a readable body
+       explaining exactly what it could not read. Read the body first, so the
+       real reason reaches the page instead of a bare status code. */
+    const text = await res.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch (e){ json = null; }
+
+    if (!json || typeof json !== "object" || Array.isArray(json)){
+      throw new Error(res.ok ? "the reply was not readable"
+                             : "the server replied " + res.status + " and the reply was not readable");
+    }
+    /* The server says plainly whether the snapshot is good ("ok"), so the page
+       never has to guess from a status code. Either way the body is a complete,
+       readable status document and its reasons get shown rather than binned. */
+    if ((!res.ok || json.ok === false) && !(Array.isArray(json.errors) && json.errors.length)){
+      json.errors = ["The server could not build this reading" +
+                     (res.ok ? "" : " (replied " + res.status + ")") + " and did not say why."];
+    }
     STATE.data = json;
+    STATE.sig = text;
     STATE.lastGood = new Date();
     STATE.lastError = null;
   } catch (err){
@@ -752,404 +973,854 @@ async function poll(){
 /* ============================================================
    4.  Render
    ============================================================ */
-function render(){
-  const d = STATE.data;
-  renderHeader(d);
-  if (!d){ return; }                     /* bootstrap card stays put */
-  const main = $("main");
-  PENDING.length = 0;
-  main.innerHTML =
-      sectionGoal(d)
-    + sectionProgress(d)
-    + sectionVideos(d)
-    + sectionRobot(d)
-    + sectionTimeline(d);
-  flushCharts();
-  wireGallery();
+/* The page is polled every 30 seconds and is meant to be left open for hours,
+   quite possibly with a clip playing. So it is never rebuilt wholesale. Each
+   section is built into a string, compared with the string that is already on
+   screen, and only swapped in if it genuinely changed — a poll that moves only
+   the training numbers therefore does not touch the videos, the photographs or
+   any panel the reader has opened. A section holding a video that is playing or
+   part-watched is left alone until the reader is finished with it. */
+const SECTIONS = [
+  {id:"goals",   build: sectionGoals},
+  {id:"watch",   build: sectionVideos},
+  {id:"joints",  build: sectionJoints},
+  {id:"numbers", build: sectionNumbers},
+  {id:"robot",   build: sectionRobot},
+  {id:"story",   build: sectionTimeline},
+  {id:"how",     build: sectionHow}
+];
+
+function videoBusy(root){
+  if (!root || !root.querySelectorAll) return false;
+  const vids = root.querySelectorAll("video");
+  for (let i=0;i<vids.length;i++){
+    const v = vids[i];
+    if (document.fullscreenElement === v) return true;   /* filling the screen */
+    if (!v.paused && !v.ended) return true;              /* playing right now  */
+    if (v.currentTime > 0 && !v.ended) return true;      /* paused part-way    */
+  }
+  return false;
+}
+function snapOpen(root){
+  const m = {};
+  if (!root || !root.querySelectorAll) return m;
+  root.querySelectorAll("details[data-k]").forEach(x => { m[x.getAttribute("data-k")] = x.open; });
+  return m;
+}
+function applyOpen(root, m){
+  root.querySelectorAll("details[data-k]").forEach(x => {
+    const k = x.getAttribute("data-k");
+    if (Object.prototype.hasOwnProperty.call(m, k)) x.open = m[k];
+  });
+}
+function nodeFrom(html){
+  const t = document.createElement("template");
+  t.innerHTML = String(html).trim();
+  return t.content.firstElementChild;
 }
 
-/* ---------- header ---------- */
-function renderHeader(d){
-  const t  = (d && d.training) || {};
-  const g  = (d && d.goal) || {};
-  const running = !!t.running;
+function render(force){
+  const d = STATE.data;
+  renderHeader(d);
+  if (!d) return;                        /* bootstrap card stays put */
 
-  $("headLede").innerHTML = esc(g.headline ||
-    "Teaching the robot to improve on its hand-written walk, in simulation, before it goes near the real hardware.");
+  const main = $("main");
+  if (!main._built){ main.innerHTML = ""; main._built = {}; }
+
+  let held = false;
+  SECTIONS.forEach(sec => {
+    PENDING.length = 0;
+    chartReset(sec.id);
+    let html;
+    try {
+      html = sec.build(d) || "";
+    } catch (err){
+      html = '<section id="' + sec.id + '">' +
+             '<div class="banner bad"><span class="flag">error</span><div>' +
+             '<b>This part of the page could not be drawn.</b> ' + esc((err && err.message) || String(err)) +
+             '</div></div></section>';
+    }
+    const jobs = PENDING.splice(0, PENDING.length);   /* charts this section queued */
+    const old  = $(sec.id);
+
+    if (old && main._built[sec.id] === html) return;  /* unchanged — hands off */
+    if (old && !force && videoBusy(old)){ held = true; return; }
+
+    const node = nodeFrom(html);
+    if (!node) return;
+    if (old){ applyOpen(node, snapOpen(old)); old.replaceWith(node); }
+    else { main.appendChild(node); }
+    main._built[sec.id] = html;
+
+    PENDING.push.apply(PENDING, jobs);
+    flushCharts();
+    wireGallery(node);
+  });
+
+  STATE.held = held;
+  const note = $("holdnote");
+  if (note) note.hidden = !held;
+}
+
+/* ============================================================
+   5.  The header — three things and nothing else
+   ============================================================ */
+/* The verdict answers the first question he asks: is it working, better or
+   worse than the walk I wrote by hand — RIGHT NOW.
+
+   It is counted off current_value: the newest measured attempt on each goal.
+   It used to be counted off best_value, which is a different and much kinder
+   question. The six bests come from six different rounds spread over the whole
+   run, so "better on five of six" described a robot that has never existed;
+   the one you would actually load today can be behind on all six. Best-ever is
+   still on the page, on the cards, labelled and dated. */
+function latestScoredRound(rows){
+  let at = null;
+  rows.forEach(r => {
+    if (!isNum(r.current_value)) return;
+    const n = numOrNull(r.current_iteration);
+    if (n !== null && (at === null || n > at)) at = n;
+  });
+  return at;
+}
+function verdict(d){
+  const rows = scoreRows(d);
+  const judged = rows.filter(r => isNum(r.current_value));
+  const n = rows.length;
+  if (!judged.length){
+    return {html: "Nothing measured yet", cls: "blank",
+            sub: "No saved attempt has been played back and measured yet, so there is nothing to " +
+                 "compare with your walk."};
+  }
+  const at = latestScoredRound(rows);
+  const sub = "Measured on the newest attempt" + (at !== null ? ", round " + nf(at, 0) : "") +
+              ", against the walk you wrote by hand.";
+  /* Counted out of every goal, not just the ones measured so far. A goal with
+     no measurement is not a goal being beaten. */
+  const won = judged.filter(currentBeats).length;
+  const lost = n - won;
+  if (won === n) return {html: 'Right now, better than your walk on <span class="cnt">all ' + n + '</span> goals',
+                         cls: "", sub: sub};
+  if (won === 0) return {html: 'Right now, worse than your walk on <span class="cnt bad">all ' + n + '</span> goals',
+                         cls: "behind", sub: sub};
+  return {html: 'Right now, behind your walk on <span class="cnt bad">' + lost + " of " + n + '</span> goals',
+          cls: "", sub: sub};
+}
+
+/* The run state in words. eta_seconds is how much work is left; that is just as
+   true of a stopped run as a running one, so it is quoted either way — with the
+   "if restarted" said out loud rather than the number thrown away. */
+function runStateHTML(t){
+  const iter  = isNum(t.iteration) ? t.iteration : 0;
+  const total = (isNum(t.total_iterations) && t.total_iterations > 0) ? t.total_iterations : null;
+  const running = !!t.running;
+  const finished = (typeof t.finished === "boolean") ? t.finished
+                                                     : (total !== null && iter >= total && iter > 0);
+  const of  = total !== null ? " of " + nf(total, 0) : "";
+  const eta = (isNum(t.eta_seconds) && t.eta_seconds > 0) ? timeLeft(t.eta_seconds) : null;
+  const pct = (total !== null && iter > 0) ? Math.max(0, Math.min(100, (iter / total) * 100)) : null;
+
+  let kind, flag, lead, tail;
+  if (finished){
+    kind = "done"; flag = "finished";
+    lead = "Finished all " + nf(total !== null ? total : iter, 0) + " rounds.";
+    tail = "Nothing is training now.";
+  } else if (running){
+    kind = "go"; flag = "training";
+    lead = "Training now — round " + nf(iter, 0) + of + ".";
+    tail = eta ? "About " + eta + " left." : "Still working out how much is left.";
+  } else if (iter > 0){
+    kind = "stop"; flag = "stopped";
+    lead = "Stopped at round " + nf(iter, 0) + of + ".";
+    tail = eta ? "About " + eta + " of work left if restarted."
+               : "Nothing is training; restart it to finish the rest.";
+  } else {
+    kind = "idle"; flag = "not started";
+    lead = "No training has run yet."; tail = "";
+  }
+
+  let h = '<div class="runstate ' + kind + '"><span class="flag">' + esc(flag) + '</span>' +
+          '<span class="rs-text"><b>' + esc(lead) + '</b>' + (tail ? " " + esc(tail) : "") + '</span>';
+  if (pct !== null){
+    h += '<span class="bar"><i style="width:' + pct.toFixed(1) + '%"></i></span>' +
+         '<span class="rs-pct">' + esc(nf(pct, 0)) + '% done</span>';
+  }
+  return h + '</div>';
+}
+
+function renderHeader(d){
+  const t = (d && d.training) || {};
+  const el = $("verdict");
 
   if (!d){
-    $("statusbar").innerHTML =
-      tile("Status", '<span class="dot" style="background:var(--ink-3);display:inline-block;margin-right:9px;vertical-align:middle"></span>' +
-           '<span style="font-size:20px;font-family:var(--sans);letter-spacing:0">Unknown</span>',
-           "nothing read from the server yet") +
-      tile("Page updated", esc(agoText(STATE.lastGood)), "retrying every 30 seconds");
+    el.className = "verdict blank";
+    el.textContent = STATE.lastError ? "Cannot reach the server" : "Reading the training files…";
+    $("subverdict").textContent =
+      "Gray, your 3D-printed four-legged robot, against the walk you wrote by hand.";
+    $("runstate").innerHTML = '<div class="runstate idle"><span class="flag">no reading</span>' +
+      '<span class="rs-text">Nothing has come back from the server yet.</span></div>';
     $("headBanners").innerHTML = STATE.lastError
-      ? '<div class="banner warn"><span class="flag">no data</span><div><b>The dashboard server has not answered yet</b> (' +
-        esc(STATE.lastError) + '). Nothing is lost &mdash; this page will fill itself in as soon as it does.</div></div>'
+      ? '<div class="banner warn"><span class="flag">no data</span><div><b>The server has not answered yet</b> (' +
+        esc(STATE.lastError) + '). This page fills itself in as soon as it does.</div></div>'
       : "";
+    $("updatedNote").textContent = "";
     return;
   }
 
-  const iter  = isNum(t.iteration) ? t.iteration : 0;
-  const total = isNum(t.total_iterations) && t.total_iterations > 0 ? t.total_iterations : 3000;
-  const pct   = Math.max(0, Math.min(100, (iter/total)*100));
+  const v = verdict(d);
+  el.className = "verdict " + v.cls;
+  el.innerHTML = v.html;
+  $("subverdict").textContent = v.sub || "";
 
-  const statusDot   = running ? "var(--good)" : "var(--warning)";
-  const statusWord  = running ? "Training now" : "Idle";
-  const statusNote  = running ? "files were written in the last few minutes"
-                              : "no new files written recently";
+  $("runstate").innerHTML = runStateHTML(t);
 
-  let html = "";
-  html += tile("Status",
-      '<span class="dot" style="background:' + statusDot + ';display:inline-block;margin-right:9px;vertical-align:middle"></span>' +
-      '<span style="font-size:20px;font-family:var(--sans);letter-spacing:0">' + statusWord + '</span>',
-      statusNote);
-  html += tile("Round",
-      '<span class="num">' + esc(nf(iter,0)) + '</span><span class="unit">of ' + esc(nf(total,0)) + '</span>',
-      esc(t.run_name || "current run"),
-      '<div class="bar"><i style="width:' + pct.toFixed(1) + '%"></i></div>');
-  html += tile("Time remaining", isNum(t.eta_seconds) ? hms(t.eta_seconds) : "estimating…",
-      "running for " + hms(t.elapsed_seconds));
-  html += tile("Robots in parallel",
-      '<span class="num">' + esc(nf(t.num_envs || 0, 0)) + '</span>',
-      "all learning at once on one graphics card");
-  html += tile("Page updated", esc(agoText(STATE.lastGood)),
-      STATE.lastGood ? ("last reply " + STATE.lastGood.toLocaleTimeString("en-GB")) : "waiting for first reply");
-
-  $("statusbar").innerHTML = html;
-
-  /* banners: stale fetch + collector errors */
+  /* banners: stale fetch + collector errors. Nothing else is allowed up here. */
   let b = "";
   if (STATE.lastError){
     b += '<div class="banner warn"><span class="flag">stale</span><div>' +
-         '<b>Could not reach the dashboard server just now</b> (' + esc(STATE.lastError) + '). ' +
-         'Everything below is the last good reading, from ' + esc(agoText(STATE.lastGood)) + '. ' +
-         'The page keeps retrying every 30 seconds.</div></div>';
+         '<b>Could not reach the server just now.</b> Everything below is the last good reading, from ' +
+         esc(agoText(STATE.lastGood)) + '. The page keeps retrying.</div></div>';
   }
   const errs = (d && Array.isArray(d.errors)) ? d.errors : [];
   if (errs.length){
     b += '<div class="banner bad"><span class="flag">not read</span><div>' +
          '<b>' + errs.length + ' thing' + (errs.length>1?"s":"") + ' on disk could not be read.</b> ' +
-         'Shown rather than hidden, so nothing on this page is silently missing:' +
+         'Shown rather than hidden, so nothing here is silently missing:' +
          '<ul>' + errs.map(e => '<li>' + esc(e) + '</li>').join("") + '</ul></div></div>';
   }
   $("headBanners").innerHTML = b;
+
+  $("updatedNote").textContent = "Page updated " + agoText(STATE.lastGood) + " · checks again every 30 seconds.";
 }
-function tile(k, v, sub, extra){
-  return '<div class="tile"><div class="k">' + esc(k) + '</div><div class="v">' + v + '</div>' +
-         (sub ? '<div class="sub">' + sub + '</div>' : "") + (extra || "") + '</div>';
-}
-function sechead(n, title, sub){
-  return '<div class="sechead"><div class="eyebrow">' + esc(n) + '</div><h2>' + esc(title) + '</h2>' +
-         '<p class="sub">' + esc(sub) + '</p></div>';
+function sechead(title, sub){
+  return '<div class="sechead"><h2>' + esc(title) + '</h2>' +
+         (sub ? '<p class="sub">' + esc(sub) + '</p>' : "") + '</div>';
 }
 function emptyCard(title, body){
   return '<div class="card"><h3 style="font-size:16px">' + esc(title) + '</h3>' +
          '<p class="sec-ink" style="margin-top:8px;font-size:14px;max-width:74ch">' + body + '</p></div>';
 }
 
-/* ---------- 2. what we're teaching it ---------- */
-function sectionGoal(d){
-  const g = d.goal || {};
-  const base = g.baseline || {};
-  const walks = Array.isArray(d.walks) ? d.walks : [];
-  const bd = isNum(base.distance_mm) ? base.distance_mm : 675.4;
+/* ============================================================
+   6.  The six goals
+   ============================================================ */
+/* The robot is taught six things at once and they pull against each other:
+   walking faster means stomping harder, landing softly means going slower. One
+   overall score would hide exactly that tension, so every goal is scored on its
+   own against the hand-written walk.
 
-  let best = null;
-  walks.forEach(w => { if (isNum(w.distance_mm) && (!best || w.distance_mm > best.distance_mm)) best = w; });
+   The collector sends this ready-made as data.scorecard. This table is the
+   fallback for an older collector: the same six goals, measured off the same
+   columns of progress/summary.csv. */
+const GOAL_SPEC = [
+  {goal:"Cover ground",  unit:"mm",     better:"higher", col:"distance_mm",       base:675.4,
+   plain:"Travel as far as it can in one 12-second attempt."},
+  {goal:"Walk straight", unit:"mm",     better:"lower",  col:"drift_mm", abs:true, base:33.8,
+   plain:"Finish in front of where it started, not off to one side."},
+  {goal:"Stay upright",  unit:"",       better:"higher", col:"upright_min",       base:0.976,
+   plain:"Keep the body level, and never end an attempt on the floor."},
+  {goal:"Land softly",   unit:"N",      better:"lower",  col:"foot_force_p99_n",  base:28.89,
+   plain:"Put the feet down gently — the legs are brittle printed resin."},
+  {goal:"Move smoothly", unit:"rad/s²", better:"lower",  col:"joint_acc_rms",     base:70.72,
+   plain:"Change joint speed gradually instead of snapping between positions."},
+  {goal:"Use less power",unit:"",       better:"lower",  col:"cost_of_transport", base:8.37,
+   plain:"Carry itself further on the same energy."}
+];
 
-  let h = '<section id="goal">';
-  h += sechead("02 — the goal", "What we're teaching it",
-        g.headline ? "In one line: " + g.headline
-                   : "A plain-English account of what the computer is being asked to improve, and the mark it has to beat.");
+/* One short line per goal, in his words. Anything the collector sends is longer
+   than a glance, so its prose is only the fallback. */
+const GOAL_SHORT = {
+  "cover ground":   "How far it walks in one 12-second attempt.",
+  "walk straight":  "How far it wanders sideways off the line.",
+  "stay upright":   "How far the body leans at its worst moment.",
+  "land softly":    "How hard the feet hit the ground.",
+  "move smoothly":  "How sharply the joints change speed.",
+  "use less power": "How much energy it burns to travel."
+};
+/* Units he would use himself. Anything else is shown as a percentage against
+   the hand-written walk instead of a number he would have to decode. */
+const FRIENDLY_UNIT = {"mm":1, "mm/s":1, "n":1, "%":1, "°":1, "deg":1, "degrees":1};
 
-  /* explain paragraphs */
-  const ex = Array.isArray(g.explain) ? g.explain : [];
-  if (ex.length){
-    h += '<div class="card" style="margin-bottom:16px"><div class="stack" style="gap:11px">';
-    ex.forEach(p => { h += '<p class="sec-ink" style="max-width:82ch">' + esc(p) + '</p>'; });
-    h += '</div></div>';
-  }
+function scoreRows(d){
+  const given = Array.isArray(d.scorecard) ? d.scorecard.filter(r => r && r.goal) : [];
+  if (given.length) return given;
 
-  /* the mark to beat */
-  h += '<div class="hero-baseline">';
-  h += '<div><div class="hero-cap">The mark to beat</div>' +
-       '<div class="hero-fig">' + esc(nf(bd,1)) + '<span class="unit" style="font-size:15px">mm</span></div>' +
-       '<p class="sec-ink" style="font-size:13.5px;margin-top:8px">' +
-       'Distance covered in 12 seconds by the hand-written walking gait — no learning involved. ' +
-       'The trained version has to walk further than this to be worth using.</p></div>';
-  h += '<div class="hero-stats">';
-  h += heroStat("Speed", base.speed_mms, "mm/s", 1);
-  h += heroStat("Sideways drift", base.drift_mm, "mm", 1);
-  h += heroStat("Uprightness, worst", base.upright_min, "of 1.00", 3);
-  if (best){
-    const delta = best.distance_mm - bd;
-    const ahead = delta >= 0;
-    h += '<div><div class="k">Best trained walk</div>' +
-         '<div class="v">' + esc(nf(best.distance_mm,1)) + '<span class="unit">mm</span></div>' +
-         '<div style="font-size:12px;margin-top:2px;color:' + (ahead ? "var(--good)" : "var(--critical)") + '">' +
-         (ahead ? "▲ ahead by " : "▼ behind by ") + esc(nf(Math.abs(delta),1)) + " mm</div></div>";
-  } else {
-    h += '<div><div class="k">Best trained walk</div><div class="v muted">—</div>' +
-         '<div style="font-size:12px;margin-top:2px" class="muted">no test walk recorded yet</div></div>';
-  }
-  h += '</div></div>';
+  const walks = (Array.isArray(d.walks) ? d.walks : []).slice()
+                  .sort((a,b) => (a.iteration||0) - (b.iteration||0));
+  if (!walks.length) return [];
+  const bw = d.baseline_walk || {};
 
-  /* the things it is being taught */
-  const targets = Array.isArray(g.targets) ? g.targets : [];
-  h += '<h3 style="font-size:17px;margin:26px 0 4px">The things it is being taught</h3>';
-  h += '<p class="sec-ink" style="font-size:13.5px;margin-bottom:14px;max-width:80ch">' +
-       'Each one is scored automatically on every attempt. The computer is not told <em>how</em> to move &mdash; ' +
-       'only whether an attempt scored better or worse than the last one.</p>';
-  if (targets.length){
-    h += '<div class="teach">';
-    targets.forEach((t, i) => {
-      h += '<div class="card"><div class="idx">' + String(i+1).padStart(2,"0") + '</div>' +
-           '<h3>' + esc(t.name || "") + '</h3>' +
-           (t.target ? '<div class="tgt">' + esc(t.target) + '</div>' : "") +
-           '<p>' + esc(t.why || "") + '</p></div>';
+  return GOAL_SPEC.map(spec => {
+    const read = w => {
+      const v = w[spec.col];
+      if (!isNum(v)) return null;
+      return spec.abs ? Math.abs(v) : v;
+    };
+    const baseline = isNum(bw[spec.col]) ? (spec.abs ? Math.abs(bw[spec.col]) : bw[spec.col]) : spec.base;
+
+    /* A run that fell over is thrown out of "best so far": a robot that hits
+       the floor after two seconds trivially wins "landed softly". */
+    let best = null, bestIter = null;
+    walks.forEach(w => {
+      if (w.fell) return;
+      const v = read(w);
+      if (v === null) return;
+      if (best === null || (spec.better === "higher" ? v > best : v < best)){ best = v; bestIter = w.iteration; }
     });
+
+    let cur = null, curIter = null;
+    for (let i = walks.length - 1; i >= 0; i--){
+      const v = read(walks[i]);
+      if (v !== null){ cur = v; curIter = walks[i].iteration; break; }
+    }
+
+    const vidWalk = walks.filter(w => w.iteration === bestIter && w.video)[0];
+    return {
+      goal: spec.goal, unit: spec.unit, better: spec.better, plain: spec.plain,
+      baseline: baseline,
+      best_value: best, best_iteration: bestIter,
+      current_value: cur, current_iteration: curIter,
+      beats_baseline: betterThan(best, baseline, spec.better),
+      video: vidWalk ? vidWalk.video : null
+    };
+  });
+}
+
+function betterThan(v, base, better){
+  if (!isNum(v) || !isNum(base)) return false;
+  return better === "higher" ? v > base : v < base;
+}
+/* Two different questions, kept apart on purpose.
+   bestBeats  — did the best round ever recorded beat your walk?
+   currentBeats — does the newest measured round beat it?
+   beats_baseline in the payload is the collector's answer to the FIRST one, so
+   it is never used for the second. */
+function bestBeats(r){
+  if (typeof r.beats_baseline === "boolean") return r.beats_baseline;
+  return betterThan(r.best_value, r.baseline, r.better);
+}
+function currentBeats(r){
+  return betterThan(r.current_value, r.baseline, r.better);
+}
+function numOrNull(v){
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return isNum(n) ? n : null;
+}
+function roundText(i){
+  const n = numOrNull(i);
+  return n === null ? "an earlier round" : "round " + nf(n, 0);
+}
+/* Digits he would write down himself: whole numbers once past a hundred. */
+function dpFor(v){ return (isNum(v) && Math.abs(v) >= 100) ? 0 : 1; }
+/* "38 mm", but "5.7°" — the degree sign is written tight against the number. */
+function withUnit(v, dp, unit){
+  return nf(v, dp) + (unit === "°" ? "°" : " " + unit);
+}
+/* Same rule for the big numbers, where the unit is its own smaller span. */
+function unitSpan(u){
+  if (!u) return "";
+  return '<span class="unit' + (u === "°" ? " deg" : "") + '">' + esc(u) + '</span>';
+}
+
+/* Turn one scorecard row into what the card shows: the CURRENT value as the big
+   number, one line saying which side of the hand-written walk that falls on,
+   and the best ever recorded underneath with the round it came from. The two
+   are separate facts and the card shows both — the best is not what the robot
+   does today, and it was never a substitute for it. */
+function goalDisplay(r){
+  const name = String(r.goal || "").toLowerCase();
+  let cur  = isNum(r.current_value) ? r.current_value : null;
+  let best = isNum(r.best_value)    ? r.best_value    : null;
+  let base = isNum(r.baseline)      ? r.baseline      : null;
+  let unit = String(r.unit || "").trim();
+  let better = (r.better === "lower") ? "lower" : "higher";
+
+  /* Both verdicts are taken on the numbers as recorded, before any unit
+     conversion below, so a conversion that flips the direction cannot flip the
+     answer. */
+  const beats = currentBeats(r);
+
+  /* Uprightness arrives as a cosine with no unit. Degrees of lean is the same
+     fact in a unit he would use, and it flips the direction: less is better. */
+  const cosLike = (name === "stay upright") ||
+                  (!unit && better === "higher" && isNum(base) && base > 0 && base <= 1);
+  if (cosLike){
+    cur  = leanDeg(cur);
+    best = leanDeg(best);
+    base = leanDeg(base);
+    unit = "°"; better = "lower";
+  }
+
+  const friendly = !!(unit && FRIENDLY_UNIT[unit.toLowerCase()]);
+  const rawUnits = friendly || !isNum(base) || base === 0;   /* big number is the value itself */
+
+  /* Best ever, in whatever terms the big number is quoted in, always dated. */
+  let bestTxt = "";
+  if (best !== null){
+    if (rawUnits){
+      bestTxt = "Best so far " + (friendly ? withUnit(best, dpFor(best), unit) : nfSmart(best)) +
+                " (" + roundText(r.best_iteration) + ")";
+    } else if (cur !== null){
+      /* The big number here is a percentage against your walk, so the raw
+         readings go on this line instead of being lost. */
+      bestTxt = "Now " + nfSmart(cur) + " · best " + nfSmart(best) +
+                " (" + roundText(r.best_iteration) + ")";
+    } else {
+      bestTxt = "Best so far " + nfSmart(best) + " (" + roundText(r.best_iteration) + ")";
+    }
+  }
+
+  if (cur === null){
+    return {big:"—", unit:"", mark:"No measured attempt yet", state:"none", best: bestTxt};
+  }
+
+  if (friendly){
+    /* One precision per card: the gap is quoted to the same digits as the
+       number above it, so the two read as one comparison. */
+    const dp = dpFor(cur);
+    const gap = isNum(base) ? Math.abs(cur - base) : null;
+    const level = gap !== null && gap < Math.pow(10, -dp) / 2;
+    return {
+      big: nf(cur, dp),
+      unit: unit,
+      mark: (gap === null) ? "Nothing to compare against"
+          : level ? "Level with your walk"
+          : (withUnit(gap, dp, unit) + (beats ? " better than your walk" : " worse than your walk")),
+      state: (gap === null) ? "none" : level ? "same" : (beats ? "better" : "worse"),
+      best: bestTxt
+    };
+  }
+
+  /* No friendly unit for this one, so the answer is the comparison itself. */
+  if (!isNum(base) || base === 0){
+    return {big: nfSmart(cur), unit:"", mark:"Nothing to compare against", state:"none", best: bestTxt};
+  }
+  const pct = (better === "higher" ? (cur - base) : (base - cur)) / Math.abs(base) * 100;
+  const level = Math.abs(pct) < 0.5;
+  return {
+    big: nf(Math.abs(pct), 0),
+    unit: "%",
+    mark: level ? "Level with your walk" : (beats ? "Better than your walk" : "Worse than your walk"),
+    state: level ? "same" : (beats ? "better" : "worse"),
+    best: bestTxt
+  };
+}
+
+/* The six bests are six different rounds, so no one saved robot holds all of
+   them. That is a real fact about what is on disk, and it belongs under the
+   cards rather than buried. */
+function bestsNote(rows){
+  const its = [];
+  rows.forEach(r => {
+    if (!isNum(r.best_value)) return;
+    const n = numOrNull(r.best_iteration);
+    if (n !== null && its.indexOf(n) < 0) its.push(n);
+  });
+  if (its.length < 2) return "";
+  const WORD = ["no","one","two","three","four","five","six","seven","eight"];
+  const lo = Math.min.apply(null, its), hi = Math.max.apply(null, its);
+  const n = rows.length;
+  const bestWins = rows.filter(bestBeats).length;
+  const nowWins  = rows.filter(currentBeats).length;
+  const at = latestScoredRound(rows);
+  return "Each best comes from a different round (" + nf(lo,0) + " to " + nf(hi,0) + "), so no single saved " +
+         "robot does all " + (WORD[n] || n) + " at once. Best-ever beats your walk on " + bestWins + " of " + n +
+         "; the newest attempt" + (at !== null ? ", round " + nf(at,0) + "," : "") + " beats it on " + nowWins + ".";
+}
+
+function sectionGoals(d){
+  const rows = scoreRows(d);
+  /* Say "the six goals" only while there really are six of them. */
+  const WORD = ["no","one","two","three","four","five","six","seven","eight"];
+  const title = "The " + (WORD[rows.length] || rows.length) + " goals";
+
+  let h = '<section id="goals">';
+  h += sechead(rows.length ? title : "The goals",
+        "The big number is the newest measured attempt. Best ever recorded is underneath it, "
+        + "with the round it came from.");
+
+  if (!rows.length){
+    h += emptyCard("Nothing scored yet",
+      "Each goal fills in once a saved attempt has been played back and measured. " +
+      "Until then there is nothing to compare, so nothing is shown.");
+    return h + '</section>';
+  }
+
+  h += '<div class="goals">';
+  rows.forEach(r => {
+    const g = goalDisplay(r);
+    const line = GOAL_SHORT[String(r.goal || "").toLowerCase()] || shortLine(r.plain, 12);
+
+    h += '<div class="goal">';
+    h += '<div class="gname">' + esc(r.goal) + '</div>';
+    h += '<div class="gbig">' + esc(g.big) + unitSpan(g.unit) + '</div>';
+    h += '<div class="gmark ' + g.state + '">' +
+         (g.state === "better" ? "▲ " : g.state === "worse" ? "▼ " : "") + esc(g.mark) + '</div>';
+    if (g.best) h += '<div class="gbest">' + esc(g.best) + '</div>';
+    if (line) h += '<p class="gplain">' + esc(line) + '</p>';
+
+    /* The clip belongs to the best round, so the button says which round it
+       opens — the big number above it is a different round entirely. */
+    const bi = numOrNull(r.best_iteration);
+    const anchorable = bi !== null &&
+                       (Array.isArray(d.walks) ? d.walks : [])
+                         .some(w => w.video && Number(w.iteration) === bi);
+    if (anchorable){
+      h += '<a class="btn" href="#walk-' + esc(bi) + '" data-watch="walk-' + esc(bi) + '">▶ Watch round ' +
+           esc(nf(bi,0)) + '</a>';
+    } else if (r.video){
+      h += '<a class="btn" href="' + esc(mediaURL(r.video)) + '" target="_blank" rel="noopener">▶ Watch ' +
+           esc(bi === null ? "it" : roundText(bi)) + '</a>';
+    }
     h += '</div>';
-  } else {
-    h += emptyCard("Not described yet",
-        "The list of things being taught comes from the training configuration. It will appear here once the server can read it.");
-  }
+  });
+  h += '</div>';
 
-  /* scoring table */
-  const rewards = Array.isArray(g.rewards) ? g.rewards : [];
-  if (rewards.length){
-    h += '<details class="more" open><summary>How each attempt is scored <span class="muted" style="font-weight:400;font-size:12.5px">' +
-         rewards.length + ' terms</span></summary><div class="inner">';
-    h += '<p class="sec-ink" style="font-size:13.5px;margin-bottom:12px;max-width:82ch">' +
-         'Points are added for the things we want and subtracted for the things we don’t. ' +
-         'The weight is simply how much that item counts relative to the others.</p>';
-    h += '<div class="scroll-x"><table><thead><tr>' +
-         '<th>Item</th><th class="n">Weight</th><th>Adds or subtracts</th><th>In plain terms</th>' +
-         '</tr></thead><tbody>';
-    rewards.forEach(r => {
-      h += '<tr><td class="mono">' + esc(r.name || "") + '</td>' +
-           '<td class="n">' + esc(nfSmart(r.weight)) + '</td>' +
-           '<td>' + (r.good ? '<span class="tag-good">adds</span>' : '<span class="tag-cost">subtracts</span>') + '</td>' +
-           '<td style="white-space:normal;min-width:280px">' + esc(r.plain || "") + '</td></tr>';
-    });
-    h += '</tbody></table></div></div></details>';
-  }
-
-  /* domain randomization */
-  const rand = Array.isArray(g.randomization) ? g.randomization : [];
-  if (rand.length){
-    h += '<details class="more"><summary>Why this should survive contact with the real robot</summary><div class="inner">';
-    h += '<p class="sec-ink" style="font-size:13.5px;margin-bottom:12px;max-width:82ch">' +
-         'No simulation matches reality exactly. So every one of the parallel robots is built slightly differently — ' +
-         'different weight, different friction, different servo behaviour, different delays. Anything that only works for ' +
-         'one particular set of numbers scores badly on average, so what survives is a walk that tolerates being wrong ' +
-         'about the hardware.</p>';
-    h += '<div class="scroll-x"><table><thead><tr><th>What is varied</th><th>Range</th><th>Why</th></tr></thead><tbody>';
-    rand.forEach(r => {
-      h += '<tr><td>' + esc(r.name || "") + '</td><td class="mono">' + esc(r.range || "") + '</td>' +
-           '<td style="white-space:normal;min-width:260px">' + esc(r.why || "") + '</td></tr>';
-    });
-    h += '</tbody></table></div></div></details>';
-  }
+  const note = bestsNote(rows);
+  if (note) h += '<p class="note" style="margin-top:26px">' + esc(note) + '</p>';
 
   h += '</section>';
   return h;
 }
-function heroStat(k, v, unit, digits){
+
+/* ============================================================
+   7.  Watch it
+   ============================================================ */
+function sectionVideos(d){
+  const walks = (Array.isArray(d.walks) ? d.walks : []).slice().sort((a,b) => (b.iteration||0)-(a.iteration||0));
+  const bw = d.baseline_walk || null;
+  const withVid = walks.filter(w => w.video);
+
+  let h = '<section id="watch">';
+  h += sechead("Watch it", "Each clip is one 12-second attempt. Your walk first, then the newest.");
+
+  if (!withVid.length && !(bw && bw.video)){
+    h += emptyCard("No clips yet",
+      "A clip is recorded whenever a saved attempt is played back. " +
+      "When they exist you get one card per round here, with that round's numbers underneath.");
+    return h + '</section>';
+  }
+
+  /* Only the newest few are put on the page. There will eventually be sixty of
+     these; even with preload="none" that is sixty video elements the browser has to
+     lay out and keep alive, on a page that redraws every thirty seconds. The rest
+     stay one click away. */
+  const SHOWN = 6;
+  const shown = withVid.slice(0, SHOWN);
+  const hidden = withVid.slice(SHOWN);
+
+  h += '<div class="vidgrid">';
+  if (bw){ h += vidCard(bw, true); }
+  shown.forEach(w => { h += vidCard(w, false); });
+  h += '</div>';
+
+  if (hidden.length){
+    /* Held back with data-src rather than src, so the browser creates no video
+       source at all for them until the panel is actually opened. */
+    h += '<details class="morevids" data-k="morevids" ontoggle="wakeVideos(this)">' +
+         '<summary>Show the earlier ' + esc(hidden.length) + ' round' + (hidden.length>1?"s":"") + '</summary>';
+    h += '<div class="vidgrid" style="margin-top:16px">';
+    hidden.forEach(w => { h += vidCard(w, false, true); });
+    h += '</div></details>';
+  }
+
+  const noVid = walks.length - withVid.length;
+  if (noVid > 0){
+    h += '<p class="note" style="margin-top:18px">' + esc(noVid) +
+         ' further attempt' + (noVid>1?"s have":" has") + ' numbers recorded but no clip.</p>';
+  }
+  h += '</section>';
+  return h;
+}
+/* Give a held-back panel its videos the moment it is opened, and only then. */
+function wakeVideos(det){
+  if (!det || !det.open) return;
+  det.querySelectorAll("video[data-src]").forEach(v => {
+    v.src = v.getAttribute("data-src");
+    v.removeAttribute("data-src");
+  });
+}
+function vidCard(w, isBaseline, lazy){
+  const src = mediaURL(w.video);
+  const it = numOrNull(w.iteration);
+  const title = isBaseline ? "Your walk" : (it === null ? "One attempt" : "Round " + esc(nf(it,0)));
+  const tagHTML = '<span class="vtag">' + (isBaseline ? "written by hand" : "trained") + '</span>';
+
+  /* The goal cards link straight to a round's card, so it needs an anchor. */
+  let h = '<div class="vidcard"' +
+          (isBaseline ? ' id="walk-baseline"'
+                      : (it === null ? "" : ' id="walk-' + esc(it) + '"')) + '>';
+  if (src){
+    h += '<video controls preload="none" playsinline ' +
+         (lazy ? 'data-src="' : 'src="') + esc(src) + '" ' +
+         'onerror="this.style.display=\'none\';this.parentNode.querySelector(\'.vmissing\').style.display=\'block\'"></video>';
+    h += '<div class="vmissing" style="display:none">Clip not reachable at <span class="mono">' + esc(src) + '</span>.</div>';
+  } else {
+    h += '<div class="vmissing" style="display:block">No clip recorded for this one.</div>';
+  }
+  h += '<div class="vhead"><span class="vtitle">' + title + '</span>' + tagHTML + '</div>';
+  h += '<div class="vbody"><div class="vstats">';
+  h += vs("Distance", w.distance_mm, "mm", 1);
+  h += vs("Speed", w.speed_mms, "mm/s", 1);
+  h += vs("Sideways", isNum(w.drift_mm) ? Math.abs(w.drift_mm) : null, "mm", 1);
+  h += vs("Worst lean", leanDeg(w.upright_min), "°", 1);
+  if (isNum(w.foot_force_p99_n)) h += vs("Hardest foot hit", w.foot_force_p99_n, "N", 1);
+  h += '<div><div class="k">Fell over</div><div class="v" style="color:' +
+       (w.fell ? "var(--worse)" : "var(--better)") + '">' + (w.fell ? "yes" : "no") + '</div></div>';
+  h += '</div></div></div>';
+  return h;
+}
+function vs(k, v, unit, dg){
   return '<div><div class="k">' + esc(k) + '</div><div class="v">' +
-         (isNum(v) ? esc(nf(v, digits)) + '<span class="unit">' + esc(unit) + '</span>' : '<span class="muted">—</span>') +
+         (isNum(v) ? esc(nf(v,dg)) + unitSpan(unit) : '<span class="muted">—</span>') +
          '</div></div>';
 }
 
-/* ---------- 3. how it's going ---------- */
-function sectionProgress(d){
+/* ============================================================
+   8.  The joints
+   ============================================================ */
+/* Its own section because the finding is counter-intuitive and easy to misread from
+   the videos: the legs look barely articulated, but the servos have 270 degrees of
+   travel each and the walk asks for at most 55 — and asks the four abduction joints
+   for nothing whatsoever. Four of the twelve servos hold one angle the whole time. */
+function sectionJoints(d){
+  const j = d.joints || {};
+  const rows = Array.isArray(j.joints) ? j.joints : [];
+
+  let h = '<section id="joints">';
+  h += sechead("The joints",
+        "Every joint uses the same servo, with 270° of travel. Each clip sweeps one through all of it.");
+
+  if (!j.available || !rows.length){
+    h += emptyCard("Not measured yet",
+      "Run scripts/render_joint_atlas.py to record one clip per joint. " +
+      "It sweeps each joint through its full travel and measures how much of that the walk uses.");
+    return h + '</section>';
+  }
+
+  if (isNum(j.widest_used_deg) && isNum(j.servo_span_deg)){
+    h += '<p class="note" style="margin-bottom:20px"><strong>The joints are not the limit — the walk is.</strong> ' +
+         'Each servo turns ' + esc(nf(j.servo_span_deg,0)) + '°, and the widest swing in the walk is ' +
+         esc(nf(j.widest_used_deg,0)) + '°.</p>';
+  }
+
+  h += '<div class="vidgrid">';
+  rows.forEach(row => {
+    const src = mediaURL(row.video);
+    const used = isNum(row.percent_used) ? row.percent_used : null;
+    const idle = used !== null && used < 0.5;
+
+    h += '<div class="vidcard">';
+    if (src){
+      h += '<video controls preload="none" playsinline loop muted src="' + esc(src) + '" ' +
+           'onerror="this.style.display=\'none\';this.parentNode.querySelector(\'.vmissing\').style.display=\'block\'"></video>';
+      h += '<div class="vmissing" style="display:none">Clip not reachable at <span class="mono">' + esc(src) + '</span>.</div>';
+    } else {
+      h += '<div class="vmissing" style="display:block">No clip recorded for this joint.</div>';
+    }
+    h += '<div class="vhead"><span class="vtitle">' + esc(row.title || row.segment) + '</span>' +
+         '<span class="vtag">' + (idle ? "never moves" : esc(nf(used,0)) + "% used") + '</span></div>';
+    h += '<div class="vbody">';
+    h += '<p class="note" style="margin:0 0 12px">' + esc(row.how_it_moves || "") +
+         ' &middot; ' + esc(row.count || 4) + ' of these on the robot.</p>';
+
+    /* Used against available, drawn to scale. The empty part of the bar is the
+       capability that is currently going to waste. */
+    if (isNum(used)){
+      const pct = Math.max(0.6, Math.min(100, used));   /* keep 0% visible as a sliver */
+      h += '<div class="jbar" title="' + esc(nf(row.gait_span_deg,1)) + '° used of ' +
+           esc(nf(row.servo_span_deg,0)) + '° available">' +
+           '<div class="jbar-fill" style="width:' + pct.toFixed(1) + '%"></div></div>';
+      h += '<div class="jbar-legend"><span>' + esc(nf(row.gait_span_deg,1)) +
+           '° used by the walk</span><span>' + esc(nf(row.servo_span_deg,0)) + '° available</span></div>';
+    }
+    h += '</div></div>';
+  });
+  h += '</div>';
+
+  /* The collector's own note is the fuller version of the finding above. It is
+     kept word for word, one click away, rather than competing with the clips. */
+  if (j.note){
+    h += '<details class="sub" data-k="jointnote" style="margin-top:20px">' +
+         '<summary>Why four of the twelve servos never move</summary>' +
+         '<div class="inner"><p class="sec-ink" style="font-size:13.5px;max-width:80ch">' +
+         esc(j.note) + '</p></div></details>';
+  }
+  h += '</section>';
+  return h;
+}
+
+/* ============================================================
+   9.  The numbers — three charts, then everything else folded away
+   ============================================================ */
+/* Episode_Termination/fell_over and .../time_out are NOT episodes per round.
+   mjlab logs how many robots reset on a single simulation step; the trainer then
+   averages that over the 24 steps of a rollout. So each is a rate per simulation
+   step, and its absolute size means nothing to a reader. The ratio does: every
+   attempt ends either on the floor or at the 12-second mark, so
+       fell / (fell + timed out)
+   is exactly the share of attempts that ended in a fall. That is the only
+   honest readable figure here, and it is the one the page shows. */
+function fallRate(t){
+  if (isNum(t.fall_rate_percent)) return {percent: t.fall_rate_percent, note: t.fall_rate_note || ""};
+  const l = (t && t.latest) || {};
+  const fell = l["Episode_Termination/fell_over"], out = l["Episode_Termination/time_out"];
+  if (!isNum(fell) || !isNum(out) || (fell + out) <= 0) return {percent: null, note: ""};
+  return {percent: (fell / (fell + out)) * 100, note: ""};
+}
+function oneIn(pct){
+  if (!isNum(pct)) return "";
+  if (pct <= 0.5)  return "practically none end on the floor";
+  if (pct >= 95)   return "almost every attempt ends on the floor";
+  const n = Math.round(100 / pct);
+  if (n <= 1) return "most attempts end on the floor";
+  return "about 1 attempt in " + n + " ends on the floor";
+}
+function fallRateSeries(series){
+  const fell = series["Episode_Termination/fell_over"] || [];
+  const outs = series["Episode_Termination/time_out"] || [];
+  if (!fell.length || !outs.length) return [];
+  const byStep = {};
+  outs.forEach(p => { if (isNum(p[0]) && isNum(p[1])) byStep[p[0]] = p[1]; });
+  const res = [];
+  fell.forEach(p => {
+    const o = byStep[p[0]];
+    if (!isNum(o) || !isNum(p[1])) return;
+    const tot = p[1] + o;
+    if (tot <= 0) return;
+    res.push([p[0], (p[1] / tot) * 100]);
+  });
+  return res;
+}
+function chartCard(title, sub, slotHTML, legendHTML, cls){
+  return '<div class="chartcard' + (cls ? " " + cls : "") + '"><div class="charttitle">' + esc(title) + '</div>' +
+         '<div class="chartsub">' + esc(sub) + '</div>' + slotHTML + (legendHTML || "") + '</div>';
+}
+
+function sectionNumbers(d){
   const t = d.training || {};
   const series = t.series || {};
   const latest = t.latest || {};
   const walks = (Array.isArray(d.walks) ? d.walks : []).slice().sort((a,b) => (a.iteration||0)-(b.iteration||0));
   const bw = d.baseline_walk || null;
-  const bd = (bw && isNum(bw.distance_mm)) ? bw.distance_mm
-           : ((d.goal && d.goal.baseline && d.goal.baseline.distance_mm) || 675.4);
-  const bdrift = (bw && isNum(bw.drift_mm)) ? bw.drift_mm
-           : ((d.goal && d.goal.baseline && d.goal.baseline.drift_mm) || 33.8);
-  const bspeed = (bw && isNum(bw.speed_mms)) ? bw.speed_mms
-           : ((d.goal && d.goal.baseline && d.goal.baseline.speed_mms) || 56.3);
+  const gb = (d.goal && d.goal.baseline) || {};
+  const bd     = (bw && isNum(bw.distance_mm)) ? bw.distance_mm : (isNum(gb.distance_mm) ? gb.distance_mm : 675.4);
+  const bspeed = (bw && isNum(bw.speed_mms))   ? bw.speed_mms   : (isNum(gb.speed_mms)   ? gb.speed_mms   : 56.3);
+  /* Drift is recorded with a sign — left of the line is negative — so the
+     smallest signed value is the worst wander, not the best. Straightness is
+     about the distance from the line whichever side it strays, so every drift
+     figure on this page uses the magnitude. */
+  const bdrift = Math.abs((bw && isNum(bw.drift_mm)) ? bw.drift_mm : (isNum(gb.drift_mm) ? gb.drift_mm : 33.8));
 
-  /* plain names for the reward terms, keyed by the short name */
-  const rewardPlain = {};
-  ((d.goal && d.goal.rewards) || []).forEach(r => {
-    rewardPlain[r.name] = {pretty: titleCase(r.name), plain: r.plain, good: r.good, weight: r.weight};
-  });
+  /* Keyed by the log tag suffix (forward_progress, action_rate, …) — which is
+     what the chart tags are named after — and never by the collector's prose.
+     Keying on prose meant nothing ever matched, so every penalty was drawn as
+     though it added points. */
+  const rewardPlain = rewardIndex(d.goal);
+  const fr = fallRate(t);
 
-  let h = '<section id="progress">';
-  h += sechead("03 — progress", "How it's going",
-        "Every line here is measured, not estimated. Hover any chart to read the exact numbers for a round.");
+  let h = '<section id="numbers">';
+  h += sechead("The numbers", "The three worth watching. Everything else is folded away below.");
 
-  /* --- headline comparison tiles --- */
-  let bestDist = null, lowDrift = null, lastWalk = null;
-  walks.forEach(w => {
-    if (isNum(w.distance_mm) && (bestDist === null || w.distance_mm > bestDist)) bestDist = w.distance_mm;
-    if (isNum(w.drift_mm) && (lowDrift === null || w.drift_mm < lowDrift)) lowDrift = w.drift_mm;
-    lastWalk = w;
-  });
-  h += '<div class="grid g-auto" style="margin-bottom:20px">';
-  h += cmpTile("Furthest trained walk", bestDist, bd, "mm", 1, true,
-        "vs the hand-written gait");
-  h += cmpTile("Least sideways drift", lowDrift, bdrift, "mm", 1, false,
-        "lower is straighter");
-  h += cmpTile("Latest test walk", lastWalk ? lastWalk.distance_mm : null, bd, "mm", 1, true,
-        lastWalk ? ("round " + esc(lastWalk.iteration)) : "none yet");
-  const fellNow = latest["Episode_Termination/fell_over"];
-  h += tile("Falls this round", isNum(fellNow) ? '<span class="num">' + esc(nf(fellNow,1)) + '</span><span class="unit">episodes</span>' : '<span class="muted">—</span>',
-        "attempts that tipped past 60&deg;");
+  h += '<div class="grid g-auto-chart" style="margin-bottom:10px">';
+
+  h += chartCard("Distance covered",
+    "How far it travelled in one attempt. The dashed line is your walk.",
+    chartSlot({
+      height: 250, yZero: true,
+      xLabel: "round", yLabel: "distance (mm)",
+      emptyText: "No attempt has been measured yet.",
+      aria: "Distance walked in millimetres for each measured round, against your hand-written walk at " + nf(bd,1) + " millimetres.",
+      refLines: [{y: bd, label: "your walk " + nf(bd,0) + " mm"}],
+      series: [{name:"trained walk", unit:"mm", color:"var(--data)", area:true,
+                points: walks.filter(w=>isNum(w.distance_mm)).map(w => [w.iteration, w.distance_mm])}],
+      tipTitle: v => "Round " + nf(v,0), yFmt: v => nf(v,0)
+    }), "", "bare");
+
+  h += chartCard("Attempts ending in a fall",
+    isNum(fr.percent) ? ("Out of every 100 attempts. Right now " + oneIn(fr.percent) + ".")
+                      : "Out of every 100 attempts. Lower is better.",
+    chartSlot({
+      height: 250, yZero: true,
+      xLabel: "round", yLabel: "attempts ending in a fall (%)",
+      emptyText: "Not enough has been recorded yet.",
+      aria: "Percentage of attempts ending in a fall, per round.",
+      series: [{name:"ended in a fall", unit:"%", color:"var(--data)", area:true, points: fallRateSeries(series)}],
+      tipTitle: v => "Round " + nf(v,0), yFmt: v => nf(v,0), tipFmt: v => nf(v,1)
+    }), "", "bare");
+
+  h += chartCard("Sideways drift",
+    "How far off the straight line it ended up, either side. The dashed line is your walk.",
+    chartSlot({
+      height: 250, yZero: true,
+      xLabel: "round", yLabel: "distance off the line (mm)",
+      emptyText: "No attempt has been measured yet.",
+      aria: "Distance off the straight line in millimetres per measured round, against your hand-written walk at " +
+            nf(bdrift,1) + " millimetres.",
+      refLines: [{y: bdrift, label: "your walk " + nf(bdrift,0) + " mm"}],
+      series: [{name:"off the line", unit:"mm", color:"var(--data)",
+                points: walks.filter(w=>isNum(w.drift_mm)).map(w => [w.iteration, Math.abs(w.drift_mm)])}],
+      tipTitle: v => "Round " + nf(v,0), yFmt: v => nf(v,0)
+    }), "", "bare");
+
   h += '</div>';
 
-  /* --- walk charts --- */
-  if (walks.length){
-    h += '<div class="grid g-auto-chart" style="margin-bottom:16px">';
+  /* ---------- folded: how it is scored ---------- */
+  h += panelScoring(d);
 
-    h += chartCard("Distance walked, per test round",
-      "How far it travelled in one 12-second attempt. The dashed line is the hand-written gait it has to beat.",
-      chartSlot({
-        height: 250,
-        yZero: true,
-        xLabel: "training round",
-        yLabel: "distance (mm)",
-        aria: "Distance walked in millimetres for each evaluated training round, against a baseline of " + nf(bd,1) + " millimetres.",
-        refLines: [{y: bd, label: "hand-written gait " + nf(bd,1) + " mm"}],
-        series: [{name:"trained walk", unit:"mm", color:"var(--s1)", area:true,
-                  points: walks.filter(w=>isNum(w.distance_mm)).map(w => [w.iteration, w.distance_mm])}],
-        tipTitle: v => "Round " + nf(v,0),
-        yFmt: v => nf(v,0)
-      }),
-      '<div class="legend"><span class="item"><span class="swatch" style="background:var(--s1)"></span>trained walk</span>' +
-      '<span class="item"><span class="swatch dash"></span>hand-written gait, ' + esc(nf(bd,1)) + ' mm</span></div>');
+  /* ---------- folded: all the other charts ---------- */
+  h += panelAllCharts(d, series, latest, walks, bw, bspeed, rewardPlain);
 
-    h += chartCard("Sideways drift, per test round",
-      "How far it wandered off the straight line. It is asked to walk straight, so lower is better.",
-      chartSlot({
-        height: 250, yZero: true,
-        xLabel: "training round", yLabel: "drift (mm)",
-        aria: "Sideways drift in millimetres per evaluated round.",
-        refLines: [{y: bdrift, label: "hand-written gait " + nf(bdrift,1) + " mm"}],
-        series: [{name:"drift", unit:"mm", color:"var(--s2)",
-                  points: walks.filter(w=>isNum(w.drift_mm)).map(w => [w.iteration, w.drift_mm])}],
-        tipTitle: v => "Round " + nf(v,0), yFmt: v => nf(v,0)
-      }),
-      '<div class="legend"><span class="item"><span class="swatch" style="background:var(--s2)"></span>sideways drift</span>' +
-      '<span class="item"><span class="swatch dash"></span>hand-written gait, ' + esc(nf(bdrift,1)) + ' mm</span></div>');
+  h += '</section>';
+  return h;
+}
 
-    h += chartCard("Walking speed, per test round",
-      "Average pace over the 12 seconds.",
-      chartSlot({
-        height: 220, yZero: true,
-        xLabel: "training round", yLabel: "speed (mm/s)",
-        aria: "Walking speed in millimetres per second per evaluated round.",
-        refLines: [{y: bspeed, label: "hand-written gait " + nf(bspeed,1) + " mm/s"}],
-        series: [{name:"speed", unit:"mm/s", color:"var(--s3)",
-                  points: walks.filter(w=>isNum(w.speed_mms)).map(w => [w.iteration, w.speed_mms])}],
-        tipTitle: v => "Round " + nf(v,0), yFmt: v => nf(v,0)
-      }),
-      '<div class="legend"><span class="item"><span class="swatch" style="background:var(--s3)"></span>speed</span>' +
-      '<span class="item"><span class="swatch dash"></span>hand-written gait</span></div>');
+/* ---------- panel: how it is scored ---------- */
+function panelScoring(d){
+  const rewards = (d.goal && Array.isArray(d.goal.rewards)) ? d.goal.rewards : [];
+  let h = '<details class="more" data-k="scoring"><summary>How it is scored</summary><div class="inner">';
+  if (!rewards.length){
+    h += '<p class="lead">The list of scoring items comes from the training configuration. ' +
+         'It will appear here once the server can read it.</p></div></details>';
+    return h;
+  }
+  h += '<p class="lead">Points are added for the things we want and taken away for the things we don’t. ' +
+       'The weight is how much an item counts against the others; for an item that adds points it is also the ' +
+       'most it can earn in a second, because the thing being measured tops out at 1.</p>';
+  h += '<div class="scroll-x"><table><thead><tr>' +
+       '<th>Item</th><th class="n">Weight</th><th>Adds or subtracts</th><th>In plain terms</th>' +
+       '</tr></thead><tbody>';
+  rewards.forEach(r => {
+    /* "good" follows the sign of the weight — that is what actually decides
+       whether an item pays or costs, whatever it happens to be called. */
+    const w = isNum(r.weight) ? r.weight : null;
+    const good = isNum(w) ? (w >= 0) : (r.good !== false);
+    h += '<tr><td style="white-space:normal">' + esc(r.name || "") +
+         (r.key ? ' <span class="mono muted" style="font-size:12px">' + esc(r.key) + '</span>' : "") + '</td>' +
+         '<td class="n">' + esc(nfSmart(r.weight)) + '</td>' +
+         '<td>' + (good ? '<span class="tag-good">adds</span>' : '<span class="tag-cost">subtracts</span>') + '</td>' +
+         '<td style="white-space:normal;min-width:280px">' + esc(r.plain || "") + '</td></tr>';
+  });
+  h += '</tbody></table></div></div></details>';
+  return h;
+}
 
-    h += chartCard("Did it fall over? (test walks)",
-      "One bar per test walk. A bar at 1 means that attempt ended on the floor.",
-      chartSlot({
-        height: 220, yZero: true,
-        xLabel: "training round", yLabel: "fell (1 = yes)",
-        aria: "Whether each evaluated walk ended in a fall.",
-        series: [{name:"fell over", unit:"", kind:"bar", color:"var(--s2)",
-                  points: walks.map(w => [w.iteration, isNum(w.fell) ? w.fell : 0])}],
-        tipTitle: v => "Round " + nf(v,0), yFmt: v => nf(v,0)
-      }));
-
-    h += '</div>';
-
-    /* table view of the same numbers */
-    h += '<details class="more" style="margin-bottom:22px"><summary>The same numbers as a table</summary><div class="inner"><div class="scroll-x"><table>' +
-         '<thead><tr><th>Round</th><th class="n">Distance (mm)</th><th class="n">Speed (mm/s)</th>' +
-         '<th class="n">Drift (mm)</th><th class="n">Uprightness, worst</th><th class="n">Body height (mm)</th><th>Fell</th></tr></thead><tbody>';
-    if (bw){
-      h += '<tr><td class="mono">hand-written</td><td class="n">' + esc(nf(bw.distance_mm,1)) + '</td><td class="n">' +
-           esc(nf(bw.speed_mms,1)) + '</td><td class="n">' + esc(nf(bw.drift_mm,1)) + '</td><td class="n">' +
-           esc(nf(bw.upright_min,3)) + '</td><td class="n">' + esc(nf(bw.height_mm,1)) + '</td><td>' +
-           (bw.fell ? "yes" : "no") + '</td></tr>';
-    }
-    walks.slice().reverse().forEach(w => {
-      h += '<tr><td class="mono">' + esc(w.iteration) + '</td><td class="n">' + esc(nf(w.distance_mm,1)) + '</td>' +
-           '<td class="n">' + esc(nf(w.speed_mms,1)) + '</td><td class="n">' + esc(nf(w.drift_mm,1)) + '</td>' +
-           '<td class="n">' + esc(nf(w.upright_min,3)) + '</td><td class="n">' + esc(nf(w.height_mm,1)) + '</td>' +
-           '<td>' + (w.fell ? "yes" : "no") + '</td></tr>';
+/* ---------- panel: every other chart ---------- */
+function panelAllCharts(d, series, latest, walks, bw, bspeed, rewardPlain){
+  /* Episode_Reward/* are NOT episode totals. The trainer divides each item's
+     running total by the full 12-second episode length before logging it — even
+     for attempts that ended early — so every one of these is a rate: points per
+     second. That is also why the ten of them add to roughly a thirteenth of the
+     total score. Because the quantity behind each item tops out at 1, the item's
+     weight is also the most it can earn in a second, which makes a ceiling. */
+  const rewardTags = Object.keys(series).filter(k => k.indexOf("Episode_Reward/") === 0)
+    .sort((a,b) => {
+      const ma = metaFor(a, rewardPlain), mb = metaFor(b, rewardPlain);
+      if (ma.good !== mb.good) return ma.good ? -1 : 1;                       /* earners first */
+      return Math.abs(mb.weight || 0) - Math.abs(ma.weight || 0) || a.localeCompare(b);
     });
-    h += '</tbody></table></div></div></details>';
-  } else {
-    h += '<div style="margin-bottom:20px">' + emptyCard("No test walks measured yet",
-      "A test walk is a full 12-second run using a saved snapshot of what the computer has learned so far. " +
-      "Each one produces a video and a row of numbers &mdash; distance, speed, drift, uprightness. They appear here " +
-      "as soon as the first snapshot is played back.") + '</div>';
-  }
 
-  /* --- falls during training --- */
-  const fellS = series["Episode_Termination/fell_over"] || [];
-  const outS  = series["Episode_Termination/time_out"] || [];
-  if (fellS.length || outS.length){
-    h += chartCard("How the 12-second attempts ended, every round",
-      "Counted across all " + nf(t.num_envs || 0, 0) + " robots. Falls should fall; full-length attempts should rise.",
-      chartSlot({
-        height: 250, yZero: true,
-        xLabel: "training round", yLabel: "episodes per round",
-        aria: "Number of attempts ending in a fall versus running the full 12 seconds, per training round.",
-        series: [
-          {name:"ran the full 12 s", unit:"episodes", color:"var(--s1)", points: outS},
-          {name:"tipped over", unit:"episodes", color:"var(--s2)", points: fellS}
-        ],
-        tipTitle: v => "Round " + nf(v,0), yFmt: v => nf(v,1)
-      }),
-      '<div class="legend"><span class="item"><span class="swatch" style="background:var(--s1)"></span>ran the full 12 s</span>' +
-      '<span class="item"><span class="swatch" style="background:var(--s2)"></span>tipped over</span></div>');
-    h += '<div style="height:16px"></div>';
-  }
-
-  /* --- reward small multiples --- */
-  const rewardTags = Object.keys(series).filter(k => k.indexOf("Episode_Reward/") === 0).sort();
-  h += '<h3 style="font-size:17px;margin:26px 0 4px">The score, broken down</h3>';
-  h += '<p class="sec-ink" style="font-size:13.5px;margin-bottom:8px;max-width:84ch">' +
-       'One panel per scoring item. <strong>These are point totals added up over a single 12-second attempt</strong> &mdash; ' +
-       'not percentages, not accuracy, and there is no maximum. Blue items add points; orange items subtract them, ' +
-       'so an orange line moving <em>towards</em> zero is an improvement.</p>';
-  h += '<div class="legend" style="margin-bottom:12px">' +
-       '<span class="item"><span class="swatch" style="background:var(--s1)"></span>adds points (want it up)</span>' +
-       '<span class="item"><span class="swatch" style="background:var(--s2)"></span>subtracts points (want it near zero)</span></div>';
-
-  if (rewardTags.length){
-    h += '<div class="grid g-auto-chart">';
-    rewardTags.forEach(tag => {
-      const meta = metaFor(tag, rewardPlain);
-      const col = meta.good ? "var(--s1)" : "var(--s2)";
-      const last = latest[tag];
-      h += '<div class="chartcard">';
-      h += '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">' +
-           '<div class="charttitle">' + esc(meta.label) + '</div>' +
-           '<div class="num" style="font-size:16px;color:' + col + '">' + esc(nfSmart(last)) + '</div></div>';
-      h += '<div class="chartsub">' + esc(meta.note || "") +
-           (isNum(meta.weight) ? ' <span class="mono muted">(weight ' + esc(nfSmart(meta.weight)) + ')</span>' : "") + '</div>';
-      h += chartSlot({
-        height: 150, compact: true,
-        yLabel: "", xLabel: "",
-        aria: meta.label + " score per episode, per training round.",
-        series: [{name: meta.label, unit:"points", color: col, points: series[tag]}],
-        tipTitle: v => "Round " + nf(v,0), yFmt: v => nfSmart(v)
-      });
-      h += '</div>';
-    });
-    h += '</div>';
-  } else {
-    h += emptyCard("No scoring numbers read yet",
-      "These come from the training log that is written as each round finishes. They will appear within a minute of training starting.");
-  }
-
-  /* --- other signals --- */
   const otherTags = Object.keys(series)
     .filter(k => k.indexOf("Episode_Reward/") !== 0)
     .filter(k => k.indexOf("Episode_Termination/") !== 0)
@@ -1160,11 +1831,159 @@ function sectionProgress(d){
       return (ord[ga]-ord[gb]) || a.localeCompare(b);
     });
 
+  const fellS = series["Episode_Termination/fell_over"] || [];
+  const outS  = series["Episode_Termination/time_out"] || [];
+
+  const total = 2 + (fellS.length || outS.length ? 1 : 0) + rewardTags.length + otherTags.length;
+
+  let h = '<details class="more" data-k="allcharts"><summary>All the charts ' +
+          '<span class="muted" style="font-weight:400;font-size:12.5px">' + total +
+          ' more</span></summary><div class="inner">';
+
+  /* walk charts that did not make the front page */
+  h += '<div class="grid g-auto-chart">';
+  h += chartCard("Walking speed, per round",
+    "Average pace over the 12 seconds.",
+    chartSlot({
+      height: 220, yZero: true,
+      xLabel: "round", yLabel: "speed (mm/s)",
+      emptyText: "No attempt has been measured yet.",
+      aria: "Walking speed in millimetres per second per measured round.",
+      refLines: [{y: bspeed, label: "your walk " + nf(bspeed,0) + " mm/s"}],
+      series: [{name:"speed", unit:"mm/s", color:"var(--s1)",
+                points: walks.filter(w=>isNum(w.speed_mms)).map(w => [w.iteration, w.speed_mms])}],
+      tipTitle: v => "Round " + nf(v,0), yFmt: v => nf(v,0)
+    }));
+
+  h += chartCard("Did each measured attempt fall over?",
+    "One bar per attempt. A bar at 1 means that attempt ended on the floor.",
+    chartSlot({
+      height: 220, yZero: true,
+      xLabel: "round", yLabel: "fell (1 = yes)",
+      emptyText: "No attempt has been measured yet.",
+      aria: "Whether each measured attempt ended in a fall.",
+      series: [{name:"fell over", unit:"", kind:"bar", color:"var(--s2)",
+                points: walks.map(w => [w.iteration, isNum(w.fell) ? w.fell : 0])}],
+      tipTitle: v => "Round " + nf(v,0), yFmt: v => nf(v,0)
+    }));
+  h += '</div>';
+
+  /* the same numbers as a table */
+  if (walks.length){
+    const extras = [
+      {k:"foot_force_p99_n",  head:"Hardest foot impact (N)", dg:2},
+      {k:"joint_acc_rms",     head:"Joint jerkiness (rad/s²)", dg:2},
+      {k:"power_mean_w",      head:"Power (W)",                dg:3},
+      {k:"cost_of_transport", head:"Cost of transport",        dg:2}
+    ].filter(c => walks.some(w => isNum(w[c.k])) || (bw && isNum(bw[c.k])));
+
+    h += '<details class="sub" data-k="walktable"><summary>The same numbers as a table</summary><div class="inner">' +
+         '<p class="sec-ink" style="font-size:13px;margin-bottom:12px;max-width:82ch">' +
+         'Drift is the one column shown with a sign, because the sign says which side of the line it ended up on. ' +
+         'Everywhere else drift means the distance from the line whichever side that is, so an attempt reading ' +
+         '&minus;280 mm here counts as 280 mm off course.</p>' +
+         '<div class="scroll-x"><table>' +
+         '<thead><tr><th>Round</th><th class="n">Distance (mm)</th><th class="n">Speed (mm/s)</th>' +
+         '<th class="n">Drift (mm, signed)</th><th class="n">Uprightness, worst</th><th class="n">Body height (mm)</th>' +
+         extras.map(c => '<th class="n">' + esc(c.head) + '</th>').join("") +
+         '<th>Fell</th></tr></thead><tbody>';
+    const walkRow = (w, label) =>
+      '<tr><td class="mono">' + label + '</td><td class="n">' + esc(nf(w.distance_mm,1)) + '</td>' +
+      '<td class="n">' + esc(nf(w.speed_mms,1)) + '</td><td class="n">' + esc(nf(w.drift_mm,1)) + '</td>' +
+      '<td class="n">' + esc(nf(w.upright_min,3)) + '</td><td class="n">' + esc(nf(w.height_mm,1)) + '</td>' +
+      extras.map(c => '<td class="n">' + esc(nf(w[c.k], c.dg)) + '</td>').join("") +
+      '<td>' + (w.fell ? "yes" : "no") + '</td></tr>';
+    if (bw){ h += walkRow(bw, "your walk"); }
+    walks.slice().reverse().forEach(w => { h += walkRow(w, esc(w.iteration)); });
+    h += '</tbody></table></div></div></details>';
+  }
+
+  /* the raw termination bookkeeping */
+  if (fellS.length || outS.length){
+    h += '<h3 style="font-size:16px;margin:26px 0 6px">How the attempts end</h3>';
+    h += '<p class="sec-ink" style="font-size:13.5px;margin-bottom:12px;max-width:84ch">' +
+         'These two are the numbers the fall percentage is worked out from, and they are easy to misread. ' +
+         'They are not counts of attempts. Each says how many robots reset in an average ' +
+         '<em>single step of the simulation</em> — the trainer averages over the 24 steps it runs between ' +
+         'learning updates. Only the balance between them means anything, and that balance is the percentage above.</p>';
+    h += chartCard("Robots resetting per simulation step",
+      "One line for attempts that ended on the floor, one for attempts that ran the full 12 seconds.",
+      chartSlot({
+        height: 230, yZero: true,
+        xLabel: "round", yLabel: "robots per simulation step",
+        aria: "Robots resetting per simulation step, split by whether the attempt fell or ran the full 12 seconds.",
+        series: [
+          {name:"ran the full 12 s", unit:"robots per step", color:"var(--s1)", points: outS},
+          {name:"tipped over",       unit:"robots per step", color:"var(--s2)", points: fellS}
+        ],
+        tipTitle: v => "Round " + nf(v,0), yFmt: v => nf(v,1)
+      }),
+      '<div class="legend"><span class="item"><span class="swatch" style="background:var(--s1)"></span>ran the full 12 s</span>' +
+      '<span class="item"><span class="swatch" style="background:var(--s2)"></span>tipped over</span></div>');
+  }
+
+  /* the ten scoring items */
+  h += '<h3 style="font-size:16px;margin:26px 0 6px">The score, item by item</h3>';
+  h += '<p class="sec-ink" style="font-size:13.5px;margin-bottom:10px;max-width:84ch">' +
+       '<strong>These are points per second, not totals for an attempt.</strong> ' +
+       'The trainer divides each item by the full 12-second attempt length before recording it — even when the ' +
+       'attempt ended early — so every one is a rate, which is why they do not add up to the whole-attempt score. ' +
+       'Blue items pay points; orange items take them away, so an orange line moving <em>towards</em> zero is an ' +
+       'improvement. Each blue item has a ceiling: it can never earn more per second than its weight.</p>';
+  h += '<div class="legend" style="margin-bottom:12px">' +
+       '<span class="item"><span class="swatch" style="background:var(--s1)"></span>' +
+       '<span class="tag-good">adds</span> pays points — want it up, towards its ceiling</span>' +
+       '<span class="item"><span class="swatch" style="background:var(--s2)"></span>' +
+       '<span class="tag-cost">subtracts</span> takes points away — want it near zero</span></div>';
+
+  if (rewardTags.length){
+    h += '<div class="grid g-auto-chart">';
+    rewardTags.forEach(tag => {
+      const meta = metaFor(tag, rewardPlain);
+      const col = meta.good ? "var(--s1)" : "var(--s2)";
+      const last = latest[tag];
+      const ceiling = (meta.good && isNum(meta.weight) && meta.weight > 0) ? meta.weight : null;
+
+      h += '<div class="chartcard ' + (meta.good ? "rew" : "pen") + '">';
+      h += '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">' +
+           '<div class="charttitle">' + esc(meta.label) + '</div>' +
+           '<div class="num" style="font-size:16px">' + esc(nfSmart(last)) + '</div></div>';
+      h += '<div style="margin-top:5px">' +
+           (meta.good ? '<span class="tag-good">adds</span>' : '<span class="tag-cost">subtracts</span>') +
+           (isNum(meta.weight) ? ' <span class="mono muted" style="font-size:11.5px">weight ' +
+              esc(nfSmart(meta.weight)) + '</span>' : "") + '</div>';
+      if (meta.note) h += '<div class="chartsub">' + esc(meta.note) + '</div>';
+
+      /* How close this item is to the most it could ever score. */
+      if (ceiling && isNum(last)){
+        const pct = Math.max(0, Math.min(100, (last / ceiling) * 100));
+        h += '<div class="ceil"><span>' + esc(nfSmart(last)) + ' of a possible ' + esc(nfSmart(ceiling)) + '</span>' +
+             '<span class="bar"><i style="width:' + pct.toFixed(1) + '%"></i></span>' +
+             '<span class="mono">' + esc(nf(pct,0)) + '%</span></div>';
+      } else if (!meta.good){
+        h += '<div class="ceil"><span>zero would be perfect — every point here comes off the total</span></div>';
+      }
+
+      h += chartSlot({
+        height: 150, compact: true,
+        xLabel: "round", yLabel: "points per second",
+        aria: meta.label + ", in points per second, for each round.",
+        series: [{name: meta.label, unit:"points/s", color: col, points: series[tag]}],
+        tipTitle: v => "Round " + nf(v,0), yFmt: v => nfSmart(v)
+      });
+      h += '</div>';
+    });
+    h += '</div>';
+  } else {
+    h += emptyCard("No scoring numbers read yet",
+      "These come from the training log written as each round finishes. They appear within a minute of training starting.");
+  }
+
+  /* everything else recorded */
   if (otherTags.length){
-    h += '<details class="more" open><summary>Everything else being recorded <span class="muted" style="font-weight:400;font-size:12.5px">' +
-         otherTags.length + ' signals</span></summary><div class="inner">';
+    h += '<h3 style="font-size:16px;margin:26px 0 6px">Everything else being recorded</h3>';
     h += '<p class="sec-ink" style="font-size:13.5px;margin-bottom:14px;max-width:84ch">' +
-         'The first few are direct measurements of the walk. The rest is the computer’s own bookkeeping &mdash; ' +
+         'The first few are direct measurements of the walk. The rest is the computer’s own bookkeeping — ' +
          'useful for spotting that training has stalled, not otherwise meaningful.</p>';
     h += '<div class="grid g-auto-chart">';
     otherTags.forEach(tag => {
@@ -1175,10 +1994,18 @@ function sectionProgress(d){
            '<div class="charttitle">' + esc(meta.label) + '</div>' +
            '<div class="num" style="font-size:16px">' + esc(nfSmart(latest[tag])) +
            (meta.unit ? '<span class="unit">' + esc(meta.unit) + '</span>' : "") + '</div></div>';
-      h += '<div class="chartsub">' + esc(meta.note || tag) + '</div>';
+      h += '<div class="chartsub">' + esc(meta.note || tag) +
+           /* Some signals only make sense once converted into something the
+              reader can picture — e.g. the exploration wobble, which is not in
+              radians however much it looks like it. */
+           (typeof meta.alt === "function" && meta.alt(latest[tag])
+              ? ' <span class="mono" style="color:var(--ink-2)">' + esc(meta.alt(latest[tag])) + '</span>' : "") +
+           '</div>';
       h += chartSlot({
         height: 140, compact: true,
-        aria: meta.label + " per training round.",
+        xLabel: "round",
+        yLabel: meta.unit || "no unit",
+        aria: meta.label + " per round, measured in " + (meta.unit || "no unit") + ".",
         series: [{name: meta.label, unit: meta.unit, color: col, points: series[tag]}],
         tipTitle: v => "Round " + nf(v,0), yFmt: v => nfSmart(v)
       });
@@ -1186,107 +2013,32 @@ function sectionProgress(d){
     });
     h += '</div>';
 
-    /* table view of latest values */
-    h += '<div class="scroll-x" style="margin-top:18px"><table><thead><tr><th>Signal</th><th>Recorded as</th>' +
-         '<th class="n">Latest</th><th class="n">Rounds logged</th></tr></thead><tbody>';
-    Object.keys(series).sort().forEach(tag => {
+    /* Table view of the latest values. Tags ending in "/time" are the same data
+       replotted against wall-clock seconds, so their "step" is a clock reading
+       and a "rounds logged" count for them would be a plain untruth. They are
+       left out of the charts for that reason and are left out here too. */
+    const tableTags = Object.keys(series).filter(k => !/\/time$/.test(k)).sort();
+    h += '<details class="sub" data-k="signaltable"><summary>Every signal as a table</summary><div class="inner">' +
+         '<div class="scroll-x"><table><thead><tr><th>Signal</th><th>Recorded as</th>' +
+         '<th class="n">Latest</th><th>Unit</th><th class="n">Rounds logged</th></tr></thead><tbody>';
+    tableTags.forEach(tag => {
       const meta = metaFor(tag, rewardPlain);
       h += '<tr><td style="white-space:normal">' + esc(meta.label) + '</td>' +
            '<td class="mono muted">' + esc(tag) + '</td>' +
-           '<td class="n">' + esc(nfSmart(latest[tag])) + (meta.unit ? ' <span class="muted">' + esc(meta.unit) + '</span>' : "") + '</td>' +
+           '<td class="n">' + esc(nfSmart(latest[tag])) + '</td>' +
+           '<td class="muted">' + esc(meta.unit || "no unit") + '</td>' +
            '<td class="n">' + esc(nf((series[tag]||[]).length, 0)) + '</td></tr>';
     });
-    h += '</tbody></table></div>';
-    h += '</div></details>';
+    h += '</tbody></table></div></div></details>';
   }
 
-  h += '</section>';
+  h += '</div></details>';
   return h;
 }
-function cmpTile(k, v, ref, unit, digits, higherBetter, sub){
-  if (!isNum(v)){
-    return tile(k, '<span class="muted">—</span>', esc(sub));
-  }
-  const delta = v - ref;
-  const good = higherBetter ? (delta >= 0) : (delta <= 0);
-  const arrow = delta >= 0 ? "▲" : "▼";
-  const word = good ? "better than the hand-written gait" : "worse than the hand-written gait";
-  return tile(k,
-    '<span class="num">' + esc(nf(v, digits)) + '</span><span class="unit">' + esc(unit) + '</span>',
-    '<span style="color:' + (good ? "var(--good)" : "var(--critical)") + '">' + arrow + " " +
-    esc(nf(Math.abs(delta), digits)) + " " + esc(unit) + "</span> " + esc(word) + ' &middot; ' + esc(sub));
-}
-function chartCard(title, sub, slotHTML, legendHTML){
-  return '<div class="chartcard"><div class="charttitle">' + esc(title) + '</div>' +
-         '<div class="chartsub">' + esc(sub) + '</div>' + slotHTML + (legendHTML || "") + '</div>';
-}
 
-/* ---------- 4. watch it ---------- */
-function sectionVideos(d){
-  const walks = (Array.isArray(d.walks) ? d.walks : []).slice().sort((a,b) => (b.iteration||0)-(a.iteration||0));
-  const bw = d.baseline_walk || null;
-  const withVid = walks.filter(w => w.video);
-
-  let h = '<section id="watch">';
-  h += sechead("04 — watch it", "Watch it",
-        "Each clip is a full 12-second attempt, recorded from a saved snapshot of what had been learned at that round. Newest first.");
-
-  if (!withVid.length && !(bw && bw.video)){
-    h += emptyCard("No clips yet",
-      "Videos are rendered by the playback script after training, or whenever a saved snapshot is replayed. " +
-      "When they exist you will see one card per round here, with that round’s distance, speed and drift underneath, " +
-      "and the hand-written gait first for comparison.");
-    h += '</section>';
-    return h;
-  }
-
-  h += '<div class="vidgrid">';
-  if (bw){ h += vidCard(bw, true); }
-  withVid.forEach(w => { h += vidCard(w, false); });
-  h += '</div>';
-
-  const noVid = walks.length - withVid.length;
-  if (noVid > 0){
-    h += '<p class="note" style="margin-top:16px">' + esc(noVid) +
-         ' further test walk' + (noVid>1?"s have":" has") + ' numbers recorded but no video file. Those rows are in the table above.</p>';
-  }
-  h += '</section>';
-  return h;
-}
-function vidCard(w, isBaseline){
-  const src = mediaURL(w.video);
-  const title = isBaseline ? "Hand-written gait" : ("Round " + esc(w.iteration));
-  const tagHTML = isBaseline
-    ? '<span class="tag-cost" style="background:rgba(255,255,255,.06);color:var(--ink-2);border-color:var(--hair)">no learning — the baseline</span>'
-    : '<span class="tag-good">trained</span>';
-
-  let h = '<div class="vidcard">';
-  if (src){
-    h += '<video controls preload="none" playsinline src="' + esc(src) + '" ' +
-         'onerror="this.style.display=\'none\';this.parentNode.querySelector(\'.vmissing\').style.display=\'block\'"></video>';
-    h += '<div class="vmissing" style="display:none">Video file not reachable at <span class="mono">' + esc(src) + '</span>.</div>';
-  } else {
-    h += '<div class="vmissing" style="display:block;border-top:none">No video recorded for this run.</div>';
-  }
-  h += '<div class="vhead"><span class="vtitle">' + title + '</span>' + tagHTML + '</div>';
-  h += '<div class="vbody"><div class="vstats">';
-  h += vs("Distance", w.distance_mm, "mm", 1);
-  h += vs("Speed", w.speed_mms, "mm/s", 1);
-  h += vs("Drift", w.drift_mm, "mm", 1);
-  h += vs("Upright, worst", w.upright_min, "", 3);
-  h += vs("Height", w.height_mm, "mm", 0);
-  h += '<div><div class="k">Fell</div><div class="v" style="color:' +
-       (w.fell ? "var(--critical)" : "var(--good)") + '">' + (w.fell ? "yes" : "no") + '</div></div>';
-  h += '</div></div></div>';
-  return h;
-}
-function vs(k, v, unit, dg){
-  return '<div><div class="k">' + esc(k) + '</div><div class="v">' +
-         (isNum(v) ? esc(nf(v,dg)) + (unit ? '<span class="unit">' + esc(unit) + '</span>' : "") : '<span class="muted">—</span>') +
-         '</div></div>';
-}
-
-/* ---------- 5. the robot ---------- */
+/* ============================================================
+   10.  The robot — folded
+   ============================================================ */
 function sectionRobot(d){
   const r = d.robot || {};
   const media = d.media || {};
@@ -1297,8 +2049,9 @@ function sectionRobot(d){
   const facts = Array.isArray(r.facts) ? r.facts : [];
 
   let h = '<section id="robot">';
-  h += sechead("05 — the hardware", "The robot",
-        "Twelve servos, four legs, printed in resin. Everything the simulation believes about the robot comes from these numbers.");
+  h += '<details class="more" data-k="robot"><summary>The robot</summary><div class="inner">';
+  h += '<p class="lead">Twelve servos, four legs, printed in resin. ' +
+       'Everything the simulation believes about the robot comes from these numbers.</p>';
 
   /* headline hardware tiles */
   h += '<div class="grid g-auto" style="margin-bottom:20px">';
@@ -1313,10 +2066,10 @@ function sectionRobot(d){
   h += '</div>';
 
   /* the constraints that shape everything */
-  h += '<div class="card" style="margin-bottom:20px">';
-  h += '<h3 style="font-size:17px">The constraints that shape everything else</h3>';
+  h += '<div class="card" style="margin-bottom:20px;background:var(--panel-2)">';
+  h += '<h3 style="font-size:16px">The constraints that shape everything else</h3>';
   h += '<p class="sec-ink" style="font-size:13.5px;margin:8px 0 6px;max-width:84ch">' +
-       'These are properties of the hardware as built. They are not choices in the software, and they are the reason ' +
+       'Properties of the hardware as built. They are not choices in the software, and they are the reason ' +
        'the training is set up the way it is.</p>';
   const cons = (d.goal && Array.isArray(d.goal.constraints)) ? d.goal.constraints : [];
   if (cons.length){
@@ -1329,7 +2082,7 @@ function sectionRobot(d){
     h += '<div class="constraint"><div class="cn">The servos give no feedback</div>' +
          '<div class="cv">position command only, no encoder</div>' +
          '<div class="cw">You can tell a servo where to go but never read where it actually is. That is why the ' +
-         'trained software is deliberately not allowed to look at measured joint positions &mdash; it would be learning ' +
+         'trained software is deliberately not allowed to look at measured joint positions — it would be learning ' +
          'to rely on something the real robot cannot supply.</div></div>';
     h += '<div class="constraint"><div class="cn">50 commands per second, no more</div>' +
          '<div class="cv">PCA9685 PWM ceiling</div>' +
@@ -1337,7 +2090,7 @@ function sectionRobot(d){
          'faster than the hardware can.</div></div>';
     h += '<div class="constraint"><div class="cn">The knee runs through a push-rod</div>' +
          '<div class="cv">servo angle ≠ joint angle</div>' +
-         '<div class="cw">The linkage geometry has not yet been measured and inverted, so a policy trained on joint ' +
+         '<div class="cw">The linkage geometry has not yet been measured and inverted, so what is trained on joint ' +
          'angles cannot be commanded directly on the real machine. Recorded as an open blocker for deployment.</div></div>';
   }
   h += '</div>';
@@ -1349,8 +2102,7 @@ function sectionRobot(d){
     h += chartCard("Where the mass sits",
       "Every printed part, heaviest first. Servo mass baked into a part is counted with that part.",
       chartSlot({
-        height: 250,
-        yZero: true,
+        height: 250, yZero: true,
         xLabel: "part (heaviest first)", yLabel: "mass (kg)",
         aria: "Mass in kilograms of each of the " + sorted.length + " links.",
         series: [{name:"mass", unit:"kg", kind:"bar", color:"var(--s1)",
@@ -1379,7 +2131,7 @@ function sectionRobot(d){
   /* servo + legs */
   h += '<div class="grid g-auto-wide" style="margin-bottom:16px">';
 
-  h += '<div class="card"><h3 style="font-size:16px">Servo specification</h3>' +
+  h += '<div class="card" style="background:var(--panel-2)"><h3 style="font-size:16px">Servo specification</h3>' +
        '<p class="sec-ink" style="font-size:13px;margin:6px 0 10px">All twelve joints use the same unit.</p>' +
        '<div class="scroll-x"><table style="min-width:0"><tbody>';
   const servoRows = [
@@ -1406,7 +2158,7 @@ function sectionRobot(d){
   h += '</tbody></table></div></div>';
 
   if (legs.length){
-    h += '<div class="card"><h3 style="font-size:16px">Leg geometry</h3>' +
+    h += '<div class="card" style="background:var(--panel-2)"><h3 style="font-size:16px">Leg geometry</h3>' +
          '<p class="sec-ink" style="font-size:13px;margin:6px 0 10px">Segment lengths taken from the CAD, per leg.</p>' +
          '<div class="scroll-x"><table><thead><tr><th>Leg</th><th class="n">Thigh (mm)</th><th class="n">Shank (mm)</th>' +
          '<th class="n">Reach (mm)</th><th class="n">Mount x, y, z (mm)</th></tr></thead><tbody>';
@@ -1422,10 +2174,10 @@ function sectionRobot(d){
 
   /* extra facts */
   if (facts.length){
-    h += '<div class="card" style="margin-bottom:16px"><h3 style="font-size:16px">Worth knowing</h3>' +
+    h += '<div class="card" style="margin-bottom:16px;background:var(--panel-2)"><h3 style="font-size:16px">Worth knowing</h3>' +
          '<div class="grid g-auto" style="margin-top:12px">';
     facts.forEach(f => {
-      h += '<div><div class="k" style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3)">' +
+      h += '<div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3)">' +
            esc(f.label || "") + '</div>' +
            '<div class="num" style="font-size:19px;margin-top:2px">' + esc(f.value || "") + '</div>' +
            (f.note ? '<div class="sec-ink" style="font-size:12.5px;margin-top:3px">' + esc(f.note) + '</div>' : "") +
@@ -1440,8 +2192,12 @@ function sectionRobot(d){
   h += gallery("Moving", "Early simulation attempts from 2022, and the most recent hardware test.", media.gifs, true);
   h += gallery("The build", "Printing, assembly and wiring, September 2022.", media.build, false);
 
-  h += '</section>';
+  h += '</div></details></section>';
   return h;
+}
+function tile(k, v, sub, extra){
+  return '<div class="tile"><div class="k">' + esc(k) + '</div><div class="v">' + v + '</div>' +
+         (sub ? '<div class="sub">' + sub + '</div>' : "") + (extra || "") + '</div>';
 }
 function gallery(title, sub, items, tall){
   if (!Array.isArray(items) || !items.length) return "";
@@ -1459,21 +2215,19 @@ function gallery(title, sub, items, tall){
   return h;
 }
 
-/* ---------- 6. timeline ---------- */
+/* ============================================================
+   11.  What happened — folded
+   ============================================================ */
 function sectionTimeline(d){
   const tl = Array.isArray(d.timeline) ? d.timeline : [];
   let h = '<section id="story">';
-  h += sechead("06 — the story", "What happened",
-        "Including the parts that went wrong — the failures are the reason the current setup looks the way it does.");
+  h += '<details class="more" data-k="story"><summary>What happened</summary><div class="inner">';
   if (!tl.length){
-    h += emptyCard("No history recorded", "The project history is read from the session notes and will appear here.");
-    h += '</section>';
-    return h;
+    h += '<p class="lead">The project history is read from the session notes and will appear here.</p>';
+    return h + '</div></details></section>';
   }
-  h += '<div class="legend" style="margin-bottom:18px">' +
-       '<span class="item"><span class="swatch" style="background:var(--s1)"></span>milestone</span>' +
-       '<span class="item"><span class="swatch" style="background:var(--critical)"></span>problem</span>' +
-       '<span class="item"><span class="swatch" style="background:var(--good)"></span>fix</span></div>';
+  h += '<p class="lead">Including the parts that went wrong — the failures are the reason the current setup ' +
+       'looks the way it does.</p>';
   h += '<div class="tl">';
   tl.forEach(ev => {
     const kind = (ev.kind === "problem" || ev.kind === "fix") ? ev.kind : "milestone";
@@ -1482,13 +2236,69 @@ function sectionTimeline(d){
          '<h3>' + esc(ev.title || "") + '</h3>' +
          '<p>' + esc(ev.detail || "") + '</p></div>';
   });
-  h += '</div></section>';
+  h += '</div></div></details></section>';
+  return h;
+}
+
+/* ============================================================
+   12.  How this works — folded
+   ============================================================
+   The long explanation that used to open the page, including the
+   points-per-second note. It is correct and it took work to get right, so it
+   stays reachable — just not first. */
+function sectionHow(d){
+  const g = d.goal || {};
+  const ex = Array.isArray(g.explain) ? g.explain : [];
+  const targets = Array.isArray(g.targets) ? g.targets : [];
+  const rand = Array.isArray(g.randomization) ? g.randomization : [];
+
+  let h = '<section id="how">';
+  h += '<details class="more" data-k="how"><summary>How this works</summary><div class="inner">';
+
+  if (g.headline) h += '<p class="lead"><strong>' + esc(g.headline) + '</strong></p>';
+
+  if (ex.length){
+    h += '<div class="stack" style="margin-bottom:18px">';
+    ex.forEach(p => { h += '<p class="sec-ink" style="max-width:82ch;font-size:14px">' + esc(p) + '</p>'; });
+    h += '</div>';
+  } else {
+    h += '<p class="sec-ink" style="font-size:14px">The written explanation comes from the training configuration ' +
+         'and will appear here once the server can read it.</p>';
+  }
+
+  if (targets.length){
+    h += '<h3 style="font-size:16px;margin:22px 0 10px">The things it is being taught</h3>';
+    h += '<div class="teach">';
+    targets.forEach(t => {
+      h += '<div class="card"><h3>' + esc(t.name || "") + '</h3>' +
+           (t.target ? '<div class="tgt">' + esc(t.target) + '</div>' : "") +
+           '<p>' + esc(t.why || "") + '</p></div>';
+    });
+    h += '</div>';
+  }
+
+  if (rand.length){
+    h += '<h3 style="font-size:16px;margin:22px 0 10px">Why this should survive contact with the real robot</h3>';
+    h += '<p class="sec-ink" style="font-size:13.5px;margin-bottom:12px;max-width:82ch">' +
+         'No simulation matches reality exactly. So every one of the parallel robots is built slightly differently — ' +
+         'different weight, different friction, different servo behaviour, different delays. Anything that only works ' +
+         'for one particular set of numbers scores badly on average, so what survives is a walk that tolerates being ' +
+         'wrong about the hardware.</p>';
+    h += '<div class="scroll-x"><table><thead><tr><th>What is varied</th><th>Range</th><th>Why</th></tr></thead><tbody>';
+    rand.forEach(r => {
+      h += '<tr><td>' + esc(r.name || "") + '</td><td class="mono">' + esc(r.range || "") + '</td>' +
+           '<td style="white-space:normal;min-width:260px">' + esc(r.why || "") + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+  }
+
+  h += '</div></details></section>';
   return h;
 }
 
 /* ---------- lightbox ---------- */
-function wireGallery(){
-  document.querySelectorAll(".gal img").forEach(img => {
+function wireGallery(root){
+  (root || document).querySelectorAll(".gal img").forEach(img => {
     img.addEventListener("click", () => {
       $("lbImg").src = img.src;
       $("lbImg").alt = img.alt || "";
@@ -1502,8 +2312,58 @@ $("lightbox").addEventListener("click", (e) => { if (e.target.id !== "lbImg") cl
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeLb(); });
 function closeLb(){ $("lightbox").classList.remove("on"); $("lbImg").removeAttribute("src"); }
 
+/* A chart inside a closed panel has no width to measure, so it is redrawn the
+   moment the panel is opened. "toggle" does not bubble — hence capture. */
+document.addEventListener("toggle", (e) => {
+  const t = e.target;
+  if (!t || t.tagName !== "DETAILS" || !t.open) return;
+  t.querySelectorAll(".chart").forEach(el => { if (el._cfg) drawChart(el); });
+}, true);
+
+/* ---------- held updates ---------- */
+$("holdApply").addEventListener("click", () => render(true));
+/* Media events do not bubble, so listen in the capture phase. The moment a clip
+   ends the held numbers can go in without the reader losing anything. */
+["ended","pause","emptied"].forEach(ev => {
+  document.addEventListener(ev, () => { if (STATE.held) render(); }, true);
+});
+
+/* A "watch it" button on a goal jumps to that round's card and starts it.
+
+   Every one of the six points at a round that set a personal best, and those are
+   old rounds — only the newest six clips are on the open page, so the card being
+   asked for is almost always inside the closed "earlier rounds" panel, with its
+   video held on data-src and no source at all. Scrolling to a display:none
+   element does nothing and playing a source-less video fails silently, so the
+   panel is opened and given its sources FIRST, and only then scrolled to. */
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest ? e.target.closest("[data-watch]") : null;
+  if (!btn) return;
+  const card = document.getElementById(btn.getAttribute("data-watch"));
+  if (!card) return;                       /* no card on the page — follow the href */
+  e.preventDefault();
+
+  /* Walk out through every closed panel above the card, opening each one. */
+  let det = card.closest ? card.closest("details") : null;
+  while (det){
+    if (!det.open) det.open = true;
+    wakeVideos(det);
+    det = det.parentElement && det.parentElement.closest ? det.parentElement.closest("details") : null;
+  }
+
+  card.scrollIntoView({behavior:"smooth", block:"center"});
+  const v = card.querySelector("video");
+  if (v){
+    if (!v.getAttribute("src") && v.getAttribute("data-src")){   /* belt and braces */
+      v.src = v.getAttribute("data-src");
+      v.removeAttribute("data-src");
+    }
+    const p = v.play(); if (p && p.catch) p.catch(() => {});
+  }
+});
+
 /* ============================================================
-   5.  Go
+   13.  Go
    ============================================================ */
 poll();
 setInterval(poll, 30000);
