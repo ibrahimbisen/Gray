@@ -76,21 +76,26 @@ These are facts about the physical robot. They stay true no matter what the CAD 
 Each one cost real time to discover.
 
 - **12 joints.** Currently DS3218MG 270° hobby servos on a PCA9685 board over I²C.
-- **All servos will have position feedback.** This is a planned change and it is load-bearing.
-  Design for it from the start: the robot can read where each joint actually is, so measured
-  joint angles are allowed in the observation space, and closed-loop control is on the table.
-  The old design excluded joint positions because the hardware could not report them. That
-  restriction is gone.
+- **Every joint will have position feedback, from potentiometers the owner installs.**
+  Rotary pots on the rotating joints, linear pots on the pushrod. This is load-bearing —
+  design for it from the start. Measured joint angles are allowed in the observation space,
+  and closed-loop control is on the table. The old design banned both because the hardware
+  could not report position. That restriction is gone.
+- **Potentiometers are analog and the Raspberry Pi has no analog inputs.** An external ADC
+  chip is required — 12 channels of it. This is a hard requirement, not an optimisation.
+- **PWM period is 20 ms, so 50 Hz is still the control ceiling.** The servos are still
+  driven by PWM. Feedback changes what can be sensed, not how fast commands go out.
 - **The knee is a pushrod linkage, not direct drive.** A thigh-mounted servo drives the
-  shank through a ball-jointed metal rod. Servo angle ≠ joint angle on the real robot.
-
-Open, to be confirmed before it constrains anything:
-
-- **Control rate.** The PCA9685's 20 ms PWM period capped the old design at 50 Hz. Whether
-  that ceiling survives depends on what the feedback servos are and how they are driven.
+  shank through a ball-jointed metal rod. Servo angle ≠ joint angle. A linear pot on the
+  rod measures the true knee angle directly and removes this problem.
+- **Every pot needs calibration.** Raw ADC counts → radians, per joint, stored in a file.
+  The model is only as good as that mapping.
 
 ## Rules of the repo
 
+- **The CAD rebuild must include mounts for the potentiometers.** Pot bodies, shaft
+  couplings, clearance, and wire routing. They are part of the robot's mass and geometry.
+  Adding them later means redoing the model.
 - `robot/` is the original SolidWorks CAD. Never edit, move, or delete anything in it.
 - `Overview/` is build photos. Same rule. They are often the only record of how the real
   robot is put together.
