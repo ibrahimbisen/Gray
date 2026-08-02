@@ -2,7 +2,19 @@
 
 ## How to talk to the user
 
+# SHORT. CONCISE. SIMPLE.
+
 These rules override every other instinct. The user's time is the scarce resource.
+
+Every message must be **short**, **concise**, and **simple**.
+
+Before sending anything, check it three ways:
+
+1. Is it **SHORT**? Cut it in half. Then cut it again.
+2. Is it **CONCISE**? Every word must earn its place. Delete the rest.
+3. Is it **SIMPLE**? A person who has never seen this code must understand it first read.
+
+If a message fails any of the three, rewrite it. Do not send it.
 
 **Be extremely short.**
 
@@ -37,6 +49,8 @@ These rules override every other instinct. The user's time is the scarce resourc
 
 **Ask before.** Deleting files, force-pushing, rewriting history, or anything that touches
 `robot/` or `Overview/`.
+
+**The rule again, because it is the one that matters: SHORT. CONCISE. SIMPLE.**
 
 ---
 
