@@ -54,6 +54,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TRAINER = ROOT / "scripts" / "train_residual.py"
+WATCHER = ROOT / "scripts" / "render_watcher.py"
 EXPERIMENT_DIR = ROOT / "logs" / "rsl_rl" / "gray_residual"
 TASK_ID = "Gray-Residual-Flat"
 
@@ -124,6 +125,40 @@ def _progress(run_name: str) -> tuple[int, Path | None, str | None]:
     return best_round, best_dir, best_file
 
 
+def _start_watcher() -> subprocess.Popen | None:
+    """Film every checkpoint this job saves, for the whole job.
+
+    STARTED HERE BECAUSE TRAINING IS WHAT PRODUCES CHECKPOINTS. It used to be run.py's
+    job, so filming only happened if the dashboard happened to be up - and after the
+    duplicate watchers were cleaned up following a crash, a run reached round 1600 with
+    31 saved checkpoints and not one clip of any of them. Nobody noticed, because the
+    page correctly said "not scored yet" and that looked like a fresh run rather than a
+    missing process.
+
+    Started ONCE for the whole job rather than per attempt: a resumed segment must not
+    add a second watcher. render_watcher holds a single-instance lock anyway, so a
+    duplicate exits immediately rather than competing for the GPU - this is belt and
+    braces, and the lock is the part that actually guarantees it.
+    """
+    if not WATCHER.exists():
+        print("  no render_watcher.py, so checkpoints will not be filmed", flush=True)
+        return None
+    try:
+        proc = subprocess.Popen(
+            [sys.executable, str(WATCHER)],
+            cwd=str(ROOT),
+            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    except OSError as exc:
+        # Filming is not worth losing the training run over.
+        print(f"  could not start the video watcher ({exc}); training anyway",
+              flush=True)
+        return None
+    print("  filming checkpoints as they are saved", flush=True)
+    return proc
+
+
 def _launch(passthrough: list[str], run_name: str, iterations: int,
             resume_from: tuple[Path, str] | None) -> int:
     cmd = [sys.executable, str(TRAINER), TASK_ID,
@@ -158,6 +193,20 @@ def main(argv: list[str] | None = None) -> int:
                     help="total rounds to reach, counting work already done")
     args = ap.parse_args(argv)
 
+    # Started before the first attempt and stopped after the last, so it spans the
+    # whole job including any crash-resume in the middle - a watcher started per
+    # attempt would be torn down and rebuilt at exactly the moment the GPU is
+    # recovering from whatever killed the trainer.
+    watcher = _start_watcher()
+    try:
+        return _supervise(args, passthrough)
+    finally:
+        if watcher is not None and watcher.poll() is None:
+            watcher.terminate()
+            print("video watcher stopped.", flush=True)
+
+
+def _supervise(args, passthrough: list[str]) -> int:
     attempt = 0
     consecutive_failures = 0
 

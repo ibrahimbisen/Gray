@@ -18,17 +18,51 @@ GPU cost is small but not zero: one 12 s clip renders in a few seconds, against 
 checkpoint every ~2 minutes. --interval trades freshness for that cost, and
 --nice-seconds keeps it from rendering a burst of backlog at full tilt while
 training is competing for the card.
+
+ONLY ONE OF THESE MAY RUN AT A TIME, and that is enforced here rather than trusted
+to whoever launches it. Restarting run.py without stopping the previous copy left
+two watchers rendering simultaneously against a live trainer, and the trainer then
+died with `Warp CUDA error 700: an illegal memory access`, losing a 3000-round run
+at round 108. Three processes on one consumer GPU is the condition that produced
+it. The guard is a listening socket rather than a PID file because a socket cannot
+go stale: if this process dies for any reason - including being killed - the OS
+drops the port, whereas a PID file survives a kill and then blocks every future
+start until someone deletes it by hand.
 """
 
 from __future__ import annotations
 
 import argparse
+import socket
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+# Arbitrary, in the IANA dynamic range, and never connected to - only bound. It is a
+# lock, not a service.
+LOCK_PORT = 49411
+
+
+def acquire_single_instance_lock() -> socket.socket | None:
+    """Bind the lock port, or return None if another watcher already holds it.
+
+    The socket is returned so the caller can keep a reference: letting it be garbage
+    collected would close it and silently release the lock mid-run.
+
+    SO_REUSEADDR is deliberately NOT set. On Windows it lets two sockets bind the
+    same port, which would defeat the entire purpose of this function.
+    """
+    lock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        lock.bind(("127.0.0.1", LOCK_PORT))
+        lock.listen(1)
+        return lock
+    except OSError:
+        lock.close()
+        return None
 
 
 def count_checkpoints() -> int:
@@ -44,6 +78,15 @@ def main() -> int:
                     help="pause between clips, to leave the GPU to training")
     ap.add_argument("--once", action="store_true", help="render what is pending, then exit")
     args = ap.parse_args()
+
+    lock = acquire_single_instance_lock()
+    if lock is None:
+        # Not an error, and exit 0 on purpose: every launcher now starts a watcher
+        # unconditionally, so "one is already running" is the normal outcome of
+        # starting training while the dashboard is open. Failing here would make
+        # train_supervised.py report a problem where none exists.
+        print("[watcher] another watcher is already running; leaving it to it")
+        return 0
 
     python = sys.executable
     script = str(ROOT / "scripts" / "make_progress_videos.py")

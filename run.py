@@ -59,6 +59,13 @@ def start_watcher(python: str) -> subprocess.Popen | None:
 
     Without this the gallery stays empty until training ends, which for a three-hour
     run means there is no way to see what the robot can currently do.
+
+    Starting a second one is now harmless: render_watcher.py holds a single-instance
+    lock and a duplicate exits immediately. That guard exists because restarting this
+    file without stopping the previous copy once left two watchers rendering against
+    a live trainer, and the trainer died with a CUDA illegal-memory-access. Filming
+    is also started by scripts/train_supervised.py, so whichever of the two runs
+    first wins and the other stands down.
     """
     script = ROOT / "scripts" / "render_watcher.py"
     if not script.exists():
