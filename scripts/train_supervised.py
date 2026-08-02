@@ -55,8 +55,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TRAINER = ROOT / "scripts" / "train_residual.py"
 WATCHER = ROOT / "scripts" / "render_watcher.py"
-EXPERIMENT_DIR = ROOT / "logs" / "rsl_rl" / "gray_residual"
-TASK_ID = "Gray-Residual-Flat"
+LOG_ROOT = ROOT / "logs" / "rsl_rl"
+# Defaults for the walking task. Both are overridable, because there is now more
+# than one task: hardcoding the task id here silently trained the WRONG ONE when a
+# stand-up run was launched, and the trainer takes the task as a positional
+# argument rather than a flag, so passing --task through was rejected outright.
+DEFAULT_TASK = "Gray-Residual-Flat"
+DEFAULT_EXPERIMENT = "gray_residual"
 
 # Stop after this many attempts in a row that fail WITHOUT advancing the checkpoint
 # count. Three is enough to ride out a transient driver fault and few enough that a
@@ -71,16 +76,21 @@ RESTART_DELAY_S = 20.0
 _CHECKPOINT_RE = re.compile(r"^model_(\d+)\.pt$")
 
 
-def _segments(run_name: str) -> list[Path]:
+def _experiment_dir(experiment: str) -> Path:
+    return LOG_ROOT / experiment
+
+
+def _segments(run_name: str, experiment: str) -> list[Path]:
     """Every log directory belonging to this job, oldest first.
 
     Matched on the --run-name suffix mjlab appends to the timestamp, which is what
     ties the segments of one interrupted job together.
     """
-    if not EXPERIMENT_DIR.is_dir():
+    exp_dir = _experiment_dir(experiment)
+    if not exp_dir.is_dir():
         return []
     suffix = f"_{run_name}"
-    found = [p for p in EXPERIMENT_DIR.iterdir()
+    found = [p for p in exp_dir.iterdir()
              if p.is_dir() and p.name.endswith(suffix)]
     return sorted(found, key=lambda p: p.name)
 
@@ -107,7 +117,7 @@ def _latest_checkpoint(run_dir: Path) -> tuple[int, str] | None:
     return best
 
 
-def _progress(run_name: str) -> tuple[int, Path | None, str | None]:
+def _progress(run_name: str, experiment: str = DEFAULT_EXPERIMENT) -> tuple[int, Path | None, str | None]:
     """(rounds completed, the directory holding it, its checkpoint filename).
 
     Scans every segment, not just the newest: an attempt that crashed during
@@ -117,7 +127,7 @@ def _progress(run_name: str) -> tuple[int, Path | None, str | None]:
     best_round = 0
     best_dir: Path | None = None
     best_file: str | None = None
-    for segment in _segments(run_name):
+    for segment in _segments(run_name, experiment):
         found = _latest_checkpoint(segment)
         if found and found[0] >= best_round:
             best_round, best_file = found
@@ -160,8 +170,8 @@ def _start_watcher() -> subprocess.Popen | None:
 
 
 def _launch(passthrough: list[str], run_name: str, iterations: int,
-            resume_from: tuple[Path, str] | None) -> int:
-    cmd = [sys.executable, str(TRAINER), TASK_ID,
+            resume_from: tuple[Path, str] | None, task: str) -> int:
+    cmd = [sys.executable, str(TRAINER), task,
            "--agent.run-name", run_name,
            "--agent.max-iterations", str(iterations)]
     if resume_from is not None:
@@ -191,6 +201,11 @@ def main(argv: list[str] | None = None) -> int:
                     help="suffix identifying this job, e.g. A_base")
     ap.add_argument("--iterations", type=int, default=3000,
                     help="total rounds to reach, counting work already done")
+    ap.add_argument("--task", default=DEFAULT_TASK,
+                    help=f"registered task id (default {DEFAULT_TASK})")
+    ap.add_argument("--experiment", default=DEFAULT_EXPERIMENT,
+                    help="log folder under logs/rsl_rl/, must match the "
+                         "task's experiment_name or resume cannot find it")
     args = ap.parse_args(argv)
 
     # Started before the first attempt and stopped after the last, so it spans the
@@ -211,7 +226,7 @@ def _supervise(args, passthrough: list[str]) -> int:
     consecutive_failures = 0
 
     while True:
-        done, run_dir, checkpoint = _progress(args.run_name)
+        done, run_dir, checkpoint = _progress(args.run_name, args.experiment)
         remaining = args.iterations - done
 
         if remaining <= 0:
@@ -226,9 +241,9 @@ def _supervise(args, passthrough: list[str]) -> int:
         print(f"\n=== {args.run_name} attempt {attempt}: {done}/{args.iterations} "
               f"rounds done, {remaining} to go, {where}", flush=True)
 
-        code = _launch(passthrough, args.run_name, remaining, resume_from)
+        code = _launch(passthrough, args.run_name, remaining, resume_from, args.task)
 
-        done_after, _, _ = _progress(args.run_name)
+        done_after, _, _ = _progress(args.run_name, args.experiment)
         advanced = done_after > done
 
         if code == 0 and not advanced and remaining > 0:

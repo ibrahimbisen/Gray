@@ -34,6 +34,9 @@ import os
 # Kept with forward slashes: they are joined with os.path.join (which accepts
 # them on Windows) and also printed into user-facing messages, where a
 # backslash reads as a typo.
+LOG_ROOT = "logs/rsl_rl"
+
+# Kept for callers that still want the walking task specifically.
 EXPERIMENT_DIR = "logs/rsl_rl/gray_residual"
 PROGRESS_DIR = "progress"
 RUNS_DIR = "progress/runs"
@@ -64,6 +67,32 @@ def run_name(run_dir: str) -> str:
     return os.path.basename(os.path.normpath(run_dir))
 
 
+def experiment_dirs(root: str = ".") -> list[str]:
+    """Every experiment folder under logs/rsl_rl/, absolute.
+
+    THERE IS MORE THAN ONE TASK NOW. This used to be the single hardcoded path
+    logs/rsl_rl/gray_residual, so when the stand-up task started logging to
+    logs/rsl_rl/gray_standup the dashboard reported "nothing is training" while a
+    run was live - it was looking in the wrong folder and had no way to say so.
+    """
+    log_root = os.path.join(root, *LOG_ROOT.split("/"))
+    if not os.path.isdir(log_root):
+        return []
+    return [os.path.join(log_root, n) for n in os.listdir(log_root)
+            if os.path.isdir(os.path.join(log_root, n))]
+
+
+def newest_run_dir(root: str = ".") -> str | None:
+    """The run directory written to most recently, across ALL experiments."""
+    candidates = []
+    for exp in experiment_dirs(root):
+        candidates += [os.path.join(exp, n) for n in os.listdir(exp)
+                       if os.path.isdir(os.path.join(exp, n))]
+    if not candidates:
+        return None
+    return max(candidates, key=_newest_mtime)
+
+
 def newest_run_name(root: str = ".") -> str | None:
     """The training run that was written to most recently, or None if none exist.
 
@@ -71,17 +100,8 @@ def newest_run_name(root: str = ".") -> str | None:
     picks the live run - a resumed run keeps its original timestamped name, so
     sorting the names alphabetically would pick the wrong one.
     """
-    exp_dir = os.path.join(root, *EXPERIMENT_DIR.split("/"))
-    if not os.path.isdir(exp_dir):
-        return None
-    candidates = [
-        os.path.join(exp_dir, name)
-        for name in os.listdir(exp_dir)
-        if os.path.isdir(os.path.join(exp_dir, name))
-    ]
-    if not candidates:
-        return None
-    return os.path.basename(max(candidates, key=_newest_mtime))
+    newest = newest_run_dir(root)
+    return os.path.basename(newest) if newest else None
 
 
 def run_paths(root: str, name: str) -> dict:

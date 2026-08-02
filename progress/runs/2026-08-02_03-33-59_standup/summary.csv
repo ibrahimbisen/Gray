@@ -1,0 +1,9 @@
+iteration,height_mm,upright_min,fell,distance_mm,speed_mms,drift_mm,foot_force_p99_n,joint_acc_rms,power_mean_w,cost_of_transport,video
+baseline,173.5,0.997,0,,,,,,,,
+0,44.6,0.999,1,,,,,,,,progress/runs/2026-08-02_03-33-59_standup/videos/iter_0000.mp4
+50,119.9,0.966,0,,,,,,,,progress/runs/2026-08-02_03-33-59_standup/videos/iter_0050.mp4
+100,118.3,0.979,0,,,,,,,,progress/runs/2026-08-02_03-33-59_standup/videos/iter_0100.mp4
+150,119.4,0.981,0,,,,,,,,progress/runs/2026-08-02_03-33-59_standup/videos/iter_0150.mp4
+200,119.6,0.984,0,,,,,,,,progress/runs/2026-08-02_03-33-59_standup/videos/iter_0200.mp4
+250,119.6,0.988,0,,,,,,,,progress/runs/2026-08-02_03-33-59_standup/videos/iter_0250.mp4
+300,118.8,0.988,0,,,,,,,,progress/runs/2026-08-02_03-33-59_standup/videos/iter_0300.mp4

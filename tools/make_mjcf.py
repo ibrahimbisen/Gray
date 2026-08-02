@@ -146,6 +146,48 @@ def add_shank_capsules(root: ET.Element) -> int:
     return added
 
 
+def exclude_false_contacts(root: ET.Element) -> int:
+    """Stop the solver checking part pairs that cannot actually touch.
+
+    THE TRUNK AND THE THIGHS. The trunk's collision shape is a solid box, because the
+    box is the mesh's bounding box - but the real chassis is an OPEN FRAME with the
+    four hip servos mounted inside it, and the thighs swing into that opening. So the
+    simplified shapes report a deep overlap where the real parts have clear air
+    between them.
+
+    MEASURED, in the owner's own resting pose (hips 55 out, thighs -21, knees +39):
+    the trunk box overlaps the two front thigh boxes by 31.2 mm and 31.1 mm before a
+    single step is taken. MuJoCo then resolves that penetration the only way it can,
+    by throwing the parts apart: the trunk left the floor at 931 mm/s, joints spun at
+    704 deg/s and every servo was saturated at its 1.96 N.m limit from the first
+    millisecond. The robot launched to 109 mm and bounced back to 82 mm, having never
+    been asked to move at all. The owner spotted it as "the front legs push out".
+
+    Swapping the thigh boxes for the real meshes barely helps - 31 mm becomes 26 mm -
+    because MuJoCo collides the CONVEX HULL of a mesh, and a hull fills in the very
+    opening the thigh sits in.
+
+    THE EXCLUSION IS MEASURED, NOT ASSUMED. 300 poses spanning the owner's full joint
+    ranges (hip -82 to +92, thigh -35 to +65, knee -40 to +39) were tested with
+    triangle-level collision on the real meshes: the trunk and the thighs touch in
+    ZERO of them. The pair cannot collide anywhere the robot can reach, so checking it
+    can only produce false positives.
+
+    Nothing else is excluded. Every other pair either can genuinely meet - the feet
+    find each other at -28 degrees of hip, which is a real limit worth keeping - or is
+    a jointed pair MuJoCo already filters.
+    """
+    contact = root.find("contact")
+    if contact is None:
+        contact = ET.SubElement(root, "contact")
+    added = 0
+    for leg in ("fl", "fr", "br", "bl"):
+        ET.SubElement(contact, "exclude",
+                      {"body1": "base_link", "body2": f"{leg}_top"})
+        added += 1
+    return added
+
+
 def rebuild_trunk(worldbody: ET.Element, cfg: dict) -> ET.Element:
     """Re-create base_link as a real floating body.
 
@@ -269,6 +311,7 @@ def main() -> None:
             hidden += 1
 
     shins = add_shank_capsules(root)
+    excluded = exclude_false_contacts(root)
 
     # --- joint dynamics --------------------------------------------------------------
     joints = [j for j in root.iter("joint") if j.get("name")]
@@ -316,6 +359,8 @@ def main() -> None:
           f"geoms {m.ngeom}  ({hidden + shins} collision geoms in group "
           f"{COLLISION_GEOM_GROUP}, hidden by default, "
           f"{shins} of them shank capsules added here)")
+    print(f"  {excluded} false contact pair(s) excluded "
+          f"(trunk against each thigh - see exclude_false_contacts)")
     print(f"  total mass {m.body_mass.sum()*1000:.1f} g   "
           f"(robot.yaml says {cfg['total_mass_kg']*1000:.1f} g)")
     print(f"  control {CONTROL_HZ} Hz over {TIMESTEP*1000:.0f} ms physics "

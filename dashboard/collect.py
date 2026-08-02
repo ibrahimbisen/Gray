@@ -613,18 +613,27 @@ def _collect_training(root: str, name: str, errors: list) -> dict:
     out = _empty_training()
     out["run_name"] = name
 
-    exp_dir = os.path.join(root, EXPERIMENT_DIR)
+    # SEARCH EVERY EXPERIMENT FOLDER, not just the walking task's. There is more than
+    # one task now, and when the stand-up task began logging to logs/rsl_rl/gray_standup
+    # this function still looked only in logs/rsl_rl/gray_residual - so the page said
+    # "nothing is training" with a run live on the GPU, and had no way to notice.
+    exp_dirs = progress_store.experiment_dirs(root)
     if not name:
-        if os.path.isdir(exp_dir):
-            errors.append(f"No training runs inside {EXPERIMENT_DIR} yet.")
+        if exp_dirs:
+            errors.append(
+                f"No training runs inside {progress_store.LOG_ROOT} yet."
+            )
         else:
             errors.append(
-                f"No training runs found - {EXPERIMENT_DIR} does not exist yet."
+                f"No training runs found - {progress_store.LOG_ROOT} does not exist yet."
             )
         return out
 
-    run_dir = os.path.join(exp_dir, name)
-    if not os.path.isdir(run_dir):
+    run_dir = next(
+        (os.path.join(d, name) for d in exp_dirs
+         if os.path.isdir(os.path.join(d, name))), ""
+    )
+    if not run_dir:
         # The name came from progress/runs/, so this run's measurements outlived
         # the training log they were taken from. Nothing is broken; there is
         # just no live feed to draw next to the scores.

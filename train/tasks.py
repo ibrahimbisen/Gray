@@ -15,6 +15,7 @@ from mjlab.rl import (
 from mjlab.tasks.registry import register_mjlab_task
 
 from train.gray_env import gray_flat_env_cfg
+from train.standup_env import gray_standup_env_cfg
 from train.runner import GrayOnPolicyRunner
 
 TASK_ID = "Gray-Residual-Flat"
@@ -145,5 +146,50 @@ register_mjlab_task(
   env_cfg=_train_cfg(),
   play_env_cfg=_play_cfg(),
   rl_cfg=gray_ppo_runner_cfg(),
+  runner_cls=GrayOnPolicyRunner,
+)
+
+
+##
+# Stage 1: get off the floor. A separate task, additive - Gray-Residual-Flat above is
+# untouched and stays the comparison.
+##
+
+STANDUP_TASK_ID = "Gray-Standup"
+
+# Fewer robots than the walking task's 16384, on purpose. Sitting up is an 8 s episode
+# against walking's 12 s, and the whole point of this task is a FAST answer to whether a
+# blind policy can learn a whole-body move at all. 8192 still gathers 196k moments a
+# round, which is far more than the 51k-parameter actor needs per update.
+STANDUP_NUM_ENVS = 8192
+
+
+def gray_standup_runner_cfg() -> RslRlOnPolicyRunnerCfg:
+  cfg = gray_ppo_runner_cfg()
+  cfg.experiment_name = "gray_standup"
+  # A short, simple movement. 800 rounds is about 25 minutes and is enough to see the
+  # answer; the walking task's 3000 exists because walking is hard, not because long
+  # runs are good.
+  cfg.max_iterations = 800
+  return cfg
+
+
+def _standup_train_cfg():
+  cfg = gray_standup_env_cfg()
+  cfg.scene.num_envs = STANDUP_NUM_ENVS
+  return cfg
+
+
+def _standup_play_cfg():
+  cfg = gray_standup_env_cfg(play=True)
+  cfg.scene.num_envs = 16
+  return cfg
+
+
+register_mjlab_task(
+  task_id=STANDUP_TASK_ID,
+  env_cfg=_standup_train_cfg(),
+  play_env_cfg=_standup_play_cfg(),
+  rl_cfg=gray_standup_runner_cfg(),
   runner_cls=GrayOnPolicyRunner,
 )
