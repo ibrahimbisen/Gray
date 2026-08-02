@@ -1,0 +1,696 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot
+  name="URDF and Meshes">
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="0.71392 1.0029 1.438"
+        rpy="0 0 0" />
+      <mass
+        value="0.8219" />
+      <inertia
+        ixx="0.0013145"
+        ixy="-4.0132E-08"
+        ixz="-9.9213E-10"
+        iyy="0.0023043"
+        iyz="-1.9742E-05"
+        izz="0.0013647" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/base_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.89412 0.89412 0.89412 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="bl_hip"
+    type="continuous">
+    <origin
+      xyz="0.65325 -1.2466 0.99369"
+      rpy="1.6621 0 1.5708" />
+    <parent
+      link="base_link" />
+    <child
+      link="hipbl" />
+    <axis
+      xyz="1 0 0" />
+  </joint>
+  <link
+    name="hipfr">
+    <inertial>
+      <origin
+        xyz="0.032747 0.00029163 -0.0023623"
+        rpy="0 0 0" />
+      <mass
+        value="0.096536" />
+      <inertia
+        ixx="2.2833E-05"
+        ixy="2.0337E-08"
+        ixz="-3.8904E-07"
+        iyy="3.7872E-05"
+        iyz="-5.8131E-07"
+        izz="4.8375E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/hipfr.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.89412 0.89412 0.89412 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/hipfr.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="fr_hip"
+    type="continuous">
+    <origin
+      xyz="0.65318 -1.5269 0.99379"
+      rpy="-1.599 0 -1.5708" />
+    <parent
+      link="base_link" />
+    <child
+      link="hipfr" />
+    <axis
+      xyz="1 0 0" />
+  </joint>
+  <link
+    name="thighfr">
+    <inertial>
+      <origin
+        xyz="-0.0154492090074044 -0.00317139451254234 -0.0579467649483922"
+        rpy="0 0 0" />
+      <mass
+        value="0.0755057669124192" />
+      <inertia
+        ixx="0.000139885633460286"
+        ixy="4.16203179965807E-07"
+        ixz="1.44434985403259E-06"
+        iyy="0.000138278054995352"
+        iyz="-7.55227665162721E-06"
+        izz="1.12626170254776E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/thighfr.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/thighfr.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="fr_thigh"
+    type="continuous">
+    <origin
+      xyz="0.0428999999999999 0.0133015103843757 -0.0298001110872436"
+      rpy="-1.67995098611259 -1.51437912000812 -1.5707963267949" />
+    <parent
+      link="hipfr" />
+    <child
+      link="thighfr" />
+    <axis
+      xyz="1 0 0" />
+  </joint>
+  <link
+    name="calffr">
+    <inertial>
+      <origin
+        xyz="-0.014331 -0.031865 0.084376"
+        rpy="0 0 0" />
+      <mass
+        value="0.046501" />
+      <inertia
+        ixx="8.2914E-05"
+        ixy="1.0805E-10"
+        ixz="-2.4366E-10"
+        iyy="6.9931E-05"
+        iyz="2.8175E-05"
+        izz="1.5393E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/calffr.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.89412 0.89412 0.89412 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/calffr.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="fr_calf"
+    type="continuous">
+    <origin
+      xyz="0 -0.0229813332935709 -0.13928362829062"
+      rpy="0.602256283932225 0 0" />
+    <parent
+      link="thighfr" />
+    <child
+      link="calffr" />
+    <axis
+      xyz="1 0 0" />
+  </joint>
+  <link
+    name="hipfl">
+    <inertial>
+      <origin
+        xyz="0.033166 -0.0079109 -0.12355"
+        rpy="0 0 0" />
+      <mass
+        value="0.096535" />
+      <inertia
+        ixx="2.2833E-05"
+        ixy="-5.0483E-08"
+        ixz="-3.8628E-07"
+        iyy="3.8009E-05"
+        iyz="1.3284E-06"
+        izz="4.8238E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/hipfl.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.89412 0.89412 0.89412 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/hipfl.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="fl_hip"
+    type="continuous">
+    <origin
+      xyz="0.65318 -1.5269 0.99379"
+      rpy="1.6337 0 -1.5708" />
+    <parent
+      link="base_link" />
+    <child
+      link="hipfl" />
+    <axis
+      xyz="1 0 0" />
+  </joint>
+  <link
+    name="thighfl">
+    <inertial>
+      <origin
+        xyz="0.0134586186491167 -0.00317135892094966 -0.0579467596966203"
+        rpy="0 0 0" />
+      <mass
+        value="0.0755059396121985" />
+      <inertia
+        ixx="0.000139885731540346"
+        ixy="-4.16248421854163E-07"
+        ixz="-1.44436245702321E-06"
+        iyy="0.000138278152977221"
+        iyz="-7.55226325000534E-06"
+        izz="1.12626629678381E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/thighfl.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/thighfl.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="fl_thigh"
+    type="continuous">
+    <origin
+      xyz="0.0433999999999999 -0.0226201522727774 -0.152048058655485"
+      rpy="-1.77915763399181 1.44502693130987 -1.57079632679489" />
+    <parent
+      link="hipfl" />
+    <child
+      link="thighfl" />
+    <axis
+      xyz="1 0 0" />
+  </joint>
+  <link
+    name="calffl">
+    <inertial>
+      <origin
+        xyz="0.0124727555104056 -0.0318645488514981 0.0843759664309658"
+        rpy="0 0 0" />
+      <mass
+        value="0.0465012723740253" />
+      <inertia
+        ixx="8.29138714941338E-05"
+        ixy="1.08388867279079E-10"
+        ixz="-2.45042186880402E-10"
+        iyy="6.99313857869423E-05"
+        iyz="2.81749152511397E-05"
+        izz="1.53933309009629E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/calffl.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.894117647058823 0.894117647058823 0.894117647058823 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/calffl.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="fl_calf"
+    type="continuous">
+    <origin
+      xyz="0 -0.0229813332935703 -0.13928362829062"
+      rpy="0.665062643185599 0 0" />
+    <parent
+      link="thighfl" />
+    <child
+      link="calffl" />
+    <axis
+      xyz="1 0 0" />
+  </joint>
+  <link
+    name="hipbr">
+    <inertial>
+      <origin
+        xyz="-0.034481 -0.0001582 0.0023734"
+        rpy="0 0 0" />
+      <mass
+        value="0.096538" />
+      <inertia
+        ixx="2.2833E-05"
+        ixy="1.6274E-09"
+        ixz="3.8956E-07"
+        iyy="3.784E-05"
+        iyz="1.3675E-08"
+        izz="4.8407E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/hipbr.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.89412 0.89412 0.89412 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/hipbr.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="br_hip"
+    type="continuous">
+    <origin
+      xyz="0.65325 -1.2466 0.99369"
+      rpy="-1.737 0 1.5708" />
+    <parent
+      link="base_link" />
+    <child
+      link="hipbr" />
+    <axis
+      xyz="1 0 0" />
+  </joint>
+  <link
+    name="thighbr">
+    <inertial>
+      <origin
+        xyz="-0.034975626794023 -0.00317139627313623 -0.0579467657182859"
+        rpy="0 0 0" />
+      <mass
+        value="0.0755057501906937" />
+      <inertia
+        ixx="0.000139885625498015"
+        ixy="4.16200035001223E-07"
+        ixz="1.44434946191899E-06"
+        iyy="0.000138278046813943"
+        iyz="-7.55227805126095E-06"
+        izz="1.12626144686545E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/thighbr.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/thighbr.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="br_thigh"
+    type="continuous">
+    <origin
+      xyz="-0.0443270345831046 0.0110000000000106 0.0109763134766172"
+      rpy="2.5662721713198 1.5707963267949 0" />
+    <parent
+      link="hipbr" />
+    <child
+      link="thighbr" />
+    <axis
+      xyz="1 0 0" />
+  </joint>
+  <link
+    name="calfbr">
+    <inertial>
+      <origin
+        xyz="-0.0352711850014683 -0.0318645461200311 0.0843759701496383"
+        rpy="0 0 0" />
+      <mass
+        value="0.0465012815456296" />
+      <inertia
+        ixx="8.29138844652739E-05"
+        ixy="1.08359764688144E-10"
+        ixz="-2.45483018022309E-10"
+        iyy="6.99313982495227E-05"
+        iyz="2.81749183319453E-05"
+        izz="1.53933308866605E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/calfbr.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.894117647058823 0.894117647058823 0.894117647058823 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/calfbr.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="br_calf"
+    type="continuous">
+    <origin
+      xyz="0.00141360721305017 -0.0229813332935683 -0.13928362829062"
+      rpy="0.463611743275537 0 0" />
+    <parent
+      link="thighbr" />
+    <child
+      link="calfbr" />
+    <axis
+      xyz="1 0 0" />
+  </joint>
+  <link
+    name="hipbl">
+    <inertial>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <mass
+        value="0" />
+      <inertia
+        ixx="0"
+        ixy="0"
+        ixz="0"
+        iyy="0"
+        iyz="0"
+        izz="0" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/hipbl.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/hipbl.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="bl_hip"
+    type="continuous">
+    <origin
+      xyz="0.653247871299468 -1.24664584255998 0.993691155293609"
+      rpy="1.66205952306395 0 1.5707963267949" />
+    <parent
+      link="base_link" />
+    <child
+      link="hipbl" />
+    <axis
+      xyz="1 0 0" />
+  </joint>
+  <link
+    name="thighbl">
+    <inertial>
+      <origin
+        xyz="0.174691001010413 0.00848228933157802 -0.0512582722591037"
+        rpy="0 0 0" />
+      <mass
+        value="0.0755059373988258" />
+      <inertia
+        ixx="0.00013988573094133"
+        ixy="-4.1624779039298E-07"
+        ixz="-1.44436309604032E-06"
+        iyy="0.00013827815267"
+        iyz="-7.55226407200811E-06"
+        izz="1.12626628895544E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/thighbl.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/thighbl.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="bl_thigh"
+    type="continuous">
+    <origin
+      xyz="-0.0443270345831046 -0.0134325586538961 -0.00781318280515964"
+      rpy="2.54606361653767 -1.5707963267949 0" />
+    <parent
+      link="hipbl" />
+    <child
+      link="thighbl" />
+    <axis
+      xyz="1 0 0" />
+  </joint>
+  <link
+    name="calfbl">
+    <inertial>
+      <origin
+        xyz="0.0133686831492897 -0.0318645476416413 0.0843759715109755"
+        rpy="0 0 0" />
+      <mass
+        value="0.046501282735256" />
+      <inertia
+        ixx="8.29138928347374E-05"
+        ixy="1.0780923232454E-10"
+        ixz="-2.43991488289399E-10"
+        iyy="6.99314043826463E-05"
+        iyz="2.81749217776306E-05"
+        izz="1.53933319498518E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/calfbl.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.894117647058823 0.894117647058823 0.894117647058823 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF and Meshes/meshes/calfbl.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="bl_calf"
+    type="continuous">
+    <origin
+      xyz="0.16033645351616 -0.0113276849352256 -0.132595140848383"
+      rpy="0.555782608673983 0 0" />
+    <parent
+      link="thighbl" />
+    <child
+      link="calfbl" />
+    <axis
+      xyz="1 0 0" />
+  </joint>
+</robot>

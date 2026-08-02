@@ -113,15 +113,20 @@ def check_parses(root, urdf_path, checks):
 def check_structure(root, checks):
     c = Check(
         "structure",
-        "13 links, 12 joints, named correctly",
-        "Everything downstream finds a leg by its name prefix.",
+        "13 links, 12 joints, each link with one parent",
+        "Everything downstream finds a leg by its name prefix. A link with two "
+        "parents is not a tree, and MuJoCo refuses to load it outright.",
     )
     links = [l.get("name") for l in root.findall("link")]
     joints = [j.get("name") for j in root.findall("joint")]
+    children = [j.find("child").get("link") for j in root.findall("joint")]
     missing_l = [n for n in EXPECTED_LINKS if n not in links]
     missing_j = [n for n in EXPECTED_JOINTS if n not in joints]
     extra_l = [n for n in links if n not in EXPECTED_LINKS]
-    c.passed = not (missing_l or missing_j)
+
+    dup_joints = sorted({n for n in joints if joints.count(n) > 1})
+    dup_children = sorted({n for n in children if children.count(n) > 1})
+
     c.detail = f"{len(links)} links, {len(joints)} joints"
     for n in missing_l:
         c.rows.append(f"missing link: {n}")
@@ -129,6 +134,53 @@ def check_structure(root, checks):
         c.rows.append(f"missing joint: {n}")
     for n in extra_l:
         c.rows.append(f"unexpected link: {n} (harmless, but nothing will use it)")
+    for n in dup_joints:
+        c.rows.append(f"joint {n!r} is defined {joints.count(n)} times")
+    for n in dup_children:
+        c.rows.append(
+            f"link {n!r} is the child of {children.count(n)} joints - delete the "
+            "duplicate in the exporter's link tree"
+        )
+    c.passed = not (missing_l or missing_j or dup_joints or dup_children)
+    checks.append(c)
+
+
+def check_symmetry(root, checks):
+    """Left and right legs must not sit on top of each other.
+
+    Catches the exporter picking the same reference geometry for both sides,
+    which puts the left leg exactly where the right one is.
+    """
+    c = Check(
+        "symmetry",
+        "Left and right legs are in different places",
+        "If the exporter reuses one side's reference geometry for both, the left "
+        "leg lands exactly on the right one and the robot has two legs, not four.",
+    )
+    origin = {}
+    for j in root.findall("joint"):
+        o = j.find("origin")
+        origin[j.get("name")] = _vec(o.get("xyz", "0 0 0")) if o is not None else (0.0, 0.0, 0.0)
+
+    # Only the hips are comparable directly: all four are expressed in base_link's
+    # frame, so a left/right pair must be a track width apart. Thigh and calf origins
+    # are each in their own parent's frame, where mirrored geometry legitimately
+    # produces the same numbers on both sides.
+    worst = None
+    for a, b in (("fr_hip", "fl_hip"), ("br_hip", "bl_hip")):
+        if a not in origin or b not in origin:
+            continue
+        d = _norm([q - p for p, q in zip(origin[a], origin[b])])
+        if worst is None or d < worst[0]:
+            worst = (d, a, b)
+        if d < 0.05:
+            c.rows.append(
+                f"{a} and {b} are {d*1000:.2f} mm apart - they should be a track "
+                "width apart. The exporter used the same reference geometry for both."
+            )
+    c.passed = not c.rows
+    if worst:
+        c.detail = f"closest hip pair {worst[1]}/{worst[2]} at {worst[0]*1000:.1f} mm"
     checks.append(c)
 
 
@@ -266,13 +318,20 @@ def check_meshes(root, urdf_path, checks):
         "Every referenced mesh file exists",
         "A missing mesh means an invisible link, or a crash on load.",
     )
-    base = urdf_path.parent
+    # A package:// URI is relative to the package root, which is the folder above
+    # urdf/. Check that, the urdf's own folder, and the path as written.
+    roots = [urdf_path.parent, urdf_path.parent.parent, Path.cwd()]
     seen, missing = 0, 0
     for mesh in root.iter("mesh"):
         fn = mesh.get("filename", "")
         seen += 1
-        rel = fn.replace("package://", "").replace("model://", "")
-        if not (base / rel).exists():
+        rel = fn
+        for scheme in ("package://", "model://", "file://"):
+            if rel.startswith(scheme):
+                rel = rel[len(scheme):]
+                rel = rel.split("/", 1)[1] if "/" in rel else rel  # drop the package name
+                break
+        if not any((r / rel).exists() for r in roots) and not Path(fn).exists():
             c.rows.append(f"missing: {fn}")
             missing += 1
     c.passed = seen > 0 and missing == 0
@@ -410,6 +469,7 @@ def run_checks(urdf_path: Path) -> list[Check]:
 
     check_parses(root, urdf_path, checks)
     check_structure(root, checks)
+    check_symmetry(root, checks)
     check_zup(root, checks)
     check_axes(root, checks)
     check_limits(root, checks)
