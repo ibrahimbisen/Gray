@@ -1,4 +1,8 @@
 desktop.ini
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
 
 # Python
 __pycache__/
@@ -8,8 +12,23 @@ venv/
 .pytest_cache/
 *.egg-info/
 
-# Training artifacts (policies are committed deliberately, logs are not)
-runs/
-logs/
-wandb/
+# Generated from the CAD by tools/. Never edited by hand, so never committed.
+# Leading slash on purpose: a bare pattern matches at every depth and last time
+# that silently swallowed 48 files somebody meant to keep.
+/sim/models/*.urdf
+/sim/models/*.xml
+/sim/models/meshes/
+/sim/models/*.png
+
+# Training output
+/logs/
+/runs/
+/wandb/
+*.pt
 *.ckpt
+*.onnx
+MUJOCO_LOG.TXT
+
+# Videos and renders produced by scripts. Overview/ is build photography and stays.
+/progress/**/*.mp4
+/reference/**/*.mp4

@@ -1,0 +1,28 @@
+[project]
+name = "gray-quadruped"
+version = "0.1.0"
+description = "Gray - a 12-DOF 3D-printed quadruped. Digital twin, gait, and learned control."
+requires-python = ">=3.10,<3.14"
+
+# Core stays tiny on purpose: this is what has to install on the Raspberry Pi.
+# Nothing here may import MuJoCo or torch.
+dependencies = [
+    "numpy",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+# Reading and checking the model.
+tools = ["trimesh", "scipy", "defusedxml"]
+# Running the physics simulation.
+sim = ["mujoco", "pillow"]
+# Training. Only ever installed on the desktop with the 4070 Ti.
+train = ["mjlab>=1.5.3"]
+dev = ["pytest"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["gray"]
