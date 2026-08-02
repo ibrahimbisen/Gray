@@ -7,8 +7,14 @@ Reads everything the dashboard shows straight off disk and returns one dict:
 Sources, all real files, nothing invented:
   gray/config/robot.yaml                    mass model and leg kinematics
   logs/rsl_rl/gray_residual/<run>/          TensorBoard event file + params/*.yaml
-  progress/summary.csv                      measured walk scores per checkpoint
+  progress/runs/<run>/summary.csv           measured walk scores per checkpoint
+  progress/baseline.json                    the hand-written gait, shared by all runs
   Overview/, sim/models/                    photos, renders and clips
+
+<run> is resolved ONCE per call, and the live feed and the scores below it both
+use that one name. They used to be worked out separately, which is how the page
+came to show the current run's round counter above the PREVIOUS run's 47 scored
+checkpoints - two runs presented as one.
 
 The "scorecard" key is the one derived thing in here: one row per training goal,
 each ranking the evaluated checkpoints on the single column of summary.csv that
@@ -39,15 +45,26 @@ from urllib.parse import quote
 
 import yaml
 
+# This file lives in <repo>/dashboard/, so the repo root - where progress_store
+# sits - is not on the path when it is run directly as a script.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
+import progress_store
+
 # ---------------------------------------------------------------------------
 # constants
 # ---------------------------------------------------------------------------
 
-# Kept with forward slashes: they are joined via os.path.join (which accepts
-# them on Windows too) and quoted straight into user-facing error messages,
-# where a backslash would just look like a typo.
-EXPERIMENT_DIR = "logs/rsl_rl/gray_residual"
-SUMMARY_CSV = "progress/summary.csv"
+# Taken from progress_store rather than spelled out again here: the scorer
+# writes these files and this reads them, and they can only agree if there is
+# one copy of each path. Disagreeing about it is the bug this module just had.
+EXPERIMENT_DIR = progress_store.EXPERIMENT_DIR
+
+# Kept with forward slashes: joined via os.path.join (which accepts them on
+# Windows too) and quoted straight into user-facing error messages, where a
+# backslash would just look like a typo.
 ROBOT_YAML = "gray/config/robot.yaml"
 
 # A run counts as "live" if anything inside its directory was touched this
@@ -64,9 +81,10 @@ MAX_SERIES_POINTS = 400
 
 # The Phase 2 hand-written gait. Written by
 # `python scripts/eval_policy.py --measure-baseline`, which walks it 30 seeds x 5
-# commands and records the whole DISTRIBUTION. Used only until progress/summary.csv
-# exists; once it does, its "baseline" row wins (see _read_walks).
-BASELINE_JSON = "progress/baseline.json"
+# commands and records the whole DISTRIBUTION. Not per-run: it is the same walk
+# every time and is what every run is measured against. Used only until the
+# current run's summary.csv has a "baseline" row, which then wins (see _read_walks).
+BASELINE_JSON = progress_store.BASELINE_JSON
 
 # Last-resort constants, and they are a warning rather than a benchmark: this is the
 # single-seed figure that was quoted as "the baseline" everywhere until it was
@@ -79,6 +97,15 @@ BASELINE_FALLBACK = {
     "drift_mm": 33.8,
     "upright_min": 0.976,
 }
+
+# Deliberately NOT an error: a run with no scores yet is what the first hour of
+# every run looks like, not a fault. The scorer can only run on a saved
+# checkpoint, and train/tasks.py saves one every 50 rounds.
+NOT_SCORED_YET = (
+    "This run has not been scored yet - scores appear once "
+    "scripts/make_progress_videos.py has run on its first saved checkpoint "
+    "(every 50 rounds)."
+)
 
 
 def _read_baseline_json(root: str, errors: list) -> dict | None:
@@ -577,30 +604,33 @@ def _read_run_params(run_dir: str, errors: list) -> tuple[int, int]:
     return total, num_envs
 
 
-def _collect_training(root: str, errors: list) -> dict:
-    exp_dir = os.path.join(root, EXPERIMENT_DIR)
-    if not os.path.isdir(exp_dir):
-        errors.append(
-            f"No training runs found - {EXPERIMENT_DIR} does not exist yet."
-        )
-        return _empty_training()
+def _collect_training(root: str, name: str, errors: list) -> dict:
+    """The TensorBoard feed for `name`, the run collect() resolved for the page.
 
-    runs = [
-        os.path.join(exp_dir, name)
-        for name in os.listdir(exp_dir)
-        if os.path.isdir(os.path.join(exp_dir, name))
-    ]
-    if not runs:
-        errors.append(f"No training runs inside {EXPERIMENT_DIR} yet.")
-        return _empty_training()
-
-    # Newest by content, not by directory name - a resumed or renamed run still
-    # sorts correctly this way.
-    run_dir = max(runs, key=_newest_mtime)
-    newest_touch = _newest_mtime(run_dir)
-
+    The name is handed in rather than worked out here so that the feed and the
+    scores underneath it can never describe two different runs.
+    """
     out = _empty_training()
-    out["run_name"] = os.path.basename(run_dir)
+    out["run_name"] = name
+
+    exp_dir = os.path.join(root, EXPERIMENT_DIR)
+    if not name:
+        if os.path.isdir(exp_dir):
+            errors.append(f"No training runs inside {EXPERIMENT_DIR} yet.")
+        else:
+            errors.append(
+                f"No training runs found - {EXPERIMENT_DIR} does not exist yet."
+            )
+        return out
+
+    run_dir = os.path.join(exp_dir, name)
+    if not os.path.isdir(run_dir):
+        # The name came from progress/runs/, so this run's measurements outlived
+        # the training log they were taken from. Nothing is broken; there is
+        # just no live feed to draw next to the scores.
+        return out
+
+    newest_touch = _newest_mtime(run_dir)
     out["running"] = (time.time() - newest_touch) < LIVE_WINDOW_S
     out["total_iterations"], out["num_envs"] = _read_run_params(run_dir, errors)
 
@@ -684,7 +714,7 @@ def _collect_training(root: str, errors: list) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# walks - measured scores from progress/summary.csv
+# walks - measured scores from the current run's progress/runs/<run>/summary.csv
 # ---------------------------------------------------------------------------
 
 
@@ -722,24 +752,39 @@ def _walk_row(raw: dict, root: str) -> dict:
     }
 
 
-def _read_walks(root: str, errors: list) -> tuple[list, dict | None, set]:
-    """(walks, baseline row, column names present in the file).
+def _current_run_name(root: str) -> str:
+    """The one run this whole page is about, resolved once and used everywhere.
+
+    The live training run if there is one; otherwise the newest run that still
+    has scores under progress/runs/, so a finished run whose checkpoints have
+    since been deleted keeps showing its results instead of blanking the page.
+    "" when neither exists.
+    """
+    live = progress_store.newest_run_name(root)
+    if live:
+        return live
+    scored = progress_store.list_runs(root)
+    return scored[0] if scored else ""
+
+
+def _read_summary_csv(root: str, path: str, errors: list) -> tuple[list, dict | None, set]:
+    """One run's summary.csv: (walks oldest-first, baseline row, columns present).
 
     Re-measuring a checkpoint adds a second row for the same iteration rather
     than replacing the first, so rows are collapsed by iteration and the last
-    one in the file wins - it was written by the most recent run.
+    one in the file wins - it was written by the most recent scoring pass.
 
-    The column names are returned so the scorecard can tell "this file predates
+    The column names are returned so the caller can tell "this file predates
     that measurement" from "that measurement came out as zero".
+
+    A missing file is not reported here: whether that is normal depends on which
+    run is being read, and only the caller knows that.
     """
-    path = os.path.join(root, SUMMARY_CSV)
     if not os.path.isfile(path):
-        errors.append(
-            "No walk scores yet - progress/summary.csv appears after the first "
-            "run of scripts/make_progress_videos.py."
-        )
         return [], None, set()
 
+    # Named the way the user sees it on the page, not as an absolute path.
+    label = progress_store.media_relpath(root, path) or path
     by_iteration: dict[int, dict] = {}
     baseline: dict | None = None
     columns: set = set()
@@ -756,16 +801,104 @@ def _read_walks(root: str, errors: list) -> tuple[list, dict | None, set]:
                     continue
                 number = _to_float(tag)
                 if number is None:
-                    errors.append(f"Skipped a summary.csv row with iteration '{tag}'.")
+                    errors.append(f"Skipped a row of {label} with iteration '{tag}'.")
                     continue
                 row["iteration"] = int(number)
                 by_iteration[row["iteration"]] = row
     except Exception as exc:
-        errors.append(f"Could not read {SUMMARY_CSV}: {exc}")
+        errors.append(f"Could not read {label}: {exc}")
         return [], None, set()
 
     walks = sorted(by_iteration.values(), key=lambda r: r["iteration"])
     return walks, baseline, columns
+
+
+def _read_walks(root: str, name: str, errors: list) -> tuple[list, dict | None, set, str]:
+    """(walks, baseline row, columns present, scoring status) for the CURRENT run.
+
+    Only this run's file is read. The previous run's scores sitting under this
+    run's round counter is the exact fault this argument exists to prevent.
+
+    The status is prose for the reader and empty once there are scores. It is
+    not an error: at the start of a run there is nothing scored yet because no
+    checkpoint has been saved yet, and that is the system working.
+    """
+    if not name:
+        # No run at all. Still the "no scores" message rather than silence, so
+        # the empty scores section always says why it is empty; that there is
+        # also no run to score is already in `errors`.
+        return [], None, set(), NOT_SCORED_YET
+
+    path = progress_store.run_paths(root, name)["summary_csv"]
+    walks, baseline, columns = _read_summary_csv(root, path, errors)
+    # No rows covers both "the file is not there yet" and "the header is there
+    # but the first checkpoint is still being measured" - the same fact to a
+    # reader. If it was neither, the reason is already in `errors`.
+    status = "" if walks else NOT_SCORED_YET
+    return walks, baseline, columns, status
+
+
+# ---------------------------------------------------------------------------
+# run history - every run that has scores on disk, not just this one
+# ---------------------------------------------------------------------------
+
+
+def _history_entry(name: str, is_current: bool, walks: list, columns: set) -> dict:
+    """One run summed up, every figure read off that run's summary.csv.
+
+    A column the file does not have is None, never 0: "this run predates that
+    measurement" and "this run measured zero" must not print as the same thing.
+
+    Best distance skips any checkpoint that fell over, for the same reason the
+    scorecard does - a robot that tips over at two seconds has not walked
+    anywhere worth quoting.
+    """
+    best_row: dict | None = None
+    if "distance_mm" in columns:
+        for row in walks:
+            if row["fell"]:
+                continue
+            value = row["distance_mm"]
+            if value is None:
+                continue
+            if best_row is None or value > best_row["distance_mm"]:
+                best_row = row
+
+    return {
+        "name": name,
+        "is_current": is_current,
+        "checkpoints_scored": len(walks),
+        # walks are sorted by iteration, so the last one is the furthest along.
+        "last_iteration": walks[-1]["iteration"] if walks else None,
+        "best_distance_mm": best_row["distance_mm"] if best_row else None,
+        "best_distance_iteration": best_row["iteration"] if best_row else None,
+        # Already resolved to a /media/ URL by _walk_row, and only if the file
+        # is actually on disk.
+        "video": best_row["video"] if best_row else None,
+    }
+
+
+def _collect_run_history(
+    root: str,
+    current: str,
+    current_walks: list,
+    current_columns: set,
+    errors: list,
+) -> list:
+    """One entry per folder in progress/runs/, newest first.
+
+    The current run's rows are handed in rather than read a second time, which
+    would report any bad row in that file twice.
+    """
+    out: list[dict] = []
+    for name in progress_store.list_runs(root):
+        if name == current:
+            walks, columns = current_walks, current_columns
+        else:
+            path = progress_store.run_paths(root, name)["summary_csv"]
+            walks, _baseline, columns = _read_summary_csv(root, path, errors)
+        out.append(_history_entry(name, name == current, walks, columns))
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -775,7 +908,7 @@ def _read_walks(root: str, errors: list) -> tuple[list, dict | None, set]:
 # The robot is taught six things at once and they pull against each other:
 # walking faster means stamping harder, landing softly means going slower. A
 # single overall score hides exactly that tension, so each goal is scored on
-# its own, on the one column of progress/summary.csv that measures it.
+# its own, on the one column of the run's summary.csv that measures it.
 #
 # "column" must be a real column of that file. Nothing here is modelled or
 # estimated - every number in the scorecard is read straight out of it.
@@ -871,7 +1004,7 @@ def _build_scorecard(
         column = spec["column"]
         if columns and column not in columns:
             errors.append(
-                f"progress/summary.csv has no '{column}' column, so the "
+                f"This run's summary.csv has no '{column}' column, so the "
                 f"'{spec['goal']}' goal cannot be scored yet. Re-running "
                 f"scripts/make_progress_videos.py adds it."
             )
@@ -1385,14 +1518,23 @@ def collect(repo_root: str = ".") -> dict:
                        "widest_used_deg": None, "servo_span_deg": None},
             "media": {key: [] for key in _MEDIA_SPEC},
             "timeline": _build_timeline(),
+            "scoring_status": "",
+            "run_history": [],
             "errors": [f"Repository folder not found: {root}"],
         }
 
-    walks, baseline_walk, walk_columns = _read_walks(root, errors)
+    # Resolved once, here, and passed to everything below. Every number on the
+    # page then belongs to the same run by construction rather than by luck.
+    run_name = _current_run_name(root)
 
-    # Prefer the measured baseline row once it exists, then progress/baseline.json,
-    # then the constants. The constants are the single-seed figure and are only a
-    # stand-in for the window before anything has been measured.
+    walks, baseline_walk, walk_columns, scoring_status = _read_walks(
+        root, run_name, errors
+    )
+
+    # Prefer this run's measured baseline row once it exists, then
+    # progress/baseline.json, then the constants. The constants are the
+    # single-seed figure and are only a stand-in for the window before anything
+    # has been measured.
     if baseline_walk:
         baseline = {key: baseline_walk[key] for key in BASELINE_FALLBACK}
     else:
@@ -1401,7 +1543,7 @@ def collect(repo_root: str = ".") -> dict:
     # Read before the goal is built: how many robots run at once and how many
     # rounds are planned belong to the live run's params/*.yaml, and the goal
     # text quotes them rather than repeating a hardcoded guess.
-    training = _collect_training(root, errors)
+    training = _collect_training(root, run_name, errors)
 
     return {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
@@ -1416,6 +1558,11 @@ def collect(repo_root: str = ".") -> dict:
         "joints": _collect_joints(root, errors),
         "media": _collect_media(root, errors),
         "timeline": _build_timeline(),
+        # Why there are no scores yet, in plain words. Empty once there are.
+        "scoring_status": scoring_status,
+        "run_history": _collect_run_history(
+            root, run_name, walks, walk_columns, errors
+        ),
         "errors": errors,
     }
 

@@ -5,12 +5,17 @@
     python scripts/make_progress_videos.py --no-video      # numbers only, much faster
     python scripts/make_progress_videos.py --full          # score under randomisation
 
-Produces, under progress/:
+Produces, under progress/runs/<training-run>/:
 
     videos/baseline_phase2.mp4     the hand-written gait, for reference
     videos/iter_0050.mp4 ...       one per checkpoint
     policies/iter_0050.npz ...     the policy behind each clip, ~200 KB each
     summary.csv                    the numbers behind each clip
+
+The folder is named after the training run being scored (see progress_store.py),
+so a new training run starts empty and never overwrites the previous run's
+measurements. progress/baseline.json and progress/joints/ stay at the top level:
+neither belongs to any one run.
 
 THE CLIP AND THE SCORE ARE TWO DIFFERENT THINGS, ON PURPOSE
 -----------------------------------------------------------
@@ -48,8 +53,10 @@ import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+ROOT = str(Path(__file__).resolve().parents[1])
+sys.path.insert(0, ROOT)
 
+import progress_store  # noqa: E402
 from train.evaluate import (  # noqa: E402
     FULL_COMMANDS,
     FULL_SEEDS,
@@ -68,7 +75,14 @@ from train.evaluate import (  # noqa: E402
 # commands cannot disagree about how a number is presented.
 from train.evaluate import _fmt, _pct  # noqa: E402
 
-OUT = "progress"
+
+def _rel(path: str) -> str:
+    """Repo-relative, forward slashes: what summary.csv stores and what the
+    dashboard's /media/ route serves. Also what gets printed, so a message and a
+    cell in the file always name a path the same way.
+    """
+    return progress_store.media_relpath(ROOT, path)
+
 
 # One column per training objective, so the dashboard can rank checkpoints by each
 # goal separately - the fastest walk and the softest walk are rarely the same one.
@@ -185,9 +199,9 @@ def _merge_summary(csv_path: str, new_rows: list[dict]):
         if previous is not None:
             replaced += 1
             # A --no-video run re-scores a checkpoint without rendering, so it has
-            # no clip name to offer. The clip from the earlier run is still sitting
-            # in progress/videos, so keep pointing at it rather than blanking the
-            # link and losing the video from the dashboard.
+            # no clip name to offer. The clip is still sitting in this run's videos
+            # folder, so keep pointing at it rather than blanking the link and
+            # losing the video from the dashboard.
             if not row.get("video") and previous.get("video"):
                 row = dict(row, video=previous["video"])
         else:
@@ -295,15 +309,32 @@ def main() -> None:
                          "rendering - much faster, and uses no GPU")
     args = ap.parse_args()
 
-    checkpoints = find_checkpoints(args.run_dir)
+    # Resolve the run ONCE, then hand the path to find_checkpoints rather than
+    # letting it default. Its default is the alphabetically last run that owns a
+    # checkpoint; progress_store's is the most recently written one, which is the
+    # run the dashboard shows. Those two rules can name different folders, and if
+    # they ever did, this script would score one run and file the numbers under
+    # another - exactly the mixing the per-run layout exists to stop.
+    run_dir = args.run_dir
+    if run_dir is None:
+        newest = progress_store.newest_run_name(ROOT)
+        if newest is None:
+            print(f"no training runs under {progress_store.EXPERIMENT_DIR}/")
+            raise SystemExit(1)
+        run_dir = os.path.join(ROOT, *progress_store.EXPERIMENT_DIR.split("/"), newest)
+
+    name = progress_store.run_name(run_dir)
+    checkpoints = find_checkpoints(run_dir)
     if not checkpoints:
-        print("no checkpoints yet under logs/rsl_rl/gray_residual/")
+        print(f"no checkpoints yet under {progress_store.EXPERIMENT_DIR}/{name}")
         raise SystemExit(1)
 
-    vid_dir = os.path.join(OUT, "videos")
-    pol_dir = os.path.join(OUT, "policies")
-    os.makedirs(vid_dir, exist_ok=True)
-    os.makedirs(pol_dir, exist_ok=True)
+    paths = progress_store.ensure_run_dirs(ROOT, name)
+    vid_dir = paths["videos_dir"]
+    pol_dir = paths["policies_dir"]
+    csv_path = paths["summary_csv"]
+
+    print(f"run {name}: {len(checkpoints)} checkpoint(s) -> {_rel(paths['dir'])}/")
 
     grid = (dict(commands=FULL_COMMANDS, seeds=FULL_SEEDS, draws=sample_draws())
             if args.full else
@@ -327,7 +358,7 @@ def main() -> None:
         if baseline_mp4:
             rollout(None, video=baseline_mp4, **clip)
         report = evaluate(None, label="Phase 2 gait", **scoring)
-        rows.append(_row("baseline", report, baseline_mp4 or ""))
+        rows.append(_row("baseline", report, _rel(baseline_mp4 or "")))
         print(HEADER)
         print(_line("gait", report))
         print("-" * len(HEADER), flush=True)
@@ -345,17 +376,15 @@ def main() -> None:
         if mp4:
             rollout(policy, video=mp4, **clip)
         report = evaluate(policy, **scoring)
-        rows.append(_row(str(policy.iteration), report, mp4 or ""))
+        rows.append(_row(str(policy.iteration), report, _rel(mp4 or "")))
         print(_line(str(policy.iteration), report), flush=True)
-
-    csv_path = os.path.join(OUT, "summary.csv")
 
     if not rows:
         # Nothing new, but tidy away any duplicate rows an earlier run left behind.
         merged, _, _, duplicates = _merge_summary(csv_path, [])
         if duplicates:
             _write_summary(csv_path, merged)
-            print(f"removed {duplicates} duplicate row(s) from {csv_path}")
+            print(f"removed {duplicates} duplicate row(s) from {_rel(csv_path)}")
         print("nothing new to render")
         return
 
@@ -364,9 +393,10 @@ def main() -> None:
 
     tidied = f", {duplicates} duplicate(s) removed" if duplicates else ""
     print(f"\nmean +/- sd [worst case across the grid]")
-    print(f"{len(rows)} row(s) scored -> {vid_dir}")
-    print(f"policies      -> {pol_dir}  (small enough to commit)")
-    print(f"numbers       -> {csv_path}  ({len(merged)} row(s) in total: "
+    print(f"run {name}")
+    print(f"{len(rows)} row(s) scored -> {_rel(vid_dir)}")
+    print(f"policies      -> {_rel(pol_dir)}  (small enough to commit)")
+    print(f"numbers       -> {_rel(csv_path)}  ({len(merged)} row(s) in total: "
           f"{added} new, {replaced} re-scored{tidied})")
 
 

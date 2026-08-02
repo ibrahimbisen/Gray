@@ -816,7 +816,7 @@ window.addEventListener("resize", () => {
 const TAG_META = {
   "Train/mean_reward":              {label:"Total score for a whole attempt", unit:"points", group:"progress",
     note:"Every scoring item added up over one complete 12-second attempt. This is a total, not a rate — " +
-         "the ten panels above are per-second averages, so they add up to roughly a thirteenth of this."},
+         "the scoring panels above are per-second averages, so they add up to roughly a thirteenth of this."},
   "Train/mean_episode_length":      {label:"How long it stays up", unit:"control steps", group:"progress",
     note:"600 steps is the full 12 seconds. Lower means it tipped over early."},
   "Metrics/twist/error_vel_xy":     {label:"Speed error", unit:"m/s", group:"progress",
@@ -853,63 +853,113 @@ const TAG_META = {
   "Perf/learning_time":             {label:"Time spent learning", unit:"s per round", group:"machine", note:""}
 };
 
-/* The scoring items are logged as Episode_Reward/<key>. The collector describes
-   them in plain English and carries the same <key> on each entry, so the two
-   sides line up. This table is the safety net: it keeps the titles readable and
-   — more importantly — keeps a penalty looking like a penalty even if the
-   collector sends no key at all. Weights are the ones in the training config. */
-const REWARD_FALLBACK = {
-  forward_progress:       {label:"Distance covered",           weight: 2.0,    good:true},
-  track_linear_velocity:  {label:"Hits the asked-for speed",    weight: 1.5,    good:true},
-  track_angular_velocity: {label:"Does not turn",               weight: 1.0,    good:true},
-  upright:                {label:"Keeps the body level",        weight: 0.5,    good:true},
-  soft_landing:           {label:"Soft landings",               weight:-1e-4,   good:false},
-  joint_acc:              {label:"Smooth joint motion",         weight:-5e-7,   good:false},
-  action_acc:             {label:"Steady corrections",          weight:-0.005,  good:false},
-  action_rate:            {label:"Slow-changing corrections",   weight:-0.05,   good:false},
-  joint_torques:          {label:"Easy on the servos",          weight:-1e-4,   good:false},
-  dof_pos_limits:         {label:"Off the end stops",           weight:-1.0,    good:false}
+/* The scoring items, as the `rewards` dict in train/gray_env.py weighs them. The
+   trainer logs each one as Episode_Reward/<key>, and <key> is the term's name in
+   that file, so the log, this table and the charts all join on the same string -
+   never on the prose.
+
+   THIS PAGE KEEPS ITS OWN COPY OF THE WEIGHTS AND IT WINS OVER THE COLLECTOR'S.
+   dashboard/collect.py carries a second hand-written copy of the same numbers and
+   it has drifted from the trainer: it still lists joint_torques and
+   dof_pos_limits, both deleted, still pays forward_progress 2.0 where the trainer
+   pays 3.0, and still credits track_angular_velocity with keeping the robot
+   straight, a job that has moved to cross_track_drift. Whichever copy you edit,
+   check it against train/gray_env.py - that file is the only thing that decides
+   what a round is actually worth.
+
+   Whether an item pays or charges is read off the sign of its weight and is never
+   stored twice, so the two cannot disagree. The order here is the order the table
+   shows: everything that pays, then everything that charges, biggest first. */
+const REWARD_ITEMS = {
+  forward_progress: {label:"Distance covered", weight: 3.0, plain:
+    "Points for covering ground, counted along the direction it was told to go. Raised from 2.0: at " +
+    "the old weight, standing perfectly still was still nearly as good a way to score."},
+  track_linear_velocity: {label:"Hits the asked-for speed", weight: 1.5, plain:
+    "Points for walking at the speed it was asked for. Dead on target scores full marks and the score " +
+    "fades away smoothly as it misses."},
+  track_angular_velocity: {label:"Does not turn", weight: 0.5, plain:
+    "Points for not spinning. Halved from 1.0 and loosened, because it used to be the straightness " +
+    "item and was bad at it: a normal stride rocks the body more than it allowed for."},
+  upright: {label:"Keeps the body level", weight: 0.5, plain:
+    "Points for staying level rather than leaning as it moves. Halved, because a robot standing still " +
+    "scores it perfectly and falling is already punished by the attempt ending."},
+  cross_track_drift: {label:"Stays on the line", weight: 0.5, plain:
+    "Points for ending up on the straight line it was told to walk along. This is the straightness " +
+    "item now: it measures distance off the line, which the rocking of a stride cannot swamp."},
+  support_count: {label:"Three feet on the ground", weight: 0.25, plain:
+    "Points for keeping at least three feet genuinely carrying weight, which is the stability this " +
+    "walk was chosen for. The smallest earner on purpose: standing still scores it perfectly too."},
+  base_height_floor: {label:"Body off the floor", weight: -2000.0, plain:
+    "Marked down for letting the body sink below 150 mm, which is the obvious way to cheat several " +
+    "of the items below. Scores exactly zero at any normal walking height."},
+  fall_penalty: {label:"Falling over", weight: -250.0, plain:
+    "One charge on the step it tips past 60 degrees, and nothing at all for an attempt that stays " +
+    "up. Deliberately a kick rather than a catastrophe: falling already costs it the rest of its " +
+    "scoring time."},
+  stance_foot_anchoring: {label:"Feet that do not slide", weight: -8.0, plain:
+    "Marked down for a loaded foot skidding across the floor. Measured, the feet slide at 68 mm/s " +
+    "while the robot itself only travels 57 mm/s."},
+  pitch_regulation: {label:"Level nose to tail", weight: -1.5, plain:
+    "Marked down for walking nose-up or nose-down. Levelling the body lifts the back feet without " +
+    "asking the servos for travel they have not got."},
+  swing_clearance: {label:"Picks its feet up", weight: -0.6, plain:
+    "Marked down for dragging a foot that is supposed to be swinging forward. Measured, the back " +
+    "feet lift 0.8 mm where the walk asks for 34."},
+  excess_touchdowns: {label:"No extra footfalls", weight: -0.5, plain:
+    "Marked down for putting a foot down when the walk did not ask for it. Measured, 262 landings in " +
+    "12 seconds against the 80 intended, and every extra one is an impact on a brittle part."},
+  servo_tracking_error: {label:"Servos keeping up", weight: -0.2, plain:
+    "Marked down when a joint ends up far from where it was told to go. This is the item that decides " +
+    "whether any of this works on the real robot: only the range where the servo still obeys can be " +
+    "trusted."},
+  action_rate: {label:"Slow-changing corrections", weight: -0.05, plain:
+    "Marked down for changing its correction quickly. With the item below, this is what stops the " +
+    "servos buzzing and cooking themselves."},
+  soft_landing: {label:"Soft landings", weight: -0.02, plain:
+    "Marked down for slamming a foot into the ground. Far heavier than it was, where it was doing " +
+    "nothing at all: the printed resin parts are brittle and chip."},
+  action_acc: {label:"Steady corrections", weight: -0.005, plain:
+    "Marked down for changing its correction jerkily from one step to the next."},
+  preclip_action_magnitude: {label:"Corrections it can actually make", weight: -0.002, plain:
+    "Marked down for asking for a bigger correction than the 11 degrees it is allowed. Everything past " +
+    "the limit is thrown away, so asking for it is wasted output and nothing else pulls it back."},
+  joint_acc: {label:"Smooth joint motion", weight: -3e-7, plain:
+    "A very small mark-down for snatching a joint from one speed to another."}
 };
 
-/* Build the lookup the charts use: keyed by the tag suffix, never by prose. */
+/* Build the lookup the charts and the scoring table both use: keyed by the tag
+   suffix, never by prose.
+
+   The collector is read only for a term this page has never been taught, so that
+   something added to the trainer still gets a readable name here. For every term
+   the table above knows, the table wins outright - name, weight and prose - for
+   the reason given on it. */
 function rewardIndex(goal){
   const out = {};
-  Object.keys(REWARD_FALLBACK).forEach(k => {
-    out[k] = {pretty: REWARD_FALLBACK[k].label, plain: "", good: REWARD_FALLBACK[k].good,
-              weight: REWARD_FALLBACK[k].weight};
+  Object.keys(REWARD_ITEMS).forEach(k => {
+    const it = REWARD_ITEMS[k];
+    out[k] = {pretty: it.label, plain: it.plain, good: it.weight >= 0, weight: it.weight};
   });
   ((goal && goal.rewards) || []).forEach(r => {
-    if (!r) return;
-    const k = r.key || GUESS_KEY[r.name];
-    if (!k) return;
-    const fb = REWARD_FALLBACK[k] || {};
-    const weight = isNum(r.weight) ? r.weight : (isNum(fb.weight) ? fb.weight : null);
-    out[k] = {
-      pretty: r.name || fb.label || titleCase(k),
+    if (!r || !r.key || REWARD_ITEMS[r.key]) return;
+    const weight = isNum(r.weight) ? r.weight : null;
+    out[r.key] = {
+      pretty: r.name || titleCase(r.key),
       plain:  r.plain || "",
-      good:   (typeof r.good === "boolean") ? r.good
-              : (isNum(weight) ? weight >= 0 : (fb.good !== false)),
+      good:   isNum(weight) ? weight >= 0 : (r.good !== false),
       weight: weight
     };
   });
   return out;
 }
-/* Only used if an older collector sends no key field. */
-const GUESS_KEY = {
-  "Distance covered":"forward_progress", "Hits the asked-for speed":"track_linear_velocity",
-  "Does not turn":"track_angular_velocity", "Keeps the body level":"upright",
-  "Soft landings":"soft_landing", "Smooth joint motion":"joint_acc",
-  "Steady corrections":"action_acc", "Slow-changing corrections":"action_rate",
-  "Easy on the servos":"joint_torques", "Off the end stops":"dof_pos_limits"
-};
 
 function metaFor(tag, rewardPlain){
   if (tag.indexOf("Episode_Reward/") === 0){
     const key = tag.split("/").pop();
-    const r = rewardPlain[key] || REWARD_FALLBACK[key];
+    const r = rewardPlain[key];
     return {
       key: key,
-      label: r ? (r.pretty || r.label) : titleCase(key),
+      label: r ? r.pretty : titleCase(key),
       unit: "points per second",
       group: "reward",
       note: (r && r.plain) ? r.plain : "",
@@ -1429,22 +1479,100 @@ function bestsNote(rows){
          "; the newest attempt" + (at !== null ? ", round " + nf(at,0) + "," : "") + " beats it on " + nowWins + ".";
 }
 
+/* ---------- which run these numbers came from ---------- */
+/* Every measured figure on this page - the cards, the clips, every best-so-far -
+   belongs to ONE training run, and the page has to say which. It used to be
+   possible to read the previous run's scores underneath the current run's round
+   counter with no way of telling them apart. */
+function runHistory(d){
+  return Array.isArray(d.run_history) ? d.run_history.filter(r => r && r.name) : [];
+}
+function currentRunName(d){
+  const cur = runHistory(d).filter(r => r.is_current)[0];
+  if (cur) return cur.name;
+  /* Same string, and the answer while the history is still empty. */
+  return (d.training && d.training.run_name) || "";
+}
+/* A plain sentence from the collector saying the current run has nothing scored
+   yet. It is empty whenever there ARE scores, so its presence is the whole test:
+   when it is set, a wall of dashes would read as a robot that scored nothing
+   rather than one that has not been measured. */
+function scoringStatus(d){
+  return (d && typeof d.scoring_status === "string") ? d.scoring_status.trim() : "";
+}
+/* run_history carries a clip the way summary.csv stores it - repo-relative, with
+   forward slashes - while the walk rows arrive already turned into a URL by the
+   collector. Take either, so a clip is never lost over a leading slash. */
+function clipURL(p){
+  if (!p) return null;
+  const s = String(p).replace(/\\/g, "/");
+  if (/^https?:\/\//i.test(s) || s.charAt(0) === "/") return s;
+  return "/media/" + s.replace(/^\.\//, "").split("/").map(encodeURIComponent).join("/");
+}
+
+/* Four columns and no charts on purpose: this exists so any number on the page
+   can be traced back to the run that produced it, not to be a second dashboard. */
+function runsBlock(d){
+  const rows = runHistory(d);
+  if (!rows.length) return "";
+
+  const earlier = rows.filter(r => !r.is_current).length;
+  let h = '<h3 style="font-size:16px;margin:34px 0 8px">Previous runs</h3>';
+  h += '<p class="sec-ink" style="font-size:13px;margin-bottom:12px;max-width:82ch">' +
+       (earlier
+         ? 'Every run keeps its own scores, clips and policies. A new run starts an empty folder of its ' +
+           'own, so nothing here is ever overwritten by a later one.'
+         : 'Nothing earlier is on disk - this is the first run with a folder of its own.') + '</p>';
+  h += '<div class="scroll-x"><table><thead><tr><th>Run</th><th class="n">Checkpoints scored</th>' +
+       '<th class="n">Best distance (mm)</th><th class="n">From round</th></tr></thead><tbody>';
+  rows.forEach(r => {
+    const scored = numOrNull(r.checkpoints_scored);
+    const best = isNum(r.best_distance_mm) ? r.best_distance_mm : null;
+    const at = numOrNull(r.best_distance_iteration);
+    const clip = clipURL(r.video);
+    h += '<tr><td class="mono' + (r.is_current ? "" : " muted") + '">' + esc(r.name) +
+         (r.is_current ? ' <span class="vtag">current</span>' : "") +
+         (clip ? ' <a class="vtag" href="' + esc(clip) + '" target="_blank" rel="noopener">▶ clip</a>' : "") +
+         '</td>';
+    h += '<td class="n">' + esc(scored === null ? "—" : nf(scored, 0)) + '</td>';
+    /* No best distance means no scored checkpoint that stayed on its feet, so
+       saying "not scored" is the honest cell rather than a dash. */
+    h += (best === null)
+       ? '<td class="n muted">not scored</td><td class="n muted">—</td>'
+       : '<td class="n">' + esc(nf(best, 0)) + '</td>' +
+         '<td class="n">' + esc(at === null ? "—" : nf(at, 0)) + '</td>';
+    h += '</tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+
 function sectionGoals(d){
   const rows = scoreRows(d);
+  const status = scoringStatus(d);
+  const run = currentRunName(d);
   /* Say "the six goals" only while there really are six of them. */
   const WORD = ["no","one","two","three","four","five","six","seven","eight"];
   const title = "The " + (WORD[rows.length] || rows.length) + " goals";
+  /* Said once, and said first: which run every measured number below belongs to. */
+  const scope = run
+    ? "Every number here and in the clips below is from training run " + run + ". "
+    : "Every number here and in the clips below is from the newest training run. ";
 
   let h = '<section id="goals">';
   h += sechead(rows.length ? title : "The goals",
-        "The big number is the newest measured attempt. Best ever recorded is underneath it, "
+        scope + "The big number is the newest measured attempt. Best ever recorded is underneath it, "
         + "with the round it came from.");
+
+  if (status){
+    h += emptyCard("Not scored yet", esc(status));
+    return h + runsBlock(d) + '</section>';
+  }
 
   if (!rows.length){
     h += emptyCard("Nothing scored yet",
       "Each goal fills in once a saved attempt has been played back and measured. " +
       "Until then there is nothing to compare, so nothing is shown.");
-    return h + '</section>';
+    return h + runsBlock(d) + '</section>';
   }
 
   h += '<div class="goals">';
@@ -1480,6 +1608,7 @@ function sectionGoals(d){
   const note = bestsNote(rows);
   if (note) h += '<p class="note" style="margin-top:26px">' + esc(note) + '</p>';
 
+  h += runsBlock(d);
   h += '</section>';
   return h;
 }
@@ -1488,12 +1617,20 @@ function sectionGoals(d){
    7.  Watch it
    ============================================================ */
 function sectionVideos(d){
+  const status = scoringStatus(d);
   const walks = (Array.isArray(d.walks) ? d.walks : []).slice().sort((a,b) => (b.iteration||0)-(a.iteration||0));
   const bw = d.baseline_walk || null;
   const withVid = walks.filter(w => w.video);
 
   let h = '<section id="watch">';
   h += sechead("Watch it", "Each clip is one 12-second attempt. Your walk first, then the newest.");
+
+  /* Checked before the clips, not after: an unscored run must never borrow the
+     previous run's clips to fill this grid with. */
+  if (status){
+    h += emptyCard("Not scored yet", esc(status));
+    return h + '</section>';
+  }
 
   if (!withVid.length && !(bw && bw.video)){
     h += emptyCard("No clips yet",
@@ -1777,30 +1914,62 @@ function sectionNumbers(d){
 }
 
 /* ---------- panel: how it is scored ---------- */
+/* WHICH ITEMS EXIST IS READ OFF THE TRAINING LOG, not off any list on this page:
+   the trainer writes Episode_Reward/<key> only for a term it is really scoring.
+   So an item deleted from train/gray_env.py drops out of this table by itself,
+   and one added to it turns up here immediately - with a blank weight until
+   someone teaches REWARD_ITEMS what it is worth, which is the honest way round.
+   Before the first round is logged there is nothing to read, and the table falls
+   back to listing everything the page knows. */
 function panelScoring(d){
-  const rewards = (d.goal && Array.isArray(d.goal.rewards)) ? d.goal.rewards : [];
+  const idx = rewardIndex(d.goal);
+  const series = (d.training && d.training.series) || {};
+  const known = Object.keys(REWARD_ITEMS);
+
+  let keys = Object.keys(series)
+    .filter(k => k.indexOf("Episode_Reward/") === 0)
+    .map(k => k.split("/").pop());
+  if (!keys.length) keys = known.slice();
+  /* Earners first, then the charges, biggest first - which is the order
+     REWARD_ITEMS is written in. Anything the page does not know goes last. */
+  keys.sort((a, b) => {
+    const ia = known.indexOf(a), ib = known.indexOf(b);
+    return (ia < 0 ? 1e6 : ia) - (ib < 0 ? 1e6 : ib) || a.localeCompare(b);
+  });
+
+  const rows = keys.map(k => {
+    const it = idx[k] || {};
+    const w = isNum(it.weight) ? it.weight : null;
+    return {
+      key: k,
+      label: it.pretty || titleCase(k),
+      weight: w,
+      plain: it.plain || "",
+      /* The sign of the weight is what actually decides whether an item pays or
+         costs, whatever it happens to be called. */
+      good: (w !== null) ? (w >= 0) : (it.good !== false)
+    };
+  });
+  const pays = rows.filter(r => r.good).length;
+  /* Only said when such a weight is actually in the table below it. */
+  const huge = rows.some(r => r.weight !== null && Math.abs(r.weight) >= 100);
+
   let h = '<details class="more" data-k="scoring"><summary>How it is scored</summary><div class="inner">';
-  if (!rewards.length){
-    h += '<p class="lead">The list of scoring items comes from the training configuration. ' +
-         'It will appear here once the server can read it.</p></div></details>';
-    return h;
-  }
-  h += '<p class="lead">Points are added for the things we want and taken away for the things we don’t. ' +
-       'The weight is how much an item counts against the others; for an item that adds points it is also the ' +
-       'most it can earn in a second, because the thing being measured tops out at 1.</p>';
+  h += '<p class="lead">' + esc(rows.length) + ' items: ' + esc(pays) + ' add points for the things we want, ' +
+       esc(rows.length - pays) + ' take them away for the things we don’t. The weight is how much an item ' +
+       'counts against the others; for an item that adds points it is also the most it can earn in a second, ' +
+       'because the thing being measured tops out at 1.' +
+       (huge ? ' A weight in the hundreds or thousands is not a bigger version of the others - it is measured ' +
+               'in different units, and those items score zero unless something has gone wrong.' : "") + '</p>';
   h += '<div class="scroll-x"><table><thead><tr>' +
        '<th>Item</th><th class="n">Weight</th><th>Adds or subtracts</th><th>In plain terms</th>' +
        '</tr></thead><tbody>';
-  rewards.forEach(r => {
-    /* "good" follows the sign of the weight — that is what actually decides
-       whether an item pays or costs, whatever it happens to be called. */
-    const w = isNum(r.weight) ? r.weight : null;
-    const good = isNum(w) ? (w >= 0) : (r.good !== false);
-    h += '<tr><td style="white-space:normal">' + esc(r.name || "") +
-         (r.key ? ' <span class="mono muted" style="font-size:12px">' + esc(r.key) + '</span>' : "") + '</td>' +
+  rows.forEach(r => {
+    h += '<tr><td style="white-space:normal">' + esc(r.label) +
+         ' <span class="mono muted" style="font-size:12px">' + esc(r.key) + '</span></td>' +
          '<td class="n">' + esc(nfSmart(r.weight)) + '</td>' +
-         '<td>' + (good ? '<span class="tag-good">adds</span>' : '<span class="tag-cost">subtracts</span>') + '</td>' +
-         '<td style="white-space:normal;min-width:280px">' + esc(r.plain || "") + '</td></tr>';
+         '<td>' + (r.good ? '<span class="tag-good">adds</span>' : '<span class="tag-cost">subtracts</span>') + '</td>' +
+         '<td style="white-space:normal;min-width:280px">' + esc(r.plain) + '</td></tr>';
   });
   h += '</tbody></table></div></div></details>';
   return h;
@@ -1811,9 +1980,9 @@ function panelAllCharts(d, series, latest, walks, bw, bspeed, rewardPlain){
   /* Episode_Reward/* are NOT episode totals. The trainer divides each item's
      running total by the full 12-second episode length before logging it — even
      for attempts that ended early — so every one of these is a rate: points per
-     second. That is also why the ten of them add to roughly a thirteenth of the
-     total score. Because the quantity behind each item tops out at 1, the item's
-     weight is also the most it can earn in a second, which makes a ceiling. */
+     second. That is also why they add to roughly a thirteenth of the total score.
+     Because the quantity behind each earner tops out at 1, its weight is also the
+     most it can earn in a second, which makes a ceiling. */
   const rewardTags = Object.keys(series).filter(k => k.indexOf("Episode_Reward/") === 0)
     .sort((a,b) => {
       const ma = metaFor(a, rewardPlain), mb = metaFor(b, rewardPlain);
@@ -1922,7 +2091,7 @@ function panelAllCharts(d, series, latest, walks, bw, bspeed, rewardPlain){
       '<span class="item"><span class="swatch" style="background:var(--s2)"></span>tipped over</span></div>');
   }
 
-  /* the ten scoring items */
+  /* the scoring items */
   h += '<h3 style="font-size:16px;margin:26px 0 6px">The score, item by item</h3>';
   h += '<p class="sec-ink" style="font-size:13.5px;margin-bottom:10px;max-width:84ch">' +
        '<strong>These are points per second, not totals for an attempt.</strong> ' +

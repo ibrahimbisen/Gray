@@ -36,6 +36,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+# For BASELINE_JSON only. The baseline is NOT per-run - it is the same hand-written
+# gait every time, and the thing every run is measured against - so it stays at the
+# top level while summary.csv, videos and policies moved under progress/runs/.
+import progress_store  # noqa: E402
 from train.evaluate import (  # noqa: E402
     FULL_COMMANDS,
     FULL_SEEDS,
@@ -79,8 +83,8 @@ def main() -> None:
     ap.add_argument("--sweep", action="store_true",
                     help="also print the per-command breakdown")
     ap.add_argument("--measure-baseline", action="store_true",
-                    help="re-measure the Phase 2 gait over 30 seeds and write "
-                         "progress/baseline.json")
+                    help=f"re-measure the Phase 2 gait over 30 seeds and write "
+                         f"{progress_store.BASELINE_JSON}")
     ap.add_argument("--baseline-seeds", type=int, default=30)
     ap.add_argument("--video", metavar="MP4",
                     help="render one deterministic clip (seed 0, nominal robot)")
@@ -203,7 +207,7 @@ def print_baseline(blob: dict) -> None:
     print(f"  it sits {abs(blob['superseded']['distance_mm'] - blob['distance_mm']) / max(blob['distance_mm_sd'], 1e-9):.2f} "
           f"standard deviations from the mean - one draw, not a benchmark.")
     print()
-    print(f"  written to progress/baseline.json")
+    print(f"  written to {progress_store.BASELINE_JSON}")
     print("=" * 78)
 
 

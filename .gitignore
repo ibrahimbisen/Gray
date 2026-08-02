@@ -18,6 +18,12 @@ wandb/
 MUJOCO_LOG.TXT
 
 # Progress clips are derived artefacts: the rollout is deterministic, so any of them
-# can be regenerated exactly from the committed policy in progress/policies/.
+# can be regenerated exactly from the committed policy alongside them.
 # Committing ~90 MB of video to reproduce something already reproducible is waste.
+#
+# Both spellings on purpose. Results moved from one shared progress/videos/ to a
+# per-run progress/runs/<run>/videos/ so that a new training run starts with an empty
+# dashboard instead of the previous run's scores; the old path is kept so a checkout
+# predating that move still ignores its clips rather than offering 180 MB for commit.
 progress/videos/
+progress/runs/*/videos/

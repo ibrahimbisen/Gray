@@ -127,12 +127,51 @@ TRACK_TAU_S = 0.6
 # integral of velocity, and a zero-mean ripple integrates away to nothing. No filter,
 # no tau, nothing to check against the ripple.
 #
-# 0.03 m is sized off the classical baseline. Over 6 seeds the crawl drifts a mean of
-# 52.6 mm (sd 162.1, range +33.8 to -358.7 - the single "33.8 mm" figure quoted
-# elsewhere is ONE LUCKY DRAW and is not the benchmark). At std 0.03 a typical
-# classical run scores exp(-3.1) = 0.05 and a 15 mm run scores 0.78, so the whole
-# range worth improving sits on the slope.
-CROSS_TRACK_STD = 0.03
+# WAS 0.03, AND THAT WAS THE TOO-TIGHT-STD FAILURE FOR THE THIRD TIME. First it was
+# TRACK_LIN_STD at 0.035, then TRACK_ANG_STD at 0.050; here it was 0.03 m, and a
+# walking policy scored +0.035 out of a possible +0.50 - seven percent of the term's
+# ceiling, with no slope anywhere the robot can actually be.
+#
+# THE DERIVATION, and it is a derivation rather than a preference.
+#
+# What this term samples is not the drift at the END of a run - it is evaluated every
+# step, on a cross-track distance that starts at zero and grows. So the quantity that
+# has to sit on the slope is the PER-STEP MEAN |cross-track| over an episode, and
+# that is now measured directly rather than inferred from an end-of-run figure:
+#
+#     classical crawl, per-step mean |cross-track| over 10 s, 1024 robots
+#       nominal robot (s = 0)              37.4 mm
+#       start-of-training fleet (s = 0.3)  68.9 mm
+#       full envelope (s = 1.0)           118.6 mm
+#
+# (For reference, the end-of-run drift these replace: -52.6 mm mean, sd 162.1 over
+# 6 seeds. The reason that number produced a bad std is that it is roughly twice the
+# per-step figure - drift accumulates over the episode - and the term is charged on
+# the per-step one.)
+#
+# exp(-d^2/std^2) has its steepest slope at d = std/sqrt(2). Putting that point on the
+# envelope training actually STARTS at, 68.9 mm, gives std = sqrt(2) x 0.0689 =
+# 0.097 m. Rounded to 0.10.
+#
+# THE CHECK THE OTHER TWO NEVER GOT - what the term is worth across the range the
+# policy occupies, at std = 0.10:
+#
+#      0 mm  1.00      the target
+#     37 mm  0.87      classical gait on a nominal robot
+#     69 mm  0.62      classical gait at the start of the ramp   <- max slope
+#    100 mm  0.37
+#    119 mm  0.24      classical gait under the full envelope
+#    200 mm  0.02      a robot that has wandered off
+#
+# Nearly the whole 0-1 range is in use and the derivative is largest exactly where the
+# untrained policy sits. Compare std = 0.03, where the same six rows read 1.00 / 0.22 /
+# 0.005 / 1e-5 / 1e-7 / 0: everything past 40 mm was indistinguishable from everything
+# else, which is a flat exponential, which has no gradient.
+#
+# MEASURED WALKING vs FROZEN at the start of training is in THE FREEZE ARITHMETIC in
+# train/rewards.py - this term is the one that fails the freeze test on its own and is
+# capped by achieved progress to contain it.
+CROSS_TRACK_STD = 0.10
 
 # Load threshold, in newtons, for calling a foot "in stance".
 #
@@ -189,24 +228,38 @@ FOOT_CONTACT_SENSOR = "feet_ground_contact"
 # THE RANDOMISATION ENVELOPE, AND THE RAMP THAT LETS THE GAIT SURVIVE IT.
 #
 # =================================================================================
-# THE MEASUREMENT THAT FORCED THIS. Classical crawl, no policy, 10 s, 256 robots per
-# point, commanded 52.9 mm/s, mean along-track distance. The envelope below scaled by
-# a single factor s, every range interpolated from its nominal value toward its full
-# width:
+# THE MEASUREMENT THAT FORCED THIS, AND IT WAS MEASURED, NOT GUESSED. Classical
+# crawl, zero residual, 1 s settle + 10 s measured, 1024 robots per point, commanded
+# 52.9 mm/s, everything else exactly as training runs it (pushes on). The envelope
+# below scaled by a single factor s:
 #
-#     s = 0.00      703 mm     the Phase 2 gait, intact
-#     s = 0.25      613 mm     -13%
-#     s = 0.50      451 mm     -36%
-#     s = 0.75      269 mm     -62%
-#     s = 1.00      131 mm     -81%
+#      s     mean mm    median mm    % of s=0    tipped in first 1 s
+#     0.00     425.6      436.3        100%          3.5%
+#     0.10     429.3      437.8        101%          4.1%
+#     0.20     355.2      353.4         84%          5.7%
+#     0.25     316.4      304.8         74%          6.4%
+#     0.30     286.2      270.6         67%          7.4%
+#     0.40     227.1      180.3         53%          8.5%
+#     0.50     180.5      125.1         42%          8.3%
+#     0.75      96.1        2.9         23%         11.4%
+#     1.00      47.3       -0.2         11%         13.0%
 #
-# There is no cliff. The gait degrades smoothly and is already half destroyed by
-# s = 0.5, which is why no single event looked guilty when they were tested one at a
-# time and why the full envelope annihilated the gait: the losses compound.
+# THERE IS NO CLIFF, which is exactly why testing the events one at a time found no
+# culprit: the losses compound. The envelope is flat to s = 0.1 and then costs about
+# 1.4% of the gait's distance per 0.01 of s, all the way down.
 #
-# s = 0.3 is the starting point. It holds 84% of the nominal distance (590 mm),
-# which leaves a gait that unambiguously walks for the policy to improve on, while
-# still being a genuinely varied fleet of robots rather than one nominal one.
+# WATCH THE MEDIAN, NOT THE MEAN. Up to s = 0.3 the two track each other, so the
+# TYPICAL robot walks. From s = 0.4 the median falls away from the mean (180 vs 227,
+# then 125 vs 181, then 3 vs 96), which is the fleet splitting into robots that still
+# walk and robots that have stopped - and the mean is then reporting a population that
+# no longer exists. Under the full envelope the median robot travels -0.2 mm: it does
+# not walk at all.
+#
+# s = 0.3 IS THE STARTING POINT. It keeps 67% of the gait's distance and a median
+# robot moving at 27 mm/s, it is the last scale at which the fleet is still unimodal,
+# and it matches the "~0.3x" the research specified. Anything past 0.4 hands the
+# policy a starting point that does not walk, which is the entire failure this ramp
+# exists to prevent.
 # =================================================================================
 #
 # Each entry is (VALUE WITH NO RANDOMISATION, FULL RANGE). At scale s each bound is
@@ -238,12 +291,12 @@ DR_ENVELOPE: dict[str, dict[str, tuple[float, tuple[float, float]]]] = {
 
 # Where the ramp starts, and when it reaches full width.
 #
-# START comes from the table above: 0.3 is the largest scale at which the classical
-# gait still covers most of its nominal distance, i.e. the largest envelope that still
-# leaves something that walks for the residual to be a residual OF. It is not a taste
-# judgement and it should be re-derived, not nudged, if the gait or the servo model
-# changes - the throwaway that produced the table is a twenty-line loop over
-# `scaled_dr_params`.
+# START comes from the table above: 0.3 is the largest scale at which the fleet is
+# still unimodal - where the MEDIAN robot walks, not just the mean - i.e. the largest
+# envelope that still leaves something for the residual to be a residual OF. It is not
+# a taste judgement and it should be re-derived, not nudged, if the gait or the servo
+# model changes; the throwaway that produced the table is a loop over
+# `scaled_dr_params` and a distance measurement.
 #
 # RAMP_END_STEPS is one third of training. train/tasks.py runs max_iterations 3000 x
 # num_steps_per_env 24 = 72000 environment steps, and `env.common_step_counter` counts
@@ -792,6 +845,36 @@ def gray_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # settles it is 262 footfalls against the 80 the gait commands - the robot is
     # landing three times more often than it means to, and every unplanned landing is
     # an impact on a brittle part. Still the first knob to back off if it tiptoes.
+    #
+    # THIS IS THE SURVIVOR OF THE excess_touchdowns / soft_landing PAIR. Both priced the
+    # same physical event and the two together measured -0.56 of a -1.05 budget. The
+    # argument is not close once you look at what each one computes:
+    #
+    #   soft_landing        = sum over feet of (contact force x first_contact)
+    #   excess_touchdowns   = count of first_contacts past one per commanded gait cycle
+    #
+    # soft_landing ALREADY CONTAINS THE COUNT. It fires on exactly the same event and
+    # sums over every one of them, so a robot landing 262 times instead of 80 pays it
+    # 3.3x over. What it adds is the severity of each event, which excess_touchdowns
+    # cannot see at all: a 0.5 N re-graze and a 40 N stomp both cost it exactly 0.5.
+    # The reverse containment does not exist.
+    #
+    # And severity is what actually breaks the parts. Fatigue life of a brittle
+    # thermoset goes as roughly S^-m with m of order 10, so halving the landing force
+    # buys three orders of magnitude of life while halving the number of landings buys
+    # a factor of two. "Fails on repeated impact" is true, but the repetition only
+    # matters at a given stress amplitude, and amplitude is the term that dominates.
+    # Pricing by force is pricing the physics; pricing by count is pricing a proxy that
+    # is blind to the variable the S-N curve is steep in.
+    #
+    # WHAT IS GIVEN UP, stated rather than hidden: excess_touchdowns PASSED the freeze
+    # test (-0.3506 walking against -0.3757 frozen) and soft_landing FAILS it weakly
+    # (-0.2095 against -0.1784). Dropping the anti-freeze term of the pair and keeping
+    # the freeze-shaped one costs 0.025 of walking-vs-frozen margin, which is 1% of the
+    # measured gap. That is the price of pricing the right quantity, and it is cheap.
+    # The count is not lost, only unpriced - `excess_touchdowns` is still computed and
+    # logged as Episode_Metrics/excess_touchdowns below, so a policy that starts
+    # bouncing is still visible, it just is not charged for the same event twice.
     "soft_landing": RewardTermCfg(
       func=mdp.soft_landing,
       weight=-0.02,
@@ -801,11 +884,14 @@ def gray_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         "command_threshold": 0.005,
       },
     ),
-    # Each unplanned touchdown is an impact the gait never asked for: 262 in 12 s
-    # against 80 commanded. soft_landing charges for how HARD a landing is; this
-    # charges for landings that should not have happened at all. Gated on measured
-    # force rather than the contact boolean, because the boolean is the thing that is
-    # chattering.
+    # KEPT AS A PRICED TERM, against a proposal to demote it to a metric on the
+    # grounds that it double-charges soft_landing. It is not dead - it logged -0.2225
+    # in the run this decision was taken from - and the two terms charge different
+    # things: soft_landing prices how HARD a foot lands, this prices how OFTEN one
+    # lands that should not have. A policy can pass the first by touching down gently
+    # 262 times in 12 s where the gait commands 80, and only this term notices.
+    # Dropping a penalty that protects brittle SLA parts is a design change, not a bug
+    # fix, and it is not being made in the same breath as a measured std correction.
     "excess_touchdowns": RewardTermCfg(
       func=ExcessTouchdowns,
       weight=-0.5,
