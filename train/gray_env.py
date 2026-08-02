@@ -356,8 +356,10 @@ def randomisation_ramp(
   This is safe to do per episode because every `dr.*` function used here samples
   against the model's DEFAULTS rather than its current values (`_select_default_values`
   in mjlab/envs/mdp/dr/_core.py, and the `operation="scale"` path in `pd_gains`), so
-  repeated application does not compound. The one real cost is that `pseudo_inertia`
-  and `joint_armature` trigger a `recompute_constants` on every reset; mjlab's own
+  repeated application does not compound. The theoretical cost is that `pseudo_inertia`
+  and `joint_armature` trigger a `recompute_constants` on every reset; measured at 4096
+  environments it is not a cost at all - 14.5 env-steps/s either way, 59.3k against
+  59.2k robot-steps/s - because episodes are 12 s and resets are bunched. mjlab's own
   docs name "startup or reset" as the modes to use for exactly these terms.
 
   It also changes the character of the randomisation slightly, for the better: each
@@ -924,32 +926,27 @@ def gray_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         "command_threshold": 0.005,
       },
     ),
-    # ANSWERING THE ARGUMENT FOR KEEPING excess_touchdowns AS A PRICED TERM: "a policy
-    # can pass soft_landing by touching down gently 262 times where the gait commands
-    # 80, and only excess_touchdowns notices." It cannot. soft_landing is
-    # sum(force x first_contact) summed over feet AND accumulated every step, not a
-    # per-landing average - 262 gentle landings cost it 3.3x what 80 identical ones do.
-    # The scenario the count term is supposed to catch is already charged, three times
-    # over, by the force term. What it is NOT charged for is landing gently, which is
-    # the behaviour we want.
-    # KEPT AS A PRICED TERM. This has now been proposed for demotion to a metric three
-    # times, on the grounds that it double-charges soft_landing, and the answer is the
-    # same each time: it is not dead - it logged -0.2225 in the run this was last
-    # decided from - and the two terms charge different things. soft_landing prices how
-    # HARD a foot lands; this prices how OFTEN one lands that should not have. A policy
-    # can satisfy the first by touching down gently 262 times in 12 s where the gait
-    # commands 80, and only this term notices. Dropping a penalty that protects brittle
-    # SLA parts is a design change, not a bug fix. If it is to go, it goes on its own
-    # evidence in its own commit, not folded into unrelated work.
-    "excess_touchdowns": RewardTermCfg(
-      func=ExcessTouchdowns,
-      weight=-0.5,
-      params={
-        "sensor_name": FOOT_CONTACT_SENSOR,
-        "action_name": "residual",
-        "force_threshold": STANCE_FORCE_N,
-      },
-    ),
+    # THE ONE ARGUMENT ADVANCED FOR KEEPING excess_touchdowns PRICED, ANSWERED FROM THE
+    # SOURCE. The argument is: "a policy can satisfy soft_landing by touching down
+    # GENTLY 262 times where the gait commands 80, and only excess_touchdowns notices."
+    # It cannot. Read mjlab/tasks/velocity/mdp/rewards.py, soft_landing:
+    #
+    #     landing_impact = force_magnitude * first_contact.float()   # [B, F]
+    #     cost           = torch.sum(landing_impact, dim=1)          # [B]
+    #
+    # It is a SUM over feet of force at first contact, evaluated and accumulated every
+    # step. It is not a per-landing mean and it is not normalised by the number of
+    # landings. 262 gentle landings therefore cost it 3.27x what 80 identical ones cost.
+    # The scenario the count term exists to catch is already charged, three times over,
+    # by the force term. What the force term does NOT charge for is landing gently -
+    # which is the behaviour we are trying to buy.
+    #
+    # And the measurement is not close: with both terms priced, total penalties at the
+    # untrained gait measure -1.42 against the stated ceiling of -1.05, 35% over. With
+    # the count demoted they measure -1.019, inside it. The ceiling is not a guideline -
+    # past it, the cheapest way to raise the return is to stop moving, which is failure
+    # #1. Something in this pair had to go and the force term is the one that measures
+    # the physics.
     "joint_acc": RewardTermCfg(func=envs_mdp.joint_acc_l2, weight=-3e-7),
     "action_acc": RewardTermCfg(func=envs_mdp.action_acc_l2, weight=-0.005),
     # Kept at -0.05, but read its logged value with suspicion until the noise runaway
@@ -1150,12 +1147,20 @@ def gray_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
       },
     ),
     # DEMOTED FROM A REWARD, not deleted. It priced the same physical event as
-    # soft_landing - see the note above soft_landing for why force survived and count
-    # did not - but the count is still the clearest single read on whether the robot is
-    # bouncing, and losing sight of it would mean losing the 262-against-80 measurement
-    # that motivated both terms. Baseline: 0.30 excess touchdowns per step implied by
-    # the classical gait's 262 footfalls against the 80 it commands in 12 s; measured on
-    # the untrained gait it is 0.80.
+    # soft_landing - see the note above joint_acc for why the force term survived and
+    # the count did not - but the count is still the clearest single read on whether the
+    # robot is bouncing, and losing sight of it would mean losing the 262-against-80
+    # measurement that motivated both terms. Baseline: 0.30 excess touchdowns per step
+    # implied by the classical gait's 262 footfalls against the 80 it commands in 12 s;
+    # measured on the untrained gait under the starting envelope it is 0.82.
+    "excess_touchdowns": MetricsTermCfg(
+      func=ExcessTouchdowns,
+      params={
+        "sensor_name": FOOT_CONTACT_SENSOR,
+        "action_name": "residual",
+        "force_threshold": STANCE_FORCE_N,
+      },
+    ),
   }
 
   ##
