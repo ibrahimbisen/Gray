@@ -70,6 +70,81 @@ SPAWN_HEIGHT_M = 0.25
 # obscuring the visual meshes. Purely cosmetic - the solver ignores geom groups.
 COLLISION_GEOM_GROUP = 3
 
+# THE SHIN HAD NO COLLISION BODY AT ALL. The URDF gives each shank exactly one
+# collision shape, `<leg>_bottom_collision`, a 12 mm sphere sitting at the foot. That
+# is the right shape for a foot and the wrong amount of shape for a shank: measured
+# against the CAD mesh it covers 3% of the part, so the 170 mm shin between knee and
+# foot is invisible to the solver and passes straight through the trunk, the thighs
+# and the other legs.
+#
+# It never showed up standing or walking, because a shin rarely touches anything. It
+# becomes constant the moment the robot is folded belly-down, which is where the legs
+# tuck directly under the trunk - and belly-down is now the start pose for every
+# training episode.
+#
+# For reference, the other three parts do not need this: the same measurement puts
+# base_link at 100% of its mesh and the hip at 99%. Only the shank was missing.
+#
+# A SEPARATE GEOM, NOT A REPLACEMENT for the foot sphere. The foot's name is matched
+# by FOOT_GEOM_REGEX "^(fl|fr|br|bl)_bottom_collision$" in train/gray_robot.py, which
+# is what drives the contact sensor, condim=3 and the friction randomisation. Growing
+# that geom into the whole shin would fire every foot-contact reward whenever a shin
+# brushed anything. The new geom is named `<leg>_shank_collision` so it matches
+# ".*_collision" (condim 1, plain contact) and NOT the foot regex.
+SHANK_GEOM_SUFFIX = "_shank_collision"
+
+# Radius matches the foot sphere so the capsule and the foot form one smooth leg with
+# no step in the profile where they meet.
+SHANK_RADIUS_M = 0.012
+
+
+def add_shank_capsules(root: ET.Element) -> int:
+    """Give each shank a collision body running knee to foot. Returns how many.
+
+    The capsule is derived from the model rather than typed in: its far end is read
+    off the foot geom's own `pos`, and its near end is the shank body's origin, which
+    is where the knee joint sits (every `<leg>_bottom` joint declares pos="0 0 0").
+    Measured that way the four shins come out 169.9-170.3 mm, agreeing with the
+    thigh+shank reach in gray/config/robot.yaml. Hardcoding four coordinate triples
+    would silently go stale the first time the CAD is re-exported.
+    """
+    added = 0
+    for body in root.iter("body"):
+        name = body.get("name") or ""
+        if not name.endswith("_bottom"):
+            continue
+        leg = name[: -len("_bottom")]
+        foot = next(
+            (g for g in body.findall("geom")
+             if g.get("name") == f"{leg}_bottom_collision"), None
+        )
+        if foot is None:
+            # Refuse rather than emit a leg that is quietly still hollow.
+            raise SystemExit(
+                f"{name} has no '{leg}_bottom_collision' geom to take the shin's "
+                f"far end from, so the shank capsule cannot be placed."
+            )
+        tip = foot.get("pos")
+        if not tip:
+            raise SystemExit(f"{leg}_bottom_collision has no pos to measure from.")
+
+        shin = ET.Element("geom")
+        shin.attrib.update({
+            "name": f"{leg}{SHANK_GEOM_SUFFIX}",
+            "type": "capsule",
+            # Knee anchor to foot centre. The foot sphere stays where it is and the
+            # capsule ends inside it, so the leg has no step in its profile.
+            "fromto": f"0 0 0 {tip}",
+            "size": str(SHANK_RADIUS_M),
+            "group": str(COLLISION_GEOM_GROUP),
+            "rgba": "1 1 1 1",
+        })
+        # Before the foot geom, so the foot is still the last word on the contact
+        # that matters; ordering is cosmetic to the solver but keeps the XML readable.
+        body.insert(list(body).index(foot), shin)
+        added += 1
+    return added
+
 
 def rebuild_trunk(worldbody: ET.Element, cfg: dict) -> ET.Element:
     """Re-create base_link as a real floating body.
@@ -193,6 +268,8 @@ def main() -> None:
             g.set("group", str(COLLISION_GEOM_GROUP))
             hidden += 1
 
+    shins = add_shank_capsules(root)
+
     # --- joint dynamics --------------------------------------------------------------
     joints = [j for j in root.iter("joint") if j.get("name")]
     for j in joints:
@@ -236,8 +313,9 @@ def main() -> None:
     m = mujoco.MjModel.from_xml_path(args.out)
     print(f"wrote {args.out}")
     print(f"  bodies {m.nbody}  joints {m.njnt}  dofs {m.nv}  actuators {m.nu}  "
-          f"geoms {m.ngeom}  ({hidden} collision geoms in group "
-          f"{COLLISION_GEOM_GROUP}, hidden by default)")
+          f"geoms {m.ngeom}  ({hidden + shins} collision geoms in group "
+          f"{COLLISION_GEOM_GROUP}, hidden by default, "
+          f"{shins} of them shank capsules added here)")
     print(f"  total mass {m.body_mass.sum()*1000:.1f} g   "
           f"(robot.yaml says {cfg['total_mass_kg']*1000:.1f} g)")
     print(f"  control {CONTROL_HZ} Hz over {TIMESTEP*1000:.0f} ms physics "

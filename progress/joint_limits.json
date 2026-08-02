@@ -1,0 +1,17 @@
+{
+  "segments": {
+    "hip": {
+      "blocked_at_zero": true
+    },
+    "top": {
+      "blocked_at_zero": true
+    },
+    "bottom": {
+      "blocked_at_zero": true
+    }
+  },
+  "step_deg": 3.0,
+  "parked_grid": 3,
+  "safety_margin_deg": 3.0,
+  "method": "triangle-level trimesh/FCL on the compiled MuJoCo meshes; MuJoCo used for kinematics only. Convex hulls and MuJoCo's own contact filtering both give wrong answers here - see tools/measure_joint_limits.py."
+}

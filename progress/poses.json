@@ -1,0 +1,111 @@
+{
+  "belly": {
+    "angles_rad": {
+      "fl_hip": 1.467821900927231,
+      "fl_top": -0.0,
+      "fl_bottom": 0.0,
+      "fr_hip": -1.467821900927231,
+      "fr_top": 0.0,
+      "fr_bottom": 0.0,
+      "br_hip": 1.467821900927231,
+      "br_top": 0.0,
+      "br_bottom": 0.0,
+      "bl_hip": -1.467821900927231,
+      "bl_top": 0.0,
+      "bl_bottom": 0.0
+    },
+    "trunk_height_mm": 42.73907662732205,
+    "self_collision_free": true,
+    "checked_under_physics": false
+  },
+  "resting_limp": {
+    "angles_rad": {
+      "fl_hip": 0.9599310885968813,
+      "fl_top": 0.3665191429188092,
+      "fl_bottom": -0.6806784082777885,
+      "fr_hip": -0.9599310885968813,
+      "fr_top": -0.3665191429188092,
+      "fr_bottom": 0.6806784082777885,
+      "br_hip": 0.9599310885968813,
+      "br_top": -0.3665191429188092,
+      "br_bottom": 0.6806784082777885,
+      "bl_hip": -0.9599310885968813,
+      "bl_top": 0.3665191429188092,
+      "bl_bottom": -0.6806784082777885
+    },
+    "physical_deg": {
+      "hip": 55.0,
+      "top": -21.0,
+      "bottom": 39.0
+    },
+    "trunk_height_mm": 42.539120737936116,
+    "self_collision_free": true,
+    "touching_floor": [
+      "fl_hip",
+      "fl_top",
+      "fr_hip",
+      "fr_top"
+    ],
+    "note": "powered off and limp: legs pulled in, hips and toes on the floor"
+  },
+  "sitting_ready": {
+    "angles_rad": {
+      "fl_hip": 0.0,
+      "fl_top": 0.3839724354387525,
+      "fl_bottom": -0.6806784082777885,
+      "fr_hip": -0.0,
+      "fr_top": -0.3839724354387525,
+      "fr_bottom": 0.6806784082777885,
+      "br_hip": 0.0,
+      "br_top": -0.3839724354387525,
+      "br_bottom": 0.6806784082777885,
+      "bl_hip": -0.0,
+      "bl_top": 0.3839724354387525,
+      "bl_bottom": -0.6806784082777885
+    },
+    "physical_deg": {
+      "hip": 0.0,
+      "top": -22.0,
+      "bottom": 39.0
+    },
+    "trunk_height_mm": 103.6789381924667,
+    "self_collision_free": true,
+    "touching_floor": [
+      "fl_bottom",
+      "fl_shank",
+      "fr_bottom",
+      "fr_shank"
+    ],
+    "note": "powered on, sitting, all limbs active and ready to stand"
+  },
+  "standing_max": {
+    "angles_rad": {
+      "fl_hip": 0.0,
+      "fl_top": -0.4188790204786391,
+      "fl_bottom": 0.7504915783575618,
+      "fr_hip": -0.0,
+      "fr_top": 0.4188790204786391,
+      "fr_bottom": -0.7504915783575618,
+      "br_hip": 0.0,
+      "br_top": 0.4188790204786391,
+      "br_bottom": -0.7504915783575618,
+      "bl_hip": -0.0,
+      "bl_top": -0.4188790204786391,
+      "bl_bottom": 0.7504915783575618
+    },
+    "physical_deg": {
+      "hip": 0.0,
+      "top": 24.0,
+      "bottom": -43.0
+    },
+    "trunk_height_mm": 281.4766998359083,
+    "self_collision_free": true,
+    "touching_floor": [
+      "fl_bottom",
+      "fl_shank",
+      "fr_bottom",
+      "fr_shank"
+    ],
+    "note": "fully extended, maximum height"
+  }
+}

@@ -34,7 +34,7 @@
           <inertial pos="0.0784822 -0.0448672 0.00348749" quat="0.200781 0.678002 -0.190626 0.680927" mass="0.029326" diaginertia="5.22905e-05 5.16336e-05 2.17725e-06" />
           <joint name="fl_bottom" pos="0 0 0" axis="0 0 -1" range="-2.356200 2.356200" actuatorfrcrange="-1.96 1.96" damping="0.05" frictionloss="0.01" armature="0.003" />
           <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="fl_bottom" />
-          <geom name="fl_bottom_collision" size="0.012" pos="0.137671 -0.100124 0.004461" rgba="1 1 1 1" group="3" />
+          <geom name="fl_shank_collision" type="capsule" fromto="0 0 0 0.137671 -0.100124 0.004461" size="0.012" group="3" rgba="1 1 1 1" /><geom name="fl_bottom_collision" size="0.012" pos="0.137671 -0.100124 0.004461" rgba="1 1 1 1" group="3" />
         </body>
       </body>
     </body>
@@ -52,7 +52,7 @@
           <inertial pos="0.079147 -0.043374 -0.00421337" quat="0.178591 0.684182 -0.200508 0.678083" mass="0.029326" diaginertia="5.22904e-05 5.16335e-05 2.17725e-06" />
           <joint name="fr_bottom" pos="0 0 0" axis="0 0 1" range="-2.356200 2.356200" actuatorfrcrange="-1.96 1.96" damping="0.05" frictionloss="0.01" armature="0.003" />
           <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="fr_bottom" />
-          <geom name="fr_bottom_collision" size="0.012" pos="0.138941 -0.097521 -0.006355" rgba="1 1 1 1" group="3" />
+          <geom name="fr_shank_collision" type="capsule" fromto="0 0 0 0.138941 -0.097521 -0.006355" size="0.012" group="3" rgba="1 1 1 1" /><geom name="fr_bottom_collision" size="0.012" pos="0.138941 -0.097521 -0.006355" rgba="1 1 1 1" group="3" />
         </body>
       </body>
     </body>
@@ -70,7 +70,7 @@
           <inertial pos="0.079172 -0.0434855 -0.002027" quat="0.195553 0.679529 -0.183188 0.682966" mass="0.029326" diaginertia="5.22905e-05 5.16336e-05 2.17725e-06" />
           <joint name="br_bottom" pos="0 0 0" axis="0 0 1" range="-2.356200 2.356200" actuatorfrcrange="-1.96 1.96" damping="0.05" frictionloss="0.01" armature="0.003" />
           <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="br_bottom" />
-          <geom name="br_bottom_collision" size="0.012" pos="0.138997 -0.097637 -0.001443" rgba="1 1 1 1" group="3" />
+          <geom name="br_shank_collision" type="capsule" fromto="0 0 0 0.138997 -0.097637 -0.001443" size="0.012" group="3" rgba="1 1 1 1" /><geom name="br_bottom_collision" size="0.012" pos="0.138997 -0.097637 -0.001443" rgba="1 1 1 1" group="3" />
         </body>
       </body>
     </body>
@@ -88,7 +88,7 @@
           <inertial pos="0.081727 -0.0387449 0.00203601" quat="0.16228 0.688234 -0.176119 0.684822" mass="0.029326" diaginertia="5.22904e-05 5.16336e-05 2.17721e-06" />
           <joint name="bl_bottom" pos="0 0 0" axis="0 0 -1" range="-2.356200 2.356200" actuatorfrcrange="-1.96 1.96" damping="0.05" frictionloss="0.01" armature="0.003" />
           <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="bl_bottom" />
-          <geom name="bl_bottom_collision" size="0.012" pos="0.14519 -0.089077 0.00141" rgba="1 1 1 1" group="3" />
+          <geom name="bl_shank_collision" type="capsule" fromto="0 0 0 0.14519 -0.089077 0.00141" size="0.012" group="3" rgba="1 1 1 1" /><geom name="bl_bottom_collision" size="0.012" pos="0.14519 -0.089077 0.00141" rgba="1 1 1 1" group="3" />
         </body>
       </body>
     </body>
