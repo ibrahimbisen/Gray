@@ -75,14 +75,19 @@ write software on top of it.
 These are facts about the physical robot. They stay true no matter what the CAD says.
 Each one cost real time to discover.
 
-- **12× DS3218MG 270° hobby servos on a PCA9685 board over I²C.**
-- **PWM period is 20 ms, so 50 Hz is a hard control ceiling.** Do not design anything that
-  needs to run faster.
-- **The servos are position-commanded with no feedback.** You can never read where a joint
-  actually is, only where you told it to go. Any control scheme that needs to measure joint
-  angle will not work on this robot.
+- **12 joints.** Currently DS3218MG 270° hobby servos on a PCA9685 board over I²C.
+- **All servos will have position feedback.** This is a planned change and it is load-bearing.
+  Design for it from the start: the robot can read where each joint actually is, so measured
+  joint angles are allowed in the observation space, and closed-loop control is on the table.
+  The old design excluded joint positions because the hardware could not report them. That
+  restriction is gone.
 - **The knee is a pushrod linkage, not direct drive.** A thigh-mounted servo drives the
   shank through a ball-jointed metal rod. Servo angle ≠ joint angle on the real robot.
+
+Open, to be confirmed before it constrains anything:
+
+- **Control rate.** The PCA9685's 20 ms PWM period capped the old design at 50 Hz. Whether
+  that ceiling survives depends on what the feedback servos are and how they are driven.
 
 ## Rules of the repo
 
