@@ -99,6 +99,7 @@ def build() -> tuple[Path, float]:
         ET.SubElement(world, "light", {"pos": "0 0 2", "dir": "0 0 -1", "directional": "true"})
 
     name_geoms(root)
+    add_foot_sites(root, model)
     add_servos(root, tree)
 
     ET.indent(tree, space="  ")
@@ -125,6 +126,53 @@ def name_geoms(root) -> None:
             if geom.get("name"):
                 continue
             geom.set("name", base if len(geoms) == 1 else f"{base}_{i}")
+
+
+def add_foot_sites(root, model) -> None:
+    """Put a marked point on each foot, where it actually touches the ground.
+
+    Without these there is no way to ask where a foot is or how fast it is
+    moving - MuJoCo's URDF importer creates no sites at all, and a calf's centre
+    of mass is not its foot. Every gait reward worth having needs them: whether a
+    foot is sliding while loaded, how high it lifts on a swing, how long it
+    spends in the air, how hard it lands.
+
+    The point is the calf mesh's farthest vertex from the knee, which is the part
+    that reaches the floor. Taken off the mesh rather than guessed.
+    """
+    for body in root.iter("body"):
+        name = body.get("name") or ""
+        if "calf" not in name.lower():
+            continue
+        leg = name.split("_")[0]
+        if body.find(f"site[@name='{leg}_foot']") is not None:
+            continue
+        bid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, name)
+        if bid < 0:
+            continue
+
+        best, best_d = np.zeros(3), -1.0
+        for g in range(model.body_geomadr[bid],
+                       model.body_geomadr[bid] + model.body_geomnum[bid]):
+            if model.geom_type[g] != mujoco.mjtGeom.mjGEOM_MESH:
+                continue
+            mid = model.geom_dataid[g]
+            adr, num = model.mesh_vertadr[mid], model.mesh_vertnum[mid]
+            verts = model.mesh_vert[adr:adr + num].astype(float)
+            rot = np.zeros(9)
+            mujoco.mju_quat2Mat(rot, model.geom_quat[g])
+            pts = verts @ rot.reshape(3, 3).T + model.geom_pos[g]
+            dist = np.linalg.norm(pts, axis=1)
+            i = int(np.argmax(dist))
+            if dist[i] > best_d:
+                best_d, best = float(dist[i]), pts[i]
+
+        ET.SubElement(body, "site", {
+            "name": f"{leg}_foot",
+            "pos": " ".join(f"{v:.6g}" for v in best),
+            "size": "0.004",
+            "rgba": "0.9 0.3 0.2 0.6",
+        })
 
 
 def add_servos(root, tree) -> None:

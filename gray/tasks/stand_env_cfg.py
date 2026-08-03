@@ -43,6 +43,8 @@ from mjlab.rl import (
 )
 from mjlab.rl.config import RslRlModelCfg
 from mjlab.scene import SceneCfg
+from mjlab.sensor import ContactSensorCfg
+from mjlab.sensor.contact_sensor import ContactMatch
 from mjlab.sim import MujocoCfg, SimulationCfg
 from mjlab.terrains import TerrainEntityCfg
 from mjlab.viewer import ViewerConfig
@@ -219,6 +221,18 @@ def stand_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         scene=SceneCfg(
             terrain=TerrainEntityCfg(terrain_type="plane"),
             entities={"robot": _robot_cfg()},
+            # Four foot contacts, the same thing a switch in each foot would
+            # report on the real robot. Free in simulation - MuJoCo already
+            # knows which geoms are touching - and it needs nothing added to
+            # the CAD. track_air_time also gives how long each foot has been
+            # up or down, which is what every gait reward is built on.
+            sensors=(ContactSensorCfg(
+                name="feet",
+                primary=ContactMatch(mode="geom", pattern=(".*_calf",),
+                                     entity="robot"),
+                fields=("found", "force"),
+                track_air_time=True,
+            ),),
             num_envs=4096,
             env_spacing=1.0,
         ),

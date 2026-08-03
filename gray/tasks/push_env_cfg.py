@@ -39,12 +39,48 @@ PUSH_SPIN = (-1.5, 1.5)      # rad/s about the vertical, either way
 PUSH_EVERY_S = (2.0, 4.0)
 
 FEET = SceneEntityCfg("robot", geom_names=(".*calf.*",))
+FOOT_SITES = SceneEntityCfg("robot", site_names=(".*_foot",))
 
 PUSH_NOTES = {
     "spinning": "Trunk rotating. A shove usually sets the robot turning as well as "
                 "sliding, and killing that rotation is most of recovering from it. "
                 "The stand task had no term for this because nothing ever span it.",
+    "skidding": "A foot sliding along the floor while it is carrying weight. Nothing "
+                "stopped the robot recovering by scuffing its feet across the ground, "
+                "and that does not survive contact with a real floor: the simulator's "
+                "friction is a guess, and a policy that leans on sliding is leaning "
+                "on the guess.",
+    "foot_lift": "Picking a foot up and putting it down. Once sliding is expensive, "
+                 "the only way left to move a foot is to lift it - this pays for "
+                 "doing that properly rather than dragging.",
 }
+
+
+def foot_slip(env, sensor_name: str = "feet", asset_cfg=FOOT_SITES):
+    """How fast the feet are sliding while they are actually touching the ground.
+
+    Contact comes from the contact sensor rather than being inferred from height.
+    A height threshold is a guess that gets it wrong exactly when it matters -
+    a foot skimming a millimetre above the floor is not carrying weight, and one
+    pressed into a slope can be higher than the threshold while fully loaded.
+    """
+    asset = env.scene[asset_cfg.name]
+    contact = env.scene[sensor_name]
+    vel = asset.data.site_lin_vel_w[:, asset_cfg.site_ids, :2]
+    down = (contact.data.found > 0).float()
+    return torch.sum(torch.sum(torch.square(vel), dim=-1) * down, dim=1)
+
+
+def foot_lift(env, target: float = 0.04, asset_cfg=FOOT_SITES):
+    """Reward a foot that is genuinely off the ground, up to a sensible height.
+
+    Capped on purpose. Rewarding height without a ceiling buys a robot that
+    stands on three legs waving the fourth, which scores well and is useless.
+    """
+    asset = env.scene[asset_cfg.name]
+    height = (asset.data.site_pos_w[:, asset_cfg.site_ids, 2]
+              - env.scene.env_origins[:, 2].unsqueeze(1))
+    return torch.sum(torch.clamp(height, max=target), dim=1) / target
 
 
 def trunk_spin(env, asset_cfg=ROBOT):
@@ -128,6 +164,19 @@ def push_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # needed a term for that because nothing ever span it. The existing height,
     # tilt and still terms already pay for the rest of recovering.
     cfg.rewards["spinning"] = RewardTermCfg(func=trunk_spin, weight=-0.05)
+
+    # Scuffing a foot along the floor is the cheapest way to recover from a shove
+    # and the one least likely to survive contact with a real floor. Make it
+    # expensive and stepping becomes the cheaper option on its own.
+    cfg.rewards["skidding"] = RewardTermCfg(func=foot_slip, weight=-2.0)
+    cfg.rewards["foot_lift"] = RewardTermCfg(func=foot_lift, weight=0.3,
+                                             params={"target": 0.04})
+
+    # The stance task wanted the robot glued to one pose. Recovering by stepping
+    # means leaving it, so stop paying so much for staying put.
+    cfg.rewards["posture"].weight = 0.6
+    cfg.rewards["still"].weight = 0.5
+    cfg.rewards["joint_speed"].weight = -0.0002
 
     # Falling costs more here. The whole point is that being disturbed and
     # recovering beats being disturbed and going over.
