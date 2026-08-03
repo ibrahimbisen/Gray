@@ -201,6 +201,48 @@ def retarget_base(root, rot: np.ndarray, origin: np.ndarray) -> None:
                 rotate_inertia(el, rt)
 
 
+def level_legs(root) -> list[str]:
+    """Turn any leg that was exported folded the wrong way up.
+
+    In the V2 export the front-right and back-left thighs came out 180 degrees
+    rotated from the other two, so at the model's zero those two feet floated
+    146 mm in the air while the other two sat on the floor - and the legs
+    intersected the body. It is an artefact of how the assembly was posed, not
+    of the robot.
+
+    Rather than hard-code which two, each thigh is tried both ways and the one
+    that puts the leg further below its hip is kept. That stays correct if the
+    next export folds a different pair.
+    """
+    flip = np.diag([1.0, -1.0, -1.0])  # 180 degrees about the joint's own x axis
+    report = []
+
+    for j in root.findall("joint"):
+        part = leg_seg(j.get("name")) or leg_seg(j.find("child").get("link"))
+        if part is None or part[1] != "thigh":
+            continue
+        leg = part[0]
+        xyz, rot = read_origin(j)
+
+        def drop(matrix, j=j, xyz=xyz, leg=leg):
+            write_origin(j, xyz, matrix)
+            fk = forward_kinematics_full(root)
+            calf = next((n for n in fk if leg_seg(n) == (leg, "calf")), None)
+            hip = next((n for n in fk if leg_seg(n) == (leg, "hip")), None)
+            return fk[hip][0][2] - fk[calf][0][2] if calf and hip else 0.0
+
+        as_is, flipped = drop(rot), drop(rot @ flip)
+        if flipped > as_is:
+            write_origin(j, xyz, rot @ flip)
+            report.append(f"{leg}_thigh turned 180 deg - the knee was above the hip "
+                          f"({as_is*1000:+.0f} mm), now below it ({flipped*1000:+.0f} mm)")
+        else:
+            write_origin(j, xyz, rot)
+    if not report:
+        report.append("all four legs already fold the same way")
+    return report
+
+
 def apply_joint_limits(root, cfg: dict) -> list[str]:
     """Write the owner's measured travel into all 12 joints, per-joint sign included.
 
@@ -467,6 +509,7 @@ def main() -> int:
 
     before = forward_kinematics(root)
     add_floating_base(root)
+    level_report = level_legs(root)
     mass_report = fix_masses(root, cfg)
     rot, origin, notes = derive_base_frame(root)
     retarget_base(root, rot, origin)
@@ -483,6 +526,9 @@ def main() -> int:
 
     print(f"source   {src}")
     print(f"output   {OUT_URDF.relative_to(ROOT)}   ({n_meshes} mesh references)")
+    print("\nleg orientation at the model's zero:")
+    for line in level_report:
+        print(f"  {line}")
     print("\nmass, from gray/config/robot.yaml:")
     for line in mass_report:
         print(f"  {line}")
