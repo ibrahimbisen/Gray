@@ -81,8 +81,13 @@ def newest_run(mapping: dict[str, str], want_task: str | None) -> tuple[Path, st
 class Filmer:
     """Holds one env and runner, rebuilt only when the task changes."""
 
-    def __init__(self, seconds: float, envs: int) -> None:
+    def __init__(self, seconds: float, envs: int, distance: float = 2.6,
+                 elevation: float = -18.0, azimuth: float = 125.0,
+                 trail: float = 1.2) -> None:
         self.seconds, self.envs = seconds, envs
+        self.distance, self.elevation, self.azimuth = distance, elevation, azimuth
+        self.trail = trail
+        self.lookat = None
         self.task: str | None = None
 
     def _build(self, task: str) -> None:
@@ -106,7 +111,9 @@ class Filmer:
         self.data = mujoco.MjData(self.model)
         self.cam = mujoco.MjvCamera()
         mujoco.mjv_defaultCamera(self.cam)
-        self.cam.distance, self.cam.elevation, self.cam.azimuth = 1.0, -12.0, 125.0
+        self.cam.distance = self.distance
+        self.cam.elevation = self.elevation
+        self.cam.azimuth = self.azimuth
         self.task = task
         print(f"[film] built environment for {task}", flush=True)
 
@@ -123,6 +130,7 @@ class Filmer:
         policy = self.runner.get_inference_policy(device="cuda:0")
 
         obs, _ = self.env.reset()
+        self.lookat = None      # each clip frames its own start
         frames = []
         with torch.inference_mode():
             for _ in range(int(self.seconds * 50)):
@@ -131,7 +139,22 @@ class Filmer:
                 self.data.qpos[:] = sim.qpos[0].detach().cpu().numpy()
                 self.data.qvel[:] = sim.qvel[0].detach().cpu().numpy()
                 mujoco.mj_forward(self.model, self.data)
-                self.cam.lookat[:] = self.data.xpos[1]
+                # Follow the trunk, but keep the START of the walk in shot by
+                # letting the camera lag behind it. Locked dead on the trunk, the
+                # robot sits centred for the whole clip and nothing tells you
+                # whether it covered five metres or none - the only cue is the
+                # ground sliding past. Lagging by up to `trail` metres puts the
+                # distance already walked on screen.
+                target = self.data.xpos[1].copy()
+                if self.lookat is None:
+                    self.lookat = target.copy()
+                else:
+                    behind = target[:2] - self.lookat[:2]
+                    dist = float(np.linalg.norm(behind))
+                    if dist > self.trail:
+                        self.lookat[:2] += behind * (1.0 - self.trail / dist)
+                    self.lookat[2] = target[2]
+                self.cam.lookat[:] = self.lookat
                 self.renderer.update_scene(self.data, self.cam)
                 frames.append(np.asarray(self.renderer.render()))
 
@@ -154,14 +177,25 @@ def main() -> int:
     # dropping to 25.
     ap.add_argument("--every", type=int, default=2,
                     help="film 1 in N checkpoints; 2 is every 50 iterations")
-    ap.add_argument("--seconds", type=float, default=6.0)
+    ap.add_argument("--seconds", type=float, default=20.0,
+                    help="clip length. 20 s at 0.25 m/s is the 5 m the walk bar "
+                         "asks for; 6 s only ever showed the first metre and a half")
+    ap.add_argument("--distance", type=float, default=2.6,
+                    help="camera distance in metres. 1.0 was close enough that the "
+                         "robot filled the frame and the ground was invisible")
+    ap.add_argument("--elevation", type=float, default=-18.0)
+    ap.add_argument("--azimuth", type=float, default=125.0)
+    ap.add_argument("--trail", type=float, default=1.2,
+                    help="how far the camera is allowed to fall behind the robot, "
+                         "in metres. 0 locks it dead on the trunk")
     ap.add_argument("--envs", type=int, default=1)
     ap.add_argument("--watch", action="store_true",
                     help="keep running alongside training, filming each new checkpoint")
     args = ap.parse_args()
 
     mapping = experiment_to_task()
-    filmer = Filmer(args.seconds, args.envs)
+    filmer = Filmer(args.seconds, args.envs, args.distance,
+                    args.elevation, args.azimuth, args.trail)
     print(f"mode     {'following whatever is training' if args.watch else 'one pass'}")
     print(f"tasks    {', '.join(sorted(mapping.values()))}\n", flush=True)
 
