@@ -1,6 +1,12 @@
 desktop.ini
 Thumbs.db
 .DS_Store
+
+# SolidWorks lock files. They appear while a document is open and vanish when it
+# closes, so tracking them means every commit shows CAD churn that is not real.
+~$*
+*.swp
+sw2urdf_logs/
 .vscode/
 .idea/
 
