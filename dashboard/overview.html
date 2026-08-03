@@ -415,7 +415,7 @@ const COVER = {
   condition: ["a dial in the scene", "var(--live)"],
   emerges:   ["falls out of the reward", "var(--good)"],
   measured:  ["measured, not trained", "var(--muted)"],
-  blocked:   ["cannot be trained yet", "var(--crit)"],
+  blocked:   ["not by reward alone", "var(--crit)"],
 };
 
 function stages(){
@@ -498,10 +498,11 @@ function blockedPanel(){
   return `<div class="card" style="margin-top:12px">
     <h3>Rows no reward can reach<span class="grow"></span>
       <span class="chip bad">${rows.length}</span></h3>
-    <div class="faint small" style="margin-bottom:9px">These cannot be trained by
-      tuning anything. They wait on ${groups.length} capabilities that do not exist
-      &mdash; not on ${rows.length} separate problems. Listed so none of them is
-      quietly counted as work in progress.</div>
+    <div class="faint small" style="margin-bottom:9px">No weight in the current
+      reward reaches these. Not impossible &mdash; they need a new INPUT, a new
+      COMMAND, or their own run, and <a class="plain" href="/stage2#blocked">stage 2
+      section 5</a> says which for every row. Listed so none is quietly counted as
+      work in progress.</div>
     <div class="wrapx"><table>
       <tr><th>Missing</th><th class="n">Rows</th><th>Where</th><th>Why nothing reaches them</th></tr>
       ${groups.map(g => `<tr><td><b>${esc(g.label)}</b></td>

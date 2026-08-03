@@ -212,16 +212,57 @@ SUBSECTIONS = [
 #   command   set a number and it happens. Already covered by the reward.
 #   condition a dial in the scene. Same reward, different world.
 #   emerges   nobody asks for it; it falls out of the reward terms.
-#   blocked   needs a capability that does not exist yet - a camera, a
-#             per-foot command, an object in the scene. No amount of reward
-#             tuning produces it.
+#   blocked   no amount of reward tuning produces it. NOT "impossible" and NOT
+#             "the hardware will never exist" - the owner is fitting cameras and
+#             distance sensors. It means the fix is a new input, a new command or
+#             a separate run, never a new weight in the existing one.
 #   measured  read off a trained policy. Never trained toward.
 COVERAGE = {
     "command":   "set a command and it happens - already covered",
     "condition": "a dial in the scene - same reward, different world",
     "emerges":   "nobody asks for it; it falls out of the reward",
-    "blocked":   "needs a capability that does not exist yet",
+    "blocked":   "no weight in the current reward reaches it - it needs a new "
+                 "input, a new command, or its own run",
     "measured":  "read off a trained policy, never trained toward",
+}
+
+# WHY a blocked row is blocked, which is three different problems that were
+# previously wearing one word. Splitting them matters because the fix, the cost
+# and the person who unblocks it are different in each case.
+BLOCKED_CLASSES = {
+    "input": {
+        "label": "The policy cannot KNOW it",
+        "why": "The policy reads a fixed list of numbers, and these are not on it. "
+               "Today that list is: which way is down and how fast the trunk is "
+               "turning (the IMU), twelve joint angles, twelve joint speeds, the "
+               "twelve targets it sent last step, and the three command numbers. "
+               "Nothing else reaches it.",
+        "fix": "Fitting the sensor is necessary and not sufficient. The reading has "
+               "to be added to that list, which changes its length - so it is a "
+               "different policy and a retrain from zero. The simulator also has to "
+               "produce a fake version of the sensor for every robot at 50 Hz, and "
+               "for a camera that is the expensive part, not the hardware.",
+    },
+    "command": {
+        "label": "The policy cannot be TOLD to",
+        "why": "Nothing is missing from what the robot senses. There is simply no "
+               "way to ask. The command is three numbers - forward, sideways, turn "
+               "- and a request that is not one of those three cannot be made, so "
+               "it can never be scored either.",
+        "fix": "Add the numbers to the command. Cheap to write, and it still grows "
+               "the input list, so it is still a retrain.",
+    },
+    "reward": {
+        "label": "The reward stops working",
+        "why": "Not a sensing problem at all - detection here is already perfect. "
+               "The contact sensor reports zero feet down today. What breaks is the "
+               "SCORING: foot_clearance, stepping, dragging and ground_covered are "
+               "each multiplied by foot contact, so the moment all four feet leave "
+               "the ground every one of them returns zero and the robot is given no "
+               "signal for the whole airborne part.",
+        "fix": "A different reward function for the airborne part, which by this "
+               "page's own test means a separate run.",
+    },
 }
 
 # A row that _OVERRIDE relocated must take its coverage from where it LANDED, not
@@ -290,37 +331,52 @@ _COVERAGE_OVERRIDE = {
 # nineteen separate problems. Grouped this way, the list becomes four things to
 # build rather than nineteen things to worry about.
 BLOCKED_NEEDS = {
-    "height": {"label": "A height and attitude command",
-               "why": "The command vector is vx, vy, yaw. Nothing in it asks for a "
-                      "ride height or a lean, so a crouch cannot be commanded and "
-                      "'hold any commanded height' cannot even be tested. This is "
-                      "the one blocker with a decision already on the table: fold "
-                      "height, pitch and roll into the command. It grows the "
-                      "observation by three, so every existing policy file becomes "
-                      "unreadable and all three runs restart from zero."},
-    "foot":   {"label": "A per-foot command",
-               "why": "The command vector is vx, vy, yaw. Nothing in it addresses "
-                      "one leg, so there is no way to ask for a three-legged stance "
-                      "or a raised foot. Adding one is a change to the observation, "
-                      "so it is a retrain."},
-    "camera": {"label": "A camera",
-               "why": "Plus a depth-to-heightmap pipeline behind it. It changes the "
-                      "observation the policy reads, so it is a retrain from scratch "
-                      "and its own project."},
-    "where":  {"label": "Knowing where it is",
-               "why": "Localisation. The policy has no idea where it stands on the "
-                      "floor or where the walls are - that is a layer above the "
-                      "policy, and it does not exist."},
-    "flight": {"label": "A flight phase",
-               "why": "Every contact-based reward term stops working the moment no "
-                      "foot is down. It also needs joint speed the servos may not "
-                      "have; stage 3.3 measures that."},
+    "height": {"label": "A height and attitude command", "class": "command",
+               "why": "The command is vx, vy, yaw. Nothing in it asks for a ride "
+                      "height or a lean, so a crouch cannot be commanded and 'hold "
+                      "any commanded height' cannot even be tested.",
+               "cost": "The one blocker with a decision already on the table: fold "
+                       "height, pitch and roll into the command. Ten rows at once. "
+                       "It grows the input list by three, so every existing policy "
+                       "file becomes unreadable and all three runs restart."},
+    "foot":   {"label": "A per-foot command", "class": "command",
+               "why": "Nothing in the command addresses one leg, so a three-legged "
+                      "stance or a raised foot cannot be asked for.",
+               "cost": "Bigger than the height change and nobody has costed it - "
+                       "four more numbers, and terms that currently score the robot "
+                       "as a whole would have to score it per leg."},
+    "camera": {"label": "A camera", "class": "input",
+               "why": "Anticipating an obstacle rather than feeling it. Reacting to "
+                      "one is already covered - step, feel the contact, correct.",
+               "cost": "The camera is the easy half. Behind it: a depth-to-heightmap "
+                       "pipeline, a much longer input list, and a simulator that has "
+                       "to render a fake depth image for 4500 robots at 50 Hz. It is "
+                       "also the hardest sim-to-real jump there is, because the fake "
+                       "heightmap is perfect and free and the real one is a noisy "
+                       "30 Hz camera full of holes. Its own project."},
+    "where":  {"label": "Knowing where it is", "class": "input",
+               "why": "Where it stands on the floor, and where the walls are. The "
+                      "policy is handed nothing about either, so 'walk to a point' "
+                      "and 'back out of a corner' have no target to aim at.",
+               "cost": "Distance sensors give range, not position - turning range "
+                       "into a position on the floor is localisation, a layer above "
+                       "the policy that does not exist yet. Then its output joins "
+                       "the input list, so retrain."},
+    "flight": {"label": "A flight phase", "class": "reward",
+               "why": "Detection is NOT the problem - the contact sensor already "
+                      "reports zero feet down, today. The reward is the problem: "
+                      "every contact-gated term returns zero while the robot is in "
+                      "the air, so it is scored nothing for the part that matters.",
+               "cost": "A different reward for the airborne part, which means its "
+                       "own run. And first the physical question: whether DS3218MGs "
+                       "can push 3.1 kg off the ground at all. Stage 3.3 measures "
+                       "the real servo speed under load and answers it for free."},
     # A blocked row that names no blocker is a hole in THIS file, not a fact
     # about the robot. Shown rather than defaulted into someone else's pile.
-    "unsaid": {"label": "Not yet said what",
-               "why": "Marked unreachable, but nothing here says what it is waiting "
-                      "on. That is a gap in this page. Give it an entry in "
-                      "_NEED_OVERRIDE or _NEED_BY_CATEGORY."},
+    "unsaid": {"label": "Not yet said what", "class": "command",
+               "why": "Marked blocked, but nothing here says what it is waiting on.",
+               "cost": "That is a gap in this page, not a fact about the robot. Give "
+                       "it an entry in _NEED_OVERRIDE or _NEED_BY_CATEGORY."},
 }
 
 _NEED_BY_CATEGORY = {
@@ -535,6 +591,7 @@ def load() -> dict:
         "dialled": dialled,
         "moved": sorted(moved, key=lambda m: m["n"]),
         "coverage_words": COVERAGE,
+        "blocked_classes": BLOCKED_CLASSES,
         "run_totals": run_totals,
         # Every blocked row in the library, however it is filed.
         "needs": _group_needs([i for s in out for i in s["skills"]]),
