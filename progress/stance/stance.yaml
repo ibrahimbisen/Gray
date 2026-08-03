@@ -1,0 +1,44 @@
+trunk_height_m: 0.308
+trunk_height_pct_of_max: 95.0
+max_standing_height_m: 0.3242
+worst_margin_x: 4.641
+angles_deg:
+  fr_hip: 8.932
+  fr_thigh: 86.158
+  fr_calf: 191.414
+  fl_hip: -9.027
+  fl_thigh: -93.385
+  fl_calf: 190.735
+  br_hip: -8.932
+  br_thigh: -91.557
+  br_calf: 190.484
+  bl_hip: 9.026
+  bl_thigh: 88.047
+  bl_calf: 190.863
+holding_torque_nm:
+  fr_hip: 0.0
+  fr_thigh: 0.2472
+  fr_calf: 0.4224
+  fl_hip: 0.0
+  fl_thigh: 0.25
+  fl_calf: 0.4188
+  br_hip: 0.0
+  br_thigh: 0.2554
+  br_calf: 0.4199
+  bl_hip: 0.0
+  bl_thigh: 0.2496
+  bl_calf: 0.4195
+servo_stall_nm: 1.96
+zero_offset_deg:
+  fr_hip: 8.471
+  fr_thigh: 106.464
+  fr_calf: 153.647
+  fl_hip: -8.576
+  fl_thigh: -73.443
+  fl_calf: 153.647
+  br_hip: -8.491
+  br_thigh: -71.758
+  br_calf: 153.647
+  bl_hip: 8.573
+  bl_thigh: 108.057
+  bl_calf: 153.647

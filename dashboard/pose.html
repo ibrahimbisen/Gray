@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gray — pose editor</title>
+<style>
+  :root{--plane:#0d0f13;--surface:#16181d;--surface2:#1b1e25;--line:#252932;
+        --ink:#f2f3f5;--ink2:#a8adb8;--muted:#787f8c;
+        --s1:#3987e5;--good:#0ca30c;--warn:#fab219;--crit:#d03b3b;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--plane);color:var(--ink);
+       font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:inherit;text-decoration:none}
+  .tnum{font-variant-numeric:tabular-nums}
+  .app{display:grid;grid-template-columns:minmax(0,1fr) 400px;min-height:100vh}
+  @media (max-width:1000px){.app{grid-template-columns:1fr}}
+  main{padding:20px 24px 60px;min-width:0}
+  aside{border-left:1px solid var(--line);background:var(--surface);padding:18px 16px 60px;
+        position:sticky;top:0;height:100vh;overflow-y:auto}
+  @media (max-width:1000px){aside{position:static;height:auto;border-left:0;border-top:1px solid var(--line)}}
+
+  h1{margin:0;font-size:20px;letter-spacing:-.01em}
+  .top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+  .grow{flex:1}
+  .hint{color:var(--ink2);font-size:12.5px;margin-bottom:14px;max-width:80ch}
+  .btn{font-size:12px;color:var(--ink2);border:1px solid var(--line);border-radius:7px;
+       padding:6px 11px;background:var(--surface);cursor:pointer;font-family:inherit}
+  .btn:hover{color:var(--ink);border-color:#39414f}
+  .btn.on{color:var(--ink);border-color:var(--s1);background:#182231}
+  .btn.go{color:#fff;background:var(--s1);border-color:var(--s1)}
+
+  .stage{background:#000;border:1px solid var(--line);border-radius:10px;overflow:hidden;
+         position:relative}
+  .stage img{display:block;width:100%;background:#000}
+  .stage.busy img{opacity:.65}
+  .warnbar{position:absolute;left:0;right:0;bottom:0;background:rgba(208,59,59,.92);
+           color:#fff;font-size:12.5px;padding:7px 12px}
+  .viewrow{display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap}
+
+  .facts{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
+         border-radius:10px;overflow:hidden;margin-top:12px;
+         grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+  .fact{background:var(--surface);padding:10px 12px}
+  .fact .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  .fact .v{font-size:20px;font-weight:600;margin-top:2px}
+
+  .grp{margin-bottom:16px}
+  .grph{font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);
+        font-weight:600;margin:0 0 8px;display:flex;align-items:center;gap:8px}
+  .row{display:grid;grid-template-columns:52px 1fr 62px;gap:8px;align-items:center;
+       margin-bottom:7px}
+  .row label{font-size:12px;color:var(--ink2)}
+  .row input[type=range]{width:100%;accent-color:var(--s1);height:20px}
+  .row .val{font-size:12.5px;text-align:right}
+  .row .val input{width:56px;background:var(--surface2);border:1px solid var(--line);
+                  color:var(--ink);border-radius:5px;padding:3px 5px;font:inherit;
+                  font-variant-numeric:tabular-nums;text-align:right}
+
+  .limbox{border:1px solid var(--line);border-radius:10px;background:var(--surface2);
+          padding:12px;margin-top:6px}
+  .limrow{display:grid;grid-template-columns:54px 1fr 1fr;gap:8px;align-items:center;
+          margin-bottom:7px;font-size:12.5px}
+  .limrow input{background:var(--surface);border:1px solid var(--line);color:var(--ink);
+                border-radius:5px;padding:4px 6px;font:inherit;
+                font-variant-numeric:tabular-nums;width:100%}
+  .note{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.45}
+  .ok{color:var(--good)} .bad{color:var(--crit)} .warnc{color:var(--warn)}
+</style>
+</head>
+<body>
+<div class="app">
+  <main>
+    <div class="top">
+      <h1>Pose editor</h1>
+      <span class="tnum" id="zero" style="color:var(--muted);font-size:12px"></span>
+      <div class="grow"></div>
+      <a class="btn" href="/">&larr; Monitor</a>
+    </div>
+    <div class="hint" id="hint"></div>
+
+    <div class="stage" id="stage">
+      <img id="shot" alt="the robot in the current pose">
+      <div class="warnbar" id="clash" style="display:none"></div>
+    </div>
+
+    <div class="viewrow">
+      <button class="btn" data-az="125">3/4 view</button>
+      <button class="btn" data-az="180">side</button>
+      <button class="btn" data-az="90">front</button>
+      <button class="btn" data-az="270">back</button>
+      <span style="flex:1"></span>
+      <label style="font-size:12px;color:var(--ink2)">zoom
+        <input type="range" id="zoom" min="0.6" max="2.0" step="0.05" value="1.05"
+               style="vertical-align:middle;width:120px;accent-color:var(--s1)"></label>
+    </div>
+
+    <div class="facts" id="facts"></div>
+  </main>
+
+  <aside>
+    <div class="grph">Dials &mdash; degrees from sitting
+      <span class="grow"></span>
+      <button class="btn" id="link">link legs</button>
+      <button class="btn" id="zeroall">reset</button>
+    </div>
+    <div id="dials"></div>
+
+    <div class="grph" style="margin-top:22px">Record the travel</div>
+    <div class="limbox">
+      <div class="limrow" style="color:var(--muted);font-size:10.5px;
+           text-transform:uppercase;letter-spacing:.08em">
+        <span></span><span>min</span><span>max</span></div>
+      <div id="lims"></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn go" id="save" style="flex:1">Save to robot.yaml</button>
+      </div>
+      <div class="note" id="savenote">
+        Drag a joint until the leg hits the body &mdash; the bar under the picture
+        turns red. That angle is the mechanical limit. Type it in, do the other two,
+        then save.
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const LEGNAME = {fr:"front right", fl:"front left", br:"back right", bl:"back left"};
+
+let CFG = null, ANG = {}, LINK = true, AZ = 125, ZOOM = 1.05, PENDING = false, AGAIN = false;
+
+function key(leg, seg){ return leg + "_" + seg; }
+
+function buildDials(){
+  $("#dials").innerHTML = CFG.legs.map(leg => `
+    <div class="grp">
+      <div class="grph">${esc(LEGNAME[leg] || leg)}</div>
+      ${CFG.segments.map(seg => `
+        <div class="row">
+          <label>${esc(seg)}</label>
+          <input type="range" min="-135" max="135" step="0.5" value="0"
+                 data-leg="${leg}" data-seg="${seg}">
+          <span class="val"><input type="text" data-num="${key(leg, seg)}" value="0"></span>
+        </div>`).join("")}
+    </div>`).join("");
+
+  document.querySelectorAll("input[type=range]").forEach(el => {
+    el.addEventListener("input", () => setAngle(el.dataset.leg, el.dataset.seg, +el.value));
+  });
+  document.querySelectorAll("input[data-num]").forEach(el => {
+    el.addEventListener("change", () => {
+      const [leg, seg] = el.dataset.num.split("_");
+      const v = parseFloat(el.value);
+      if(!isNaN(v)) setAngle(leg, seg, Math.max(-135, Math.min(135, v)));
+    });
+  });
+
+  $("#lims").innerHTML = CFG.segments.map(seg => `
+    <div class="limrow"><span>${esc(seg)}</span>
+      <input data-lim="${seg}" data-end="0" value="${CFG.current[seg][0]}">
+      <input data-lim="${seg}" data-end="1" value="${CFG.current[seg][1]}"></div>`).join("");
+}
+
+function setAngle(leg, seg, v){
+  const targets = LINK ? CFG.legs : [leg];
+  targets.forEach(l => { ANG[key(l, seg)] = v; });
+  syncInputs();
+  render();
+}
+
+function syncInputs(){
+  document.querySelectorAll("input[type=range]").forEach(el => {
+    el.value = ANG[key(el.dataset.leg, el.dataset.seg)] ?? 0;
+  });
+  document.querySelectorAll("input[data-num]").forEach(el => {
+    el.value = (ANG[el.dataset.num] ?? 0).toFixed(1);
+  });
+}
+
+function render(){
+  if(PENDING){ AGAIN = true; return; }
+  PENDING = true;
+  $("#stage").classList.add("busy");
+  const q = new URLSearchParams({angles: JSON.stringify(ANG), az: AZ, dist: ZOOM});
+  fetch("/api/pose?" + q).then(r => r.json()).then(d => {
+    $("#shot").src = "data:image/png;base64," + d.png;
+    facts(d.facts);
+  }).finally(() => {
+    PENDING = false;
+    $("#stage").classList.remove("busy");
+    if(AGAIN){ AGAIN = false; render(); }
+  });
+}
+
+function facts(f){
+  $("#facts").innerHTML = `
+    <div class="fact"><div class="k">trunk height</div>
+      <div class="v tnum">${f.trunk_mm} <span style="font-size:13px;color:var(--muted)">mm</span></div></div>
+    <div class="fact"><div class="k">stance, front-back</div>
+      <div class="v tnum">${f.stance_x_mm}</div></div>
+    <div class="fact"><div class="k">stance, side-side</div>
+      <div class="v tnum">${f.stance_y_mm}</div></div>
+    <div class="fact"><div class="k">self-collision</div>
+      <div class="v ${f.colliding ? "bad" : "ok"}" style="font-size:16px">
+        ${f.colliding ? "HITTING" : "clear"}</div></div>`;
+  const bar = $("#clash");
+  if(f.colliding){
+    bar.style.display = "block";
+    bar.textContent = "Hitting: " + f.clashes.join(", ") + " — this is the mechanical limit";
+  } else bar.style.display = "none";
+}
+
+fetch("/api/pose/config").then(r => r.json()).then(c => {
+  CFG = c;
+  c.legs.forEach(l => c.segments.forEach(s => { ANG[key(l, s)] = 0; }));
+  $("#zero").textContent = "zero = " + c.zero;
+  $("#hint").innerHTML =
+    `<b>+ hip</b> ${esc(c.convention.hip.replace("+ ",""))} &middot;
+     <b>+ thigh</b> ${esc(c.convention.thigh.replace("+ ",""))} &middot;
+     <b>+ calf</b> ${esc(c.convention.calf.replace("+ ",""))}.
+     Every dial is degrees away from the sitting pose. The robot is dropped onto the
+     floor each time, so <b>trunk height</b> is how tall it actually stands.`;
+  buildDials();
+  $("#link").classList.toggle("on", LINK);
+  render();
+});
+
+$("#link").onclick = () => { LINK = !LINK; $("#link").classList.toggle("on", LINK); };
+$("#zeroall").onclick = () => {
+  Object.keys(ANG).forEach(k => { ANG[k] = 0; });
+  syncInputs(); render();
+};
+document.querySelectorAll("[data-az]").forEach(b =>
+  b.onclick = () => { AZ = +b.dataset.az; render(); });
+$("#zoom").oninput = e => { ZOOM = +e.target.value; render(); };
+
+$("#save").onclick = () => {
+  const out = {};
+  CFG.segments.forEach(seg => {
+    const a = document.querySelector(`[data-lim="${seg}"][data-end="0"]`).value;
+    const b = document.querySelector(`[data-lim="${seg}"][data-end="1"]`).value;
+    out[seg] = [parseFloat(a), parseFloat(b)];
+  });
+  fetch("/api/pose/limits", {method: "POST", body: JSON.stringify(out)})
+    .then(r => r.json()).then(d => {
+      $("#savenote").innerHTML = `<span class="ok">Saved.</span> hip
+        ${d.hip[0]} to ${d.hip[1]}, thigh ${d.thigh[0]} to ${d.thigh[1]}, calf
+        ${d.calf[0]} to ${d.calf[1]}. Rebuild the model with
+        <span class="tnum">tools/prepare_model.py</span> to apply them.`;
+    })
+    .catch(e => { $("#savenote").innerHTML = `<span class="bad">Failed: ${esc(e)}</span>`; });
+};
+</script>
+</body>
+</html>

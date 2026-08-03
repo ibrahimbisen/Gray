@@ -66,6 +66,18 @@ def build() -> tuple[Path, float]:
     ):
         trunk.insert(0, ET.Element("freejoint", {"name": "root"}))
 
+    # MuJoCo's offscreen buffer defaults to 640x480, which silently caps every
+    # video and screenshot this project renders.
+    visual = root.find("visual")
+    if visual is None:
+        visual = ET.Element("visual")
+        root.insert(0, visual)
+    glob = visual.find("global")
+    if glob is None:
+        glob = ET.SubElement(visual, "global")
+    glob.set("offwidth", "1920")
+    glob.set("offheight", "1080")
+
     # Floor, gravity and a light, so the model can actually be dropped and looked at.
     if root.find("asset") is None:
         root.insert(0, ET.Element("asset"))

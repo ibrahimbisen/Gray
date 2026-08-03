@@ -20,7 +20,7 @@ import socketserver
 import sys
 import webbrowser
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import parse_qs, unquote
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -84,8 +84,40 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def do_POST(self):  # noqa: N802
+        if unquote(self.path.split("?")[0]) != "/api/pose/limits":
+            return self.send_error(404)
+        from dashboard import poser  # noqa: PLC0415
+
+        n = int(self.headers.get("Content-Length", 0))
+        try:
+            saved = poser.save_limits(json.loads(self.rfile.read(n) or b"{}"))
+        except Exception as exc:  # noqa: BLE001
+            return self._send(json.dumps({"error": str(exc)}).encode(), "application/json")
+        return self._send(json.dumps(saved).encode(), "application/json")
+
     def do_GET(self):  # noqa: N802, C901
         path = unquote(self.path.split("?")[0])
+        query = parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
+
+        if path == "/pose":
+            return self._send((HERE / "pose.html").read_bytes(), "text/html; charset=utf-8")
+        if path == "/api/pose/config":
+            from dashboard import poser  # noqa: PLC0415
+            return self._send(json.dumps(poser.defaults()).encode(), "application/json")
+        if path == "/api/pose":
+            import base64  # noqa: PLC0415
+
+            from dashboard import poser  # noqa: PLC0415
+            angles = json.loads(query.get("angles", ["{}"])[0])
+            png, facts = poser.pose_report(
+                angles,
+                azimuth=float(query.get("az", [125])[0]),
+                distance=float(query.get("dist", [1.05])[0]),
+            )
+            return self._send(json.dumps({
+                "png": base64.b64encode(png).decode(), "facts": facts,
+            }).encode(), "application/json")
 
         if path == "/api/monitor":
             return self._send(json.dumps(monitor_state()).encode(), "application/json")
@@ -146,6 +178,7 @@ def serve(port: int = 8000, open_browser: bool = True) -> None:
     with socketserver.TCPServer(("127.0.0.1", port), Handler) as httpd:
         url = f"http://127.0.0.1:{port}/"
         print(f"Dashboard: {url}")
+        print(f"Pose:      {url}pose")
         print(f"Summary:   {url}summary")
         print("Ctrl-C to stop.")
         if open_browser:

@@ -390,11 +390,10 @@ def rewrite_mesh_paths(root) -> int:
     return n
 
 
-# MuJoCo refuses any STL over 200,000 triangles outright. Well below that, a very
-# dense mesh still costs collision and render time for detail no contact ever
-# resolves - the trunk exported at 278,000 triangles, which is more than the whole
-# rest of the robot.
-MAX_TRIANGLES = 60_000
+# MuJoCo refuses any STL over 200,000 triangles outright, and the trunk exports at
+# 278,000. Below that, dense meshes only cost load and render time for detail no
+# contact ever resolves.
+MAX_TRIANGLES = 80_000
 
 
 def copy_meshes(src: Path, dst: Path) -> list[str]:
@@ -415,16 +414,26 @@ def copy_meshes(src: Path, dst: Path) -> list[str]:
             report.append(f"{stl.name:16s} {before:>8,} tri  (unchanged)")
             continue
 
+        # STL gives every triangle its own three vertices, so the file carries no
+        # information about which triangles touch. Quadric decimation needs that
+        # connectivity; without it, it deletes triangles at random and the part
+        # comes out as loose fragments. Merging first is not an optimisation, it is
+        # the difference between a simplified trunk and a shredded one.
+        mesh.merge_vertices()
         box0 = mesh.bounds.copy()
+        shells0 = len(mesh.split(only_watertight=False))
         mesh = mesh.simplify_quadric_decimation(face_count=MAX_TRIANGLES)
         mesh.export(dst / stl.name)
         # These are multi-body STLs, so they are not watertight and their reported
-        # volume is meaningless. The bounding box is not - if a corner moves, the
-        # part changed shape somewhere that matters.
+        # volume is meaningless. Two things that are meaningful: the bounding box,
+        # and the number of separate shells. Losing a shell means a whole component
+        # vanished, and the bounding box will not notice.
         drift = float(np.abs(mesh.bounds - box0).max()) * 1000
+        shells1 = len(mesh.split(only_watertight=False))
+        lost = f", LOST {shells0 - shells1} of {shells0} shells" if shells1 < shells0 else ""
         report.append(
             f"{stl.name:16s} {before:>8,} -> {len(mesh.faces):>7,} tri   "
-            f"bbox moved {drift:.2f} mm"
+            f"bbox moved {drift:.2f} mm{lost}"
         )
     return report
 
