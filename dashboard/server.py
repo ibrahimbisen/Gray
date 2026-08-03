@@ -28,6 +28,27 @@ sys.path.insert(0, str(ROOT))
 from dashboard import plan, runs  # noqa: E402
 from tools import check_urdf  # noqa: E402
 
+# Modules whose contents the pages are built from. The HTML is re-read on every
+# request, but these are imported once at startup - so editing a reward
+# description or a status rule and seeing no change on the page is a trap that
+# looks like a bug in the page. Reload them when the file on disk moves.
+_WATCHED = (plan, runs)
+_MTIMES: dict[str, float] = {}
+
+
+def _reload_if_edited() -> None:
+    import importlib  # noqa: PLC0415
+
+    for module in _WATCHED:
+        path = Path(module.__file__)
+        try:
+            stamp = path.stat().st_mtime
+        except OSError:
+            continue
+        if _MTIMES.get(module.__name__, stamp) != stamp:
+            importlib.reload(module)
+        _MTIMES[module.__name__] = stamp
+
 HERE = Path(__file__).resolve().parent
 URDF = ROOT / "sim" / "models" / "gray.urdf"
 MEDIA = ROOT / "progress"
@@ -49,6 +70,7 @@ def model_status() -> dict:
 
 
 def summary_state() -> dict:
+    _reload_if_edited()
     return {
         "goal": plan.GOAL,
         "stages": plan.STAGES,
@@ -60,6 +82,7 @@ def summary_state() -> dict:
 
 
 def monitor_state() -> dict:
+    _reload_if_edited()
     all_runs = runs.all_runs()
     return {
         "runs": all_runs,
