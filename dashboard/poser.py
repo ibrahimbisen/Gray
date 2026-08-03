@@ -41,8 +41,50 @@ _LOCK = threading.Lock()
 _STATE: dict | None = None
 
 
+# Collision meshes are thinned, because FCL walks a bounding-volume tree and this
+# runs on every dial movement. Not thinned too far, though: a decimated surface
+# reports overlaps a millimetre or two off, and that is the same size as a real
+# graze. 12,000 triangles holds the error well under the 1.5 mm margin below and
+# still answers in well under a tenth of a second.
+COLLISION_TRIANGLES = 12_000
+
+
+def _collision_meshes(rb) -> dict:
+    """One thinned mesh per link, in the link's own frame."""
+    import trimesh  # noqa: PLC0415
+
+    import mujoco  # noqa: PLC0415
+
+    meshes = {}
+    for b in range(rb.m.nbody):
+        parts = []
+        for g in range(rb.m.body_geomadr[b], rb.m.body_geomadr[b] + rb.m.body_geomnum[b]):
+            if rb.m.geom_type[g] != mujoco.mjtGeom.mjGEOM_MESH:
+                continue
+            mid = rb.m.geom_dataid[g]
+            adr, num = rb.m.mesh_vertadr[mid], rb.m.mesh_vertnum[mid]
+            fadr, fnum = rb.m.mesh_faceadr[mid], rb.m.mesh_facenum[mid]
+            verts = rb.m.mesh_vert[adr:adr + num].astype(float)
+            faces = rb.m.mesh_face[fadr:fadr + fnum].astype(int)
+            # A mesh sits at an offset inside its body. Without applying it, every
+            # part ends up centred on its link's origin and nothing lines up.
+            rot = np.zeros(9)
+            mujoco.mju_quat2Mat(rot, rb.m.geom_quat[g])
+            verts = verts @ rot.reshape(3, 3).T + rb.m.geom_pos[g]
+            parts.append(trimesh.Trimesh(vertices=verts, faces=faces, process=False))
+        if not parts:
+            continue
+        mesh = trimesh.util.concatenate(parts) if len(parts) > 1 else parts[0]
+        mesh.merge_vertices()
+        if len(mesh.faces) > COLLISION_TRIANGLES:
+            mesh = mesh.simplify_quadric_decimation(face_count=COLLISION_TRIANGLES)
+        meshes[b] = mesh
+    return meshes
+
+
 def _build() -> dict:
     import mujoco  # noqa: PLC0415
+    import trimesh  # noqa: PLC0415
     from find_stance import Robot, joint_signs  # noqa: PLC0415
 
     rb = Robot()
@@ -50,8 +92,58 @@ def _build() -> dict:
     renderer = mujoco.Renderer(rb.m, height=560, width=880)
     cam = mujoco.MjvCamera()
     mujoco.mjv_defaultCamera(cam)
-    return {"rb": rb, "signs": signs, "renderer": renderer,
-            "cam": cam, "mujoco": mujoco}
+
+    meshes = _collision_meshes(rb)
+    manager = trimesh.collision.CollisionManager()
+    for b, mesh in meshes.items():
+        manager.add_object(str(b), mesh)
+
+    s = {"rb": rb, "signs": signs, "renderer": renderer, "cam": cam,
+         "mujoco": mujoco, "meshes": meshes, "manager": manager, "baseline": {}}
+
+    # Parts that already overlap at the sitting pose are overlapping by design -
+    # the knee pivot has the thigh and calf interleaved, and they never separate.
+    # Record how deep that is, so only NEW penetration counts as a clash.
+    rb.set_pose(0.6, {})
+    s["baseline"] = _penetration(s)
+    return s
+
+
+def lowest_point(s: dict) -> float:
+    """Height of the lowest point on the whole robot, in metres."""
+    rb = s["rb"]
+    low = None
+    for b, mesh in s["meshes"].items():
+        z = (mesh.vertices @ rb.d.xmat[b].reshape(3, 3).T + rb.d.xpos[b])[:, 2].min()
+        low = float(z) if low is None else min(low, float(z))
+    return low if low is not None else 0.0
+
+
+def _penetration(s: dict) -> dict[tuple[str, str], float]:
+    """How deeply each pair of links overlaps, in metres, at the current pose.
+
+    MuJoCo cannot answer this: it skips any parent-child pair outright, so a calf
+    folding into its own thigh is never reported, and where it does test meshes it
+    tests their convex hulls - far too fat to trust on a bent leg.
+    """
+    rb = s["rb"]
+    manager = s["manager"]
+    for b in s["meshes"]:
+        t = np.eye(4)
+        t[:3, :3] = rb.d.xmat[b].reshape(3, 3)
+        t[:3, 3] = rb.d.xpos[b]
+        manager.set_transform(str(b), t)
+
+    hit, names, data = manager.in_collision_internal(return_names=True, return_data=True)
+    if not hit:
+        return {}
+    depth: dict[tuple[str, str], float] = {}
+    for c in data:
+        pair = tuple(sorted(c.names))
+        depth[pair] = max(depth.get(pair, 0.0), float(getattr(c, "depth", 0.0) or 0.0))
+    for pair in names:
+        depth.setdefault(tuple(sorted(pair)), 0.0)
+    return depth
 
 
 def state() -> dict:
@@ -93,39 +185,29 @@ def pose_report(physical_deg: dict[str, float], azimuth: float = 125.0,
         angles = to_raw(s, physical_deg, invert)
         rb.set_pose(0.6, angles)
 
-        # Drop it until the lowest point of the robot rests on the floor, so the
-        # trunk height means "how tall it stands" rather than "where I parked it".
-        lowest = min(
-            (float(rb.d.geom_xpos[g][2]) for g in range(rb.m.ngeom)
-             if rb.m.geom_type[g] != mj.mjtGeom.mjGEOM_PLANE),
-            default=0.0,
-        )
-        rb.d.qpos[2] -= lowest
+        # Drop it until the lowest point of the robot rests on the floor, so trunk
+        # height means "how tall it stands" rather than "where I parked it".
+        # Measured on the actual mesh vertices - a geom's centre is not its bottom,
+        # and whatever touches down first is not always a foot.
+        rb.d.qpos[2] -= lowest_point(s)
         mj.mj_forward(rb.m, rb.d)
 
-        feet = {leg: rb.foot_world(leg) for leg in LEGS}
-        floor = min(f[2] for f in feet.values())
-        rb.d.qpos[2] -= floor
-        mj.mj_forward(rb.m, rb.d)
-
-        # A leg touching the body IS the mechanical limit. Ignore the floor.
-        floor_geoms = {g for g in range(rb.m.ngeom)
-                       if rb.m.geom_type[g] == mj.mjtGeom.mjGEOM_PLANE}
+        # A part touching another part IS the mechanical limit. Measured on the
+        # real triangles, and only counting overlap beyond what the assembly
+        # already has at rest.
+        MARGIN = 0.0015  # 1.5 mm of new overlap before it counts
+        now = _penetration(s)
         clashes = []
-        for i in range(rb.d.ncon):
-            c = rb.d.contact[i]
-            if c.geom1 in floor_geoms or c.geom2 in floor_geoms:
+        for pair, d in sorted(now.items(), key=lambda kv: -kv[1]):
+            if d - s["baseline"].get(pair, 0.0) <= MARGIN:
                 continue
-            b1 = rb.m.geom_bodyid[c.geom1]
-            b2 = rb.m.geom_bodyid[c.geom2]
-            n1 = mj.mj_id2name(rb.m, mj.mjtObj.mjOBJ_BODY, b1)
-            n2 = mj.mj_id2name(rb.m, mj.mjtObj.mjOBJ_BODY, b2)
-            pair = tuple(sorted((n1 or "?", n2 or "?")))
-            if pair not in clashes:
-                clashes.append(pair)
+            n1 = mj.mj_id2name(rb.m, mj.mjtObj.mjOBJ_BODY, int(pair[0])) or pair[0]
+            n2 = mj.mj_id2name(rb.m, mj.mjtObj.mjOBJ_BODY, int(pair[1])) or pair[1]
+            clashes.append((n1, n2, (d - s["baseline"].get(pair, 0.0)) * 1000))
 
         feet = {leg: rb.foot_world(leg) for leg in LEGS}
         trunk = float(rb.d.xpos[rb.base][2])
+        grounded = [leg for leg, p in feet.items() if p[2] < 0.004]
         span_x = float(max(f[0] for f in feet.values()) - min(f[0] for f in feet.values()))
         span_y = float(max(f[1] for f in feet.values()) - min(f[1] for f in feet.values()))
 
@@ -145,8 +227,9 @@ def pose_report(physical_deg: dict[str, float], azimuth: float = 125.0,
         "stance_x_mm": round(span_x * 1000, 1),
         "stance_y_mm": round(span_y * 1000, 1),
         "feet_mm": {leg: [round(float(v) * 1000, 1) for v in p] for leg, p in feet.items()},
-        "clashes": [" against ".join(p) for p in clashes],
+        "clashes": [f"{a} into {b} by {d:.1f} mm" for a, b, d in clashes],
         "colliding": bool(clashes),
+        "feet_down": len(grounded),
     }
 
 

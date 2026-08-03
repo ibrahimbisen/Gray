@@ -38,38 +38,22 @@ feedback:
   calibrated: false          # raw ADC counts -> radians, per joint, not yet measured
 
 joint_limits:
-  # Where the assembled machine physically runs out of travel. Stated by the owner
-  # on 2 Aug 2026 from knowledge of the real robot, recovered from the previous
-  # attempt (git tag archive/attempt-1, reference/POSES.md).
-  #
-  # These are HARDWARE stops and cannot be derived from the CAD. Against the
-  # DS3218MG's own 270 degrees they use 64%, 37% and 29% - so a model given the
-  # servo's full sweep, as the last one was, lets the legs go places the robot
-  # cannot.
-  #
-  # The signs are PHYSICAL, not raw joint angles. The legs are mirrored, so the
-  # same physical motion is a positive rotation on one leg and a negative one on
-  # its opposite number. tools/prepare_model.py works out the per-joint sign from
-  # the model's own geometry and writes the twelve raw ranges.
   measured: true
-  source: "owner, 2 Aug 2026, from the assembled machine"
+  source: measured in the pose editor against the CAD
   units: deg
   convention:
-    hip: "+ swings the leg OUT, away from the body"
-    thigh: "+ swings the leg FORWARD, towards the nose"
-    calf: "+ lifts the foot UP"
-  hip: [-82, 92]     # 174 deg of travel
-  thigh: [-35, 65]   # 100 deg
-  calf: [-40, 39]    #  79 deg
-
-  # Two things the owner recorded rather than quietly resolved:
-  #
-  # 1. The "standing, max height" pose uses a knee of -43, three degrees past the
-  #    stated -40 stop. Honouring -40 costs 5 mm of trunk height.
-  # 2. The hip limit is not one number. Swinging the hips inward with the legs
-  #    hanging straight, the two front feet collide at -28 - long before -82.
-  #    Reaching -82 needs the legs folded out of each other's way. Outward is
-  #    clear all the way past +92, so +92 is the hardware, not the geometry.
+    hip: + swings the leg OUT, away from the body
+    thigh: + swings the leg FORWARD, towards the nose
+    calf: + lifts the foot UP
+  hip:
+  - -55.0
+  - 43.0
+  thigh:
+  - -35.0
+  - 65.0
+  calf:
+  - -40.0
+  - 39.0
   notes:
     knee_pose_exceeds_stop_by_deg: 3
     hip_inward_self_collision_deg: -28

@@ -232,6 +232,9 @@ function facts(f){
       <div class="v tnum">${f.stance_x_mm}</div></div>
     <div class="fact"><div class="k">stance, side-side</div>
       <div class="v tnum">${f.stance_y_mm}</div></div>
+    <div class="fact"><div class="k">feet on the floor</div>
+      <div class="v ${f.feet_down === 4 ? "ok" : "warnc"}">${f.feet_down}<span
+        style="font-size:13px;color:var(--muted)"> / 4</span></div></div>
     <div class="fact"><div class="k">self-collision</div>
       <div class="v ${f.colliding ? "bad" : "ok"}" style="font-size:16px">
         ${f.colliding ? "HITTING" : "clear"}</div></div>`;
