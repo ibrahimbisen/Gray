@@ -37,6 +37,15 @@ feedback:
   channels: 12
   calibrated: false          # raw ADC counts -> radians, per joint, not yet measured
 
+stance:
+  # The owner drove the model to its tallest standing pose in the pose editor on
+  # 2 Aug 2026 and read 273.8 mm off it. Ride height is 40% below that, which is
+  # where the robot walks: high enough to swing a leg through, low enough to have
+  # somewhere to go when it stumbles.
+  max_height_m: 0.2738
+  ride_drop: 0.40
+  measured_by: owner, in the pose editor
+
 joint_limits:
   measured: true
   source: measured in the pose editor against the CAD
@@ -46,14 +55,14 @@ joint_limits:
     thigh: + swings the leg FORWARD, towards the nose
     calf: + lifts the foot UP
   hip:
-  - -55.0
+  - -65.0
   - 40.0
   thigh:
   - -35.0
-  - 65.0
+  - 45.0
   calf:
-  - -40.0
-  - 39.0
+  - -85.0
+  - 1.0
   notes:
     knee_pose_exceeds_stop_by_deg: 3
     hip_inward_self_collision_deg: -28

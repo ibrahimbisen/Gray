@@ -195,11 +195,13 @@ def travel(rb: Robot, ref, signs, owner) -> dict[tuple[str, str], tuple[float, f
 
 def solve(rb: Robot, height: float, stance_scale: float = 1.0):
     """Angles that put each foot on the floor, under its own hip."""
+    # The model's own limits. They are the owner's, measured in the pose editor
+    # against this geometry, and written in by tools/prepare_model.py - so there
+    # is no second copy here to drift out of date.
     keys = [(leg, seg) for leg in LEGS for seg in ("hip", "thigh", "calf")]
-    bounds = solve.bounds
-    lo = np.array([bounds[k][0] for k in keys])
-    hi = np.array([bounds[k][1] for k in keys])
-    x0 = np.clip(np.array([solve.start[k] for k in keys]), lo + 1e-4, hi - 1e-4)
+    lo = np.array([rb.limits(*k)[0] for k in keys])
+    hi = np.array([rb.limits(*k)[1] for k in keys])
+    x0 = np.clip(np.zeros(len(keys)), lo + 1e-4, hi - 1e-4)
 
     def residual(x):
         rb.set_pose(height, dict(zip(keys, x)))
@@ -273,26 +275,18 @@ def main() -> int:
     print(f"model    {rb.mass*1000:.1f} g, {len(rb.joints)} hinges")
     print(f"servo    {cap} N-m stall, {servo['no_load_speed_rad_s']} rad/s")
 
-    ref = reference_pose(rb)
-    signs = joint_signs(rb)
-    solve.bounds = travel(rb, ref, signs, owner)
-    solve.start = ref
-
-    rb.set_pose(0.5, ref)
-    reach = float(np.mean([rb.hip_world(l)[2] - rb.foot_world(l)[2] for l in LEGS]))
-    hip_off = float(np.mean([rb.hip_world(l)[2] for l in LEGS])) - 0.5
-    tall = reach + hip_off
-    print(f"\nreference pose - legs straight down, which is the zero the owner's")
-    print(f"limits were measured from. Reach hip to foot {reach*1000:.1f} mm,")
-    print(f"so the tallest the trunk can stand is {tall*1000:.1f} mm.\n")
-    print("  offset of the CAD export's zero from that reference, degrees:")
-    for leg in LEGS:
-        a = [np.rad2deg(ref[(leg, s)]) for s in ("hip", "thigh", "calf")]
-        print(f"    {leg:>4}  hip {a[0]:+8.1f}   thigh {a[1]:+8.1f}   calf {a[2]:+8.1f}")
-    print()
+    # How tall it can stand: climb until the legs run out of travel.
+    tall = 0.0
+    for h in np.arange(0.06, 0.40, 0.002):
+        if solve(rb, float(h))[1] <= 0.004:
+            tall = float(h)
+    ride = tall * (1 - cfg["stance"]["ride_drop"]) if "stance" in cfg else tall * 0.6
+    print(f"\ntallest it can stand   {tall*1000:.1f} mm")
+    print(f"ride height, 40% down  {ride*1000:.1f} mm\n")
 
     heights = ([args.height] if args.height
-               else [round(tall * f, 4) for f in np.arange(0.55, 1.001, 0.05)])
+               else sorted({round(tall * f, 4) for f in np.arange(0.5, 1.001, 0.05)}
+                           | {round(ride, 4)}))
     print(f"{'height':>8} {'of max':>7}  {'reach err':>9}  {'worst joint':>12}  "
           f"{'torque':>7}  {'margin':>7}  verdict")
     print("-" * 76)
@@ -309,10 +303,11 @@ def main() -> int:
         (leg, seg), worst = max(tau.items(), key=lambda kv: kv[1])
         margin = cap / worst if worst else float("inf")
         ok = margin >= 1.5
+        mark = "  <- ride height" if abs(h - ride) < 1e-6 else ""
         print(f"{h*1000:7.0f}mm {frac:6.0%}  {err*1000:8.1f}mm   {leg + '_' + seg:>12}  "
-              f"{worst:6.2f}   {margin:6.2f}x  {'holds' if ok else 'TOO WEAK'}")
-        if ok and (best is None or margin < best[3]):
-            best = (h, angles, tau, margin)   # tallest pose that still holds
+              f"{worst:6.2f}   {margin:6.2f}x  {'holds' if ok else 'TOO WEAK'}{mark}")
+        if abs(h - ride) < 1e-6 and ok:
+            best = (h, angles, tau, margin)
 
     if best is None:
         print("\nNo height works. Either the mass is wrong or the servos are too weak.")
@@ -340,8 +335,7 @@ def main() -> int:
                        for (leg, seg), v in angles.items()},
         "holding_torque_nm": {f"{leg}_{seg}": round(float(v), 4) for (leg, seg), v in tau.items()},
         "servo_stall_nm": float(cap),
-        "zero_offset_deg": {f"{leg}_{seg}": round(float(np.rad2deg(v)), 3)
-                            for (leg, seg), v in ref.items()},
+        "zero": "the sitting pose, as exported from SolidWorks",
     }, sort_keys=False))
     print(f"\nwrote {(OUT / 'stance.yaml').relative_to(ROOT)}")
 
