@@ -184,8 +184,13 @@ def best_for_task(task: str, summaries: list[dict] | None = None) -> dict:
         })
 
     measured = {c["key"] for c in criteria}
+    # "Never measured" and "measured, but only as prose" are different facts and
+    # must not share a row. Saying drift was never measured is simply false -
+    # three runs measured it - and a page that says so about a number you can
+    # read in a log is worse than one that says nothing.
     unmeasured = [{"key": k, "name": CRITERIA[k]["name"], "bar": bars[k],
-                   "unit": CRITERIA[k]["unit"]}
+                   "unit": CRITERIA[k]["unit"],
+                   "state": "prose_only" if prose_only else "never"}
                   for k in bars if k not in measured]
 
     return {
@@ -226,6 +231,7 @@ def subsection_progress(key: str, summaries: list[dict] | None = None) -> dict:
         if rated:
             worst = min(rated, key=lambda c: c["ratio"])
 
+    live = next((s for s in (skills.load()["subsections"]) if s["key"] == key), {})
     return {
         "key": key,
         "id": sub["id"],
@@ -233,6 +239,13 @@ def subsection_progress(key: str, summaries: list[dict] | None = None) -> dict:
         "kind": sub["kind"],
         "state": sub["state"],
         "rule": sub["rule"],
+        "what": sub["what"],
+        # How its skill rows are covered, and what it is actually authored
+        # against. Two different questions, both on the page.
+        "skill_count": live.get("count", 0),
+        "coverage": live.get("coverage", {}),
+        "blocked_skills": live.get("blocked", []),
+        "trains_with": trains_with(key),
         "bar_prose": plan.STAGE2["bars"].get(key, ""),
         "trigger": sub.get("trigger", ""),
         "gap": sub.get("gap", ""),
@@ -300,6 +313,54 @@ def startable() -> list[dict]:
     return out
 
 
+def trains_with(key: str) -> dict:
+    """What a subsection is actually AUTHORED against, as opposed to filed under.
+
+    A run has one reward function and a handful of command sliders. Its skill
+    rows are the checklist, not the thing being optimised - so the page shows
+    both, side by side, because conflating them is what makes 69 rows look like
+    69 pieces of work.
+
+    Imported lazily: this pulls in torch. Degrades to "not written yet", which
+    is also the honest answer for R2 and R3 - their tasks do not exist.
+    """
+    task_for = {"walk": "Gray-Walk"}      # only R1 has a task today
+    task = task_for.get(key)
+    if not task:
+        return {"exists": False, "terms": [], "commands": [],
+                "note": "no task has been written for this yet"}
+    try:
+        import importlib  # noqa: PLC0415
+        import sys  # noqa: PLC0415
+
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        mod = importlib.import_module("gray.tasks.walk_env_cfg")
+        cfg = mod.walk_env_cfg()
+    except Exception as exc:  # noqa: BLE001
+        return {"exists": False, "terms": [], "commands": [],
+                "note": f"could not read the task: {exc}"}
+
+    terms = sorted(
+        ({"name": n, "weight": float(t.weight),
+          "sign": "+" if t.weight > 0 else "-"} for n, t in cfg.rewards.items()),
+        key=lambda t: (t["sign"] != "+", -abs(t["weight"])))
+    cmd = cfg.commands.get("walk")
+    commands = []
+    if cmd is not None:
+        commands = [
+            {"name": "forward", "range": list(cmd.ranges.lin_vel_x), "unit": "m/s"},
+            {"name": "sideways", "range": list(cmd.ranges.lin_vel_y), "unit": "m/s"},
+            {"name": "turn", "range": list(cmd.ranges.ang_vel_z), "unit": "rad/s"},
+        ]
+    return {
+        "exists": True, "task": task, "terms": terms, "commands": commands,
+        "paid": sum(1 for t in terms if t["sign"] == "+"),
+        "fined": sum(1 for t in terms if t["sign"] == "-"),
+        "note": "",
+    }
+
+
 def overview(summaries: list[dict] | None = None) -> dict:
     """The whole project against its bars. One call, no disk reads of its own."""
     if summaries is None:
@@ -323,9 +384,66 @@ def overview(summaries: list[dict] | None = None) -> dict:
     if headline:
         headline["times_over"] = (1.0 / headline["ratio"]) if headline["ratio"] else None
 
+    # Blind spots, grouped by WHAT WOULD FIX THEM. An earlier version listed
+    # every gap as its own row and printed the same fact eight times - once per
+    # subsection with no verifier - while also claiming criteria were "never
+    # measured" that three runs had measured, just not in a comparable format.
+    # Grouped by remedy it is four lines instead of twenty-six, and each one
+    # says what to do.
+    no_verifier = [s["id"] for s in subs if not s["verifiable"]]
+    prose_only = sorted({u["name"] for s in subs for u in s["unmeasured"]
+                         if u.get("state") == "prose_only"})
+    never = sorted({u["name"] for s in subs for u in s["unmeasured"]
+                    if u.get("state") != "prose_only"})
+    clauses = [c for s in subs for c in s["unverified_clauses"]]
+    blind = []
+    if prose_only:
+        blind.append({
+            "what": f"{len(prose_only)} criteria measured, but not comparably",
+            "detail": ", ".join(prose_only),
+            "why": "these runs were verified before the structured format, so the "
+                   "numbers exist in the job logs but cannot be charted or compared",
+            "fix": "re-run scripts/verify.py on those runs - the checkpoints are "
+                   "still on disk and it takes about two minutes each",
+        })
+    if never:
+        blind.append({
+            "what": f"{len(never)} criteria never measured",
+            "detail": ", ".join(never),
+            "why": "the bar defines them and no run has produced the number",
+            "fix": "finish a run with the current verifier",
+        })
+    if clauses:
+        blind.append({
+            "what": f"{len(clauses)} clauses of the bar nothing can ask for",
+            "detail": "; ".join(c.split(" - ")[0] for c in clauses),
+            "why": "the command vector has no height, pitch or roll, and nothing "
+                   "per foot - so these cannot be commanded, let alone measured",
+            "fix": "widen the command vector, which changes the observation and "
+                   "forces a retrain",
+        })
+    if no_verifier:
+        blind.append({
+            "what": f"{len(no_verifier)} subsections have no verifier at all",
+            "detail": ", ".join(no_verifier),
+            "why": "scripts/verify.py only knows Stand, Push and Walk. For the "
+                   "rest there is no bar to measure against, so their progress is "
+                   "genuinely unknown rather than zero",
+            "fix": "write a verifier for R2 first - it is the next run",
+        })
+    blind.append({
+        "what": "3 numbers in the model have no datasheet",
+        "detail": "servo stiffness and speed under load, backlash, loop latency",
+        "why": "nobody has measured them and no supplier publishes them, so every "
+               "run is trained against an estimate",
+        "fix": "stage 3.3, on the physical robot. Until then they are randomised "
+               "rather than guessed, which is the correct handling",
+    })
+
     return {
         "subsections": subs,
         "headline": headline,
+        "blind_spots": blind,
         "runs_total": len(summaries),
         "runs_verified": len(verified),
         "runs_structured": len(structured),

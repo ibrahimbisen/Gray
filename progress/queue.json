@@ -1,6 +1,6 @@
 {
   "paused": false,
-  "next_id": 24,
+  "next_id": 25,
   "jobs": [
     {
       "task": "Gray-Push",
@@ -251,14 +251,27 @@
       "verify": true,
       "clamped": "",
       "id": "j0010",
-      "state": "running",
+      "state": "done",
       "created": "2026-08-03T06:00:40",
       "started": "2026-08-03T10:59:22",
-      "finished": null,
+      "finished": "2026-08-03T12:35:20",
       "run_id": "2026-08-03_10-59-26_walk_m3100_c",
-      "exit_code": null,
+      "exit_code": 0,
       "error": "",
-      "steps": [],
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 5699.1,
+          "exit_code": 0,
+          "at": "2026-08-03T12:34:21"
+        },
+        {
+          "name": "verify",
+          "seconds": 30.0,
+          "exit_code": 1,
+          "at": "2026-08-03T12:35:20"
+        }
+      ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0010.log"
     },
@@ -277,14 +290,49 @@
       "verify": true,
       "clamped": "",
       "id": "j0023",
-      "state": "queued",
+      "state": "cancelled",
       "created": "2026-08-03T12:01:34",
-      "started": null,
+      "started": "2026-08-03T12:35:20",
+      "finished": "2026-08-03T12:37:03",
+      "run_id": "2026-08-03_12-35-24_walk_m3100_h",
+      "exit_code": null,
+      "error": "cancelled from the dashboard",
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 105.1,
+          "exit_code": 0,
+          "at": "2026-08-03T12:37:05"
+        }
+      ],
+      "owner": "31132@061706",
+      "log": "progress/jobs/j0023.log"
+    },
+    {
+      "task": "Gray-Walk",
+      "name": "walk_m3100_h",
+      "note": "Landing-speed term, at 6400 robots. NOTE the confound: walk_g and walk_c ran at 3072, so this differs from them by the new term AND by robot count. 6400 is the owner call - the card was sitting at 7.8 of 12 GB and idle capacity is worse than a slightly muddier comparison. walk_d follows at 6400 with no new term, which recovers the clean A/B.",
+      "num_envs": 6400,
+      "iterations": 3000,
+      "stop_at": 0.965,
+      "no_video": false,
+      "rewards": {},
+      "push_speed": null,
+      "push_spin": null,
+      "film": true,
+      "verify": true,
+      "clamped": "",
+      "id": "j0024",
+      "state": "running",
+      "created": "2026-08-03T12:37:03",
+      "started": "2026-08-03T12:37:42",
       "finished": null,
-      "run_id": null,
+      "run_id": "2026-08-03_12-37-47_walk_m3100_h",
       "exit_code": null,
       "error": "",
-      "steps": []
+      "steps": [],
+      "owner": "31132@061706",
+      "log": "progress/jobs/j0024.log"
     },
     {
       "task": "Gray-Walk",

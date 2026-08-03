@@ -1,0 +1,3 @@
+iteration,reward,episode_length,height_reward,upright_reward,tipped_over,collapsed,exploration,steps_per_second,speed_error,turn_error,stepping,leg_swing,dragging,ground_covered,landing_force
+0,0.601288,21.190001,0.010873,0.010676,1.708333,0.0,0.987201,7319.0,0.007253,0.019471,0.001085,0.005552,-0.001597,0.002613,8.480498
+1,1.387405,46.84,0.029195,0.025497,21.333334,0.0,0.977253,10735.0,0.023596,0.065203,0.005971,0.019247,-0.005453,0.011995,8.325912

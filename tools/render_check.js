@@ -81,8 +81,8 @@ async function overviewPage() {
 
   let bad = 0;
   console.log("\noverview.html:");
-  for (const fn of ["rail", "hero", "board", "trend", "runsPanel",
-                    "left", "unknown"]) {
+  for (const fn of ["rail", "hero", "board", "trend", "stages",
+                    "blockedPanel", "runsPanel", "left", "unknown"]) {
     try {
       const out = vm.runInContext(`${fn}()`, sandbox);
       if (typeof out !== "string") throw new Error(`returned ${typeof out}`);

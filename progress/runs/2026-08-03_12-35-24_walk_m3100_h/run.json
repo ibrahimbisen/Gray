@@ -4,10 +4,10 @@
   "stage": 5,
   "stage_name": "Walk",
   "task": "Gray-Walk",
-  "status": "finished",
+  "status": "cancelled",
   "bar": "Walks 5 m without falling, holds commanded speed within 0.05 m/s, and drifts less than 100 mm sideways over 20 s.",
-  "started": "2026-08-03T10:59:26",
-  "finished": "2026-08-03T12:34:18",
+  "started": "2026-08-03T12:35:24",
+  "finished": "2026-08-03T12:37:03",
   "iterations_target": 3000,
   "notes": "3072 robots at once, 50 Hz control.",
   "scoring": [
@@ -23,7 +23,7 @@
     },
     {
       "name": "track_speed",
-      "weight": 3.0,
+      "weight": 2.0,
       "what": "Moving at the speed it was told to, measured on a trunk speed averaged over about half a stride rather than the raw one. This is the term that pays for walking at all."
     },
     {
@@ -32,14 +32,14 @@
       "what": "A foot at the wrong height while it is travelling. This is what stops the dragging leg that shows up in every walking run without it, and it is scored continuously rather than only at touchdown."
     },
     {
-      "name": "ground_covered",
-      "weight": 1.5,
-      "what": "Ground actually put behind it. Speed tracking alone can be satisfied by rocking forwards and backwards, which averages out to the right speed and gets nowhere. This only pays for net progress, so that trick earns nothing."
-    },
-    {
       "name": "track_turn",
       "weight": 1.0,
       "what": "Turning at the rate it was told to, and not turning when it was not asked to."
+    },
+    {
+      "name": "ground_covered",
+      "weight": 1.0,
+      "what": "Ground actually put behind it. Speed tracking alone can be satisfied by rocking forwards and backwards, which averages out to the right speed and gets nowhere. This only pays for net progress, so that trick earns nothing."
     },
     {
       "name": "wandering",
@@ -92,6 +92,11 @@
       "what": "Turning off the heading it was sent along. Different from 'wandering': a robot can hold a perfectly straight line while slowly rotating to face sideways, and this is the term that catches that. Yaw RATE is already scored - this catches the drift that a near-zero rate hides, because a tenth of a degree per step is invisible in the rate and 20 degrees off after twenty seconds."
     },
     {
+      "name": "landing_speed",
+      "weight": -0.1,
+      "what": ""
+    },
+    {
       "name": "rocking",
       "weight": -0.02,
       "what": "Trunk rolling and pitching. Priced on its own rather than lumped in with turning, so rocking costs whether or not the robot is also holding its heading."
@@ -126,107 +131,5 @@
       "weight": -2.5e-07,
       "what": "Joint acceleration. Footfalls spike it, and a servo gearbox is what absorbs that spike on the real robot."
     }
-  ],
-  "verdict": "not passed",
-  "verdict_detail": "64 robots x 25 s - stayed up for 25 s: 100% \u00b7 trunk within 40 mm of target: 2.05 mm \u00b7 uprightness above 0.9: 0.9971 \u00b7 covered 5 m: 7.47 m \u00b7 speed within 0.05 m/s of 0.25: 0.071 m/s \u00b7 sideways drift under 100 mm: 2125.0 mm",
-  "verdict_checks": [
-    {
-      "key": "survive",
-      "name": "stayed up for 25 s",
-      "measured": 1.0,
-      "bar": 0.9,
-      "unit": "fraction",
-      "better": "higher",
-      "passed": true,
-      "worst": 1.0,
-      "margin": 0.09999999999999998,
-      "ratio": 1.1111111111111112,
-      "note": "0 of 64 fell",
-      "format": "{:.0%}"
-    },
-    {
-      "key": "height_err",
-      "name": "trunk within 40 mm of target",
-      "measured": 2.0491795539855957,
-      "bar": 40.0,
-      "unit": "mm",
-      "better": "lower",
-      "passed": true,
-      "worst": 23.445650100708008,
-      "margin": 37.950820446014404,
-      "ratio": 19.520007371828957,
-      "note": "worst 23.4 mm",
-      "format": "{:.2f} mm"
-    },
-    {
-      "key": "upright",
-      "name": "uprightness above 0.9",
-      "measured": 0.9970656037330627,
-      "bar": 0.9,
-      "unit": "ratio",
-      "better": "higher",
-      "passed": true,
-      "worst": 0.9927182793617249,
-      "margin": 0.09706560373306272,
-      "ratio": 1.1078506708145142,
-      "note": "worst 0.9927",
-      "format": "{:.4f}"
-    },
-    {
-      "key": "distance",
-      "name": "covered 5 m",
-      "measured": 7.471604347229004,
-      "bar": 5.0,
-      "unit": "m",
-      "better": "higher",
-      "passed": true,
-      "worst": 2.8476226329803467,
-      "margin": 2.471604347229004,
-      "ratio": 1.4943208694458008,
-      "note": "worst 2.85 m",
-      "format": "{:.2f} m"
-    },
-    {
-      "key": "speed_err",
-      "name": "speed within 0.05 m/s of 0.25",
-      "measured": 0.07108177244663239,
-      "bar": 0.05,
-      "unit": "m/s",
-      "better": "lower",
-      "passed": false,
-      "worst": 0.26992154121398926,
-      "margin": -0.021081772446632382,
-      "ratio": 0.7034152115092458,
-      "note": "worst 0.270 m/s",
-      "format": "{:.3f} m/s"
-    },
-    {
-      "key": "drift",
-      "name": "sideways drift under 100 mm",
-      "measured": 2125.04736328125,
-      "bar": 100.0,
-      "unit": "mm",
-      "better": "lower",
-      "passed": false,
-      "worst": 5696.0439453125,
-      "margin": -2025.04736328125,
-      "ratio": 0.04705777467735669,
-      "note": "worst 5696 mm",
-      "format": "{:.1f} mm"
-    }
-  ],
-  "verdict_schema": 1,
-  "verdict_at": "2026-08-03T12:35:18",
-  "verdict_context": {
-    "task": "Gray-Walk",
-    "checkpoint": "logs/rsl_rl/gray_walk/2026-08-03_10-59-26_walk_m3100_c/model_2999.pt",
-    "robots": 64,
-    "seconds": 25.0,
-    "target_height_m": 0.1904,
-    "test_speed": 0.25,
-    "drift": [
-      "  track_speedtrained 3.0   testing 2.0",
-      "  ground_coveredtrained 1.5   testing 1.0"
-    ]
-  }
+  ]
 }

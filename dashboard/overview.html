@@ -390,7 +390,112 @@ function runsPanel(){
         <td class="faint small">${esc(r.duration || "")}</td>
         <td class="faint small">${esc(r.started_age || "")}</td>
       </tr>`).join("")}
-    </table></div></section>`;
+    </table>
+    <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--grid)">
+      <div class="small"><b>Every run above started from a random, untrained
+        robot.</b> None of them continued from another. <code>walk_g</code> did not
+        begin where <code>walk_a</code> ended.</div>
+      <div class="faint small" style="margin-top:6px">That is deliberate while the
+        reward is still being debugged: if a run inherited 3000 iterations of prior
+        training AND a changed number, there would be no way to tell which produced
+        the improvement. From scratch is the only clean comparison.</div>
+      <div class="faint small" style="margin-top:6px"><b style="color:var(--warn)">To
+        add later - stacking.</b> Once the reward function is settled and the goal
+        is simply a better walker rather than a better answer, runs should warm-start
+        from the last good policy instead of from noise. Same reward, more training,
+        far less wall-clock per attempt. Not yet: it would hide which change did
+        what, and the numbers are still moving.</div>
+    </div></div></section>`;
+}
+
+/* ---------------- what each stage trains for ---------------- */
+
+const COVER = {
+  command:   ["set a command", "var(--good)"],
+  condition: ["a dial in the scene", "var(--live)"],
+  emerges:   ["falls out of the reward", "var(--good)"],
+  measured:  ["measured, not trained", "var(--muted)"],
+  blocked:   ["cannot be trained yet", "var(--crit)"],
+};
+
+function stages(){
+  const subs = S.progress.subsections;
+  return `<section>
+    <div class="sech"><h2>What each stage trains for</h2>
+      <span class="note">the skill rows are the checklist · the reward terms are
+        what is actually written and tuned</span></div>
+    <div class="cols">${subs.map(s => {
+      const cov = s.coverage || {};
+      const total = Object.values(cov).reduce((a,b) => a+b, 0) || 1;
+      const tw = s.trains_with || {};
+      const bars = Object.entries(cov)
+        .sort((a,b) => b[1]-a[1])
+        .map(([k,v]) => `<div style="display:flex;align-items:center;gap:7px;padding:2px 0">
+            <span style="width:9px;height:9px;border-radius:2px;flex:0 0 auto;
+              background:${(COVER[k]||["",""])[1]}"></span>
+            <span class="small" style="flex:1">${esc((COVER[k]||[k])[0])}</span>
+            <b class="small tnum">${v}</b>
+          </div>`).join("");
+      const stack = Object.entries(cov).sort((a,b) => b[1]-a[1]).map(([k,v]) =>
+        `<span style="display:block;height:100%;float:left;width:${100*v/total}%;
+           background:${(COVER[k]||["",""])[1]}"></span>`).join("");
+      return `<div class="card">
+        <h3><span class="chip">${esc(s.id)}</span>&nbsp;${esc(s.name)}
+          <span class="grow"></span>
+          <span class="chip ${s.kind === "run" ? "live" : ""}">${esc(s.kind)}</span></h3>
+        <div class="faint small" style="margin-bottom:9px">${esc(s.what || s.rule)}</div>
+
+        <div class="faint small">${s.skill_count} skill rows, by how they are covered</div>
+        <div style="height:7px;border-radius:99px;overflow:hidden;background:var(--line);
+             margin:5px 0 7px">${stack}</div>
+        ${bars}
+
+        ${tw.exists ? `<div style="margin-top:11px;padding-top:9px;
+            border-top:1px solid var(--grid)">
+            <div class="faint small">actually written and tuned</div>
+            <div style="font-size:19px;font-weight:600;margin-top:3px">
+              ${tw.terms.length} reward terms</div>
+            <div class="faint small">${tw.paid} paid for · ${tw.fined} fined ·
+              ${tw.commands.length} command sliders</div>
+            <div class="small" style="margin-top:6px">${tw.commands.map(c =>
+              `<code>${esc(c.name)} ${c.range[0]} to ${c.range[1]} ${esc(c.unit)}</code>`
+              ).join(" ")}</div>
+          </div>`
+          : `<div style="margin-top:11px;padding-top:9px;border-top:1px solid var(--grid)"
+                class="faint small">${esc(tw.note || "")}</div>`}
+
+        ${s.verifiable ? `<div style="margin-top:9px" class="small">
+            <span style="color:var(--good)">${s.met} met</span> ·
+            <span style="color:${s.failing ? "var(--crit)" : "var(--muted)"}">${s.failing} failing</span> ·
+            <span class="faint">${s.never_measured} never measured</span></div>`
+          : `<div style="margin-top:9px" class="faint small">no verifier - progress
+             cannot be measured for this</div>`}
+      </div>`;}).join("")}</div>
+
+    ${blockedPanel()}
+  </section>`;
+}
+
+function blockedPanel(){
+  const rows = [];
+  for(const s of S.progress.subsections)
+    for(const b of (s.blocked_skills || []))
+      rows.push({sub: s.id, n: b.n, name: b.name,
+                 why: b.coverage_why || `filed under "${b.category}" - needs something the reward cannot provide`});
+  if(!rows.length) return "";
+  return `<div class="card" style="margin-top:12px">
+    <h3>Rows no reward can reach<span class="grow"></span>
+      <span class="chip bad">${rows.length}</span></h3>
+    <div class="faint small" style="margin-bottom:9px">These are in the library and
+      cannot be trained by tuning anything. They need a capability that does not
+      exist &mdash; a camera, a per-foot command, an object in the scene. Listed so
+      they are not quietly counted as work in progress.</div>
+    <div class="wrapx"><table>
+      <tr><th></th><th class="n">#</th><th>Skill</th><th>Why not</th></tr>
+      ${rows.map(r => `<tr><td><span class="chip">${esc(r.sub)}</span></td>
+        <td class="n faint">${r.n}</td><td>${esc(r.name)}</td>
+        <td class="faint small">${esc(r.why)}</td></tr>`).join("")}
+    </table></div></div>`;
 }
 
 /* ---------------- what is left ---------------- */
@@ -439,28 +544,25 @@ function left(){
 /* ---------------- not known ---------------- */
 
 function unknown(){
-  const rows = [];
-  for(const s of S.progress.subsections){
-    for(const u of s.unmeasured)
-      rows.push([s.id, `${u.name} (${(u.task||"").replace("Gray-","")})`,
-                 "the bar defines it, no run has measured it"]);
-    for(const c of s.unverified_clauses){
-      const i = c.indexOf(" - ");
-      rows.push([s.id, i > 0 ? c.slice(0, i) : c, i > 0 ? c.slice(i + 3) : ""]);
-    }
-    if(!s.verifiable) rows.push([s.id, `${s.name} — the whole bar`,
-                                 "no verifier has been written for this subsection"]);
-  }
-  for(const o of S.stage1_open) rows.push(["1", o.q, o.n]);
+  const b = S.progress.blind_spots || [];
   return `<section>
-    <div class="sech"><h2>What this page does not know</h2>
-      <span class="note">the counterweight · without it, "criteria met" reads as a
-        fraction of the whole job</span></div>
-    <div class="card wrapx"><table>
-      <tr><th></th><th>Not known</th><th>Why</th></tr>
-      ${rows.map(r => `<tr><td><span class="chip">${esc(r[0])}</span></td>
-        <td>${esc(r[1])}</td><td class="faint small">${esc(r[2])}</td></tr>`).join("")}
-    </table></div></section>`;
+    <div class="sech"><h2>Blind spots</h2>
+      <span class="note">what cannot be answered right now, and the one thing that
+        would fix each</span></div>
+    <div class="cols">${b.map(x => `<div class="card">
+      <h3 style="color:var(--warn)">${esc(x.what)}</h3>
+      <div class="small" style="margin-bottom:7px">${esc(x.detail)}</div>
+      <div class="faint small" style="margin-bottom:9px">${esc(x.why)}</div>
+      <div style="border-top:1px solid var(--grid);padding-top:8px">
+        <div class="faint small">what fixes it</div>
+        <div class="small" style="color:var(--good)">${esc(x.fix)}</div>
+      </div>
+    </div>`).join("")}</div>
+    <div class="faint small" style="margin-top:10px">Grouped by remedy, not listed
+      one per gap. Listed individually this was twenty-six rows, eight of which
+      said the same thing and twelve of which claimed criteria were never measured
+      when three runs had measured them - just not in a comparable format.</div>
+  </section>`;
 }
 
 /* ---------------- draw ---------------- */
@@ -468,7 +570,7 @@ function unknown(){
 function draw(){
   nav();
   document.getElementById("body").innerHTML =
-    rail() + hero() + board() + trend() + runsPanel() + left() + unknown();
+    rail() + hero() + board() + trend() + stages() + runsPanel() + left() + unknown();
   document.querySelectorAll("[data-run]").forEach(el =>
     el.onclick = () => { location.href = "/runs#run=" + encodeURIComponent(el.dataset.run); });
 }

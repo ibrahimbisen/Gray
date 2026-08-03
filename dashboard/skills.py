@@ -193,6 +193,61 @@ SUBSECTIONS = [
      "state": "parked"},
 ]
 
+# HOW a skill is covered, which is a different question from WHERE it is filed.
+#
+# The owner's question, and it is the right one: "if one reward function does all
+# 69, why are we training it to back into a tight spot?" We are not. Nothing in
+# the code mentions any of these rows. They are covered - or not - in five very
+# different ways, and lumping them together is what makes a 69-row list look like
+# 69 pieces of work.
+#
+#   command   set a number and it happens. Already covered by the reward.
+#   condition a dial in the scene. Same reward, different world.
+#   emerges   nobody asks for it; it falls out of the reward terms.
+#   blocked   needs a capability that does not exist yet - a camera, a
+#             per-foot command, an object in the scene. No amount of reward
+#             tuning produces it.
+#   measured  read off a trained policy. Never trained toward.
+COVERAGE = {
+    "command":   "set a command and it happens - already covered",
+    "condition": "a dial in the scene - same reward, different world",
+    "emerges":   "nobody asks for it; it falls out of the reward",
+    "blocked":   "needs a capability that does not exist yet",
+    "measured":  "read off a trained policy, never trained toward",
+}
+
+_COVERAGE_BY_CATEGORY = {
+    "Walking": "command", "Turning": "command", "Body control": "command",
+    "Body positions": "command", "Gaits": "command",
+    "Terrain": "condition", "Payload": "condition", "Disturbance": "condition",
+    "Degraded hardware": "condition", "People": "condition",
+    "Hard variants": "condition", "Stuck": "condition",
+    "Feet": "emerges", "Foot movements": "emerges",
+    "Falls & recovery": "command", "Startup": "command",
+    "Athletic": "blocked", "Air movements": "blocked",
+    # These need to know where the robot IS, or where the walls are. That is
+    # localisation and perception - a layer above the policy that does not
+    # exist. Filing them as training targets overstates what the reward can do.
+    "Perception": "blocked", "Precision": "blocked", "Path shapes": "blocked",
+    "Speed": "measured", "Smoothness": "measured", "Self-check": "measured",
+    "Chaining": "measured",
+}
+
+# Rows whose coverage is not what their category implies. Same idea as
+# _OVERRIDE, and each one carries why.
+_COVERAGE_OVERRIDE = {
+    8:  ("blocked", "standing on three legs needs a per-foot command; the vector "
+                    "has vx, vy and yaw and nothing per leg"),
+    9:  ("blocked", "same - two diagonal legs is a per-foot command"),
+    10: ("blocked", "holding one leg out is a per-foot command"),
+    21: ("blocked", "placing a foot on a marked target needs to see the target"),
+    22: ("emerges", "a low object is felt through the leg, not seen"),
+    37: ("emerges", "a cable or rug edge is felt on contact"),
+    59: ("emerges", "an unseen hole is exactly that - felt, not seen"),
+    99: ("blocked", "'see an obstacle' is the whole point - needs a camera"),
+    130: ("blocked", "stepping stones need to see where the stones are"),
+}
+
 # Where a category goes by default...
 _DEFAULT = {
     # Everything on its feet is one run. Body control and body positions used to
@@ -286,17 +341,33 @@ def load() -> dict:
             key = _DEFAULT.get(category)
         if key is None:            # a category nobody has classified yet
             key = "robust"
+        if n in _COVERAGE_OVERRIDE:
+            cover, cover_why = _COVERAGE_OVERRIDE[n]
+        else:
+            cover = _COVERAGE_BY_CATEGORY.get(category, "condition")
+            cover_why = ""
         by_key[key].append({
             "n": n,
             "name": (r.get("Skill / Event") or "").strip(),
             "dial": (r.get("Difficulty dial") or "").strip().lstrip("-").strip(),
             "category": category,
+            "coverage": cover,
+            "coverage_why": cover_why,
         })
 
     out = []
     for s in SUBSECTIONS:
         items = sorted(by_key[s["key"]], key=lambda i: i["n"])
+        # How this subsection's rows are covered, counted. This is the number
+        # that answers "what are we actually training for" - a run with 69 rows
+        # of which 40 are commands and 9 are blocked is a very different job
+        # from 69 things to teach.
+        cover: dict[str, int] = {}
+        for i in items:
+            cover[i["coverage"]] = cover.get(i["coverage"], 0) + 1
         out.append({**s, "count": len(items), "skills": items,
+                    "coverage": cover,
+                    "blocked": [i for i in items if i["coverage"] == "blocked"],
                     "categories": sorted({i["category"] for i in items})})
 
     # Counts are reported PER KIND and never summed across kinds. One combined
