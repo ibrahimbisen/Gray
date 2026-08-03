@@ -88,15 +88,17 @@ def write_origin(el, xyz: np.ndarray, rot: np.ndarray) -> None:
 # --------------------------------------------------------------------------
 
 
-def forward_kinematics(root) -> dict[str, np.ndarray]:
-    """Position of every link's frame at the zero configuration."""
+def forward_kinematics_full(root) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    """Position and orientation of every link's frame at the zero configuration."""
     parent, xyz_of, rot_of = {}, {}, {}
     for j in root.findall("joint"):
+        if j.get("type") == "floating":
+            continue  # the world link is bookkeeping, not geometry
         child = j.find("child").get("link")
         parent[child] = j.find("parent").get("link")
         xyz_of[child], rot_of[child] = read_origin(j)
 
-    out: dict[str, np.ndarray] = {}
+    out: dict[str, tuple[np.ndarray, np.ndarray]] = {}
     for link in {l.get("name") for l in root.findall("link")}:
         chain, node, seen = [], link, set()
         while node in parent and node not in seen:
@@ -107,8 +109,12 @@ def forward_kinematics(root) -> dict[str, np.ndarray]:
         for n in reversed(chain):
             pos = pos + rot @ xyz_of[n]
             rot = rot @ rot_of[n]
-        out[link] = pos
+        out[link] = (pos, rot)
     return out
+
+
+def forward_kinematics(root) -> dict[str, np.ndarray]:
+    return {k: v[0] for k, v in forward_kinematics_full(root).items()}
 
 
 def derive_base_frame(root) -> tuple[np.ndarray, np.ndarray, list[str]]:
@@ -193,6 +199,92 @@ def retarget_base(root, rot: np.ndarray, origin: np.ndarray) -> None:
             write_origin(el, rt @ (xyz - origin), rt @ r)
             if tag == "inertial":
                 rotate_inertia(el, rt)
+
+
+def apply_joint_limits(root, cfg: dict) -> list[str]:
+    """Write the owner's measured travel into all 12 joints, per-joint sign included.
+
+    The owner's numbers are physical - "+ lifts the foot up" - but the legs are
+    mirrored, so the same physical motion is a positive rotation on one leg and a
+    negative one on its mirror. Rather than hand-maintain a table of twelve signs,
+    each one is measured off the model: spin the joint a little and see which way
+    the leg below it actually goes.
+    """
+    lim = cfg.get("joint_limits", {})
+    if not lim.get("measured"):
+        return ["joint_limits.measured is false in robot.yaml - no limits written"]
+
+    servo = cfg["servo"]
+    fk = forward_kinematics_full(root)
+    report = []
+
+    for j in root.findall("joint"):
+        if j.get("type") in ("fixed", "floating"):
+            continue
+        part = leg_seg(j.get("name")) or leg_seg(j.find("child").get("link"))
+        if part is None or part[1] not in lim:
+            report.append(f"{j.get('name'):10s} not a known leg joint - left alone")
+            continue
+        leg, seg = part
+        child = j.find("child").get("link")
+
+        # Where the joint is, and which way its axis points, in the robot's frame.
+        pos, rot = fk[child]
+        axis_el = j.find("axis")
+        axis_local = _np_vec(axis_el.get("xyz", "1 0 0")) if axis_el is not None else np.array([1.0, 0, 0])
+        axis = rot @ axis_local
+        axis /= np.linalg.norm(axis)
+
+        # A point on the segment below this joint, so we can see how it swings.
+        # It has to be the calf's centre of mass, not the calf link's frame: that
+        # frame sits *at* the knee, so it does not move when the knee turns and the
+        # sign comes out backwards. Verified against MuJoCo, which is how that bug
+        # was found.
+        probe = calf_com(root, fk, leg)
+        if probe is None:
+            report.append(f"{j.get('name'):10s} no calf found for leg {leg} - skipped")
+            continue
+        motion = np.cross(axis, probe - pos)
+
+        # What "positive" means physically, per the owner's convention.
+        outward = np.array([0.0, 1.0, 0.0]) if leg in ("fl", "bl") else np.array([0.0, -1.0, 0.0])
+        wanted = {"hip": outward,
+                  "thigh": np.array([1.0, 0.0, 0.0]),
+                  "calf": np.array([0.0, 0.0, 1.0])}[seg]
+        sign = 1.0 if float(motion @ wanted) >= 0 else -1.0
+
+        lo_deg, hi_deg = lim[seg]
+        lo, hi = sorted([math.radians(sign * lo_deg), math.radians(sign * hi_deg)])
+
+        el = j.find("limit")
+        if el is None:
+            el = ET.SubElement(j, "limit")
+        el.set("lower", f"{lo:.6f}")
+        el.set("upper", f"{hi:.6f}")
+        el.set("effort", f"{servo['stall_torque_nm']}")
+        el.set("velocity", f"{servo['no_load_speed_rad_s']}")
+        report.append(
+            f"{j.get('name'):10s} {seg:5s} {'+' if sign > 0 else '-'}  "
+            f"{math.degrees(lo):+7.1f} to {math.degrees(hi):+7.1f} deg"
+        )
+    return report
+
+
+def _np_vec(text: str) -> np.ndarray:
+    return np.array([float(v) for v in text.split()])
+
+
+def calf_com(root, fk, leg: str):
+    """Where a leg's calf actually has its mass, in the robot's frame."""
+    for link in root.findall("link"):
+        name = link.get("name")
+        if (leg_seg(name) or ("", "")) != (leg, "calf"):
+            continue
+        pos, rot = fk[name]
+        inertial = link.find("inertial")
+        offset = read_origin(inertial)[0] if inertial is not None else np.zeros(3)
+        return pos + rot @ offset
+    return None
 
 
 def add_floating_base(root) -> None:
@@ -369,6 +461,7 @@ def main() -> int:
     mass_report = fix_masses(root, cfg)
     rot, origin, notes = derive_base_frame(root)
     retarget_base(root, rot, origin)
+    limit_report = apply_joint_limits(root, cfg)
     n_meshes = rewrite_mesh_paths(root)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -383,6 +476,9 @@ def main() -> int:
     print(f"output   {OUT_URDF.relative_to(ROOT)}   ({n_meshes} mesh references)")
     print("\nmass, from gray/config/robot.yaml:")
     for line in mass_report:
+        print(f"  {line}")
+    print("\njoint travel, from the owner's measured stops:")
+    for line in limit_report:
         print(f"  {line}")
     print("\nmeshes:")
     for line in mesh_report:

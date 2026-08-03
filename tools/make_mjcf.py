@@ -118,6 +118,63 @@ def drop(seconds: float = 2.0) -> dict:
     }
 
 
+def verify_limits(cfg: dict) -> list[str]:
+    """Check the written joint travel means, physically, what the owner said.
+
+    The legs are mirrored, so on half of them a positive joint angle is the
+    physically negative direction. Rather than trust that bookkeeping, turn each
+    joint a little in the simulator and watch which way the leg goes. This caught
+    all four knee ranges written back to front.
+    """
+    lim = cfg["joint_limits"]
+    model = mujoco.MjModel.from_xml_path(str(MJCF))
+    data = mujoco.MjData(model)
+    out = []
+
+    def parse(n):
+        n = (n or "").lower()
+        seg = next((s for s in ("thigh", "calf", "hip") if s in n), None)
+        rest = n.replace(seg, "") if seg else n
+        leg = next((l for l in ("fl", "fr", "bl", "br") if l in rest), None)
+        return leg, seg
+
+    for jid in range(model.njnt):
+        if model.jnt_type[jid] != mujoco.mjtJoint.mjJNT_HINGE:
+            continue
+        name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, jid)
+        leg, seg = parse(name)
+        if seg not in lim:
+            continue
+        body = next((b for b in range(model.nbody)
+                     if parse(mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, b)) == (leg, "calf")), None)
+        if body is None:
+            out.append(f"{name:10s} no calf body found - not checked")
+            continue
+
+        mujoco.mj_resetData(model, data)
+        mujoco.mj_forward(model, data)
+        p0 = data.xipos[body].copy()
+        data.qpos[model.jnt_qposadr[jid]] += np.deg2rad(10)
+        mujoco.mj_forward(model, data)
+        moved = data.xipos[body] - p0
+
+        outward = 1.0 if leg in ("fl", "bl") else -1.0
+        wanted = {"hip": np.array([0.0, outward, 0.0]),
+                  "thigh": np.array([1.0, 0.0, 0.0]),
+                  "calf": np.array([0.0, 0.0, 1.0])}[seg]
+        sign = 1.0 if float(moved @ wanted) >= 0 else -1.0
+
+        lo, hi = np.rad2deg(model.jnt_range[jid])
+        got = sorted([sign * lo, sign * hi])
+        want = list(lim[seg])
+        ok = all(abs(a - b) < 0.5 for a, b in zip(got, want))
+        out.append(
+            f"{name:10s} {seg:5s} physical {got[0]:+7.1f} to {got[1]:+7.1f}   "
+            f"owner {want[0]:+4.0f} to {want[1]:+4.0f}   {'ok' if ok else 'MISMATCH'}"
+        )
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--drop", action="store_true", help="drop it on the floor and report")
@@ -130,6 +187,13 @@ def main() -> int:
     print(f"wrote  {path.relative_to(ROOT)}")
     print(f"mass   simulator {sim_mass*1000:.2f} g   robot.yaml {want*1000:.2f} g   "
           f"{'MATCH' if abs(sim_mass - want) < 1e-4 else 'MISMATCH - the trunk is still welded'}")
+
+    rows = verify_limits(cfg)
+    bad = [r for r in rows if "MISMATCH" in r or "not checked" in r]
+    print(f"\njoint travel, turned in the simulator and measured: "
+          f"{len(rows) - len(bad)}/{len(rows)} match the owner's numbers")
+    for r in (bad if bad else rows):
+        print(f"  {r}")
 
     if args.drop:
         r = drop()
