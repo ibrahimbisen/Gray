@@ -18,6 +18,7 @@ same, and calling mjlab's launch_training directly skips the CLI.
 
 from __future__ import annotations
 
+import _thread
 import argparse
 import csv
 import json
@@ -159,9 +160,38 @@ def sync_once(run_dir: Path, log_dir: Path) -> None:
         print(f"[bridge] {type(exc).__name__}: {exc}", flush=True)
 
 
-def bridge(run_dir: Path, log_dir: Path, stop: threading.Event) -> None:
+def reward_ceiling(rewards) -> float:
+    """The most an episode could possibly score.
+
+    Every positive term is capped at 1.0, weighted, multiplied by the timestep
+    and summed over the episode - so the largest reachable total is the positive
+    weights times the episode length. See RULES.md, rule 1.
+    """
+    return sum(t.weight for t in rewards.values() if t.weight > 0)
+
+
+def bridge(run_dir: Path, log_dir: Path, stop: threading.Event,
+           target: float = 0.0) -> None:
+    """Feed the dashboard, and stop training once the reward has nothing left to win."""
     while not stop.is_set():
         sync_once(run_dir, log_dir)
+        if target:
+            try:
+                _, rows = read_scalars(log_dir)
+                latest = rows[-1].get("reward") if rows else None
+                if latest is not None and latest >= target:
+                    print(f"\n[stop] reward {latest:.2f} reached the {target:.2f} "
+                          f"target - every positive term is maxed, so the rest of the "
+                          f"schedule would only polish. See RULES.md rule 1.",
+                          flush=True)
+                    stop.set()
+                    # rsl_rl has no way to be asked to stop mid-learn, so raise
+                    # into the main thread. The last checkpoint is at most 25
+                    # iterations behind, and training's own finally block runs.
+                    _thread.interrupt_main()
+                    return
+            except Exception as exc:  # noqa: BLE001
+                print(f"[stop] could not read the reward: {exc}", flush=True)
         stop.wait(10.0)
 
 
@@ -176,6 +206,9 @@ def main() -> int:
                     help="0 uses the task's own default")
     ap.add_argument("--name", default="")
     ap.add_argument("--no-video", action="store_true")
+    ap.add_argument("--stop-at", type=float, default=0.98, metavar="FRACTION",
+                    help="stop once the reward reaches this fraction of the most it "
+                         "could score. 0 runs the full schedule. See RULES.md rule 1.")
     ap.add_argument("--reward", action="append", default=[], metavar="NAME=WEIGHT",
                     help="change one scoring weight, e.g. --reward twitching=-1.5. "
                          "Repeatable. The change is recorded in the run, so the "
@@ -250,8 +283,16 @@ def main() -> int:
         "scoring": scoring,
     }, indent=2))
 
+    ceiling = reward_ceiling(cfg.env.rewards) * cfg.env.episode_length_s
+    target = ceiling * args.stop_at if args.stop_at else 0.0
+
     print(f"training      {args.task} - {meta['name']}")
-    print(f"              {args.num_envs} robots, {iterations} iterations")
+    print(f"              {args.num_envs} robots, up to {iterations} iterations")
+    print(f"reward        ceiling {ceiling:.1f} "
+          f"({reward_ceiling(cfg.env.rewards):.1f}/s over "
+          f"{cfg.env.episode_length_s:.0f} s)")
+    print(f"              stopping at {args.stop_at:.0%} of it = {target:.1f}"
+          if target else "              running the full schedule")
     print(f"dashboard     http://127.0.0.1:8000  ->  {run_id}")
     print(f"tensorboard   tensorboard --logdir {LOG_ROOT}\n")
 
@@ -266,7 +307,7 @@ def main() -> int:
             return
         found["dir"] = log_dir
         print(f"[bridge] following {log_dir}", flush=True)
-        bridge(run_dir, log_dir, stop)
+        bridge(run_dir, log_dir, stop, target)
 
     threading.Thread(target=watch, daemon=True).start()
 
@@ -274,7 +315,10 @@ def main() -> int:
     try:
         launch_training(task_id=args.task, args=cfg)
     except KeyboardInterrupt:
-        status = "stopped"
+        # Either Ctrl-C, or the reward hit its target and the bridge interrupted
+        # us on purpose. Reaching the target is a finished run, not an abandoned
+        # one, so do not mark it "stopped".
+        status = "done" if stop.is_set() else "stopped"
     except Exception:
         status = "failed"
         raise
