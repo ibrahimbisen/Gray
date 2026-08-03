@@ -155,9 +155,11 @@ def main() -> int:
         env=cfg.env, agent=cfg.agent,
         video=not args.no_video,
         video_length=250,
-        # Roughly every 40 iterations, so the dashboard gets a film of the robot
-        # often enough to watch it improve without stealing much GPU time.
-        video_interval=args.num_envs * 24 * 40,
+        # Every 25 iterations. The recorder counts calls to env.step(), NOT
+        # robot-steps - multiplying by num_envs makes the interval so large it
+        # only ever fires once, at step 0, which is what happened on the first
+        # real run. num_steps_per_env is 24.
+        video_interval=24 * 25,
         log_root=str(LOG_ROOT.relative_to(ROOT)),
         gpu_ids=[0],
     )
