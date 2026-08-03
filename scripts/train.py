@@ -130,12 +130,33 @@ WATCH = {
     "Episode_Termination/collapsed": "collapsed",
     "Policy/mean_std": "exploration",
     "Perf/total_fps": "steps_per_second",
-    # Walking only. These are what say whether it is actually walking, as opposed
-    # to scoring well: how far off the commanded speed it is, whether feet leave
-    # the ground at all, and how high they get.
+
+    # Walking only. These are what say whether it is actually WALKING, as opposed
+    # to merely scoring well. The reward is a weighted sum and can read
+    # excellently while the robot creeps along on stiff legs scuffing its feet -
+    # which is precisely the gait that works in simulation and falls over on a
+    # real floor. Each of these isolates one way that can happen.
+    #
+    # `Metrics/air_time_mean` and `Metrics/peak_height_mean` used to be listed
+    # here and do not exist - nothing logs them, so those two lines had been
+    # quietly doing nothing. The tags below were read off a real run's event
+    # file rather than guessed.
     "Metrics/walk/error_vel_xy": "speed_error",
-    "Metrics/air_time_mean": "air_time",
-    "Metrics/peak_height_mean": "swing_height",
+    "Metrics/walk/error_vel_yaw": "turn_error",
+    # Feet spending a sensible time in the air: the difference between a gait
+    # and a shuffle.
+    "Episode_Reward/stepping": "stepping",
+    # How far the thighs and calves actually swing. The owner's word for what is
+    # wanted is "animated"; without this the cheapest gait is tiny stiff steps.
+    "Episode_Reward/leg_swing": "leg_swing",
+    # A foot at the wrong height while travelling. Scuffing is free in
+    # simulation and trips on carpet.
+    "Episode_Reward/dragging": "dragging",
+    # Ground actually put behind it. Velocity alone can be faked by rocking.
+    "Episode_Reward/ground_covered": "ground_covered",
+    # How hard the feet land. Printed PLA with no suspension, so this is a
+    # hardware limit and not only a comfort one.
+    "Metrics/landing_force_mean": "landing_force",
 }
 
 

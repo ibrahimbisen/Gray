@@ -1073,7 +1073,10 @@ function draw(){
 
   if(TAB === "live" && DETAIL && !TABLE) wireHover(DETAIL.metrics || []);
   const tb = $("#tbtn");
-  if(tb) tb.onclick = () => { TABLE = !TABLE; draw(); };
+  // Switching to the table needs the rows the chart fetch thinned away, so it
+  // refetches. Otherwise the table would silently show 500 of 3000 iterations
+  // while claiming to be the complete twin of the chart.
+  if(tb) tb.onclick = () => { TABLE = !TABLE; draw(); fetchDetail(); };
   document.querySelectorAll(".thumb").forEach(el =>
     el.onclick = () => { VIDEO = +el.dataset.i; draw(); });
 
@@ -1108,8 +1111,14 @@ async function fetchDetail(){
   // B's name, with nothing to say so.
   const id = SELECTED;
   if(!id) return;
+  // Thin for charts, full for the table. A 3000-iteration walk run records 16
+  // metrics, and the whole history is over a megabyte - refetched every five
+  // seconds while it trains. The charts are ~480px wide, so 500 points is more
+  // resolution than the screen has. The table twin is the one thing that needs
+  // every row, and it is only on when you ask for it.
+  const points = TABLE ? 0 : 500;
   try{
-    const r = await fetch(`/api/run/${encodeURIComponent(id)}`);
+    const r = await fetch(`/api/run/${encodeURIComponent(id)}?points=${points}`);
     if(!r.ok){
       // Clear DETAIL_FOR too. Leaving it equal to SELECTED makes the poll guard
       // think this run is already loaded, so it never retries and the panel
