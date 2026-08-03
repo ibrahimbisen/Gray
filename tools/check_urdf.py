@@ -20,16 +20,26 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# What the robot is supposed to be. The names are load-bearing: everything
-# downstream indexes legs by them.
+# What the robot is supposed to be: a trunk, and four legs of hip -> thigh -> calf.
 #
-# Links and joints use different orders, which is what the SolidWorks exporter is
-# set up with:  link "thighbl"  is moved by joint "bl_thigh".
+# Names are matched by content, not by exact spelling, because the SolidWorks
+# exporter's naming has already changed three times (hip_fl, hipfl, fl_hip) and
+# each rename should not break this file. "fr_thigh", "thighfr" and "FR-Thigh"
+# all resolve to the same (leg, segment).
 LEGS = ("fl", "fr", "bl", "br")
 SEGMENTS = ("hip", "thigh", "calf")
-EXPECTED_LINKS = ("base_link",) + tuple(f"{s}{l}" for l in LEGS for s in SEGMENTS)
-EXPECTED_JOINTS = tuple(f"{l}_{s}" for l in LEGS for s in SEGMENTS)
-FOOT_LINKS = tuple(f"calf{l}" for l in LEGS)
+EXPECTED_PARTS = {(l, s) for l in LEGS for s in SEGMENTS}
+
+
+def leg_seg(name: str) -> tuple[str, str] | None:
+    """('fr_thigh') -> ('fr', 'thigh'). None if it is not a leg part."""
+    n = "".join(ch for ch in name.lower() if ch.isalnum())
+    seg = next((s for s in ("thigh", "calf", "hip") if s in n), None)
+    if seg is None:
+        return None
+    rest = n.replace(seg, "", 1)
+    leg = next((l for l in LEGS if l in rest), None)
+    return (leg, seg) if leg else None
 
 # Mass bounds, kg. Printed structure plus 12 servos plus battery, Pi and wiring.
 # Anything outside this means the CAD is missing components or double-counting.
@@ -120,20 +130,23 @@ def check_structure(root, checks):
     links = [l.get("name") for l in root.findall("link")]
     joints = [j.get("name") for j in root.findall("joint")]
     children = [j.find("child").get("link") for j in root.findall("joint")]
-    missing_l = [n for n in EXPECTED_LINKS if n not in links]
-    missing_j = [n for n in EXPECTED_JOINTS if n not in joints]
-    extra_l = [n for n in links if n not in EXPECTED_LINKS]
+
+    link_parts = {leg_seg(n) for n in links} - {None}
+    joint_parts = {leg_seg(n) for n in joints} - {None}
+    missing_l = sorted(f"{l}_{s}" for l, s in EXPECTED_PARTS - link_parts)
+    missing_j = sorted(f"{l}_{s}" for l, s in EXPECTED_PARTS - joint_parts)
+    no_root = not any(n == "base_link" for n in links)
 
     dup_joints = sorted({n for n in joints if joints.count(n) > 1})
     dup_children = sorted({n for n in children if children.count(n) > 1})
 
     c.detail = f"{len(links)} links, {len(joints)} joints"
+    if no_root:
+        c.rows.append("no link called base_link - that is the conventional root name")
     for n in missing_l:
-        c.rows.append(f"missing link: {n}")
+        c.rows.append(f"no link for {n}")
     for n in missing_j:
-        c.rows.append(f"missing joint: {n}")
-    for n in extra_l:
-        c.rows.append(f"unexpected link: {n} (harmless, but nothing will use it)")
+        c.rows.append(f"no joint for {n}")
     for n in dup_joints:
         c.rows.append(f"joint {n!r} is defined {joints.count(n)} times")
     for n in dup_children:
@@ -141,7 +154,7 @@ def check_structure(root, checks):
             f"link {n!r} is the child of {children.count(n)} joints - delete the "
             "duplicate in the exporter's link tree"
         )
-    c.passed = not (missing_l or missing_j or dup_joints or dup_children)
+    c.passed = not (no_root or missing_l or missing_j or dup_joints or dup_children)
     checks.append(c)
 
 
@@ -159,15 +172,18 @@ def check_symmetry(root, checks):
     )
     origin = {}
     for j in root.findall("joint"):
+        part = leg_seg(j.get("name"))
+        if part is None or part[1] != "hip":
+            continue
         o = j.find("origin")
-        origin[j.get("name")] = _vec(o.get("xyz", "0 0 0")) if o is not None else (0.0, 0.0, 0.0)
+        origin[part[0]] = _vec(o.get("xyz", "0 0 0")) if o is not None else (0.0, 0.0, 0.0)
 
     # Only the hips are comparable directly: all four are expressed in base_link's
     # frame, so a left/right pair must be a track width apart. Thigh and calf origins
     # are each in their own parent's frame, where mirrored geometry legitimately
     # produces the same numbers on both sides.
     worst = None
-    for a, b in (("fr_hip", "fl_hip"), ("br_hip", "bl_hip")):
+    for a, b in (("fr", "fl"), ("br", "bl")):
         if a not in origin or b not in origin:
             continue
         d = _norm([q - p for p, q in zip(origin[a], origin[b])])
@@ -175,8 +191,9 @@ def check_symmetry(root, checks):
             worst = (d, a, b)
         if d < 0.05:
             c.rows.append(
-                f"{a} and {b} are {d*1000:.2f} mm apart - they should be a track "
-                "width apart. The exporter used the same reference geometry for both."
+                f"the {a} and {b} hips are {d*1000:.2f} mm apart - they should be a "
+                "track width apart. The exporter used the same reference geometry "
+                "for both."
             )
     c.passed = not c.rows
     if worst:
@@ -393,7 +410,8 @@ def check_zup(root, checks):
             rot = _mat_mul(rot, rot_of[node])
         return pos
 
-    feet = [world_xyz(name) for name in FOOT_LINKS if name in parent_of]
+    foot_links = [n for n in parent_of if (leg_seg(n) or ("", ""))[1] == "calf"]
+    feet = [world_xyz(n) for n in foot_links]
     if len(feet) < 4:
         c.detail = "could not locate the four foot links"
         checks.append(c)

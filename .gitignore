@@ -12,13 +12,12 @@ venv/
 .pytest_cache/
 *.egg-info/
 
-# Generated from the CAD by tools/. Never edited by hand, so never committed.
+# Everything under sim/ is generated: the raw SolidWorks export, and the model
+# tools/prepare_model.py builds from it. The source of truth is robot/, which is
+# committed. Regenerate, do not edit, and never commit.
 # Leading slash on purpose: a bare pattern matches at every depth and last time
 # that silently swallowed 48 files somebody meant to keep.
-/sim/models/*.urdf
-/sim/models/*.xml
-/sim/models/meshes/
-/sim/models/*.png
+/sim/
 
 # Training output
 /logs/
