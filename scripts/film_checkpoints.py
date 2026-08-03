@@ -141,7 +141,11 @@ class Filmer:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--task", help="only follow this task")
-    ap.add_argument("--every", type=int, default=1, help="film 1 in N checkpoints")
+    # Training saves a checkpoint every 25 iterations, so --every 4 is one film
+    # per 100 iterations. Fifteen films over a 1500-iteration run is enough to
+    # watch it improve without a filmstrip nobody scrolls through.
+    ap.add_argument("--every", type=int, default=4,
+                    help="film 1 in N checkpoints; 4 is every 100 iterations")
     ap.add_argument("--seconds", type=float, default=6.0)
     ap.add_argument("--envs", type=int, default=1)
     ap.add_argument("--watch", action="store_true",
