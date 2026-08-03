@@ -232,7 +232,16 @@ const lib   = s.library || {};
 const rt    = lib.run_totals || {};
 const drive = s.driven || {};
 const walk  = ((s.rewards || {}).tasks || []).find(t => t.key === "walk") || {terms: []};
-const r1    = (s.status.tasks || []).find(t => t.id === "R1");
+const status = s.status || {};
+const head  = status.headline || {};
+const r1    = (status.tasks || []).find(t => t.id === "R1");
+
+/* A page that white-screens because one field is missing is worse than a page
+   with a gap in it. This one is served by summary_state(), and server.py is NOT
+   in the dashboard's hot-reload list - so an older server process answers with
+   an older shape and every new plate reads undefined. Say that, rather than
+   throwing. */
+const stale = !s.observation || !s.status || !s.sampling;
 
 /* ------------------------------------------------------------------ 1 ---- */
 const chain = () => `
@@ -324,6 +333,14 @@ const barRow = (c) => {
 
 /* ------------------------------------------------------------------------ */
 document.getElementById("sheet").innerHTML = `
+
+${stale ? `<div class="callout warn" style="max-width:none;margin:26px 0 0">
+  <b>This page is being served by an old dashboard process.</b>
+  <p>Everything below that needs a live measurement is blank, because the server
+    answering is running code from before this page existed. <code>server.py</code>
+    is not hot-reloaded &mdash; the data modules are, the server is not. Stop
+    every dashboard process and start one:
+    <span class="mono">run.bat</span></p></div>` : ""}
 
 <header class="mast">
   <div class="kicker mono">Gray &middot; a 12-joint quadruped &middot; read top to bottom</div>
@@ -516,11 +533,11 @@ document.getElementById("sheet").innerHTML = `
   </div></header>
   <div class="split">
     <div class="dwg">
-      <div class="cap">R1 locomotion &middot; best of ${s.status.runs_total} runs, against the bar</div>
+      <div class="cap">R1 locomotion &middot; best of ${status.runs_total || 0} runs, against the bar</div>
       ${r1 ? r1.criteria.map(barRow).join("") : `<p class="muted">Not measured yet.</p>`}
       <div class="foot">Green has passed. Red is the distance still to go, drawn
-        honestly &mdash; drift at ${n((s.status.headline || {}).best, 0)} mm against
-        a ${n((s.status.headline || {}).bar, 0)} mm bar is almost nothing done, not
+        honestly &mdash; drift at ${n(head.best, 0)} mm against
+        a ${n(head.bar, 0)} mm bar is almost nothing done, not
         nearly finished.</div>
     </div>
     <div class="prose">

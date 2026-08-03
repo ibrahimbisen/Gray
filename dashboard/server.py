@@ -16,6 +16,7 @@ from __future__ import annotations
 import http.server
 import json
 import mimetypes
+import os
 import socketserver
 import sys
 import webbrowser
@@ -462,8 +463,31 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 
 def serve(port: int = 8000, open_browser: bool = True) -> None:
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("127.0.0.1", port), Handler) as httpd:
+    # SO_REUSEADDR means two different things on the two platforms, and on this
+    # one it is a trap. On Linux it only lets a restarted server re-bind a port
+    # still in TIME_WAIT, which is what it is for. On Windows it lets a SECOND
+    # LIVE PROCESS bind an address another process is already listening on -
+    # both succeed, neither warns, and the OS hands new connections to whichever
+    # it likes, usually the older one.
+    #
+    # That is exactly how a freshly started dashboard sat there serving nothing
+    # while a process from four hours earlier answered every request with code
+    # from before half this file existed. Nothing in the terminal said so.
+    #
+    # So: only on POSIX, where it means what it is supposed to mean.
+    socketserver.TCPServer.allow_reuse_address = os.name != "nt"
+    try:
+        httpd = socketserver.TCPServer(("127.0.0.1", port), Handler)
+    except OSError as exc:
+        print(f"Could not listen on port {port}: {exc}")
+        print()
+        print("A dashboard is almost certainly already running. Only one can")
+        print("answer, so a second would be invisible rather than useful.")
+        print(f"  - close the other one, or open http://127.0.0.1:{port}/")
+        print(f"  - or use another port:   run.bat {port + 1}")
+        raise SystemExit(1) from exc
+
+    with httpd:
         url = f"http://127.0.0.1:{port}/"
         print(f"Overview:  {url}            everything, at a glance")
         print(f"Runs:      {url}runs        one run: curves, films, rewards")
