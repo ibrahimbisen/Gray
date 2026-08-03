@@ -1086,6 +1086,176 @@ def driven() -> dict:
 # rounds - which is what a DOE is, and the reason rounds get smaller as they go.
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# The whole thing, forward. Phases and the gate that ends each one.
+#
+# This is the plan the owner asked for after understanding how the project
+# works, and it is deliberately shaped as GATES rather than dates. A phase is
+# over when a number is met, not when a week is up - which is the only honest
+# way to schedule work whose duration nobody knows.
+#
+# It is also a loop rather than a line, and the loop is the part that gets
+# forgotten: the real robot measures three numbers the model is guessing, those
+# numbers go back into stage 1, and some of what was trained gets trained again.
+# ---------------------------------------------------------------------------
+
+FORWARD = {
+    "one_line": "Six phases, each ending on a number rather than a date.",
+    "lede": "Every phase below is over when a measurement says so. Nothing here "
+            "is scheduled by time, because nobody knows how long a reward takes "
+            "to get right - that is what the bars are for.",
+    "shape": [
+        "Two things get tuned, and they fight each other. The REWARD says what "
+        "good means. The RANGE says where it has to be good. Widening the range "
+        "makes the same reward harder to satisfy, so they cannot be finished one "
+        "after the other - they are turned in a loop.",
+        "Which is why the range is pinned at its narrowest right now. You cannot "
+        "tell whether a wider range broke something if the narrow one was already "
+        "broken, and until this morning it was: `wandering` was measuring drift "
+        "against a different line from the one the bar scores.",
+        "And the loop does not close in simulation. The last phase measures three "
+        "numbers the model has been guessing, feeds them back into stage 1, and "
+        "some of what was trained gets trained again against a truer robot.",
+    ],
+    "phases": [
+        {"id": "A", "name": "R1 walks forward", "state": "now",
+         "gate": "All six R1 criteria pass on the current command range.",
+         "what": "The reward is pointed the wrong way and has been since the "
+                 "first walking run. Fix it until a policy holds a line at one "
+                 "speed on flat ground.",
+         "steps": [
+             "Fix `wandering` to measure the line it was actually sent along "
+             "- done, 3 Aug",
+             "Round 0: three seeds, one config. Measure the noise floor",
+             "Round 1: 2x2x2 on the straightness terms",
+             "Round 2: 2x2 on the speed terms",
+             "Round 3: the winner, long, on unseen seeds",
+         ],
+         "cost": "About 18 runs. Roughly a week of continuous training.",
+         "blocked_by": "",
+         "note": "This is the phase the /runs queue is working through."},
+
+        {"id": "B", "name": "R1 walks the whole range", "state": "next",
+         "gate": "The same six criteria pass with vx from -0.35 to 0.35 and vy "
+                 "sampled without vx.",
+         "what": "Backward, sideways, the full command box. Not new skills - the "
+                 "same reward over a bigger region, which is why it is a phase "
+                 "and not a project.",
+         "steps": [
+             "Fix `_going_straight` to gate on abs(vx). It is positive-only "
+             "today, so `veering` and `wandering` switch off entirely for a "
+             "backward command",
+             "Widen WALK_SPEED and let WALK_SIDE stand alone",
+             "Retune. A wider range over a fixed number of draws is a harder "
+             "problem, and the corners being added are harder than the middle",
+         ],
+         "cost": "More runs than A, because the range is bigger and no denser.",
+         "blocked_by": "A. Widening a range that is already failing tells you "
+                       "nothing about which change caused what.",
+         "note": "Unblocks four library rows that currently read as commands and "
+                 "are not - walk backward, walk sideways, walk diagonally, and "
+                 "'any speed + strafe + turn combo'."},
+
+        {"id": "C", "name": "A harder world", "state": "later",
+         "gate": "The same six criteria still pass with the D1 dials at full.",
+         "what": "Terrain, slopes, payload, shoves, weak servos, worn feet. "
+                 "56 library rows and not one new movement in them - the policy "
+                 "never sees the word gravel, it sees the same 45 numbers in a "
+                 "different pattern.",
+         "steps": [
+             "Turn up what is already randomised: friction, mass, centre of "
+             "mass, PD gains, joint friction",
+             "Add terrain and payload",
+             "Add degraded hardware",
+         ],
+         "cost": "Each dial makes every run harder, so runs get longer before "
+                 "they pass.",
+         "blocked_by": "B, mostly. A policy that cannot walk backward on a flat "
+                       "floor will not learn to on gravel.",
+         "note": "This is where sim-to-real robustness actually comes from. A "
+                 "policy that survives the range survives the real value, which "
+                 "is the correct answer to three unmeasurable numbers rather "
+                 "than a workaround."},
+
+        {"id": "D", "name": "R2 gets up, and hands over", "state": "later",
+         "gate": "Stands up from 9 of 10 random ground poses in under 3 s, and "
+                 "T1 runs fall -> get up -> keep walking without a stall.",
+         "what": "The second policy file. Different start state, different "
+                 "reward, different terminations - there is no commanded "
+                 "velocity to track when the robot is on its back, so every "
+                 "tracking term is meaningless.",
+         "steps": [
+             "Write the recover task: start poses, reward, terminations",
+             "Train it",
+             "Write the runtime rule that hands control between R1 and R2",
+             "T1: test the handover, which is where separately-trained policies "
+             "usually fall apart",
+         ],
+         "cost": "A new task from scratch, so slower than a retune.",
+         "blocked_by": "A, for the handover to have something to hand to. Can "
+                       "overlap B and C otherwise.",
+         "note": "The handover is the risk here, not either policy on its own."},
+
+        {"id": "E", "name": "The sensor batch", "state": "later",
+         "gate": "Every bar that passed before still passes with the longer "
+                 "input list.",
+         "what": "Seven sensors, +50 numbers, one retrain of everything. Foot "
+                 "contact, load cells, per-servo current, battery, five optical "
+                 "flow, the downward range finder and the six range finders.",
+         "steps": [
+             "Fit them, and give the CAD positions for the three where the "
+             "mounting is in the maths",
+             "Model each one in the simulator, including how it fails",
+             "Add them to the observation, all at once",
+             "Retrain R1 and R2 from zero",
+         ],
+         "cost": "One full retrain of every policy. Which is exactly why they go "
+                 "in together rather than one at a time.",
+         "blocked_by": "The mechanical work, and worth doing after A to D so the "
+                       "retrain is spent once on something already working.",
+         "note": "Optical flow is the one that may move a bar rather than just "
+                 "add robustness: the policy currently cannot measure its own "
+                 "speed, while track_speed is its largest reward term."},
+
+        {"id": "F", "name": "The real robot", "state": "should be running",
+         "gate": "Gray walks 5 m on the workshop floor.",
+         "what": "The same policy file on the Pi, reading potentiometers and "
+                 "IMUs instead of a simulator. Nothing is converted.",
+         "steps": [
+             "Calibrate the potentiometers: ADC counts to radians, per joint",
+             "Stage 3.3: measure servo gains, backlash and loop latency under "
+             "load",
+             "Feed all three back into stage 1",
+             "Retrain against a model that is no longer guessing",
+         ],
+         "cost": "The retrain in the last step is the loop closing, and it is "
+                 "not optional.",
+         "blocked_by": "Nothing. That is the point - it is deferred by choice, "
+                       "not by dependency.",
+         "note": "Deferred on the owner's call. Worth saying plainly what that "
+                 "costs: three numbers in the model are guesses, and every "
+                 "policy trained before F is trained against them. One policy "
+                 "depends on those guesses today. After A to E, three do."},
+    ],
+    "loop": "F feeds back into A. Measuring the real servos changes the model "
+            "every policy was trained against, so some of A to E gets done "
+            "again - against a robot the simulator finally describes.",
+    "parked": [
+        {"what": "R3, using a foot on something",
+         "why": "Optional. Nothing else depends on it, and it needs objects in "
+                "the scene that nothing else does."},
+        {"what": "P1, jumping",
+         "why": "Un-parks when stage 3.3 measures the real servo speed under "
+                "load. Torque is not the blocker - speed is, and higher-torque "
+                "hobby servos are usually slower."},
+        {"what": "P2, seeing",
+         "why": "A camera the POLICY reads, which is not the camera used to "
+                "drive it. Its own project: a heightmap pipeline, a much longer "
+                "input list, and the worst sim-to-real gap on the list."},
+    ],
+}
+
+
 WEEK = {
     "lede": "Continuous training for about a week, as a designed experiment "
             "rather than one long run.",

@@ -160,8 +160,8 @@ def week_state() -> dict:
     live = next((r for r in summaries if r["status"] == "running"), None)
     runner = q.get("runner") or {}
     return {
-        **plan.WEEK,
-        "rounds": rounds,
+        "forward": plan.FORWARD,
+        "week": {**plan.WEEK, "rounds": rounds},
         "running": live,
         "runner_up": bool(runner.get("alive")),
         "paused": bool(q.get("paused")),
@@ -452,10 +452,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if path in ("/runs", "/monitor", "/training"):
             return self._send((HERE / "monitor.html").read_bytes(),
                               "text/html; charset=utf-8")
-        if path in ("/summary", "/summary.html", "/plan"):
+        if path in ("/summary", "/summary.html"):
             return self._send((HERE / "index.html").read_bytes(), "text/html; charset=utf-8")
-        if path == "/programme":
-            return self._send((HERE / "week.html").read_bytes(),
+        if path in ("/programme", "/week"):
+            return self._send((HERE / "plan.html").read_bytes(),
                               "text/html; charset=utf-8")
 
         # Any page in dashboard/ by its own name: /stage2 serves stage2.html,
