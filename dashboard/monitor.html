@@ -6,348 +6,494 @@
 <title>Gray — training</title>
 <style>
   :root{
-    --bg:#0d0f13; --panel:#14171d; --panel2:#191d24; --line:#242932; --ink:#e8eaef; --dim:#939bab;
-    --ok:#4ade80; --bad:#f87171; --warn:#fbbf24; --accent:#60a5fa; --run:#38bdf8;
-    --sidebar:280px;
+    --plane:#0d0f13;      /* page */
+    --surface:#16181d;    /* cards and chart surfaces */
+    --surface2:#1b1e25;
+    --line:#252932;       /* baseline / axis */
+    --grid:#1f232b;       /* hairline gridlines, one shade off the surface */
+    --ink:#f2f3f5;
+    --ink2:#a8adb8;
+    --muted:#787f8c;      /* axis and tick labels */
+
+    /* Categorical slots, dark steps. Validated on this surface:
+       lightness band, chroma floor, CVD separation, normal-vision floor and
+       contrast all pass. One hue per metric, fixed - never reassigned by rank. */
+    --s1:#3987e5;  --s2:#d95926;  --s3:#199e70;  --s4:#c98500;  --s5:#d55181;
+
+    --good:#0ca30c; --warn:#fab219; --crit:#d03b3b; --live:#3987e5;
+    --sidebar:264px;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);
-       font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  a{color:inherit}
-  h1,h2,h3{margin:0}
-  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+  html,body{margin:0}
+  body{background:var(--plane);color:var(--ink);
+       font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:inherit;text-decoration:none}
+  .tnum{font-variant-numeric:tabular-nums}
 
-  /* ---------- layout ---------- */
   .app{display:grid;grid-template-columns:var(--sidebar) 1fr;min-height:100vh}
-  aside{border-right:1px solid var(--line);background:var(--panel);
-        position:sticky;top:0;height:100vh;overflow-y:auto;padding:20px 16px}
-  main{padding:28px 32px 96px;max-width:1180px}
-  @media (max-width:900px){
+  aside{border-right:1px solid var(--line);background:var(--surface);
+        position:sticky;top:0;height:100vh;overflow-y:auto;padding:18px 14px}
+  main{padding:22px 26px 80px;max-width:1500px;min-width:0}
+  @media (max-width:880px){
     .app{grid-template-columns:1fr}
     aside{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}
   }
 
-  /* ---------- sidebar ---------- */
-  .brand{font-size:20px;font-weight:600;letter-spacing:-.01em;margin-bottom:2px}
-  .brand small{display:block;font-size:12px;color:var(--dim);font-weight:400;letter-spacing:.04em;
-               text-transform:uppercase;margin-top:3px}
-  .side-h{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--dim);
-          margin:26px 0 10px;font-weight:600}
-  .runcard{display:block;text-decoration:none;background:var(--panel2);border:1px solid var(--line);
-           border-radius:9px;padding:11px 12px;margin-bottom:8px;cursor:pointer}
-  .runcard:hover{border-color:#39414f}
-  .runcard.sel{border-color:var(--accent);background:#1b2330}
-  .runcard .top{display:flex;align-items:center;gap:7px;margin-bottom:3px}
-  .runcard .nm{font-weight:600;font-size:14px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .runcard .pp{font-size:12px;color:var(--dim);line-height:1.4;
-               display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .runcard .ft{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-top:6px}
-  .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
-  .dot.running{background:var(--run);box-shadow:0 0 0 3px rgba(56,189,248,.18)}
-  .dot.done{background:var(--ok)} .dot.failed{background:var(--bad)}
-  .dot.stopped{background:var(--dim)} .dot.unknown{background:var(--dim)}
-  .empty{font-size:13px;color:var(--dim);border:1px dashed var(--line);border-radius:9px;padding:14px}
+  /* ---- sidebar ---- */
+  .brand{font-size:17px;font-weight:600;letter-spacing:-.01em}
+  .brand small{display:block;font-size:10px;color:var(--muted);font-weight:500;
+               letter-spacing:.14em;text-transform:uppercase;margin-top:4px}
+  .side-h{font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);
+          margin:22px 0 8px;font-weight:600;display:flex;justify-content:space-between}
+  .rc{display:block;background:var(--surface2);border:1px solid var(--line);border-radius:8px;
+      padding:9px 10px;margin-bottom:6px;cursor:pointer}
+  .rc:hover{border-color:#333945}
+  .rc.sel{border-color:var(--s1);background:#182231}
+  .rc .r1{display:flex;align-items:center;gap:6px}
+  .rc .nm{font-weight:600;font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rc .pp{font-size:11.5px;color:var(--ink2);line-height:1.35;margin-top:3px;
+          display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .rc .r3{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-top:6px}
+  .rc .mini{height:3px;background:var(--line);border-radius:99px;margin-top:7px;overflow:hidden}
+  .rc .mini i{display:block;height:100%;background:var(--s1)}
+  .dot{width:6px;height:6px;border-radius:50%;flex:0 0 auto;background:var(--muted)}
+  .dot.running{background:var(--live);animation:pulse 1.8s ease-in-out infinite}
+  .dot.done{background:var(--good)} .dot.failed{background:var(--crit)}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(57,135,229,.5)}50%{box-shadow:0 0 0 4px rgba(57,135,229,0)}}
+  .empty{font-size:12px;color:var(--muted);border:1px dashed var(--line);border-radius:8px;padding:12px}
 
-  /* ---------- header ---------- */
-  .hdr{display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;margin-bottom:8px}
-  .hdr h1{font-size:30px;letter-spacing:-.02em}
-  .pill{font-size:11px;text-transform:uppercase;letter-spacing:.09em;padding:3px 10px;
-        border-radius:99px;border:1px solid var(--line);color:var(--dim);white-space:nowrap}
-  .pill.running{color:var(--run);border-color:rgba(56,189,248,.45)}
-  .pill.done{color:var(--ok);border-color:rgba(74,222,128,.45)}
-  .pill.failed{color:var(--bad);border-color:rgba(248,113,113,.45)}
+  /* ---- header ---- */
+  .top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .top h1{margin:0;font-size:24px;letter-spacing:-.02em}
+  .pill{font-size:10px;text-transform:uppercase;letter-spacing:.1em;padding:3px 9px;
+        border-radius:99px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+  .pill.running{color:var(--live);border-color:rgba(57,135,229,.5)}
+  .pill.done{color:var(--good);border-color:rgba(12,163,12,.5)}
+  .pill.failed{color:var(--crit);border-color:rgba(208,59,59,.5)}
   .grow{flex:1}
-  .btn{font-size:13px;text-decoration:none;color:var(--dim);border:1px solid var(--line);
-       border-radius:8px;padding:7px 13px;white-space:nowrap;background:var(--panel)}
-  .btn:hover{color:var(--ink);border-color:#39414f}
+  .btn{font-size:12px;color:var(--ink2);border:1px solid var(--line);border-radius:7px;
+       padding:6px 11px;background:var(--surface);cursor:pointer;white-space:nowrap;
+       font-family:inherit}
+  .btn:hover{color:var(--ink);border-color:#333945}
+  .btn.on{color:var(--ink);border-color:var(--s1)}
+  .purpose{color:var(--ink2);font-size:13px;margin-top:5px;max-width:78ch}
 
-  .bar{height:7px;background:var(--line);border-radius:99px;overflow:hidden;margin:16px 0 6px}
-  .bar i{display:block;height:100%;background:var(--run);transition:width .4s}
-  .barlab{display:flex;justify-content:space-between;font-size:12px;color:var(--dim)}
+  .prog{margin:16px 0 4px;height:6px;background:var(--line);border-radius:99px;overflow:hidden}
+  .prog i{display:block;height:100%;background:var(--s1);transition:width .5s}
+  .proglab{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)}
 
-  /* ---------- generic ---------- */
-  section{margin-top:40px}
-  h2.sec{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--dim);
-         font-weight:600;margin-bottom:14px}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
-  .grid{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
-        border-radius:11px;overflow:hidden;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
-  .cell{background:var(--panel);padding:13px 15px}
-  .cell .k{font-size:12px;color:var(--dim)}
-  .cell .v{font-size:22px;font-weight:600;margin-top:1px}
-  .cell .v.small{font-size:16px}
+  /* ---- stat tiles ---- */
+  .tiles{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
+         border-radius:10px;overflow:hidden;margin-top:20px;
+         grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+  .tile{background:var(--surface);padding:12px 14px 13px}
+  .tile .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+           display:flex;align-items:center;gap:6px}
+  .tile .swatch{width:7px;height:7px;border-radius:2px;flex:0 0 auto}
+  .tile .v{font-size:25px;font-weight:600;line-height:1.15;margin-top:5px;letter-spacing:-.02em}
+  .tile .d{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .tile .d b{font-weight:600}
 
-  table{width:100%;border-collapse:collapse;font-size:14px}
-  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;
-     color:var(--dim);font-weight:600;padding:0 12px 9px;border-bottom:1px solid var(--line)}
-  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  /* ---- charts ---- */
+  section{margin-top:32px}
+  .sech{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .sech h2{margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.14em;
+           color:var(--muted);font-weight:600}
+  .charts{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 12px 6px}
+  .card h3{margin:0;font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:7px}
+  .card h3 .swatch{width:8px;height:8px;border-radius:2px}
+  .card h3 .now{margin-left:auto;font-size:15px;font-weight:600;letter-spacing:-.01em}
+  .card .rng{font-size:10.5px;color:var(--muted);margin:2px 0 4px 15px}
+  .plot{position:relative}
+  .plot svg{display:block;width:100%;height:132px;overflow:visible}
+  .tip{position:absolute;pointer-events:none;background:#0b0d11;border:1px solid var(--line);
+       border-radius:6px;padding:5px 8px;font-size:11.5px;white-space:nowrap;opacity:0;
+       transition:opacity .1s;z-index:3;transform:translate(-50%,-130%)}
+  .tip b{font-weight:600}
+
+  /* ---- videos ---- */
+  .vwrap{display:grid;gap:12px;grid-template-columns:minmax(0,2.1fr) minmax(190px,1fr)}
+  @media (max-width:820px){.vwrap{grid-template-columns:1fr}}
+  .stage{background:#000;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .stage video{width:100%;display:block;aspect-ratio:16/9;background:#000;object-fit:contain}
+  .stage .cap{padding:8px 12px;background:var(--surface);font-size:12px;color:var(--ink2);
+              display:flex;justify-content:space-between;align-items:center}
+  .strip{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto;padding-right:2px}
+  .thumb{display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);
+         border-radius:8px;padding:7px 9px;cursor:pointer;font-size:12px}
+  .thumb:hover{border-color:#333945}
+  .thumb.sel{border-color:var(--s1);background:#182231}
+  .thumb .n{color:var(--muted);width:34px;font-size:11px}
+
+  /* ---- tables ---- */
+  .wrapx{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);
+     font-weight:600;padding:0 10px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:8px 10px;border-bottom:1px solid var(--grid);vertical-align:top}
   tr:last-child td{border-bottom:0}
-  tr.now td{background:rgba(56,189,248,.07)}
-  tr.done td .st{color:var(--ok)} tr.now td .st{color:var(--run)}
-  .num{width:34px;color:var(--dim)}
-  .wrap-x{overflow-x:auto}
-  .sub{font-size:13px;color:var(--dim);margin-top:3px}
-  .chip{font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--line);
-        color:var(--dim);white-space:nowrap;display:inline-block;margin:2px 3px 0 0}
-  .chip.pos{color:var(--ok);border-color:rgba(74,222,128,.35)}
-  .chip.neg{color:var(--bad);border-color:rgba(248,113,113,.35)}
-
-  /* ---------- videos ---------- */
-  .films{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
-  .film{background:var(--panel);border:1px solid var(--line);border-radius:11px;overflow:hidden}
-  .film video{width:100%;display:block;background:#000;aspect-ratio:16/10;object-fit:contain}
-  .film .cap{padding:8px 11px;font-size:12px;color:var(--dim);display:flex;justify-content:space-between}
-
-  /* ---------- chart ---------- */
-  svg.spark{width:100%;height:120px;display:block}
-  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin-top:8px}
-  .legend b{font-weight:500}
+  tr.now td{background:rgba(57,135,229,.07)}
+  td.n{color:var(--muted);width:26px}
+  .st{font-size:11px}
+  .st.done{color:var(--good)} .st.now{color:var(--live)}
+  .sub{color:var(--ink2);font-size:11.5px;margin-top:2px}
+  .chip{font-size:10.5px;padding:1px 7px;border-radius:99px;border:1px solid var(--line);
+        color:var(--muted);display:inline-block;margin:2px 3px 0 0;white-space:nowrap}
+  .chip.pos{color:var(--good);border-color:rgba(12,163,12,.4)}
+  .chip.neg{color:var(--crit);border-color:rgba(208,59,59,.4)}
+  .hide{display:none}
 </style>
 </head>
 <body>
 <div class="app">
-
   <aside>
     <div class="brand">Gray<small>training monitor</small></div>
-    <a class="btn" style="display:block;text-align:center;margin-top:14px" href="/summary">
-      Project summary &rarr;
-    </a>
-    <div class="side-h">Runs</div>
+    <a class="btn" style="display:block;text-align:center;margin-top:12px" href="/summary">
+      Project summary &rarr;</a>
+    <div class="side-h"><span>Runs</span><span id="runcount"></span></div>
     <div id="runlist"></div>
   </aside>
-
   <main>
     <div id="head"></div>
     <div id="body"></div>
   </main>
-
 </div>
 
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const n2 = v => (v === undefined || v === null || v === "") ? "—"
-  : (Math.abs(v) >= 100 ? Math.round(v).toLocaleString() : (+v).toFixed(2));
+const SLOTS = ["var(--s1)","var(--s2)","var(--s3)","var(--s4)","var(--s5)"];
 
-let STATE = null, SELECTED = null;
+let STATE = null, SELECTED = null, VIDEO = null, TABLE = false;
+
+/* A metric keeps its hue wherever it appears - tile, chart, table. Assigned by
+   fixed order of first appearance, never by rank, so a chart never repaints. */
+const HUE = {};
+function hueOf(key, order){
+  if(!(key in HUE)) HUE[key] = SLOTS[order % SLOTS.length];
+  return HUE[key];
+}
+
+function fmt(v){
+  if(v === null || v === undefined || v === "") return "—";
+  const a = Math.abs(v);
+  if(a >= 1000) return Math.round(v).toLocaleString();
+  if(a >= 100) return v.toFixed(0);
+  if(a >= 10) return v.toFixed(1);
+  return v.toFixed(2);
+}
+const label = k => k.replace(/_/g, " ").replace(/\bmm\b/, "(mm)");
 
 /* ---------------- sidebar ---------------- */
 
 function renderRuns(runs){
+  $("#runcount").textContent = runs.length || "";
   if(!runs.length){
-    $("#runlist").innerHTML =
-      `<div class="empty">No runs yet.<br><br>The first one appears here the moment
-       training writes <span class="mono">progress/runs/</span>.</div>`;
+    $("#runlist").innerHTML = `<div class="empty">No runs yet. One appears here the
+      moment training writes <span class="tnum">progress/runs/</span>.</div>`;
     return;
   }
   $("#runlist").innerHTML = runs.map(r => `
-    <a class="runcard ${r.id === SELECTED ? "sel" : ""}" data-id="${esc(r.id)}">
-      <div class="top">
-        <span class="dot ${esc(r.status)}"></span>
-        <span class="nm">${esc(r.name)}</span>
-      </div>
+    <div class="rc ${r.id === SELECTED ? "sel" : ""}" data-id="${esc(r.id)}">
+      <div class="r1"><span class="dot ${esc(r.status)}"></span>
+        <span class="nm">${esc(r.name)}</span></div>
       ${r.purpose ? `<div class="pp">${esc(r.purpose)}</div>` : ""}
-      <div class="ft">
-        <span>${r.stage !== null && r.stage !== undefined ? "Stage " + r.stage : esc(r.status)}</span>
-        <span>${esc(r.started_age)}</span>
+      <div class="r3">
+        <span>${r.stage ?? "" ? "stage " + r.stage : esc(r.status)}</span>
+        <span class="tnum">${r.iterations_target
+          ? Math.round(100 * r.progress) + "%" : esc(r.started_age)}</span>
       </div>
-    </a>`).join("");
-  document.querySelectorAll(".runcard").forEach(el =>
-    el.onclick = () => { SELECTED = el.dataset.id; draw(); });
+      ${r.iterations_target ? `<div class="mini"><i style="width:${
+        Math.round(100 * r.progress)}%"></i></div>` : ""}
+    </div>`).join("");
+  document.querySelectorAll(".rc").forEach(el =>
+    el.onclick = () => { SELECTED = el.dataset.id; VIDEO = null; draw(); });
 }
 
-/* ---------------- header ---------------- */
+/* ---------------- header + tiles ---------------- */
 
 function renderHead(run, model){
   if(!run){
-    $("#head").innerHTML = `
-      <div class="hdr">
-        <div>
-          <h1>Nothing training yet</h1>
-          <div class="sub">The model is ready. Below is what happens next.</div>
-        </div>
-        <div class="grow"></div>
-        <span class="pill ${model.passed === model.total ? "done" : "failed"}">
-          model ${model.passed}/${model.total}
-        </span>
-      </div>`;
+    $("#head").innerHTML = `<div class="top"><h1>Idle</h1>
+      <span class="pill ${model.passed === model.total ? "done" : "failed"}">model
+      ${model.passed}/${model.total}</span><div class="grow"></div></div>
+      <div class="purpose">Nothing is training. The model is ready; the plan is below.</div>`;
     return;
   }
   const pct = Math.round(100 * (run.progress || 0));
   $("#head").innerHTML = `
-    <div class="hdr">
-      <div>
-        <h1>${esc(run.name)}</h1>
-        ${run.purpose ? `<div class="sub">${esc(run.purpose)}</div>` : ""}
-      </div>
-      <div class="grow"></div>
+    <div class="top">
+      <h1>${esc(run.name)}</h1>
       <span class="pill ${esc(run.status)}">${esc(run.status)}</span>
-      ${run.stage !== null ? `<span class="pill">stage ${run.stage}</span>` : ""}
-      ${run.task ? `<span class="pill mono">${esc(run.task)}</span>` : ""}
+      ${run.stage != null ? `<span class="pill">stage ${run.stage}</span>` : ""}
+      ${run.task ? `<span class="pill tnum">${esc(run.task)}</span>` : ""}
+      <div class="grow"></div>
+      <span class="pill ${model.passed === model.total ? "done" : "failed"}">model
+        ${model.passed}/${model.total}</span>
     </div>
-    <div class="bar"><i style="width:${pct}%"></i></div>
-    <div class="barlab">
-      <span class="mono">${run.iterations_done.toLocaleString()} /
+    ${run.purpose ? `<div class="purpose">${esc(run.purpose)}</div>` : ""}
+    <div class="prog"><i style="width:${pct}%"></i></div>
+    <div class="proglab">
+      <span class="tnum">${run.iterations_done.toLocaleString()} /
         ${(run.iterations_target || 0).toLocaleString()} iterations</span>
-      <span>${pct}%</span>
+      <span class="tnum">${pct}% &middot; started ${esc(run.started_age)}</span>
     </div>`;
 }
 
-/* ---------------- pieces ---------------- */
-
-function metricGrid(run){
-  const L = run.latest || {};
-  const keys = (run.metric_columns || []).filter(k => k !== "iteration").slice(0, 6);
+function tiles(run){
+  const keys = (run.metric_columns || []).filter(k => k !== "iteration");
   if(!keys.length) return "";
-  return `<section><h2 class="sec">Latest</h2><div class="grid">${
-    keys.map(k => `<div class="cell"><div class="k">${esc(k.replace(/_/g," "))}</div>
-      <div class="v mono">${n2(L[k])}</div></div>`).join("")
-  }</div></section>`;
+  const rows = run.metrics, last = rows[rows.length - 1] || {}, first = rows[0] || {};
+  return `<div class="tiles">${keys.map((k, i) => {
+    const c = hueOf(k, i), now = last[k], was = first[k];
+    const d = (typeof now === "number" && typeof was === "number") ? now - was : null;
+    return `<div class="tile">
+      <div class="k"><span class="swatch" style="background:${c}"></span>${esc(label(k))}</div>
+      <div class="v">${fmt(now)}</div>
+      <div class="d">${d === null ? "&nbsp;" :
+        `<b>${d >= 0 ? "+" : ""}${fmt(d)}</b> since start`}</div>
+    </div>`;
+  }).join("")}</div>`;
 }
 
-function chart(run){
-  const rows = run.metrics || [];
-  const keys = (run.metric_columns || []).filter(k => k !== "iteration").slice(0, 3);
-  if(rows.length < 2 || !keys.length) return "";
-  const W = 1000, H = 120, P = 6;
+/* ---------------- charts ----------------
+   One chart per metric. Never two y-scales on one plot: the alignment would be
+   arbitrary and would invent a correlation that is not in the data. */
+
+function chartCard(run, key, colour){
+  const rows = run.metrics;
   const xs = rows.map(r => r.iteration ?? 0);
+  const ys = rows.map(r => +r[key]);
   const x0 = Math.min(...xs), x1 = Math.max(...xs) || 1;
-  const cols = ["var(--run)", "var(--ok)", "var(--warn)"];
-  const paths = keys.map((k, i) => {
-    const ys = rows.map(r => +r[k] || 0);
-    const lo = Math.min(...ys), hi = Math.max(...ys);
-    const span = (hi - lo) || 1;
-    const d = rows.map((r, j) => {
-      const x = P + (W - 2*P) * ((xs[j] - x0) / ((x1 - x0) || 1));
-      const y = H - P - (H - 2*P) * ((ys[j] - lo) / span);
-      return `${j ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join("");
-    return {d, c: cols[i % cols.length], k, lo, hi};
-  });
-  return `<section><h2 class="sec">Progress</h2><div class="panel">
-    <svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-      ${paths.map(p => `<path d="${p.d}" fill="none" stroke="${p.c}" stroke-width="2"
-        vector-effect="non-scaling-stroke"/>`).join("")}
-    </svg>
-    <div class="legend">${paths.map(p =>
-      `<span><b style="color:${p.c}">&#9632;</b> ${esc(p.k.replace(/_/g," "))}
-       <span class="mono">${n2(p.lo)} &rarr; ${n2(p.hi)}</span></span>`).join("")}</div>
-  </div></section>`;
+  let lo = Math.min(...ys), hi = Math.max(...ys);
+  if(hi === lo){ hi = lo + 1; lo -= 1; }
+  const pad = (hi - lo) * 0.12; lo -= pad; hi += pad;
+
+  const W = 480, H = 132, L = 44, R = 10, T = 8, B = 22;
+  const px = v => L + (W - L - R) * ((v - x0) / ((x1 - x0) || 1));
+  const py = v => T + (H - T - B) * (1 - (v - lo) / ((hi - lo) || 1));
+
+  const ticksY = [lo + (hi - lo) * 0.08, (lo + hi) / 2, hi - (hi - lo) * 0.08];
+  const ticksX = [x0, (x0 + x1) / 2, x1];
+  const d = rows.map((r, i) => `${i ? "L" : "M"}${px(xs[i]).toFixed(1)},${py(ys[i]).toFixed(1)}`).join("");
+  const endX = px(xs[xs.length - 1]), endY = py(ys[ys.length - 1]);
+
+  return `<div class="card" data-key="${esc(key)}">
+    <h3><span class="swatch" style="background:${colour}"></span>${esc(label(key))}
+      <span class="now" style="color:${colour}">${fmt(ys[ys.length - 1])}</span></h3>
+    <div class="rng tnum">${fmt(Math.min(...ys))} to ${fmt(Math.max(...ys))} over
+      ${rows.length} samples</div>
+    <div class="plot">
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
+           aria-label="${esc(label(key))} against training iteration">
+        ${ticksY.map(t => `<line x1="${L}" x2="${W - R}" y1="${py(t).toFixed(1)}"
+           y2="${py(t).toFixed(1)}" stroke="var(--grid)" stroke-width="1"
+           vector-effect="non-scaling-stroke"/>`).join("")}
+        <line x1="${L}" x2="${L}" y1="${T}" y2="${H - B}" stroke="var(--line)"
+              stroke-width="1" vector-effect="non-scaling-stroke"/>
+        <line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="var(--line)"
+              stroke-width="1" vector-effect="non-scaling-stroke"/>
+        ${ticksY.map(t => `<text x="${L - 6}" y="${(py(t) + 3.5).toFixed(1)}" text-anchor="end"
+           font-size="9" fill="var(--muted)" class="tnum">${fmt(t)}</text>`).join("")}
+        ${ticksX.map((t, i) => `<text x="${px(t).toFixed(1)}" y="${H - B + 13}"
+           text-anchor="${i === 0 ? "start" : i === 2 ? "end" : "middle"}"
+           font-size="9" fill="var(--muted)" class="tnum">${Math.round(t)}</text>`).join("")}
+        <path d="${d}" fill="none" stroke="${colour}" stroke-width="2"
+              stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+        <circle cx="${endX.toFixed(1)}" cy="${endY.toFixed(1)}" r="3.2" fill="${colour}"
+                stroke="var(--surface)" stroke-width="2"/>
+        <g class="cross" opacity="0">
+          <line y1="${T}" y2="${H - B}" stroke="var(--muted)" stroke-width="1"
+                vector-effect="non-scaling-stroke"/>
+          <circle r="4" fill="${colour}" stroke="var(--surface)" stroke-width="2"/>
+        </g>
+        <rect x="${L}" y="0" width="${W - L - R}" height="${H}" fill="transparent" class="hit"/>
+      </svg>
+      <div class="tip"></div>
+    </div>
+  </div>`;
 }
+
+function wireHover(run){
+  const rows = run.metrics;
+  document.querySelectorAll(".card[data-key]").forEach(card => {
+    const key = card.dataset.key, svg = card.querySelector("svg");
+    const hit = card.querySelector(".hit"), g = card.querySelector(".cross");
+    const line = g.querySelector("line"), dotEl = g.querySelector("circle");
+    const tip = card.querySelector(".tip");
+    const W = 480, H = 132, L = 44, R = 10, T = 8, B = 22;
+    const xs = rows.map(r => r.iteration ?? 0), ys = rows.map(r => +r[key]);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs) || 1;
+    let lo = Math.min(...ys), hi = Math.max(...ys);
+    if(hi === lo){ hi = lo + 1; lo -= 1; }
+    const pad = (hi - lo) * 0.12; lo -= pad; hi += pad;
+    const px = v => L + (W - L - R) * ((v - x0) / ((x1 - x0) || 1));
+    const py = v => T + (H - T - B) * (1 - (v - lo) / ((hi - lo) || 1));
+
+    const move = ev => {
+      const b = svg.getBoundingClientRect();
+      const vx = ((ev.clientX - b.left) / b.width) * W;
+      let best = 0, bd = Infinity;
+      xs.forEach((x, i) => { const dd = Math.abs(px(x) - vx); if(dd < bd){ bd = dd; best = i; } });
+      const cx = px(xs[best]), cy = py(ys[best]);
+      g.setAttribute("opacity", "1");
+      line.setAttribute("x1", cx); line.setAttribute("x2", cx);
+      dotEl.setAttribute("cx", cx); dotEl.setAttribute("cy", cy);
+      tip.style.opacity = "1";
+      tip.style.left = (cx / W * 100) + "%";
+      tip.style.top = (cy / H * b.height) + "px";
+      tip.innerHTML = `<b>${fmt(ys[best])}</b> &middot; iteration
+        <span class="tnum">${xs[best]}</span>`;
+    };
+    hit.addEventListener("mousemove", move);
+    hit.addEventListener("mouseleave", () => {
+      g.setAttribute("opacity", "0"); tip.style.opacity = "0";
+    });
+  });
+}
+
+function charts(run){
+  const keys = (run.metric_columns || []).filter(k => k !== "iteration");
+  if(!keys.length || (run.metrics || []).length < 2) return "";
+  return `<section>
+    <div class="sech"><h2>Metrics</h2><div class="grow"></div>
+      <button class="btn ${TABLE ? "on" : ""}" id="tbtn">${TABLE ? "Charts" : "Table"}</button>
+    </div>
+    <div class="charts ${TABLE ? "hide" : ""}">${
+      keys.map((k, i) => chartCard(run, k, hueOf(k, i))).join("")}</div>
+    ${TABLE ? metricTable(run, keys) : ""}
+  </section>`;
+}
+
+/* Every chart has a table twin - a value is never reachable only by hovering. */
+function metricTable(run, keys){
+  const rows = run.metrics.slice().reverse();
+  return `<div class="card wrapx"><table>
+    <tr><th>iteration</th>${keys.map(k => `<th>${esc(label(k))}</th>`).join("")}</tr>
+    ${rows.map(r => `<tr><td class="tnum">${r.iteration}</td>${
+      keys.map(k => `<td class="tnum">${fmt(r[k])}</td>`).join("")}</tr>`).join("")}
+  </table></div>`;
+}
+
+/* ---------------- videos ---------------- */
 
 function films(run){
   const v = run.videos || [];
   if(!v.length){
-    return `<section><h2 class="sec">Checkpoints</h2>
-      <div class="empty">No videos yet. One is filmed automatically every time
-      training saves a checkpoint.</div></section>`;
+    return `<section><div class="sech"><h2>Checkpoints</h2></div>
+      <div class="empty">No videos yet. One is filmed every time training saves a
+      checkpoint.</div></section>`;
   }
-  return `<section><h2 class="sec">Checkpoints &mdash; ${v.length} filmed</h2>
-    <div class="films">${v.map(f => `
-      <div class="film">
-        <video src="${esc(f.file)}" controls preload="metadata" muted loop playsinline></video>
-        <div class="cap"><span class="mono">iteration ${f.iteration ?? "?"}</span></div>
-      </div>`).join("")}</div></section>`;
-}
-
-function curriculum(stages, currentStage, rewards){
-  const byKey = Object.fromEntries((rewards||[]).map(r => [r.key, r]));
-  return `<section><h2 class="sec">What gets taught, in order</h2>
-    <div class="panel wrap-x"><table>
-      <tr><th class="num"></th><th>Stage</th><th>Scored on</th><th>Passes when</th><th></th></tr>
-      ${stages.map(s => {
-        const state = currentStage === null ? "" :
-          (s.n < currentStage ? "done" : s.n === currentStage ? "now" : "");
-        return `<tr class="${state}">
-          <td class="num mono">${s.n}</td>
-          <td><b>${esc(s.name)}</b><div class="sub">${esc(s.goal)}</div></td>
-          <td>${(s.rewarded||[]).map(k => {
-                const r = byKey[k];
-                return `<span class="chip ${r && r.sign === "-" ? "neg" : "pos"}">${
-                  r ? esc(r.sign + " " + r.name) : esc(k)}</span>`;
-              }).join("") || '<span class="sub">—</span>'}</td>
-          <td class="sub">${esc(s.bar)}</td>
-          <td class="st sub">${state === "done" ? "done" : state === "now" ? "training" : ""}</td>
-        </tr>`;
-      }).join("")}
-    </table></div>
-    <div style="margin-top:10px"><a class="btn" href="/summary">
-      Every scoring term, and why each one exists &rarr;</a></div>
+  if(VIDEO === null) VIDEO = v.length - 1;
+  const cur = v[Math.min(VIDEO, v.length - 1)];
+  return `<section>
+    <div class="sech"><h2>Checkpoints</h2><div class="grow"></div>
+      <span class="pill tnum">${v.length} filmed</span></div>
+    <div class="vwrap">
+      <div class="stage">
+        <video src="${esc(cur.file)}" controls autoplay muted loop playsinline></video>
+        <div class="cap"><span class="tnum">iteration ${cur.iteration ?? "?"}</span>
+          <span>${VIDEO === v.length - 1 ? "latest" : ""}</span></div>
+      </div>
+      <div class="strip">${v.slice().reverse().map(f => {
+        const i = v.indexOf(f);
+        return `<div class="thumb ${i === VIDEO ? "sel" : ""}" data-i="${i}">
+          <span class="n tnum">${f.iteration ?? "?"}</span>
+          <span>iteration ${f.iteration ?? "?"}</span></div>`;
+      }).join("")}</div>
+    </div>
   </section>`;
 }
 
-function phases(ph){
-  const label = {done:"done", next:"next", later:"later", blocked:"needs the robot"};
-  return `<section><h2 class="sec">The plan</h2>
-    <div class="panel wrap-x"><table>
-      <tr><th class="num"></th><th>Phase</th><th></th><th>State</th></tr>
-      ${ph.map(p => `<tr class="${p.state === "next" ? "now" : p.state === "done" ? "done" : ""}">
-        <td class="num mono">${p.n}</td>
+/* ---------------- plan, compact ---------------- */
+
+function pipeline(s, currentStage){
+  const lab = {done:"done", next:"next", later:"later", blocked:"needs robot"};
+  return `<section>
+    <div class="sech"><h2>Pipeline</h2><div class="grow"></div>
+      <a class="btn" href="/summary">Full plan &amp; every scoring term &rarr;</a></div>
+    <div class="card wrapx"><table>
+      <tr><th class="n"></th><th>Phase</th><th>State</th></tr>
+      ${s.phases.map(p => `<tr class="${p.state === "next" ? "now" : ""}">
+        <td class="n tnum">${p.n}</td>
         <td><b>${esc(p.name)}</b><div class="sub">${esc(p.one_line)}</div></td>
-        <td class="sub">${esc(p.detail)}</td>
-        <td class="st sub">${esc(label[p.state] || p.state)}</td>
-      </tr>`).join("")}
+        <td class="st ${p.state === "done" ? "done" : p.state === "next" ? "now" : ""}">${
+          esc(lab[p.state] || p.state)}</td></tr>`).join("")}
+    </table></div>
+    <div class="card wrapx" style="margin-top:10px"><table>
+      <tr><th class="n"></th><th>Stage</th><th>Passes when</th><th></th></tr>
+      ${s.stages.map(st => {
+        const cls = currentStage == null ? "" :
+          st.n < currentStage ? "done" : st.n === currentStage ? "now" : "";
+        return `<tr class="${cls === "now" ? "now" : ""}">
+          <td class="n tnum">${st.n}</td>
+          <td><b>${esc(st.name)}</b></td>
+          <td class="sub">${esc(st.bar)}</td>
+          <td class="st ${cls}">${cls === "done" ? "done" : cls === "now" ? "training" : ""}</td>
+        </tr>`;
+      }).join("")}
+    </table></div>
+  </section>`;
+}
+
+function blockers(nx){
+  return `<section><div class="sech"><h2>Blocking &mdash; ${esc(nx.title)}</h2></div>
+    <div class="card wrapx"><table>
+      <tr><th>Needed first</th><th></th></tr>
+      ${nx.before.map(b => `<tr><td style="white-space:nowrap"><b>${esc(b.task)}</b></td>
+        <td class="sub">${esc(b.note)}</td></tr>`).join("")}
+      ${nx.open.map(o => `<tr><td style="white-space:nowrap;color:var(--warn)">open</td>
+        <td class="sub">${esc(o.q)} ${esc(o.note)}</td></tr>`).join("")}
     </table></div></section>`;
 }
 
-function nextUp(nx){
-  return `<section><h2 class="sec">Next up &mdash; ${esc(nx.title)}</h2>
-    <div class="panel">
-      <div style="font-size:17px;margin-bottom:16px">${esc(nx.why)}</div>
-      <table>
-        <tr><th>Before it can start</th><th></th></tr>
-        ${nx.before.map(b => `<tr><td><b>${esc(b.task)}</b></td>
-          <td class="sub">${esc(b.note)}</td></tr>`).join("")}
-      </table>
-      <div class="sub" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)">
-        <b style="color:var(--ink)">Known and unresolved</b>
-        ${nx.open.map(o => `<div style="margin-top:7px">${esc(o.q)}
-          <span style="opacity:.75">${esc(o.note)}</span></div>`).join("")}
-      </div>
+function modelRow(m){
+  const bad = (m.checks || []).filter(c => !c.passed);
+  return `<section><div class="sech"><h2>Model</h2></div>
+    <div class="tiles">
+      <div class="tile"><div class="k">checks</div>
+        <div class="v" style="color:${bad.length ? "var(--crit)" : "var(--good)"}">${
+          m.passed}/${m.total}</div><div class="d">${esc(m.urdf)}</div></div>
+      ${bad.slice(0, 3).map(c => `<div class="tile"><div class="k">failing</div>
+        <div class="v" style="font-size:15px;line-height:1.3">${esc(c.title)}</div>
+        <div class="d">${esc(c.detail)}</div></div>`).join("")}
     </div></section>`;
-}
-
-function modelPanel(m){
-  const good = m.passed === m.total;
-  return `<section><h2 class="sec">Model</h2><div class="grid">
-    <div class="cell"><div class="k">checks</div>
-      <div class="v mono" style="color:${good ? "var(--ok)" : "var(--bad)"}">${m.passed}/${m.total}</div></div>
-    ${(m.checks||[]).filter(c => !c.passed).slice(0,3).map(c =>
-      `<div class="cell"><div class="k">failing</div>
-       <div class="v small">${esc(c.title)}</div></div>`).join("")}
-  </div></section>`;
 }
 
 /* ---------------- draw ---------------- */
 
 function draw(){
-  const s = STATE;
-  const runs = s.runs || [];
+  const s = STATE, runs = s.runs || [];
   if(SELECTED === null) SELECTED = (s.active && s.active.id) || null;
   const run = runs.find(r => r.id === SELECTED) || s.active || null;
 
   renderRuns(runs);
   renderHead(run, s.model);
-
-  const stage = run && run.stage !== undefined ? run.stage : null;
   $("#body").innerHTML = [
-    run ? metricGrid(run) : "",
-    run ? chart(run) : "",
+    run ? tiles(run) : "",
+    run ? charts(run) : "",
     run ? films(run) : "",
-    phases(s.phases),
-    nextUp(s.next_up),
-    curriculum(s.stages, stage, s.rewards),
-    modelPanel(s.model),
+    pipeline(s, run ? run.stage : null),
+    blockers(s.next_up),
+    modelRow(s.model),
   ].join("");
+
+  if(run && !TABLE) wireHover(run);
+  const tb = $("#tbtn");
+  if(tb) tb.onclick = () => { TABLE = !TABLE; draw(); };
+  document.querySelectorAll(".thumb").forEach(el =>
+    el.onclick = () => { VIDEO = +el.dataset.i; draw(); });
 }
 
 function load(){
-  fetch("/api/monitor").then(r => r.json()).then(s => { STATE = s; draw(); })
-    .catch(e => { $("#head").innerHTML = `<h1>Could not load</h1><div class="sub">${esc(e)}</div>`; });
+  fetch("/api/monitor").then(r => r.json()).then(s => {
+    // Hold the previous render while refetching - no skeleton flash, no jump.
+    STATE = s; draw();
+  }).catch(e => { $("#head").innerHTML = `<h1>Could not load</h1>
+    <div class="purpose">${esc(e)}</div>`; });
 }
 load();
-// Cheap poll. The page is local and the payload is small; this is what makes it
-// a monitor rather than a snapshot.
 setInterval(load, 10000);
 </script>
 </body>
