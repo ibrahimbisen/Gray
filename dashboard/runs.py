@@ -89,7 +89,10 @@ def read_run(folder: Path) -> dict:
         ({"file": f"/media/runs/{folder.name}/videos/{p.name}",
           "iteration": _iteration_of(p.name),
           "name": p.stem}
-         for p in (folder / "videos").glob("*.mp4")),
+         # ".writing.mp4" is a film still being encoded. Showing it hands the
+         # browser a truncated file that will never finish loading.
+         for p in (folder / "videos").glob("*.mp4")
+         if not p.name.endswith(".writing.mp4")),
         key=lambda v: (v["iteration"] is None, v["iteration"] or 0),
     )
     checkpoints = sorted(

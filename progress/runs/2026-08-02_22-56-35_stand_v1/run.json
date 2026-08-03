@@ -4,10 +4,10 @@
   "stage": 1,
   "stage_name": "Stand still",
   "task": "Gray-Stand",
-  "status": "running",
+  "status": "done",
   "bar": "30 s without falling. Trunk within 5 mm of 164 mm. Uprightness above 0.99.",
   "started": "2026-08-02T22:56:35",
-  "finished": null,
+  "finished": "2026-08-02T23:03:17",
   "iterations_target": 600,
   "notes": "3072 robots at once, 50 Hz control."
 }
