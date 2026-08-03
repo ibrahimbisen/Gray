@@ -1,0 +1,13 @@
+{
+  "name": "Stand still",
+  "purpose": "Can a policy hold the ride-height stance? The static check says twelve servos at 1.96 N-m have 3.58x the torque they need, so a failure here is the reward or the setup, not the robot.",
+  "stage": 1,
+  "stage_name": "Stand still",
+  "task": "Gray-Stand",
+  "status": "failed",
+  "bar": "30 s without falling. Trunk within 5 mm of 164 mm. Uprightness above 0.99.",
+  "started": "2026-08-02T22:54:38",
+  "finished": "2026-08-02T22:54:42",
+  "iterations_target": 600,
+  "notes": "8192 robots at once, 50 Hz control."
+}
