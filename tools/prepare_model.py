@@ -353,6 +353,64 @@ def calf_com(root, fk, leg: str):
     return None
 
 
+def fix_inertial_frames(root, pkg: Path) -> list[str]:
+    """Put each link's centre of mass back in the frame its joints are in.
+
+    The exporter converts joint origins to Z-up but leaves the inertial origin in
+    SolidWorks' own Y-up frame. On this robot that put the trunk's centre of mass
+    2.39 m behind a 0.3 m machine: the simulated robot was so rear-heavy it
+    toppled backwards the instant it was let go, and nothing about that is visible
+    in the mass, which was correct all along.
+
+    The test is the link's own mesh: a centre of mass has to lie inside the part
+    it belongs to. Where it does not, the Y-up rotation is tried, and kept only if
+    that lands it inside.
+    """
+    import trimesh  # noqa: PLC0415
+
+    # Y-up to Z-up: (x, y, z) -> (x, -z, y)
+    to_z_up = np.array([[1.0, 0, 0], [0, 0, -1.0], [0, 1.0, 0]])
+    report = []
+
+    for link in root.findall("link"):
+        name = link.get("name")
+        inertial = link.find("inertial")
+        if inertial is None:
+            continue
+        mesh_el = next((m for m in link.iter("mesh")), None)
+        if mesh_el is None:
+            continue
+        stl = pkg / "meshes" / Path(mesh_el.get("filename", "")).name
+        if not stl.exists():
+            report.append(f"{name}: no mesh to check against, left alone")
+            continue
+
+        box = trimesh.load_mesh(stl, process=False).bounds
+        pad = 0.02  # a COM can sit slightly outside a thin, hollow shell
+        com, rot = read_origin(inertial)
+
+        def inside(p, box=box, pad=pad):
+            return bool(np.all(p >= box[0] - pad) and np.all(p <= box[1] + pad))
+
+        if inside(com):
+            continue
+        turned = to_z_up @ com
+        if inside(turned):
+            write_origin(inertial, turned, to_z_up @ rot)
+            rotate_inertia(inertial, to_z_up)
+            report.append(
+                f"{name}: centre of mass was {np.round(com, 3)} - outside the part. "
+                f"Rotated from Y-up to {np.round(turned, 3)}, which is inside it."
+            )
+        else:
+            report.append(
+                f"{name}: WARNING centre of mass {np.round(com, 3)} is outside the "
+                f"part and rotating it does not help. Mesh spans "
+                f"{np.round(box[0], 3)} to {np.round(box[1], 3)}."
+            )
+    return report or ["every centre of mass already sits inside its part"]
+
+
 def add_floating_base(root) -> None:
     """Say out loud that the robot is not bolted to the ground.
 
@@ -534,6 +592,7 @@ def main() -> int:
     before = forward_kinematics(root)
     add_floating_base(root)
     level_report = level_legs(root)
+    inertial_report = fix_inertial_frames(root, pkg)
     mass_report = fix_masses(root, cfg)
     rot, origin, notes = derive_base_frame(root)
     retarget_base(root, rot, origin)
@@ -553,6 +612,9 @@ def main() -> int:
     print(f"output   {OUT_URDF.relative_to(ROOT)}   ({n_meshes} mesh references)")
     print("\nleg orientation at the model's zero:")
     for line in level_report:
+        print(f"  {line}")
+    print("\ncentre of mass, checked against each part's own mesh:")
+    for line in inertial_report:
         print(f"  {line}")
     print("\nmass, from gray/config/robot.yaml:")
     for line in mass_report:

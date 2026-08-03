@@ -98,6 +98,8 @@ def build() -> tuple[Path, float]:
     if world.find("light") is None:
         ET.SubElement(world, "light", {"pos": "0 0 2", "dir": "0 0 -1", "directional": "true"})
 
+    add_servos(root, tree)
+
     ET.indent(tree, space="  ")
     tree.write(MJCF, encoding="utf-8", xml_declaration=True)
 
@@ -105,17 +107,85 @@ def build() -> tuple[Path, float]:
     return MJCF, float(sum(checked.body_mass))
 
 
-def drop(seconds: float = 2.0) -> dict:
-    """Let it fall and settle, and report what happened."""
+def add_servos(root, tree) -> None:
+    """Give the twelve joints something to drive them.
+
+    Straight out of the URDF the joints spin freely - a skeleton with bearings
+    and no motors, which is why the robot collapses the moment it is dropped. A
+    DS3218MG is a position servo: you send it an angle and its internal loop
+    pushes toward that angle. In MuJoCo that is a position actuator with a gain,
+    a damping term, and a hard ceiling on the force it can produce.
+
+    The force ceiling is the one number here that is real - 1.96 N-m is the
+    published stall torque. The gains are a starting point; see robot.yaml.
+    """
+    cfg = yaml.safe_load((ROOT / "gray" / "config" / "robot.yaml").read_text())
+    servo = cfg["servo"]
+
+    for old in root.findall("actuator"):
+        root.remove(old)
+    actuator = ET.SubElement(root, "actuator")
+
+    for jnt in root.iter("joint"):
+        name = jnt.get("name")
+        if not name or jnt.get("type") in ("free", "slide", "ball"):
+            continue
+        # The gearbox has inertia and friction of its own. Without them the joint
+        # is a frictionless hinge, which is easier to control in simulation than
+        # anything real - and a policy trained against that does not transfer.
+        jnt.set("armature", str(servo["armature"]))
+        jnt.set("damping", str(servo["damping"]))
+        jnt.set("frictionloss", str(servo["frictionloss"]))
+
+        rng = jnt.get("range")
+        ET.SubElement(actuator, "position", {
+            "name": name,
+            "joint": name,
+            "kp": str(servo["kp"]),
+            "kv": str(servo["kv"]),
+            "forcerange": f"-{servo['stall_torque_nm']} {servo['stall_torque_nm']}",
+            **({"ctrlrange": rng} if rng else {}),
+        })
+
+    # 50 Hz is the servo's PWM period and cannot be exceeded. The physics runs
+    # four times faster so contact is resolved properly between commands.
+    opt = root.find("option")
+    if opt is None:
+        opt = ET.Element("option")
+        root.insert(0, opt)
+    opt.set("timestep", str(round(1.0 / (servo["control_hz"] * 4), 6)))
+
+
+def drop(seconds: float = 2.0, hold: bool = True) -> dict:
+    """Let it settle, and report what happened.
+
+    With `hold`, the servos are told to keep the stance they were dropped in -
+    which is the whole test: can the robot hold itself up. Without it they are
+    commanded to zero and it collapses, which is what a robot with no motors does.
+    """
     model = mujoco.MjModel.from_xml_path(str(MJCF))
     data = mujoco.MjData(model)
 
-    # Start it a little above the ground so the fall is visible in the numbers.
     root_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "base_link")
+    stance = ROOT / "progress" / "stance" / "stance.yaml"
+    if stance.exists():
+        st = yaml.safe_load(stance.read_text())
+        for name, deg in st["angles_deg"].items():
+            jid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, name.replace("_", ""))
+            if jid >= 0:
+                data.qpos[model.jnt_qposadr[jid]] = np.deg2rad(deg)
+        # Take the height straight from the solver, which placed the feet on the
+        # floor to find it. Measuring it here off geom centres instead puts the
+        # robot's legs through the floor, and MuJoCo answers by firing it 100 mm
+        # into the air on the first step.
+        data.qpos[2] = st["trunk_height_m"] + 0.001
+
     mujoco.mj_forward(model, data)
-    lowest = min(float(data.geom_xpos[g][2]) for g in range(model.ngeom)
-                 if model.geom_type[g] != mujoco.mjtGeom.mjGEOM_PLANE)
-    data.qpos[2] += 0.02 - lowest
+
+    if hold and model.nu:
+        for a in range(model.nu):
+            jid = model.actuator_trnid[a, 0]
+            data.ctrl[a] = data.qpos[model.jnt_qposadr[jid]]
 
     n = int(seconds / model.opt.timestep)
     for _ in range(n):

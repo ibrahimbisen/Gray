@@ -30,6 +30,21 @@ servo:
   travel_deg: 270
   control_hz: 50             # hard ceiling: the PWM period is 20 ms
 
+  # How hard the servo pulls toward the angle it was told to hold, and how much
+  # it resists being moved. A hobby servo's internal controller is sealed and
+  # these numbers are not published, so they are a starting point, not a
+  # measurement. Everything the robot learns depends on them, so they get checked
+  # against the real servo before any policy goes near hardware.
+  #
+  # kp is set so the joint carrying the most weight at ride height - 0.55 N-m -
+  # sags about 1.5 degrees under load, which is roughly what these servos do.
+  kp: 21.0                   # N-m per radian of error
+  kv: 0.6                    # N-m per rad/s, the damping
+  armature: 0.003            # the gear train's own inertia, seen at the joint
+  frictionloss: 0.01         # stiction in the gearbox
+  damping: 0.05              # viscous drag in the joint itself
+  gains_measured: false      # replace kp/kv once the real servo can be tested
+
 feedback:
   # Potentiometers the owner is fitting - rotary on the rotating joints, linear
   # on the knee pushrod. Analog, so the Raspberry Pi needs an external ADC.
