@@ -82,6 +82,69 @@ function shell(sections, opts = {}) {
   if (opts.onReady) opts.onReady(open);
 }
 
+/* One continuous page, laid out like a paper: numbered sections, the sidebar
+   demoted to a contents list. Used where the point is to read end to end and
+   hold two tables against each other - which shell(), showing one panel at a
+   time, actively prevents.
+
+   sections: [{id, label, count, lead, html}]  - lead:true is the unnumbered
+   opening block. */
+function paper(sections) {
+  const side = document.querySelector(".side");
+  const main = document.querySelector(".main");
+
+  let n = 0;
+  const secs = sections.map(s => ({ ...s, num: s.lead ? null : ++n }));
+
+  side.innerHTML = `<h4>Contents</h4>` + secs.map(s =>
+    `<button data-id="${esc(s.id)}">${
+      s.num ? `<span class="id">${s.num}</span>` : ""
+    }${esc(s.label)}${
+      s.count != null ? `<span class="n">${s.count}</span>` : ""
+    }</button>`).join("");
+
+  main.innerHTML = `<div class="paper">` + secs.map(s => `
+    <section id="${esc(s.id)}"${s.lead ? ` class="lead"` : ""}>
+      ${s.num ? `<h2><span class="secnum">${s.num}</span>${esc(s.label)}</h2>` : ""}
+      ${typeof s.html === "function" ? s.html() : s.html}
+    </section>`).join("") + `</div>`;
+
+  const buttons = new Map(
+    [...side.querySelectorAll("button[data-id]")].map(b => [b.dataset.id, b]));
+  const mark = (id) => buttons.forEach((b, k) => b.classList.toggle("on", k === id));
+  const go = (id) => {
+    const el = main.querySelector("#" + CSS.escape(id));
+    if (el) el.scrollIntoView({ block: "start" });
+  };
+
+  side.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-id]");
+    if (b) { go(b.dataset.id); mark(b.dataset.id); }
+  });
+
+  // The contents list follows the reader rather than the reader having to
+  // remember where they got to. rootMargin pins "current" to the top band, so
+  // a tall section stays selected the whole way down it.
+  const onScreen = new Set();
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) onScreen.add(e.target.id);
+      else onScreen.delete(e.target.id);
+    }
+    const first = secs.find(s => onScreen.has(s.id));
+    if (first) {
+      mark(first.id);
+      if (location.hash.slice(1) !== first.id)
+        history.replaceState(null, "", "#" + first.id);
+    }
+  }, { root: main, rootMargin: "0px 0px -72% 0px" });
+  main.querySelectorAll("section[id]").forEach(el => io.observe(el));
+
+  const start = location.hash.slice(1);
+  if (buttons.has(start)) go(start);
+  mark(buttons.has(start) ? start : secs[0].id);
+}
+
 /* ---- small builders the pages share ---- */
 
 const facts = (rows) => `<div class="facts">${rows.map(f => `

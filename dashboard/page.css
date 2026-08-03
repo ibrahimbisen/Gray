@@ -114,6 +114,35 @@ td.dim { color:var(--dim); }
    a panel uses the viewport instead of leaving half of it empty. */
 .scroller { max-height:calc(100vh - 310px); min-height:180px; overflow-y:auto; }
 
+/* ---------- paper: one continuous page, numbered sections ---------- */
+.paper { max-width:1180px; }
+.paper section { padding-bottom:46px; scroll-margin-top:4px; }
+.paper section + section { border-top:1px solid var(--line); padding-top:36px; }
+.paper section.lead { padding-bottom:34px; }
+.paper h2 { display:flex; gap:12px; align-items:baseline; margin:0 0 16px; }
+.paper section > .tw, .paper section > .cols, .paper section > .facts { margin-bottom:16px; }
+.paper section > :last-child { margin-bottom:0; }
+.secnum { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:14px;
+          font-weight:700; color:var(--accent); border:1px solid var(--line);
+          border-radius:7px; padding:1px 9px; flex:0 0 auto; }
+
+/* A stacked bar for the five coverage words. Never the only carrier of meaning -
+   every row that shows one also shows the counts as numbers beside it. */
+.cov { display:flex; height:8px; min-width:110px; border-radius:99px;
+       overflow:hidden; background:var(--line); }
+.cov i { display:block; height:100%; }
+.cov i + i { box-shadow:inset 2px 0 0 var(--panel); }
+.cov i.command, .dot.command   { background:var(--ok); }
+.cov i.condition, .dot.condition { background:var(--accent); }
+.cov i.emerges, .dot.emerges   { background:var(--warn); }
+.cov i.measured, .dot.measured { background:var(--faint); }
+.cov i.blocked, .dot.blocked   { background:var(--bad); }
+.dot { width:9px; height:9px; border-radius:2px; display:inline-block;
+       margin-right:7px; vertical-align:0; }
+.filter { background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+          color:var(--ink); font:inherit; font-size:13px; padding:6px 10px; }
+.filter:focus { outline:none; border-color:var(--accent); }
+
 /* ---------- model checks ---------- */
 .status { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
 .score { font-size:30px; font-weight:600; font-variant-numeric:tabular-nums; }

@@ -18,12 +18,195 @@
 document.getElementById("top").innerHTML =
   topbar("/stage2", "Stage 2 of 3 &middot; in progress");
 
+/* One page, read top to bottom. Everything that can be a table is a table -
+   the previous version split this across fifteen panels, which meant no two
+   numbers could ever be held against each other. */
+
+const COV = ["command", "condition", "emerges", "measured", "blocked"];
+const COV_SHORT = { command: "a command", condition: "a dial", emerges: "falls out",
+                    measured: "read off", blocked: "unreachable" };
+
 const chipFor = (state) =>
   /^(done|passed)/.test(state) ? "ok"
   : /^(in progress|partly|ongoing)/.test(state) ? "now" : "warn";
 
-/* A kind is a claim about how much work something is, so it gets its own colour
-   of language rather than being another row in the same table. */
+const sum = (cov) => COV.reduce((a, k) => a + (cov[k] || 0), 0);
+
+const covBar = (cov) => {
+  const t = sum(cov) || 1;
+  return `<div class="cov">${COV.filter(k => cov[k]).map(k =>
+    `<i class="${k}" style="width:${(100 * cov[k] / t).toFixed(1)}%"></i>`).join("")}</div>`;
+};
+
+/* Counts as numbers, always, beside the bar. The bar is a shape, not the data. */
+const covCells = (cov) => COV.map(k =>
+  cov[k] ? `<td class="n">${cov[k]}</td>` : `<td class="n dim">&middot;</td>`).join("");
+
+const covWords = (cov) => COV.filter(k => cov[k])
+  .map(k => `${cov[k]} ${COV_SHORT[k]}`).join(" &middot; ");
+
+const COV_HEAD = COV.map(k =>
+  `<th class="n"><span class="dot ${k}"></span>${COV_SHORT[k]}</th>`).join("");
+
+fetch("/api/stage/2").then(r => r.json()).then(s => {
+
+const runs = s.subsections.filter(x => x.kind === "run");
+const rt = s.run_totals || {};
+const blockedTotal = s.needs.reduce((a, n) => a + n.count, 0);
+
+/* ---------------------------------------------------------------- lead --- */
+const lead = () => `
+  <div class="eyebrow">Stage 2 &middot; Train</div>
+  <h1>${s.total} skills. ${s.runs} training runs.</h1>
+  <p class="lede">${esc(s.lede)}</p>
+  ${facts([
+    {k:"Skills in the library", v:s.total, n:`read live from ${s.path}`},
+    {k:"Training runs", v:s.runs, n:"the only unit that is a piece of work"},
+    {k:"Trained toward", v:rt.command || 0, n:`of ${rt.rows || 0} rows across the ${s.runs} runs`},
+    {k:"Nothing can reach", v:blockedTotal, n:`waiting on ${s.needs.length} missing capabilities`},
+    {k:"Commands one R1 run tries", v:(s.sampling.headline || {}).commands || "—",
+     n:"in ONE simulation, not one per skill"},
+  ])}`;
+
+/* ------------------------------------------------------- 1. everything --- */
+const everything = () => `
+  <div class="tw"><table>
+    <tr><th class="n"></th><th>Group</th><th>Kind</th><th class="n">Rows</th>
+        <th style="width:130px">Split</th>${COV_HEAD}</tr>
+    ${s.subsections.map(x => `<tr>
+      <td class="n"><span class="chip ${chipFor(x.state)}"
+            style="font-family:ui-monospace">${esc(x.id)}</span></td>
+      <td><b>${esc(x.name)}</b><div class="dim small">${esc(x.rule)}</div></td>
+      <td class="dim">${esc(x.kind)}</td>
+      <td class="n"><b>${x.count}</b></td>
+      <td>${covBar(x.coverage)}</td>
+      ${covCells(x.coverage)}</tr>`).join("")}
+    <tr><td></td><td class="dim"><b>The ${s.runs} runs only</b></td><td class="dim">run</td>
+      <td class="n"><b>${rt.rows || 0}</b></td>
+      <td>${covBar(rt)}</td>${covCells(rt)}</tr>
+  </table></div>
+  <p class="why small">Rows are only added across the ${s.runs} runs, because those
+    are the same kind of thing. A run and a friction value in one total is what made
+    the previous version of this page misleading.</p>`;
+
+/* ------------------------------------------------------- 2. five words --- */
+const words = () => {
+  const tally = {};
+  for (const x of s.subsections)
+    for (const k of COV) tally[k] = (tally[k] || 0) + (x.coverage[k] || 0);
+  return `
+  <p class="lede">Where a skill is filed and how it is covered are different
+    questions. This is the second one, and it is the one that says what training
+    can actually do about a row.</p>
+  <div class="tw"><table>
+    <tr><th>Word</th><th>What it means</th><th class="n">Rows</th>
+        <th class="n">Of ${s.total}</th></tr>
+    ${COV.map(k => `<tr>
+      <td><span class="dot ${k}"></span><b>${esc(COV_SHORT[k])}</b>
+          <div class="dim small" style="margin-left:16px">${esc(k)}</div></td>
+      <td class="dim">${esc(s.coverage_words[k] || "")}</td>
+      <td class="n"><b>${tally[k] || 0}</b></td>
+      <td class="n dim">${Math.round(100 * (tally[k] || 0) / s.total)}%</td></tr>`).join("")}
+  </table></div>`;
+};
+
+/* --------------------------------------------------- 3. what runs train -- */
+const trained = () => `
+  <p class="lede">One reward function is one JOB, not one skill. R1's job is
+    <i>put the trunk where you are told and do not fall</i>. The command is what
+    makes that one job cover many rows &mdash; and it is also what it cannot cover.</p>
+  <div class="tw"><table>
+    <tr><th class="n"></th><th>Run</th><th>Command</th><th class="n">Rows</th>
+        <th style="width:130px">Split</th>${COV_HEAD}</tr>
+    ${runs.map(x => `<tr>
+      <td class="n"><span class="chip ${chipFor(x.state)}"
+            style="font-family:ui-monospace">${esc(x.id)}</span></td>
+      <td><b>${esc(x.name)}</b><div class="dim small">${esc(x.state)}</div></td>
+      <td class="dim small"><code>${esc(x.commands || "—")}</code></td>
+      <td class="n"><b>${x.count}</b></td>
+      <td>${covBar(x.coverage)}</td>
+      ${covCells(x.coverage)}</tr>`).join("")}
+  </table></div>
+  <div class="cols" style="margin-top:18px">
+    ${runs.map(x => `<div class="card">
+      <h3>${esc(x.id)} &nbsp;${esc(x.name)}</h3>
+      <p class="small">${covWords(x.coverage)}.</p>
+      <p class="why small">${esc(x.why)}</p>
+      ${x.gap ? `<div class="risk small"><b>Known gap.</b> ${esc(x.gap)}</div>` : ""}
+    </div>`).join("")}
+  </div>
+  <h3 style="margin-top:24px">R1 one level down &mdash; by category</h3>
+  <div class="tw"><table>
+    <tr><th>Category</th><th class="n">Rows</th><th style="width:130px">Split</th>
+        ${COV_HEAD}<th>Reads as</th></tr>
+    ${(runs[0] || {by_category: []}).by_category.map(c => `<tr>
+      <td><b>${esc(c.category)}</b></td>
+      <td class="n">${c.count}</td>
+      <td>${covBar(c.coverage)}</td>
+      ${covCells(c.coverage)}
+      <td class="dim small">${covWords(c.coverage)}</td></tr>`).join("")}
+  </table></div>`;
+
+/* ------------------------------------------------------- 4. one sim ------ */
+const sim = () => {
+  const m = s.sampling;
+  if (m.error) return `<div class="risk small"><b>Could not read the numbers.</b>
+    ${esc(m.error)}</div>`;
+  return `
+  <p class="lede">Not one simulation per skill. <b>One simulation</b>, holding
+    ${esc(m.headline.envs)} robots, each handed its own random command that rerolls
+    every few seconds. Every number below is read out of the file that sets it.</p>
+  <div class="cols">
+    <div class="card">
+      <h3>What goes in</h3>
+      <div class="tw"><table>
+        <tr><th>Input</th><th class="n">Value</th><th>Read from</th></tr>
+        ${m.inputs.map(i => `<tr>
+          <td><b>${esc(i.label)}</b><div class="dim small">${esc(i.note)}</div></td>
+          <td class="n"><b>${esc(i.value)}</b> <span class="dim">${esc(i.unit)}</span></td>
+          <td class="dim small"><code>${esc(i.source)}</code></td></tr>`).join("")}
+      </table></div>
+    </div>
+    <div class="card">
+      <h3>What comes out</h3>
+      <div class="tw"><table>
+        <tr><th>Quantity</th><th class="n">Value</th><th>How</th></tr>
+        ${m.derived.map(d => `<tr>
+          <td><b>${esc(d.label)}</b><div class="dim small">${esc(d.aside)}</div></td>
+          <td class="n"><b>${esc(d.value)}</b> <span class="dim">${esc(d.unit)}</span></td>
+          <td class="dim small">${esc(d.how)}</td></tr>`).join("")}
+      </table></div>
+      <div class="note key small" style="margin-top:12px"><b>This is the answer
+        to "how many simulations".</b> One run tries ${esc(m.headline.commands)}
+        different command settings. That is how one reward function covers a list
+        of skills without a run per row.</div>
+    </div>
+  </div>`;
+};
+
+/* ------------------------------------------------------- 5. unreachable -- */
+const unreachable = () => `
+  <p class="lede">${blockedTotal} rows that no amount of reward tuning produces.
+    They are waiting on ${s.needs.length} things that do not exist &mdash; not on
+    ${blockedTotal} separate problems.</p>
+  <div class="tw"><table>
+    <tr><th>Missing</th><th class="n">Rows</th><th>Why nothing reaches them</th></tr>
+    ${s.needs.map(n => `<tr>
+      <td><span class="dot blocked"></span><b>${esc(n.label)}</b></td>
+      <td class="n"><b>${n.count}</b></td>
+      <td class="dim">${esc(n.why)}</td></tr>`).join("")}
+  </table></div>
+  <h3 style="margin-top:22px">Named, so none of them is quietly counted as progress</h3>
+  <div class="tw scroller"><table>
+    <tr><th class="n">#</th><th>Skill</th><th>Waiting on</th><th>Note</th></tr>
+    ${s.needs.flatMap(n => n.rows.map(r => `<tr>
+      <td class="n dim">${r.n}</td>
+      <td>${esc(r.name)}</td>
+      <td class="dim"><span class="dot blocked"></span>${esc(n.label)}</td>
+      <td class="dim small">${esc(r.why)}</td></tr>`)).join("")}
+  </table></div>`;
+
+/* ------------------------------------------------------- 6. five kinds --- */
 const KIND_LEDE = {
   run: "A piece of work in its own right.",
   axis: "Not a piece of work &mdash; a number changed inside one.",
@@ -31,167 +214,127 @@ const KIND_LEDE = {
   test: "Read off a trained policy, not trained toward.",
   parked: "Not being worked. Each one names its trigger.",
 };
-
-function overview(s) {
-  const kindRow = (k) => `<tr>
+const kinds = () => `
+  <div class="tw"><table>
+    <tr><th class="n"></th><th>Kind</th><th class="n">Groups</th><th class="n">Rows</th>
+        <th>What it means</th></tr>
+    ${s.kinds.map(k => `<tr>
       <td class="n"><span class="chip">${esc(k.items.join(" "))}</span></td>
-      <td><b>${esc(k.name)}</b><div class="dim small">${esc(KIND_LEDE[k.key] || "")}</div></td>
+      <td><b>${esc(k.name)}</b><div class="dim small">${KIND_LEDE[k.key] || ""}</div></td>
       <td class="n">${k.subsections}</td>
-      <td class="n">${k.count}</td>
-    </tr>`;
-  return `
-    <div class="eyebrow">Stage 2 &middot; Train</div>
-    <h1>200 skills, ${s.runs} training runs</h1>
-    <p class="lede">${esc(s.lede)}</p>
-    ${facts([
-      {k:"Skills in the library", v:s.total, n:"read live from your CSV"},
-      {k:"Training runs", v:s.runs, n:"the only unit of work that is a piece of work"},
-      {k:"Skills in R1 alone", v:(s.subsections.find(x => x.id === "R1") || {}).count || 0,
-       n:"one policy, one reward, six commands"},
-      {k:"Difficulty dial written", v:s.dialled, n:"the randomisation ranges, already yours"},
-    ])}
-    <div class="cols">
-      <div class="card">
-        <h3>What each kind means</h3>
-        <div class="tw"><table>
-          <tr><th class="n"></th><th>Kind</th><th class="n">Items</th><th class="n">Skills</th></tr>
-          ${s.kinds.map(kindRow).join("")}
-        </table></div>
-        <p class="why small" style="margin-top:12px">Counts are shown per kind and
-          never added together. One combined total is what made the previous version
-          of this page misleading &mdash; it put a training run and a friction value
-          in the same number.</p>
-      </div>
-      <div class="card">
-        <h3>The runs, and what each one costs</h3>
-        <div class="tw"><table>
-          <tr><th class="n"></th><th>Run</th><th class="n">Skills</th><th>State</th></tr>
-          ${s.subsections.filter(x => x.kind === "run").map(x => `<tr>
-            <td class="n"><span class="chip ${chipFor(x.state)}"
-                  style="font-family:ui-monospace">${esc(x.id)}</span></td>
-            <td><b>${esc(x.name)}</b><div class="dim small">${esc(x.rule)}</div></td>
-            <td class="n">${x.count}</td>
-            <td class="dim">${esc(x.state)}</td></tr>`).join("")}
-        </table></div>
-        <p class="why small" style="margin-top:12px">Three files ship. Everything else
-          on this page is a number inside one of them, a property checked across all
-          of them, or a measurement taken afterwards.</p>
-      </div>
-    </div>`;
-}
+      <td class="n"><b>${k.count}</b></td>
+      <td class="dim small">${esc(k.blurb)}</td></tr>`).join("")}
+  </table></div>
+  <h3 style="margin-top:22px">What order, and why</h3>
+  <div class="cols tight">
+    ${s.order.map(o => `<div class="card"><p class="why small">${esc(o)}</p></div>`).join("")}
+  </div>`;
 
-function methodPanel(s) {
-  return `
-    <div class="eyebrow">Stage 2</div>
-    <h1>How it is sorted, and in what order</h1>
-    <p class="lede">Why 200 things is ${s.runs} pieces of work rather than 200.</p>
-    <div class="cols">
-      <div class="card">
-        <h3>How it is sorted</h3>
-        ${s.intro.map(p => `<p class="why small">${esc(p)}</p>`).join("")}
-        <div class="note key small"><b>Source:</b>
-          <code>${esc(s.path)}</code> &mdash; edit it and this page follows.</div>
-      </div>
-      <div class="card">
-        <h3>What order, and why</h3>
-        ${s.order.map(o => `<div class="risk small">${esc(o)}</div>`).join("")}
-      </div>
-    </div>`;
-}
+/* ------------------------------------------------------- 7. pass bars ---- */
+const bars = () => `
+  <p class="lede">A group is passed by its bar, never by its curve. Clauses that
+    nothing measures are listed as unknown rather than dropped &mdash; an unlisted
+    clause is worse than a failing one, because it makes the count look complete.</p>
+  <div class="tw"><table>
+    <tr><th class="n"></th><th>Group</th><th>State</th><th>Passes when</th></tr>
+    ${s.subsections.map(x => `<tr>
+      <td class="n"><span class="chip ${chipFor(x.state)}"
+            style="font-family:ui-monospace">${esc(x.id)}</span></td>
+      <td><b>${esc(x.name)}</b></td>
+      <td class="dim">${esc(x.state)}</td>
+      <td class="dim">${esc(x.bar || "—")}
+        ${(x.unverified || []).map(u => `<div class="risk small" style="padding:8px 0 0">
+          <b style="color:var(--warn)">Nothing measures this.</b>
+          ${esc(u)}</div>`).join("")}
+        ${x.trigger ? `<div class="note key small" style="margin:8px 0 0">
+          <b>Un-parks when:</b> ${esc(x.trigger)}</div>` : ""}
+      </td></tr>`).join("")}
+  </table></div>`;
 
-function kindPanel(s, k) {
-  const items = s.subsections.filter(x => x.kind === k.key);
+/* ------------------------------------------------------- 8. every row ---- */
+const every = () => {
+  const rows = s.subsections.flatMap(x => x.skills.map(k => ({ ...k, sub: x })));
+  rows.sort((a, b) => a.n - b.n);
   return `
-    <div class="eyebrow">Stage 2 &middot; kind</div>
-    <h1>${esc(k.name)}</h1>
-    <p class="lede">${esc(k.blurb)}</p>
-    ${facts([
-      {k:"Items", v:k.subsections, n:esc(k.items.join(", "))},
-      {k:"Skills", v:k.count, n:"never added to another kind's count"},
-    ])}
-    <div class="cols tight">
-      ${items.map(x => `<div class="card">
-        <h3>${esc(x.id)} &nbsp;${esc(x.name)}
-          <span class="chip ${chipFor(x.state)}">${esc(x.state)}</span></h3>
-        <p class="small">${esc(x.what)}</p>
-        <div class="dim small" style="margin-top:8px">${x.count} skills &middot;
-          ${esc(x.rule)}</div>
-      </div>`).join("")}
-    </div>`;
-}
+    <p class="lede">The owner's CSV, sorted. This page never invents a row and
+      never stores a copy &mdash; edit <code>${esc(s.path)}</code> and it changes.</p>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+      <input class="filter" id="q" placeholder="filter by skill, group or category"
+             style="flex:1;max-width:340px">
+      <span class="dim small" id="qn">${rows.length} rows</span>
+    </div>
+    <div class="tw scroller" style="max-height:calc(100vh - 300px)"><table>
+      <tr><th class="n">#</th><th>Skill</th><th>Category</th><th class="n">Group</th>
+          <th>Covered by</th><th>Difficulty dial</th></tr>
+      <tbody id="rows">${rows.map(k => `<tr data-s="${esc(
+          (k.name + " " + k.category + " " + k.sub.id + " " + k.sub.name + " " +
+           COV_SHORT[k.coverage]).toLowerCase())}">
+        <td class="n dim">${k.n}</td>
+        <td>${esc(k.name)}</td>
+        <td class="dim small">${esc(k.category)}</td>
+        <td class="n"><span class="chip" style="font-family:ui-monospace">${esc(k.sub.id)}</span></td>
+        <td class="dim"><span class="dot ${k.coverage}"></span>${esc(COV_SHORT[k.coverage])}
+          ${k.coverage_why ? `<div class="dim small" style="margin-left:16px">${esc(k.coverage_why)}</div>` : ""}</td>
+        <td class="dim small">${k.dial ? esc(k.dial) : "&mdash;"}</td></tr>`).join("")}</tbody>
+    </table></div>`;
+};
 
-function subPanel(x) {
-  return `
-    <div class="eyebrow">${esc(x.id)} &middot; ${esc(x.kind)}</div>
-    <h1>${esc(x.name)} <span class="chip ${chipFor(x.state)}"
-      style="vertical-align:6px;margin-left:6px">${esc(x.state)}</span></h1>
-    <p class="lede">${esc(x.rule)} &mdash; ${x.count} skills.</p>
-    <div class="cols">
-      <div class="card">
-        <h3>What is in it</h3>
-        <p class="small">${esc(x.what)}</p>
-        ${x.commands ? `<div class="note key small" style="margin-top:12px">
-          <b>Commands:</b> <code>${esc(x.commands)}</code></div>` : ""}
-        <h3 style="margin-top:16px">Why it is its own ${esc(x.kind)}</h3>
-        <p class="why small">${esc(x.why)}</p>
-        ${x.gap ? `<div class="risk small"><b>Known gap.</b> ${esc(x.gap)}</div>` : ""}
-        ${x.trigger ? `<div class="note key small"><b>Un-parks when:</b>
-          ${esc(x.trigger)}</div>` : ""}
-        ${x.bar ? `<div class="barline"><b>Passes when</b>${esc(x.bar)}</div>` : ""}
-      </div>
-      <div class="card">
-        <h3>The ${x.count} skills</h3>
-        <div class="tw scroller"><table>
-          <tr><th class="n">#</th><th>Skill</th><th>Difficulty dial</th></tr>
-          ${x.skills.map(k => `<tr>
-            <td class="n dim">${k.n}</td>
-            <td>${esc(k.name)}</td>
-            <td class="dim">${k.dial ? esc(k.dial) : "&mdash;"}</td></tr>`).join("")}
-        </table></div>
-      </div>
-    </div>`;
-}
+/* ------------------------------------------------------- 9. judgement ---- */
+const calls = () => `
+  <p class="lede">${s.moved.length} skills ended up somewhere other than the
+    category they were filed under. Listed so they can be argued with rather
+    than buried.</p>
+  <div class="tw scroller"><table>
+    <tr><th class="n">#</th><th>Skill</th><th>Filed under</th><th>Moved to</th>
+        <th>Kind</th><th>Why</th></tr>
+    ${s.moved.map(m => `<tr>
+      <td class="n dim">${m.n}</td>
+      <td>${esc(m.skill)}</td>
+      <td class="dim">${esc(m.from)}</td>
+      <td>${esc(m.to_name)}</td>
+      <td class="dim">${esc(m.to_kind)}</td>
+      <td class="dim small">${esc(m.reason)}</td></tr>`).join("")}
+  </table></div>`;
 
-function movedPanel(s) {
-  return `
-    <div class="eyebrow">Stage 2</div>
-    <h1>Judgement calls</h1>
-    <p class="lede">${s.moved.length} skills ended up somewhere other than the
-      category they were filed under. These are the debatable ones, listed so
-      they can be argued with rather than buried.</p>
-    <div class="card">
-      <div class="tw scroller" style="max-height:66vh"><table>
-        <tr><th class="n">#</th><th>Skill</th><th>Filed under</th>
-            <th>Moved to</th><th>Kind</th><th>Why</th></tr>
-        ${s.moved.map(m => `<tr>
-          <td class="n dim">${m.n}</td>
-          <td>${esc(m.skill)}</td>
-          <td class="dim">${esc(m.from)}</td>
-          <td>${esc(m.to_name)}</td>
-          <td class="dim">${esc(m.to_kind)}</td>
-          <td class="dim">${esc(m.reason)}</td></tr>`).join("")}
-      </table></div>
-    </div>`;
-}
+/* ------------------------------------------------------ 10. method ------- */
+const method = () => `
+  <div class="cols tight">
+    ${s.intro.map(p => `<div class="card"><p class="why small">${esc(p)}</p></div>`).join("")}
+  </div>
+  <div class="note key small" style="margin-top:16px"><b>Source:</b>
+    <code>${esc(s.path)}</code> for the rows,
+    <code>dashboard/skills.py</code> for where each one lands,
+    <code>gray/tasks/</code> and <code>dashboard/queue.py</code> for every number
+    in section 4. Nothing on this page is typed twice.</div>`;
 
-fetch("/api/stage/2").then(r => r.json()).then(s => {
-  const sections = [
-    { id: "overview", label: "Overview", html: () => overview(s) },
-    { id: "method", label: "How it is sorted", html: () => methodPanel(s) },
-  ];
-  // Grouped by kind, in the order skills.py declares them, so the sidebar itself
-  // says how much work each thing is before anything is opened.
-  for (const k of s.kinds) {
-    sections.push({ id: "kind-" + k.key, group: k.name, label: "What this kind is",
-                    count: k.count, html: () => kindPanel(s, k) });
-    for (const x of s.subsections.filter(v => v.kind === k.key)) {
-      sections.push({ id: x.id, group: k.name, label: x.name,
-                      badge: x.id, count: x.count, html: () => subPanel(x) });
-    }
+paper([
+  { id: "top",       label: "Stage 2 - Train", lead: true, html: lead },
+  { id: "library",   label: "The library in one table", count: s.total, html: everything },
+  { id: "words",     label: "The five words", count: 5, html: words },
+  { id: "trained",   label: "What the runs train for", count: s.runs, html: trained },
+  { id: "sim",       label: "One simulation, not forty", html: sim },
+  { id: "blocked",   label: "What nothing can reach", count: blockedTotal, html: unreachable },
+  { id: "kinds",     label: "The five kinds", count: s.kinds.length, html: kinds },
+  { id: "bars",      label: "Pass bars", count: s.subsections.length, html: bars },
+  { id: "every",     label: "Every skill", count: s.total, html: every },
+  { id: "calls",     label: "Judgement calls", count: s.moved.length, html: calls },
+  { id: "method",    label: "How it was sorted", html: method },
+]);
+
+// Live filter on the full library table.
+const q = document.getElementById("q");
+if (q) q.addEventListener("input", () => {
+  const term = q.value.trim().toLowerCase();
+  let shown = 0;
+  for (const tr of document.querySelectorAll("#rows tr")) {
+    const hit = !term || tr.dataset.s.includes(term);
+    tr.classList.toggle("hidden", !hit);
+    if (hit) shown++;
   }
-  sections.push({ id: "calls", group: "Reference", label: "Judgement calls",
-                  count: s.moved.length, html: () => movedPanel(s) });
-  shell(sections);
+  document.getElementById("qn").textContent =
+    term ? `${shown} of ${s.total} rows` : `${s.total} rows`;
+});
+
 }).catch(fail);
 </script>
 </body>

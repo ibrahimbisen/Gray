@@ -789,9 +789,105 @@ UNVERIFIED_CLAUSES = {
 }
 
 
+# ---------------------------------------------------------------------------
+# How much ONE training run covers.
+#
+# The question this answers: "if one reward function covers 40 skills, do we run
+# 40 simulations?" No - one, and the reason is arithmetic rather than an opinion,
+# so the arithmetic is shown instead of asserted.
+#
+# Every input is READ, never written here: four out of the source line that sets
+# them, one out of the queue's live default. A regex over the file rather than an
+# import, because importing the task configs pulls in torch and this page is meant
+# to open instantly. A read that misses names itself on the page - a missing
+# number is recoverable, a number that used to be true is not.
+# ---------------------------------------------------------------------------
+
+_SAMPLING_READS = (
+    {"key": "iterations", "label": "Iterations in the run", "unit": "",
+     "file": "gray/tasks/walk_env_cfg.py", "re": r"max_iterations\s*=\s*(\d+)",
+     "note": "R1's own target, set in its config"},
+    {"key": "num_steps_per_env", "label": "Steps per iteration", "unit": "",
+     "file": "gray/tasks/stand_env_cfg.py", "re": r"num_steps_per_env\s*=\s*(\d+)",
+     "note": "control steps each robot takes before the policy is updated"},
+    {"key": "control_hz", "label": "Control rate", "unit": "Hz",
+     "file": "gray/config/robot.yaml", "re": r"control_hz:\s*(\d+)",
+     "note": "the PWM period is 20 ms, so this is a hard ceiling"},
+    {"key": "hold_lo", "label": "Command held for, shortest", "unit": "s",
+     "file": "gray/tasks/walk_env_cfg.py",
+     "re": r"resampling_time_range\s*=\s*\(\s*([\d.]+)\s*,",
+     "note": "then the robot is handed a fresh random command"},
+    {"key": "hold_hi", "label": "Command held for, longest", "unit": "s",
+     "file": "gray/tasks/walk_env_cfg.py",
+     "re": r"resampling_time_range\s*=\s*\(\s*[\d.]+\s*,\s*([\d.]+)\s*\)",
+     "note": "drawn uniformly between the two"},
+)
+
+
+def _fmt(x: float) -> str:
+    """Whole numbers without a trailing .0, and thousands separated."""
+    return f"{int(round(x)):,}" if abs(x - round(x)) < 1e-9 else f"{x:,.1f}"
+
+
+def sampling() -> dict:
+    """One run, in numbers: how many different commands it actually tries."""
+    import re  # noqa: PLC0415
+
+    from dashboard import queue as job_queue  # noqa: PLC0415
+
+    inputs, missing, val = [], [], {}
+    for spec in _SAMPLING_READS:
+        path = ROOT / spec["file"]
+        text = path.read_text(encoding="utf-8") if path.is_file() else ""
+        hit = re.search(spec["re"], text)
+        if hit is None:
+            missing.append(f"{spec['label']} - not found in {spec['file']}")
+            continue
+        val[spec["key"]] = float(hit.group(1))
+        inputs.append({**spec, "value": _fmt(val[spec["key"]]),
+                       "source": spec["file"]})
+
+    envs = float(job_queue.DEFAULTS.get("num_envs") or 0)
+    inputs.insert(0, {
+        "key": "num_envs", "label": "Robots at once", "unit": "", "value": _fmt(envs),
+        "source": "dashboard/queue.py", "file": "dashboard/queue.py",
+        "note": "the queue's default, capped at what the card measured"})
+    if not envs:
+        missing.append("Robots at once - the queue has no default")
+
+    if missing:
+        return {"error": "Could not read: " + "; ".join(missing),
+                "inputs": inputs, "derived": [], "headline": {}}
+
+    step_dt = 1.0 / val["control_hz"]
+    seconds = val["iterations"] * val["num_steps_per_env"] * step_dt
+    hold = (val["hold_lo"] + val["hold_hi"]) / 2.0
+    per_robot = seconds / hold
+    total = per_robot * envs
+
+    derived = [
+        {"label": "Simulated time, per robot", "value": _fmt(seconds), "unit": "s",
+         "how": f"{_fmt(val['iterations'])} iterations "
+                f"× {_fmt(val['num_steps_per_env'])} steps ÷ {_fmt(val['control_hz'])} Hz",
+         "aside": f"{seconds / 60:.0f} minutes of walking"},
+        {"label": "Commands tried, per robot", "value": _fmt(per_robot), "unit": "",
+         "how": f"{_fmt(seconds)} s ÷ {hold:g} s average hold",
+         "aside": "a fresh speed, direction and turn rate each time"},
+        {"label": "Commands tried, whole run", "value": _fmt(total), "unit": "",
+         "how": f"{_fmt(per_robot)} × {_fmt(envs)} robots",
+         "aside": "this is the number that covers the skill list"},
+        {"label": "Robot-hours of walking", "value": _fmt(seconds * envs / 3600.0),
+         "unit": "h", "how": f"{_fmt(seconds)} s × {_fmt(envs)} robots",
+         "aside": "in roughly 1.5 hours of wall clock"},
+    ]
+    return {"error": "", "inputs": inputs, "derived": derived,
+            "headline": {"sims": 1, "commands": _fmt(total), "envs": _fmt(envs)}}
+
+
 def stage2_state() -> dict:
     """Stage 2 with the live skill library folded in."""
     lib = skills.load()
     for s in lib["subsections"]:
         s["bar"] = STAGE2["bars"].get(s["key"], "")
-    return {**STAGE2, **lib}
+        s["unverified"] = UNVERIFIED_CLAUSES.get(s["key"], [])
+    return {**STAGE2, **lib, "sampling": sampling()}

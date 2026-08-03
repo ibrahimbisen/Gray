@@ -77,11 +77,19 @@ SUBSECTIONS = [
             "changes the equation being optimised, so none of it needs its own "
             "policy - and splitting it would mean learning balance twice and then "
             "needing a switcher, which is where separately-trained policies fall "
-            "over.",
-     "commands": "vx, vy, yaw, height, pitch, roll",
-     "gap": "Three-legged stance, two-legged diagonal stance and single-leg reach "
-            "are filed here but are NOT in the command vector above. They need a "
-            "per-foot command that does not exist yet. Listed rather than buried.",
+            "over. Holding a height would be a fourth number alongside the three, "
+            "not a fourth policy.",
+     # What the vector ACTUALLY holds today, read against walk_env_cfg.py's
+     # UniformVelocityCommandCfg. It used to read "vx, vy, yaw, height, pitch,
+     # roll", which described a proposal as if it had shipped - directly beside
+     # ten rows listed as blocked on exactly those three.
+     "commands": "vx, vy, yaw",
+     "gap": "Thirteen of these rows are blocked on a command that does not exist. "
+            "Ten want a height or an attitude - crouching, sitting, leaning, "
+            "'hold any commanded height' - and folding height, pitch and roll into "
+            "the vector covers all ten at once. Three want a single leg addressed "
+            "on its own, which is a bigger change nobody has costed. Both grow the "
+            "observation, so both mean every policy file is retrained from zero.",
      "state": "in progress"},
     {"id": "R2", "key": "recover", "kind": "run", "name": "Getting up",
      "rule": "starts lying on the ground",
@@ -216,6 +224,18 @@ COVERAGE = {
     "measured":  "read off a trained policy, never trained toward",
 }
 
+# A row that _OVERRIDE relocated must take its coverage from where it LANDED, not
+# from where it was filed. Without this, "Squeeze under something" - filed under
+# Athletic, moved to R1 because squeezing under is crouched walking - still read
+# as blocked on a flight phase, and "IMU drift and noise" read as blocked on a
+# camera. Both are nonsense, and both were on the page.
+_COVERAGE_BY_SUBSECTION = {
+    "walk": "command", "recover": "command", "tool": "emerges",
+    "robust": "condition", "quality": "condition",
+    "measure": "measured", "chain": "measured",
+    "flight": "blocked", "see": "blocked",
+}
+
 _COVERAGE_BY_CATEGORY = {
     "Walking": "command", "Turning": "command", "Body control": "command",
     "Body positions": "command", "Gaits": "command",
@@ -236,6 +256,17 @@ _COVERAGE_BY_CATEGORY = {
 # Rows whose coverage is not what their category implies. Same idea as
 # _OVERRIDE, and each one carries why.
 _COVERAGE_OVERRIDE = {
+    # Height and attitude. The command vector is vx, vy, yaw - there is no ride
+    # height in it and no lean, so none of these can be ASKED for, whatever the
+    # policy is capable of. This is the same fact UNVERIFIED_CLAUSES states in
+    # prose for R1's bar; listing the rows makes the count agree with the prose.
+    1:  ("blocked", "sit to stand is a height command, and there is no height in "
+                    "the command vector"),
+    2:  ("blocked", "a commanded height"),
+    3:  ("blocked", "a commanded height"),
+    4:  ("blocked", "a commanded height"),
+    5:  ("blocked", "this row IS the missing command, named"),
+    6:  ("blocked", "pitch and roll are not in the command vector"),
     8:  ("blocked", "standing on three legs needs a per-foot command; the vector "
                     "has vx, vy and yaw and nothing per leg"),
     9:  ("blocked", "same - two diagonal legs is a per-foot command"),
@@ -244,9 +275,67 @@ _COVERAGE_OVERRIDE = {
     22: ("emerges", "a low object is felt through the leg, not seen"),
     37: ("emerges", "a cable or rug edge is felt on contact"),
     59: ("emerges", "an unseen hole is exactly that - felt, not seen"),
+    90: ("blocked", "clearance to 60% body height is a crouch, and a crouch is a "
+                    "height command - not a jump, whatever the category says"),
+    91: ("blocked", "backing out between two walls needs to know where the walls are"),
     99: ("blocked", "'see an obstacle' is the whole point - needs a camera"),
     130: ("blocked", "stepping stones need to see where the stones are"),
+    170: ("blocked", "belly near the ground is the bottom of the height range"),
+    174: ("blocked", "leaning with the feet planted is a pitch and roll command"),
+    175: ("blocked", "scanning with the feet planted is a yaw attitude, not a yaw rate"),
 }
+
+# What every blocked row is waiting on. "19 blocked" is only a useful number if
+# it says blocked on WHAT - and the answer is four missing capabilities, not
+# nineteen separate problems. Grouped this way, the list becomes four things to
+# build rather than nineteen things to worry about.
+BLOCKED_NEEDS = {
+    "height": {"label": "A height and attitude command",
+               "why": "The command vector is vx, vy, yaw. Nothing in it asks for a "
+                      "ride height or a lean, so a crouch cannot be commanded and "
+                      "'hold any commanded height' cannot even be tested. This is "
+                      "the one blocker with a decision already on the table: fold "
+                      "height, pitch and roll into the command. It grows the "
+                      "observation by three, so every existing policy file becomes "
+                      "unreadable and all three runs restart from zero."},
+    "foot":   {"label": "A per-foot command",
+               "why": "The command vector is vx, vy, yaw. Nothing in it addresses "
+                      "one leg, so there is no way to ask for a three-legged stance "
+                      "or a raised foot. Adding one is a change to the observation, "
+                      "so it is a retrain."},
+    "camera": {"label": "A camera",
+               "why": "Plus a depth-to-heightmap pipeline behind it. It changes the "
+                      "observation the policy reads, so it is a retrain from scratch "
+                      "and its own project."},
+    "where":  {"label": "Knowing where it is",
+               "why": "Localisation. The policy has no idea where it stands on the "
+                      "floor or where the walls are - that is a layer above the "
+                      "policy, and it does not exist."},
+    "flight": {"label": "A flight phase",
+               "why": "Every contact-based reward term stops working the moment no "
+                      "foot is down. It also needs joint speed the servos may not "
+                      "have; stage 3.3 measures that."},
+    # A blocked row that names no blocker is a hole in THIS file, not a fact
+    # about the robot. Shown rather than defaulted into someone else's pile.
+    "unsaid": {"label": "Not yet said what",
+               "why": "Marked unreachable, but nothing here says what it is waiting "
+                      "on. That is a gap in this page. Give it an entry in "
+                      "_NEED_OVERRIDE or _NEED_BY_CATEGORY."},
+}
+
+_NEED_BY_CATEGORY = {
+    "Athletic": "flight", "Air movements": "flight",
+    "Perception": "camera", "Precision": "where", "Path shapes": "where",
+    "Body control": "height", "Body positions": "height",
+}
+
+# A relocated row's blocker follows where it landed, same rule as its coverage.
+_NEED_BY_SUBSECTION = {"flight": "flight", "see": "camera"}
+
+# Rows whose blocker is not what their category implies.
+_NEED_OVERRIDE = {8: "foot", 9: "foot", 10: "foot",
+                  21: "camera", 99: "camera", 130: "camera",
+                  90: "height", 91: "where"}
 
 # Where a category goes by default...
 _DEFAULT = {
@@ -314,9 +403,39 @@ def _csv_path() -> Path | None:
     return None
 
 
+def _group_needs(items: list[dict]) -> list[dict]:
+    """Blocked rows, grouped by the one capability each is waiting on."""
+    seen: dict[str, list] = {}
+    for i in items:
+        if i["needs"]:
+            seen.setdefault(i["needs"], []).append(i)
+    return [{"key": k, **BLOCKED_NEEDS[k], "count": len(rows),
+             "rows": [{"n": r["n"], "name": r["name"], "why": r["coverage_why"]}
+                      for r in sorted(rows, key=lambda r: r["n"])]}
+            for k, rows in sorted(seen.items(), key=lambda kv: -len(kv[1]))]
+
+
+def _by_category(items: list[dict]) -> list[dict]:
+    """Category by coverage, biggest first.
+
+    This is the table that answers "what is it actually being trained for" one
+    level down from the totals: 22 rows of Walking that are all one command is a
+    very different thing from 6 rows of Precision that no reward can reach.
+    """
+    seen: dict[str, dict] = {}
+    for i in items:
+        row = seen.setdefault(i["category"] or "(none)",
+                              {"category": i["category"] or "(none)", "count": 0,
+                               "coverage": {}})
+        row["count"] += 1
+        row["coverage"][i["coverage"]] = row["coverage"].get(i["coverage"], 0) + 1
+    return sorted(seen.values(), key=lambda r: (-r["count"], r["category"]))
+
+
 def _empty() -> dict:
     return {"found": False, "path": "", "total": 0, "subsections": [],
-            "kinds": [], "runs": 0, "dialled": 0, "moved": []}
+            "kinds": [], "runs": 0, "dialled": 0, "moved": [],
+            "coverage_words": COVERAGE, "needs": [], "run_totals": {}}
 
 
 def load() -> dict:
@@ -341,8 +460,14 @@ def load() -> dict:
             key = _DEFAULT.get(category)
         if key is None:            # a category nobody has classified yet
             key = "robust"
+        # Coverage follows where the row LANDED when it was relocated, and its
+        # filed category otherwise. A named override beats both.
+        moved_here = n in _OVERRIDE
         if n in _COVERAGE_OVERRIDE:
             cover, cover_why = _COVERAGE_OVERRIDE[n]
+        elif moved_here:
+            cover = _COVERAGE_BY_SUBSECTION.get(key, "condition")
+            cover_why = ""
         else:
             cover = _COVERAGE_BY_CATEGORY.get(category, "condition")
             cover_why = ""
@@ -353,6 +478,13 @@ def load() -> dict:
             "category": category,
             "coverage": cover,
             "coverage_why": cover_why,
+            # Only blocked rows are waiting on anything. Everything else is
+            # already reachable, so `needs` stays empty rather than inventing a
+            # blocker for a row that has none.
+            "needs": (_NEED_OVERRIDE.get(n)
+                      or (_NEED_BY_SUBSECTION.get(key) if moved_here else None)
+                      or _NEED_BY_CATEGORY.get(category)
+                      or "unsaid") if cover == "blocked" else "",
         })
 
     out = []
@@ -368,6 +500,8 @@ def load() -> dict:
         out.append({**s, "count": len(items), "skills": items,
                     "coverage": cover,
                     "blocked": [i for i in items if i["coverage"] == "blocked"],
+                    "needs": _group_needs(items),
+                    "by_category": _by_category(items),
                     "categories": sorted({i["category"] for i in items})})
 
     # Counts are reported PER KIND and never summed across kinds. One combined
@@ -384,6 +518,13 @@ def load() -> dict:
     for m in moved:
         m["to_name"] = next(s["name"] for s in SUBSECTIONS if s["key"] == m["to"])
         m["to_kind"] = _KIND_OF[m["to"]]
+    # The three runs added up, which is the only cross-subsection total that is
+    # honest: they are the same kind of thing. Kinds are still never summed.
+    run_rows = [i for s in out if s["kind"] == "run" for i in s["skills"]]
+    run_totals: dict[str, int] = {"rows": len(run_rows)}
+    for i in run_rows:
+        run_totals[i["coverage"]] = run_totals.get(i["coverage"], 0) + 1
+
     return {
         "found": True,
         "path": path.name,
@@ -393,4 +534,8 @@ def load() -> dict:
         "runs": sum(1 for s in out if s["kind"] == "run"),
         "dialled": dialled,
         "moved": sorted(moved, key=lambda m: m["n"]),
+        "coverage_words": COVERAGE,
+        "run_totals": run_totals,
+        # Every blocked row in the library, however it is filed.
+        "needs": _group_needs([i for s in out for i in s["skills"]]),
     }

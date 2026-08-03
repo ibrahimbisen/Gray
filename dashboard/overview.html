@@ -477,23 +477,43 @@ function stages(){
 }
 
 function blockedPanel(){
+  // Grouped by the capability each row waits on, not listed flat. Fifty-odd
+  // blocked rows reads as fifty problems; five missing capabilities reads as
+  // five decisions - and that is what it actually is.
+  const need = new Map();
   const rows = [];
-  for(const s of S.progress.subsections)
+  for(const s of S.progress.subsections){
+    for(const g of (s.blocked_needs || [])){
+      const e = need.get(g.key) || {...g, count: 0, subs: new Set()};
+      e.count += g.count; e.subs.add(s.id); need.set(g.key, e);
+    }
     for(const b of (s.blocked_skills || []))
-      rows.push({sub: s.id, n: b.n, name: b.name,
-                 why: b.coverage_why || `filed under "${b.category}" - needs something the reward cannot provide`});
+      rows.push({sub: s.id, n: b.n, name: b.name, needs: b.needs,
+                 why: b.coverage_why || ""});
+  }
   if(!rows.length) return "";
+  const groups = [...need.values()].sort((a,b) => b.count - a.count);
+  const label = Object.fromEntries(groups.map(g => [g.key, g.label]));
+  rows.sort((a,b) => a.n - b.n);
   return `<div class="card" style="margin-top:12px">
     <h3>Rows no reward can reach<span class="grow"></span>
       <span class="chip bad">${rows.length}</span></h3>
-    <div class="faint small" style="margin-bottom:9px">These are in the library and
-      cannot be trained by tuning anything. They need a capability that does not
-      exist &mdash; a camera, a per-foot command, an object in the scene. Listed so
-      they are not quietly counted as work in progress.</div>
+    <div class="faint small" style="margin-bottom:9px">These cannot be trained by
+      tuning anything. They wait on ${groups.length} capabilities that do not exist
+      &mdash; not on ${rows.length} separate problems. Listed so none of them is
+      quietly counted as work in progress.</div>
     <div class="wrapx"><table>
-      <tr><th></th><th class="n">#</th><th>Skill</th><th>Why not</th></tr>
+      <tr><th>Missing</th><th class="n">Rows</th><th>Where</th><th>Why nothing reaches them</th></tr>
+      ${groups.map(g => `<tr><td><b>${esc(g.label)}</b></td>
+        <td class="n"><b>${g.count}</b></td>
+        <td class="faint small">${[...g.subs].join(" ")}</td>
+        <td class="faint small">${esc(g.why)}</td></tr>`).join("")}
+    </table></div>
+    <div class="wrapx" style="margin-top:12px"><table>
+      <tr><th></th><th class="n">#</th><th>Skill</th><th>Waiting on</th><th>Note</th></tr>
       ${rows.map(r => `<tr><td><span class="chip">${esc(r.sub)}</span></td>
         <td class="n faint">${r.n}</td><td>${esc(r.name)}</td>
+        <td class="faint small">${esc(label[r.needs] || r.needs || "—")}</td>
         <td class="faint small">${esc(r.why)}</td></tr>`).join("")}
     </table></div></div>`;
 }

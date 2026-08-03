@@ -245,6 +245,9 @@ def subsection_progress(key: str, summaries: list[dict] | None = None) -> dict:
         "skill_count": live.get("count", 0),
         "coverage": live.get("coverage", {}),
         "blocked_skills": live.get("blocked", []),
+        # The blocked rows grouped by the one capability each waits on. A count
+        # of blocked rows is only useful once it says blocked on WHAT.
+        "blocked_needs": live.get("needs", []),
         "trains_with": trains_with(key),
         "bar_prose": plan.STAGE2["bars"].get(key, ""),
         "trigger": sub.get("trigger", ""),
