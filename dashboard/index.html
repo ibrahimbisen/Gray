@@ -116,6 +116,20 @@ body{ overflow:auto; display:block; }
   letter-spacing:.1em; text-transform:uppercase; color:var(--sig);
   font-style:normal; white-space:nowrap; }
 
+/* Decided, not yet fitted. Dashed and unlit on purpose: blue means a live
+   signal on this page, so drawing a solid wire to a sensor nobody has soldered
+   would be a lie in the page's own language. */
+.planned{ margin-top:20px; border:1px dashed var(--wire); border-radius:10px;
+  padding:15px 17px; }
+.planned .io li{ color:var(--faint); }
+.planned .io li b{ color:var(--dim); }
+.planned .tot{ display:flex; justify-content:space-between; align-items:baseline;
+  gap:12px; border-top:1px solid var(--wire); margin-top:10px; padding-top:10px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11.5px;
+  color:var(--faint); font-variant-numeric:tabular-nums; }
+.planned .tot b{ font-size:19px; font-weight:750; color:var(--ink);
+  letter-spacing:-.02em; }
+
 /* -- the sampled box: one track per axis -- */
 .axis{ margin-bottom:22px; }
 .axis:last-child{ margin-bottom:0; }
@@ -231,6 +245,7 @@ const envs  = ((s.sampling || {}).headline || {}).envs || "—";
 const lib   = s.library || {};
 const rt    = lib.run_totals || {};
 const drive = s.driven || {};
+const batch = s.batch || {};
 const walk  = ((s.rewards || {}).tasks || []).find(t => t.key === "walk") || {terms: []};
 const status = s.status || {};
 const head  = status.headline || {};
@@ -271,6 +286,22 @@ const chain = () => `
           one set every 20 ms.<br>The servo PWM period<br>sets that limit.</p>
       </div>
     </div>
+    ${batch.added ? `<div class="planned">
+      <div class="cap">decided, not yet fitted &middot; gray/config/sensors.yaml</div>
+      <ul class="io">
+        ${(batch.rows || []).map(r =>
+          `<li><b>+${r.adds}</b> ${esc(r.name)}</li>`).join("")}
+      </ul>
+      <div class="tot">
+        <span>${obs.total || 0} now &nbsp;+&nbsp; ${batch.added} from
+          ${batch.sensors} sensors &nbsp;=</span>
+        <b>${batch.after} inputs</b></div>
+    </div>
+    <div class="foot">The dashed block is not in any trained policy. Adding it
+      changes how many inputs the file takes, which makes it a different file,
+      so all ${batch.sensors} go in together in one retrain rather than one at a
+      time. <a class="plain" href="/stage2#sensors">The full sensor list
+      &rarr;</a></div>` : ""}
     <div class="foot">These exact inputs have not occurred before. Section 4
       covers why that still works.</div>
   </div>`;
@@ -349,7 +380,8 @@ ${stale ? `<div class="callout warn" style="max-width:none;margin:26px 0 0">
     why there are three files, the command range, what runs on the real robot,
     and current status.</p>
   <div class="meta">
-    <div><b>${obs.total || 0}</b><span>numbers in</span></div>
+    <div><b>${obs.total || 0}</b><span>numbers in${
+      batch.added ? `, ${batch.after} decided` : ""}</span></div>
     <div><b>12</b><span>joint angles out</span></div>
     <div><b>50 Hz</b><span>control rate</span></div>
     <div><b>${lib.total || 0}</b><span>skills in the library</span></div>
@@ -363,7 +395,8 @@ ${stale ? `<div class="callout warn" style="max-width:none;margin:26px 0 0">
     <h2>What gets deployed</h2>
     <p>One file. ${obs.total || 0} numbers in, 12 joint angles out, 50 times a
       second. Everything else in the project exists to produce that file and
-      check it.</p>
+      check it. ${batch.added ? `${batch.sensors} more sensors are decided and
+      not yet fitted; they would make it ${batch.after} in.` : ""}</p>
   </div></header>
   ${chain()}
   <div class="callout"><b>It is not a stored motion.</b>
