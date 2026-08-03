@@ -75,7 +75,31 @@ const lead = () => `
   ])}`;
 
 /* ------------------------------------------------------- 1. everything --- */
-const everything = () => `
+const everything = () => {
+  // The table needs its question stated. Without it the six columns read as
+  // jargon and the row of counts reads as a score, which it is not - it is one
+  // question asked of every row in the CSV, and six possible answers to it.
+  const r1 = runs[0] || {coverage: {}, skills: []};
+  const example = (k) => (r1.skills.find(x => x.coverage === k) || {}).name || "";
+  return `
+  <div class="note key" style="margin-bottom:18px">
+    <b>What this table is.</b> Every one of the ${s.total} rows in your library
+    was asked the same question &mdash; <i>how does this actually get done?</i>
+    &mdash; and there are ${COV.length} possible answers. Each row below is a
+    group, and the numbers are how its skills were answered. A dot means none.
+  </div>
+  <div class="tw" style="margin-bottom:20px"><table>
+    <tr><th>Answer</th><th>Means</th><th class="n">In R1</th>
+        <th>An actual row of yours</th></tr>
+    ${COV.map(k => `<tr>
+      <td><span class="dot ${k}"></span><b>${esc(COV_SHORT[k])}</b></td>
+      <td class="dim small">${esc(s.coverage_words[k] || "")}</td>
+      <td class="n">${r1.coverage[k] || `<span class="dim">&middot;</span>`}</td>
+      <td class="dim small">${esc(example(k)) || "&mdash;"}</td></tr>`).join("")}
+    <tr><td colspan="2" class="dim"><b>R1 adds up to</b></td>
+      <td class="n"><b>${r1.count || 0}</b></td>
+      <td class="dim small">which is every row filed under it, counted once</td></tr>
+  </table></div>
   <div class="tw"><table>
     <tr><th class="n"></th><th>Group</th><th>Kind</th><th class="n">Rows</th>
         <th style="width:130px">Split</th>${COV_HEAD}</tr>
@@ -93,7 +117,15 @@ const everything = () => `
   </table></div>
   <p class="why small">Rows are only added across the ${s.runs} runs, because those
     are the same kind of thing. A run and a friction value in one total is what made
-    the previous version of this page misleading.</p>`;
+    the previous version of this page misleading.</p>
+  <p class="why small"><b>What the split is for.</b> "${r1.count} skills" reads
+    like ${r1.count} pieces of work, and it is not.
+    ${r1.coverage.command || 0} are covered by setting a number,
+    ${r1.coverage.emerges || 0} appear without being asked for, and
+    ${r1.coverage.pilot || 0} are done by whoever is holding the controls. Only
+    ${r1.coverage.blocked || 0} need something built &mdash;
+    <a class="plain" href="#blocked">section 7 says what</a>.</p>`;
+};
 
 /* ------------------------------------------------------- 2. five words --- */
 const words = () => {
