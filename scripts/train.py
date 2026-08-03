@@ -209,6 +209,11 @@ def main() -> int:
     ap.add_argument("--stop-at", type=float, default=0.98, metavar="FRACTION",
                     help="stop once the reward reaches this fraction of the most it "
                          "could score. 0 runs the full schedule. See RULES.md rule 1.")
+    ap.add_argument("--push-speed", type=float, nargs=2, metavar=("MIN", "MAX"),
+                    help="how hard the shoves are, m/s of instant trunk speed. "
+                         "On 2.379 kg, 1 m/s is about 2.4 N-s.")
+    ap.add_argument("--push-spin", type=float, nargs=2, metavar=("MIN", "MAX"),
+                    help="how much spin each shove adds, rad/s about the vertical")
     ap.add_argument("--reward", action="append", default=[], metavar="NAME=WEIGHT",
                     help="change one scoring weight, e.g. --reward twitching=-1.5. "
                          "Repeatable. The change is recorded in the run, so the "
@@ -227,6 +232,19 @@ def main() -> int:
         cfg.agent.max_iterations = args.iterations
     iterations = cfg.agent.max_iterations
     cfg.agent.run_name = run_name
+
+    shove = cfg.env.events.get("shove")
+    if shove is None and (args.push_speed or args.push_spin):
+        raise SystemExit(f"{args.task} has no shove event to change")
+    if args.push_speed:
+        was = shove.params["speed_range"]
+        shove.params["speed_range"] = tuple(args.push_speed)
+        print(f"shove         speed: {was} -> {tuple(args.push_speed)} m/s "
+              f"(up to {args.push_speed[1] * 2.3787:.1f} N-s)")
+    if args.push_spin:
+        was = shove.params["spin_range"]
+        shove.params["spin_range"] = tuple(args.push_spin)
+        print(f"shove         spin: {was} -> {tuple(args.push_spin)} rad/s")
 
     for change in args.reward:
         term, _, weight = change.partition("=")
@@ -279,7 +297,10 @@ def main() -> int:
         "started": datetime.now().isoformat(timespec="seconds"),
         "finished": None,
         "iterations_target": iterations,
-        "notes": f"{args.num_envs} robots at once, 50 Hz control.",
+        "notes": f"{args.num_envs} robots at once, 50 Hz control."
+                 + (f" Shoves {shove.params['speed_range'][0]}-"
+                    f"{shove.params['speed_range'][1]} m/s from any angle, spin "
+                    f"{shove.params['spin_range'][1]} rad/s." if shove else ""),
         "scoring": scoring,
     }, indent=2))
 
