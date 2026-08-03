@@ -58,8 +58,15 @@ stance:
   # where the robot walks: high enough to swing a leg through, low enough to have
   # somewhere to go when it stumbles.
   max_height_m: 0.2738
-  ride_drop: 0.40
+  ride_drop: 0.30            # ride at 70% of full height -> 191.7 mm
   measured_by: owner, in the pose editor
+
+  # How far outboard of its hip each foot is planted. Straight under the hip puts
+  # the feet at +/-60.7 mm, and the trunk is +/-83.4 mm wide - so the robot stands
+  # on a base narrower than its own body and rolls easily. 34 mm out puts each
+  # foot at +/-94.7 mm, about 11 mm proud of the body, which is what a quadruped
+  # standing steady actually looks like.
+  foot_outboard_mm: 34.0
 
 joint_limits:
   measured: true

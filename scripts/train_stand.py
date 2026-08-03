@@ -106,17 +106,10 @@ def sync_once(run_dir: Path, log_dir: Path) -> None:
                 for r in rows:
                     w.writerow({k: r.get(k, "") for k in names})
 
-        # mjlab films into videos/train/. Hand them over named by iteration.
-        src = log_dir / "videos" / "train"
-        if src.is_dir():
-            for mp4 in sorted(src.glob("*.mp4")):
-                dst = run_dir / "videos" / f"{mp4.stem}.mp4"
-                if not dst.exists() or dst.stat().st_size != mp4.stat().st_size:
-                    dst.parent.mkdir(parents=True, exist_ok=True)
-                    try:
-                        shutil.copy2(mp4, dst)
-                    except OSError:
-                        pass  # still being written; the next pass will get it
+        # mjlab's own recorder is not used for the dashboard: it names files by
+        # env-step, which collides with the checkpoint iterations that
+        # scripts/film_checkpoints.py writes, and both then show as "iteration 0".
+        # Run that script with --watch alongside training instead.
 
         # The dashboard only counts checkpoints, so a marker per .pt is enough
         # and keeps a few hundred MB of weights out of progress/.

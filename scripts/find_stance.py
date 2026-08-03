@@ -193,7 +193,7 @@ def travel(rb: Robot, ref, signs, owner) -> dict[tuple[str, str], tuple[float, f
     return out
 
 
-def solve(rb: Robot, height: float, stance_scale: float = 1.0):
+def solve(rb: Robot, height: float, outboard: float = 0.0):
     """Angles that put each foot on the floor, under its own hip."""
     # The model's own limits. They are the owner's, measured in the pose editor
     # against this geometry, and written in by tools/prepare_model.py - so there
@@ -208,7 +208,10 @@ def solve(rb: Robot, height: float, stance_scale: float = 1.0):
         out = []
         for leg in LEGS:
             hip, foot = rb.hip_world(leg), rb.foot_world(leg)
-            target = np.array([hip[0], hip[1] * stance_scale, 0.0])
+            # Plant each foot outboard of its own hip, on whichever side that hip
+            # is. Under the hip puts the feet inside the body's own width.
+            side = 1.0 if hip[1] >= 0 else -1.0
+            target = np.array([hip[0], hip[1] + side * outboard, 0.0])
             out.extend(foot - target)
         return np.array(out)
 
@@ -275,10 +278,14 @@ def main() -> int:
     print(f"model    {rb.mass*1000:.1f} g, {len(rb.joints)} hinges")
     print(f"servo    {cap} N-m stall, {servo['no_load_speed_rad_s']} rad/s")
 
+    stance = cfg.get("stance", {})
+    outboard = float(stance.get("foot_outboard_mm", 0.0)) / 1000.0
+    print(f"stance   feet planted {outboard*1000:.0f} mm outboard of each hip")
+
     # How tall it can stand: climb until the legs run out of travel.
     tall = 0.0
     for h in np.arange(0.06, 0.40, 0.002):
-        if solve(rb, float(h))[1] <= 0.004:
+        if solve(rb, float(h), outboard)[1] <= 0.004:
             tall = float(h)
     ride = tall * (1 - cfg["stance"]["ride_drop"]) if "stance" in cfg else tall * 0.6
     print(f"\ntallest it can stand   {tall*1000:.1f} mm")
@@ -293,7 +300,7 @@ def main() -> int:
 
     best = None
     for h in heights:
-        angles, err = solve(rb, h)
+        angles, err = solve(rb, h, outboard)
         frac = h / tall
         if err > 0.004:
             print(f"{h*1000:7.0f}mm {frac:6.0%}  {err*1000:8.1f}mm   {'-':>12}  "
@@ -324,7 +331,7 @@ def main() -> int:
         print(f"  {leg:>4} {a[0]:8.1f} {a[1]:8.1f} {a[2]:8.1f}   {'|':>14} "
               f"{t[0]:7.2f} {t[1]:7.2f} {t[2]:7.2f}")
 
-    solve(rb, h)
+    solve(rb, h, outboard)
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "stance.yaml").write_text(yaml.safe_dump({
         "trunk_height_m": round(float(h), 4),
