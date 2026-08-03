@@ -135,15 +135,26 @@ def overview_state() -> dict:
     _reload_if_edited()
     summaries = runs.all_summaries()
     live = next((r for r in summaries if r["status"] == "running"), None)
+    # The run list, trimmed. The overview links INTO runs, so it needs enough to
+    # label and rank them - but never their metric rows, which is what made the
+    # monitor's payload 1.6 MB.
+    keep = ("id", "variant", "name", "task", "status", "verdict", "started_age",
+            "duration", "iterations_done", "iterations_target", "progress",
+            "videos", "verdict_structured")
     return {
         "progress": progress.overview(summaries),
+        "runs": [{k: r.get(k) for k in keep} | {"reward": (r.get("latest") or {}).get("reward")}
+                 for r in summaries],
         "queue": queue.load(),
         "running": live,
         "loop": plan.LOOP,
         "stage1_open": plan.STAGE1["open"],
+        "next_up": plan.NEXT_UP,
+        "phases": plan.PHASES,
         "blockers": progress.blockers(),
         "startable": progress.startable(),
         "model": model_status(),
+        "feasibility": plan.FEASIBILITY,
     }
 
 
@@ -330,14 +341,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._send((HERE / "page.js").read_bytes(),
                               "text/javascript; charset=utf-8")
 
-        if path in ("/", "/index.html", "/monitor"):
-            return self._send((HERE / "monitor.html").read_bytes(), "text/html; charset=utf-8")
+        if path in ("/", "/index.html", "/overview"):
+            return self._send((HERE / "overview.html").read_bytes(),
+                              "text/html; charset=utf-8")
+        if path in ("/runs", "/monitor", "/training"):
+            return self._send((HERE / "monitor.html").read_bytes(),
+                              "text/html; charset=utf-8")
         if path in ("/summary", "/summary.html", "/plan"):
             return self._send((HERE / "index.html").read_bytes(), "text/html; charset=utf-8")
         # The three project stages, each its own page.
-        if path in ("/overview", "/overview.html"):
-            return self._send((HERE / "overview.html").read_bytes(),
-                              "text/html; charset=utf-8")
         if path in ("/stage1", "/stage2", "/stage3"):
             return self._send((HERE / f"{path[1:]}.html").read_bytes(),
                               "text/html; charset=utf-8")
@@ -406,7 +418,8 @@ def serve(port: int = 8000, open_browser: bool = True) -> None:
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("127.0.0.1", port), Handler) as httpd:
         url = f"http://127.0.0.1:{port}/"
-        print(f"Dashboard: {url}")
+        print(f"Overview:  {url}            everything, at a glance")
+        print(f"Runs:      {url}runs        one run: curves, films, rewards")
         print(f"Summary:   {url}summary")
         print(f"  stage 1: {url}stage1     Prepare - the model (provisional)")
         print(f"  stage 2: {url}stage2     Train - 200 skills, three training runs")

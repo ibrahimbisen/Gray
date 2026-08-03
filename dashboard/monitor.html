@@ -235,7 +235,14 @@ const MAX_COMPARE = SLOTS.length;   // never cycle a hue: see the palette commen
 
 let STATE = null, DETAIL = null, DETAIL_FOR = null;
 let SELECTED = null, VIDEO = null, TABLE = false;
-let TAB = location.hash.slice(1) || "live";
+/* The overview links in as /runs#run=<id>. Anything else in the hash is a tab
+   name, which is how this page has always remembered where it was. */
+let TAB = "live";
+{
+  const hash = decodeURIComponent(location.hash.slice(1) || "");
+  if(hash.startsWith("run=")){ SELECTED = hash.slice(4); TAB = "live"; }
+  else if(hash) TAB = hash;
+}
 let COMPARE = [], METRIC = "reward", COMPARE_DATA = null;
 let JOBLOG = null, JOBLOG_TEXT = "";
 let BUSY = false, LAST_SIG = null;

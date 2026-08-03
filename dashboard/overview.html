@@ -3,375 +3,487 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gray &mdash; overview</title>
-<link rel="stylesheet" href="/page.css">
+<title>Gray — overview</title>
 <style>
-  /* Distance to bar, as a multiple. Log scale, fixed domain 0.1x to 100x, so the
-     bar line sits at the same place in every row and rows are comparable by eye.
-     A linear "percent of bar" would put a criterion at 4% of where it needs to be
-     almost at the left edge of a bar that reads as nearly full. */
-  .track { position:relative; height:16px; min-width:150px; }
-  .track .axis { position:absolute; left:0; right:0; top:7px; height:1px;
-                 background:var(--line); }
-  .track .barline { position:absolute; top:1px; width:1px; height:14px;
-                    background:var(--accent); margin:0; padding:0; border:0; }
-  .track .dot { position:absolute; top:3px; width:9px; height:9px; border-radius:50%;
-                margin-left:-4.5px; }
-  .track .dot.ok  { background:var(--ok); }
-  .track .dot.bad { background:var(--bad); }
-  .track .dot.drifted { outline:1.5px dashed var(--warn); outline-offset:1.5px; }
-  .track .ghost { position:absolute; top:3px; width:9px; height:9px; border-radius:50%;
-                  margin-left:-4.5px; border:1.5px solid var(--faint); }
-  .scale { display:flex; justify-content:space-between; font-size:10px;
-           color:var(--faint); margin-top:2px; }
+  :root{
+    --plane:#0d0f13; --surface:#16181d; --surface2:#1b1e25;
+    --line:#252932; --grid:#1f232b;
+    --ink:#f2f3f5; --ink2:#a8adb8; --muted:#787f8c;
+    /* Status, not identity. Everything on this page encodes a STATE - met,
+       failing, unknown, blocked - so it uses the reserved status colours and
+       never the five categorical slots, which mean "which run" on the Runs
+       page and must keep meaning only that. */
+    --good:#0ca30c; --warn:#fab219; --crit:#d03b3b; --live:#3987e5;
+    --accent:#3987e5;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--plane);color:var(--ink);
+       font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:inherit;text-decoration:none}
+  .tnum{font-variant-numeric:tabular-nums}
+  main{padding:0 22px 90px;max-width:1680px;margin:0 auto}
 
-  .huge { font-size:38px; font-weight:650; letter-spacing:-.03em; line-height:1.1;
-          margin:2px 0 6px; }
-  .huge.bad { color:var(--bad); } .huge.ok { color:var(--ok); }
-  .counts { display:flex; gap:22px; flex-wrap:wrap; margin-top:10px; }
-  .counts div { font-size:12.5px; color:var(--dim); }
-  .counts b { display:block; font-size:22px; color:var(--ink); font-weight:600; }
-  .strip { display:flex; gap:14px; align-items:center; flex-wrap:wrap;
-           font-size:12.5px; color:var(--dim); border:1px solid var(--line);
-           border-radius:9px; padding:9px 13px; margin-bottom:18px; }
-  .strip b { color:var(--ink); }
-  .dotlive { width:7px; height:7px; border-radius:50%; background:var(--accent);
-             display:inline-block; }
-  .dotdead { width:7px; height:7px; border-radius:50%; background:var(--bad);
-             display:inline-block; }
-  .spark { display:block; height:34px; width:100%; }
+  /* ---- top bar ---- */
+  .nav{display:flex;align-items:center;gap:2px;padding:11px 22px;
+       border-bottom:1px solid var(--line);background:var(--surface);
+       position:sticky;top:0;z-index:20;flex-wrap:wrap;
+       max-width:1680px;margin:0 auto}
+  .nav .brand{font-weight:650;font-size:16px;letter-spacing:-.01em;margin-right:14px}
+  .nav a{padding:5px 10px;border-radius:7px;font-size:12.5px;color:var(--ink2)}
+  .nav a:hover{color:var(--ink);background:var(--surface2)}
+  .nav a.on{color:var(--ink);background:var(--surface2);
+            box-shadow:inset 0 -2px 0 var(--accent)}
+  .nav .sp{flex:1}
+
+  /* ---- instrument rail ---- */
+  .rail{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
+        border-radius:11px;overflow:hidden;margin:18px 0 0;
+        grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .gauge{background:var(--surface);padding:11px 14px 12px}
+  .gauge .k{font-size:10px;text-transform:uppercase;letter-spacing:.1em;
+            color:var(--muted);display:flex;align-items:center;gap:6px}
+  .gauge .v{font-size:23px;font-weight:600;line-height:1.15;margin-top:5px;
+            letter-spacing:-.02em}
+  .gauge .d{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .lamp{width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:var(--muted)}
+  .lamp.on{background:var(--live);animation:pulse 1.8s ease-in-out infinite}
+  .lamp.ok{background:var(--good)} .lamp.bad{background:var(--crit)}
+  .lamp.warn{background:var(--warn)}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(57,135,229,.55)}
+                   50%{box-shadow:0 0 0 5px rgba(57,135,229,0)}}
+
+  /* ---- hero ---- */
+  .hero{display:grid;gap:14px;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);
+        margin-top:14px}
+  @media (max-width:1000px){.hero{grid-template-columns:1fr}}
+  .huge{font-size:44px;font-weight:650;letter-spacing:-.035em;line-height:1.05;
+        margin:6px 0 4px}
+  .huge.bad{color:var(--crit)} .huge.ok{color:var(--good)}
+  .sub{color:var(--ink2);font-size:13.5px;max-width:70ch}
+
+  section{margin-top:30px}
+  .sech{display:flex;align-items:baseline;gap:11px;margin-bottom:11px}
+  .sech h2{margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.15em;
+           color:var(--muted);font-weight:600}
+  .sech .note{font-size:11.5px;color:var(--muted)}
+  .grow{flex:1}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:11px;
+        padding:13px 14px}
+  .cols{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+  .cols3{display:grid;gap:12px;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)}
+  @media (max-width:1000px){.cols3{grid-template-columns:1fr}}
+  h3{margin:0 0 9px;font-size:12.5px;font-weight:600}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.09em;
+     color:var(--muted);font-weight:600;padding:0 9px 7px;
+     border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:7px 9px;border-bottom:1px solid var(--grid);vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  td.n{text-align:right;font-variant-numeric:tabular-nums}
+  tr.click{cursor:pointer}
+  tr.click:hover td{background:rgba(255,255,255,.035)}
+  .wrapx{overflow-x:auto}
+  .dim{color:var(--ink2)} .faint{color:var(--muted)}
+  .small{font-size:11.5px}
+
+  .chip{font-size:10.5px;padding:1.5px 7px;border-radius:99px;
+        border:1px solid var(--line);color:var(--muted);display:inline-block;
+        white-space:nowrap}
+  .chip.ok{color:var(--good);border-color:rgba(12,163,12,.45)}
+  .chip.bad{color:var(--crit);border-color:rgba(208,59,59,.45)}
+  .chip.warn{color:var(--warn);border-color:rgba(250,178,25,.45)}
+  .chip.live{color:var(--live);border-color:rgba(57,135,229,.5)}
+
+  /* Distance to bar. Log scale, fixed 0.1x - 100x domain, so the bar tick sits
+     at the same x in every row and rows are comparable at a glance. A linear
+     "percent of bar" would put something at 4% of target near a full-looking
+     bar's left edge, which is the lie this exists to avoid. */
+  .track{position:relative;height:15px;min-width:132px}
+  .track .ax{position:absolute;left:0;right:0;top:7px;height:1px;background:var(--line)}
+  .track .tick{position:absolute;top:1px;width:1px;height:13px;background:var(--accent)}
+  .track .dot{position:absolute;top:2.5px;width:10px;height:10px;border-radius:50%;
+              margin-left:-5px}
+  .track .dot.ok{background:var(--good)} .track .dot.bad{background:var(--crit)}
+  .track .dot.drift{outline:1.5px dashed var(--warn);outline-offset:1.5px}
+  .track .ghost{position:absolute;top:3.5px;width:8px;height:8px;border-radius:50%;
+                margin-left:-4px;border:1.5px solid var(--muted)}
+  .scalerow{display:flex;justify-content:space-between;font-size:9.5px;
+            color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0}
+
+  .spark{display:block;width:100%;height:38px}
+  .prog{height:4px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:6px}
+  .prog i{display:block;height:100%;background:var(--live)}
+  .empty{font-size:12px;color:var(--muted);border:1px dashed var(--line);
+         border-radius:9px;padding:13px}
+  .kv{display:flex;gap:8px;font-size:11.5px;color:var(--muted);margin-top:3px}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;
+       color:var(--ink2);background:var(--surface2);padding:1px 5px;border-radius:4px}
 </style>
 </head>
 <body>
-<div class="top" id="top"></div>
-<div class="shell">
-  <div class="side"></div>
-  <div class="main"></div>
-</div>
+<div class="nav" id="nav"></div>
+<main id="body"><div class="empty" style="margin-top:24px">Loading…</div></main>
 
-<script src="/page.js"></script>
 <script>
 const S = {};
+const esc = s => String(s ?? "").replace(/[&<>"]/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const n2 = (v, dp) => (v === null || v === undefined || isNaN(v))
+  ? "—" : (+v).toFixed(dp === undefined ? 1 : dp);
 
-const fmtNum = (v, dp) => (v === null || v === undefined || isNaN(v))
-  ? "&mdash;" : (+v).toFixed(dp === undefined ? 2 : dp);
-
-/* A failing criterion is reported as how many TIMES over its bar it is.
-   ratio is 1.0 at the bar and above 1.0 passing, so 1/ratio is the multiple. */
-function timesOver(c){
-  if(c.ratio === null || c.ratio === undefined || c.ratio <= 0) return null;
-  return c.ratio >= 1 ? null : (1 / c.ratio);
-}
-
-function fmtValue(v, unit){
-  if(v === null || v === undefined) return "&mdash;";
+function value(v, unit){
+  if(v === null || v === undefined) return "—";
   if(unit === "fraction") return (v * 100).toFixed(0) + "%";
-  if(unit === "ratio") return (+v).toFixed(4);
-  if(unit === "mm") return (+v).toFixed(1) + " mm";
-  if(unit === "m") return (+v).toFixed(2) + " m";
-  if(unit === "m/s") return (+v).toFixed(3) + " m/s";
+  if(unit === "ratio")    return (+v).toFixed(4);
+  if(unit === "mm")       return (+v).toFixed(1) + " mm";
+  if(unit === "m")        return (+v).toFixed(2) + " m";
+  if(unit === "m/s")      return (+v).toFixed(3) + " m/s";
   return String(v);
 }
-
-/* log10(ratio) mapped onto a fixed 0.1x - 100x domain. The bar sits at 1.0,
-   which is one third along, always. */
-function trackPos(ratio){
-  if(!ratio || ratio <= 0) return null;
-  const l = Math.log10(ratio);            // -1 .. +2
-  return Math.max(0, Math.min(100, ((l + 1) / 3) * 100));
-}
+/* ratio is 1.0 at the bar and above 1.0 passing, in both directions.
+   So a failing criterion is 1/ratio times over. */
+const timesOver = c => (!c.ratio || c.ratio <= 0 || c.ratio >= 1) ? null : 1 / c.ratio;
+const trackPos = r => (!r || r <= 0) ? null
+  : Math.max(0, Math.min(100, ((Math.log10(r) + 1) / 3) * 100));
 
 function track(c){
-  const pos = trackPos(c.ratio);
-  const latestPos = trackPos(c.latest_ratio);
-  if(pos === null) return `<span class="muted small">no scale</span>`;
-  const ok = c.passes_current_bar;
-  const drift = c.drifted_runs ? " drifted" : "";
-  // The ghost is the BEST ever seen; the solid dot is the latest. Only drawn
-  // when they differ - a page that shows best-ever by default hides regressions.
-  const ghost = (latestPos !== null && Math.abs(latestPos - pos) > 1.5)
-    ? `<span class="ghost" style="left:${pos}%" title="best seen"></span>` : "";
-  const solid = latestPos === null ? pos : latestPos;
-  return `<div class="track">
-      <div class="axis"></div>
-      <div class="barline" style="left:33.3%"></div>
-      ${ghost}
-      <span class="dot ${ok ? "ok" : "bad"}${drift}" style="left:${solid}%"></span>
-    </div>`;
+  const best = trackPos(c.ratio), latest = trackPos(c.latest_ratio);
+  if(best === null) return `<span class="faint small">no scale</span>`;
+  const at = latest === null ? best : latest;
+  const ghost = (latest !== null && Math.abs(latest - best) > 1.5)
+    ? `<span class="ghost" style="left:${best}%" title="best ever seen"></span>` : "";
+  return `<div class="track"><div class="ax"></div>
+    <div class="tick" style="left:33.3%"></div>${ghost}
+    <span class="dot ${c.passes_current_bar ? "ok" : "bad"}${
+      c.drifted_runs ? " drift" : ""}" style="left:${at}%"></span></div>`;
 }
 
-/* ---------------- panels ---------------- */
+/* ---------------- top bar + rail ---------------- */
 
-function strip(){
-  const q = S.queue, run = S.running;
-  return `<div class="strip">
-    <span>${q.runner.alive ? '<span class="dotlive"></span> runner up'
-                           : '<span class="dotdead"></span> <b>runner down</b>'}</span>
-    ${run ? `<span><b>${esc(run.variant)}</b> training &middot;
-      ${Math.round(100 * run.progress)}% of ${run.iterations_target.toLocaleString()}</span>`
-          : `<span>nothing training</span>`}
-    <span>${q.queued.length} queued${q.paused ? " &middot; <b>PAUSED</b>" : ""}</span>
-    <div class="sp" style="flex:1"></div>
-    <a class="plain small" href="/#queue">Queue &rarr;</a>
+function nav(){
+  const links = [["/","Overview"],["/runs","Runs"],["/summary","Summary"],
+                 ["/stage1","1 · Prepare"],["/stage2","2 · Train"],
+                 ["/stage3","3 · Deploy"],["/pose","Pose editor"]];
+  const h = S.progress.headline;
+  document.getElementById("nav").innerHTML =
+    `<div class="brand">Gray</div>` +
+    links.map(([href, label]) =>
+      `<a href="${href}" class="${href === "/" ? "on" : ""}">${esc(label)}</a>`).join("") +
+    `<div class="sp"></div>` +
+    (h ? `<span class="chip bad">${esc(h.name)} ${n2(h.times_over)}× over bar</span>`
+       : `<span class="chip">nothing measured yet</span>`);
+  document.title = h
+    ? `Gray — ${h.name} ${n2(h.times_over)}× over bar`
+    : "Gray — overview";
+}
+
+function rail(){
+  const q = S.queue, r = S.running, m = S.model, p = S.progress;
+  const met = p.subsections.reduce((a, s) => a + s.met, 0);
+  const fail = p.subsections.reduce((a, s) => a + s.failing, 0);
+  const never = p.subsections.reduce((a, s) => a + s.never_measured, 0);
+  const g = (k, v, d, lamp) => `<div class="gauge">
+    <div class="k">${lamp ? `<span class="lamp ${lamp}"></span>` : ""}${esc(k)}</div>
+    <div class="v">${v}</div><div class="d">${d}</div></div>`;
+  return `<div class="rail">
+    ${g("runner", q.runner.alive ? "up" : "DOWN",
+        q.paused ? "queue paused" : "queue live",
+        q.runner.alive ? (q.paused ? "warn" : "ok") : "bad")}
+    ${g("training", r ? esc(r.variant) : "idle",
+        r ? `${r.iterations_done.toLocaleString()} / ${(r.iterations_target||0).toLocaleString()} iter`
+          : `${q.queued.length} queued`, r ? "on" : "")}
+    ${g("queued", q.queued.length, q.queued.length ? esc(q.queued[0].name) + " next" : "nothing waiting")}
+    ${g("criteria met", met, `${fail} failing · ${never} never measured`,
+        fail ? "bad" : (met ? "ok" : "warn"))}
+    ${g("runs", p.runs_total, `${p.runs_verified} verified · ${p.runs_passed} passed`)}
+    ${g("model", `${m.passed}/${m.total}`, "checks, re-run live",
+        m.passed === m.total ? "ok" : "bad")}
   </div>`;
 }
 
-function verdictPanel(){
-  const o = S.progress, h = o.headline;
-  const head = h
-    ? `<div class="eyebrow">${esc(h.sub)} &middot; ${esc(h.sub_name)}</div>
-       <div class="huge bad">${esc(h.name)} is ${fmtNum(h.times_over, 1)}&times; over its bar</div>
-       <p class="lede">${fmtValue(h.latest, h.unit)} measured against a bar of
-         ${fmtValue(h.bar, h.unit)}, from <b>${esc(h.latest_label)}</b>.</p>`
-    : `<div class="eyebrow">Nothing measured yet</div>
-       <div class="huge">No structured verdict on any run</div>
-       <p class="lede">Runs verified before the verdict format changed carry only a
-         prose line, which cannot be compared or charted. The next run to finish
-         produces the first comparable numbers.</p>`;
+/* ---------------- hero ---------------- */
 
-  const met = o.subsections.reduce((a, s) => a + s.met, 0);
-  const fail = o.subsections.reduce((a, s) => a + s.failing, 0);
-  const never = o.subsections.reduce((a, s) => a + s.never_measured, 0);
+function hero(){
+  const p = S.progress, h = p.headline;
+  const left = h
+    ? `<div class="faint small">${esc(h.sub)} · ${esc(h.sub_name)} · worst criterion</div>
+       <div class="huge bad">${n2(h.times_over)}× over</div>
+       <div class="sub"><b>${esc(h.name)}</b> measured
+         <b>${value(h.latest, h.unit)}</b> against a bar of
+         <b>${value(h.bar, h.unit)}</b>, on
+         <a href="/runs#run=${encodeURIComponent(h.latest_run)}"
+            style="color:var(--live)">${esc(h.latest_label)}</a>.
+         ${h.n > 1 ? `${h.n} runs have measured it.` : ""}</div>`
+    : `<div class="faint small">Stage 2</div>
+       <div class="huge">Nothing comparable yet</div>
+       <div class="sub">Every existing verdict predates the structured format, so it
+         can be read but not compared or charted. The next run to finish produces
+         the first numbers this page can work with.</div>`;
 
-  return `${head}
-    <div class="counts">
-      <div><b>${met}</b>criteria met</div>
-      <div><b>${fail}</b>failing</div>
-      <div><b>${never}</b>never measured</div>
-      <div><b>${o.runs_structured}</b>of ${o.runs_total} runs comparable</div>
+  const done = p.subsections.filter(s => s.kind === "run");
+  return `<div class="hero">
+    <div class="card">${left}
+      <div class="prog" style="margin-top:14px"><i style="width:${
+        h ? Math.max(2, Math.min(100, 100 / (h.times_over || 1))) : 0}%"></i></div>
+      <div class="kv"><span>the bar</span><div class="grow"></div>
+        <span>${h ? n2(h.times_over) + "× away" : "unknown"}</span></div>
     </div>
-    <div class="note small" style="margin-top:16px">Three numbers, never one. There is
-      no project percentage on this page on purpose: ${met} of ${met + fail} criteria
-      met reads as good progress for a robot whose worst criterion is
-      ${h ? fmtNum(h.times_over, 0) + "&times;" : "many times"} over its bar. And
-      "never measured" is not a zero &mdash; most of it is criteria no verifier
-      exists for.</div>
-    <div class="note small">${o.runs_total} run folders exist; ${o.runs_verified}
-      have any verdict at all. The rest are smoke tests, cancellations and runs that
-      were interrupted. Counting folders as attempts would overstate everything.</div>`;
+    <div class="card">
+      <h3>The three training runs</h3>
+      <div class="wrapx"><table>
+        <tr><th></th><th>Run</th><th>State</th><th class="n">met</th>
+            <th class="n">failing</th><th class="n">unknown</th></tr>
+        ${done.map(s => `<tr>
+          <td><span class="chip">${esc(s.id)}</span></td>
+          <td><b>${esc(s.name)}</b></td>
+          <td class="dim small">${esc(s.state)}</td>
+          <td class="n" style="color:var(--good)">${s.met || "—"}</td>
+          <td class="n" style="color:${s.failing ? "var(--crit)" : "var(--muted)"}">${s.failing || "—"}</td>
+          <td class="n faint">${s.never_measured || "—"}</td>
+        </tr>`).join("")}
+      </table></div>
+      <div class="small faint" style="margin-top:10px">Three numbers, never one.
+        A single percentage would let a criterion ${h ? n2(h.times_over, 0) + "×" : "many times"}
+        over its bar disappear into an average.</div>
+    </div>
+  </div>`;
 }
 
-function boardPanel(){
+/* ---------------- bar board ---------------- */
+
+function board(){
   const rows = [];
   for(const s of S.progress.subsections)
     for(const c of s.criteria) rows.push({...c, sub: s.id});
-  if(!rows.length)
-    return `<div class="eyebrow">Stage 2</div><h1>The bar board</h1>
-      <div class="note">Nothing has produced a structured verdict yet. The board
-      fills in as runs finish.</div>`;
-
-  rows.sort((a, b) => (a.ratio || 99) - (b.ratio || 99));
-  const anyDrift = rows.some(r => r.drifted_runs);
-  return `<div class="eyebrow">Stage 2</div>
-    <h1>The bar board</h1>
-    <p class="lede">Every criterion any run has measured, worst first. Distance is
-      shown as a multiple of the bar, not a percentage.</p>
-    <div class="card">
-      <div class="tw"><table>
-        <tr><th>Criterion</th><th>Task</th><th class="n">Measured</th>
-            <th class="n">Bar</th><th class="n">Worst robot</th>
-            <th style="min-width:170px">Distance
-              <div class="scale" style="font-weight:400"><span>0.1&times;</span>
-              <span style="color:var(--accent)">bar</span><span>100&times;</span></div>
-            </th><th>Verdict</th></tr>
-        ${rows.map(c => {
-          const over = timesOver(c);
-          return `<tr>
-            <td><b>${esc(c.name)}</b>
-              ${c.n > 1 ? `<div class="dim small">${c.n} measurements</div>` : ""}</td>
-            <td class="dim small">${esc((c.task || "").replace("Gray-", ""))}</td>
-            <td class="n">${fmtValue(c.latest, c.unit)}</td>
-            <td class="n dim">${fmtValue(c.bar, c.unit)}</td>
-            <td class="n dim">${fmtValue(c.worst_seen, c.unit)}</td>
-            <td>${track(c)}</td>
-            <td>${c.passes_current_bar
-                  ? `<span class="chip ok">met</span>`
-                  : `<span class="chip warn">${over ? fmtNum(over, 1) + "&times; over" : "failing"}</span>`}
-                ${c.stale ? `<span class="chip">bar moved</span>` : ""}
-                ${c.drifted_runs ? `<span class="chip warn">task drifted</span>` : ""}</td>
-          </tr>`;
-        }).join("")}
-      </table></div>
-      <div class="note small" style="margin-top:14px"><b>These came from different
-        policies.</b> Standing, being shoved and walking were each measured on a
-        different policy file. R1's bar asks ONE policy to meet all of them, and no
-        single policy has been measured against all of them yet.</div>
-      ${anyDrift ? `<div class="risk small"><b>Task drifted.</b> A dashed outline
-        means that run was scored against a task that had changed since it trained.
-        Its numbers answer a different question and should not be read beside the
-        others without noticing.</div>` : ""}
-    </div>`;
+  if(!rows.length) return `<section><div class="sech"><h2>The bar board</h2></div>
+    <div class="empty">No run has produced a structured verdict yet. Every
+    criterion below fills in the moment one does.</div></section>`;
+  rows.sort((a, b) => (a.ratio ?? 99) - (b.ratio ?? 99));
+  const drift = rows.some(r => r.drifted_runs);
+  return `<section>
+    <div class="sech"><h2>The bar board</h2>
+      <span class="note">every criterion measured, worst first · distance as a
+        multiple of the bar, never a percentage</span></div>
+    <div class="card wrapx"><table>
+      <tr><th>Criterion</th><th>Task</th><th class="n">Measured</th><th class="n">Bar</th>
+          <th class="n">Worst robot</th>
+          <th style="min-width:150px">Distance
+            <div class="scalerow"><span>0.1×</span>
+              <span style="color:var(--accent)">bar</span><span>100×</span></div></th>
+          <th>From</th><th></th></tr>
+      ${rows.map(c => {
+        const over = timesOver(c);
+        return `<tr>
+          <td><b>${esc(c.name)}</b>${c.n > 1
+            ? `<div class="faint small">${c.n} measurements</div>` : ""}</td>
+          <td class="faint small">${esc((c.task || "").replace("Gray-", ""))}</td>
+          <td class="n">${value(c.latest, c.unit)}</td>
+          <td class="n dim">${value(c.bar, c.unit)}</td>
+          <td class="n faint">${value(c.worst_seen, c.unit)}</td>
+          <td>${track(c)}</td>
+          <td class="small"><a href="/runs#run=${encodeURIComponent(c.latest_run)}"
+              style="color:var(--live)">${esc(c.latest_label)}</a></td>
+          <td>${c.passes_current_bar ? `<span class="chip ok">met</span>`
+              : `<span class="chip bad">${over ? n2(over) + "× over" : "failing"}</span>`}
+              ${c.stale ? `<span class="chip warn">bar moved</span>` : ""}
+              ${c.drifted_runs ? `<span class="chip warn">task drifted</span>` : ""}</td>
+        </tr>`;}).join("")}
+    </table>
+    <div class="small faint" style="margin-top:11px"><b>These came from different
+      policies.</b> Standing, being shoved and walking were each measured on a
+      different policy file. R1's bar asks one policy to meet all of them, and no
+      single policy has been measured against all of them yet.</div>
+    ${drift ? `<div class="small" style="color:var(--warn);margin-top:6px">A dashed
+      ring marks a run scored against a task that changed after it trained. Its
+      numbers answer a different question.</div>` : ""}
+    </div></section>`;
 }
 
-function trendPanel(){
-  const withHistory = [];
+/* ---------------- gap closing ---------------- */
+
+function trend(){
+  const cs = [];
   for(const s of S.progress.subsections)
-    for(const c of s.criteria) if(c.n >= 2) withHistory.push(c);
-  if(!withHistory.length)
-    return `<div class="eyebrow">Stage 2</div><h1>Is the gap closing?</h1>
-      <div class="note">Needs at least two structured verdicts for a criterion.
-      There ${S.progress.runs_structured === 1 ? "is 1" : "are " + S.progress.runs_structured}
-      so far.</div>`;
-
-  return `<div class="eyebrow">Stage 2</div>
-    <h1>Is the gap closing?</h1>
-    <p class="lede">One panel per criterion with more than one measurement, in the
-      order the runs were verified. The line at 1.0 is the bar.</p>
-    <div class="cols tight">
-      ${withHistory.map(c => {
-        const pts = c.history.filter(p => typeof p.value === "number");
-        const ratios = pts.map(p => {
-          const r = c.better === "higher" ? (p.value / p.bar) : (p.bar / p.value);
-          return isFinite(r) && r > 0 ? r : null;
-        });
-        const usable = ratios.filter(r => r !== null);
-        if(usable.length < 2) return "";
-        const W = 300, H = 34, PAD = 4;
-        const xs = pts.map((_, i) => PAD + (W - 2 * PAD) * (i / (pts.length - 1)));
-        const lo = Math.log10(Math.min(...usable, 1) * 0.7);
-        const hi = Math.log10(Math.max(...usable, 1) * 1.4);
-        const y = r => PAD + (H - 2 * PAD) * (1 - (Math.log10(r) - lo) / ((hi - lo) || 1));
-        const d = ratios.map((r, i) => r === null ? null
-          : `${i ? "L" : "M"}${xs[i].toFixed(1)},${y(r).toFixed(1)}`).filter(Boolean).join("");
-        return `<div class="card">
-          <h3>${esc(c.name)}
-            <span class="chip ${c.passes_current_bar ? "ok" : "warn"}"
-              style="margin-left:auto">${c.passes_current_bar ? "met"
-              : fmtNum(timesOver(c), 1) + "&times; over"}</span></h3>
-          <svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
-               role="img" aria-label="${esc(c.name)} against its bar over ${pts.length} runs">
-            <line x1="0" x2="${W}" y1="${y(1).toFixed(1)}" y2="${y(1).toFixed(1)}"
-                  stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 3"
-                  vector-effect="non-scaling-stroke"/>
-            <path d="${d}" fill="none" stroke="var(--ink2, #a8adb8)" stroke-width="2"
-                  vector-effect="non-scaling-stroke"/>
-            ${ratios.map((r, i) => r === null ? "" :
-              `<circle cx="${xs[i].toFixed(1)}" cy="${y(r).toFixed(1)}" r="3"
-                 fill="${pts[i].passed ? "var(--ok)" : "var(--bad)"}"/>`).join("")}
-          </svg>
-          <div class="tw"><table>
-            <tr><th>Run</th><th class="n">Measured</th><th class="n">Bar</th><th></th></tr>
-            ${pts.map(p => `<tr><td>${esc(p.label)}</td>
-              <td class="n">${fmtValue(p.value, c.unit)}</td>
-              <td class="n dim">${fmtValue(p.bar, c.unit)}</td>
-              <td>${p.passed ? `<span class="chip ok">met</span>`
-                             : `<span class="chip warn">failing</span>`}</td></tr>`).join("")}
-          </table></div>
-        </div>`;
-      }).join("")}
-    </div>
-    <div class="note small" style="margin-top:14px">No trend line is drawn. With a
-      handful of points whose spread is larger than the bar itself, a slope would be
-      a claim the data cannot support &mdash; and it would read as "improving" from
-      any two runs that happened to fall the right way.</div>`;
+    for(const c of s.criteria) if(c.n >= 2) cs.push(c);
+  if(!cs.length) return `<section><div class="sech"><h2>Is the gap closing</h2></div>
+    <div class="empty">Needs two structured verdicts for the same criterion.
+    ${S.progress.runs_structured} exist so far.</div></section>`;
+  return `<section>
+    <div class="sech"><h2>Is the gap closing</h2>
+      <span class="note">one panel per criterion, in the order runs were verified ·
+        the dashed line is the bar</span></div>
+    <div class="cols">${cs.map(c => {
+      const pts = c.history.filter(p => typeof p.value === "number");
+      const rs = pts.map(p => {
+        const r = c.better === "higher" ? p.value / p.bar : p.bar / p.value;
+        return (isFinite(r) && r > 0) ? r : null;
+      });
+      const ok = rs.filter(r => r !== null);
+      if(ok.length < 2) return "";
+      const W = 320, H = 38, P = 5;
+      const xs = pts.map((_, i) => P + (W - 2 * P) * (i / (pts.length - 1)));
+      const lo = Math.log10(Math.min(...ok, 1) * 0.7);
+      const hi = Math.log10(Math.max(...ok, 1) * 1.4);
+      const y = r => P + (H - 2 * P) * (1 - (Math.log10(r) - lo) / ((hi - lo) || 1));
+      const d = rs.map((r, i) => r === null ? null
+        : `${i ? "L" : "M"}${xs[i].toFixed(1)},${y(r).toFixed(1)}`).filter(Boolean).join("");
+      const over = timesOver(c);
+      return `<div class="card">
+        <h3>${esc(c.name)}<span class="grow"></span>
+          <span class="chip ${c.passes_current_bar ? "ok" : "bad"}">${
+            c.passes_current_bar ? "met" : n2(over) + "× over"}</span></h3>
+        <svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
+             aria-label="${esc(c.name)} against its bar across ${pts.length} runs">
+          <line x1="0" x2="${W}" y1="${y(1).toFixed(1)}" y2="${y(1).toFixed(1)}"
+                stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 3"
+                vector-effect="non-scaling-stroke"/>
+          <path d="${d}" fill="none" stroke="var(--ink2)" stroke-width="2"
+                stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+          ${rs.map((r, i) => r === null ? "" : `<circle cx="${xs[i].toFixed(1)}"
+            cy="${y(r).toFixed(1)}" r="3.4" fill="${
+            pts[i].passed ? "var(--good)" : "var(--crit)"}"/>`).join("")}
+        </svg>
+        <div class="wrapx"><table>
+          <tr><th>Run</th><th class="n">Measured</th><th class="n">Bar</th><th></th></tr>
+          ${pts.map(p => `<tr class="click" data-run="${esc(p.run)}">
+            <td>${esc(p.label)}</td><td class="n">${value(p.value, c.unit)}</td>
+            <td class="n faint">${value(p.bar, c.unit)}</td>
+            <td>${p.passed ? `<span class="chip ok">met</span>`
+                            : `<span class="chip bad">failing</span>`}</td></tr>`).join("")}
+        </table></div>
+      </div>`;}).join("")}</div>
+    <div class="small faint" style="margin-top:10px">No trend line is fitted. With a
+      handful of points whose spread is wider than the bar itself, a slope would be
+      a claim the data cannot support.</div>
+  </section>`;
 }
 
-function leftPanel(){
-  const subs = S.progress.subsections;
-  const order = {run: 0, axis: 1, constraint: 2, test: 3, parked: 4};
-  const sorted = [...subs].sort((a, b) => order[a.kind] - order[b.kind]);
-  return `<div class="eyebrow">What is left</div>
-    <h1>What is left, in units that are real</h1>
-    <p class="lede">The unit of work is a training run, and there are three. The
-      rest are dials, constraints, tests and parked items &mdash; counted
-      separately, never summed.</p>
-    <div class="card">
-      <div class="tw"><table>
-        <tr><th class="n"></th><th>Item</th><th>Kind</th><th>State</th>
-            <th>Blocked by</th></tr>
-        ${sorted.map(s => `<tr>
-          <td class="n"><span class="chip" style="font-family:ui-monospace">${esc(s.id)}</span></td>
+/* ---------------- runs ---------------- */
+
+function runsPanel(){
+  const rs = S.runs.slice(0, 14);
+  return `<section>
+    <div class="sech"><h2>Runs</h2>
+      <span class="note">click any row to open its curves, films and reward table</span>
+      <div class="grow"></div><a href="/runs" class="chip live">all ${S.runs.length} →</a></div>
+    <div class="card wrapx"><table>
+      <tr><th>Run</th><th>Task</th><th>Status</th><th>Verdict</th>
+          <th class="n">Iterations</th><th class="n">Reward</th>
+          <th class="n">Films</th><th>Took</th><th>Started</th></tr>
+      ${rs.map(r => `<tr class="click" data-run="${esc(r.id)}">
+        <td><b>${esc(r.variant)}</b></td>
+        <td class="faint small">${esc((r.task || "").replace("Gray-", ""))}</td>
+        <td>${r.status === "running"
+              ? `<span class="chip live">training</span>`
+              : `<span class="chip ${/finish|target/.test(r.status) ? "ok"
+                  : /fail/.test(r.status) ? "bad" : "warn"}">${esc(r.status)}</span>`}</td>
+        <td>${r.verdict ? `<span class="chip ${r.verdict === "passed" ? "ok" : "bad"}">${
+              esc(r.verdict)}</span>${r.verdict_structured ? "" :
+              `<span class="chip" title="prose only - cannot be compared">text</span>`}`
+            : `<span class="faint small">—</span>`}</td>
+        <td class="n">${(r.iterations_done || 0).toLocaleString()}${
+          r.iterations_target ? `<span class="faint"> / ${r.iterations_target.toLocaleString()}</span>` : ""}</td>
+        <td class="n">${n2(r.reward)}</td>
+        <td class="n faint">${r.videos || 0}</td>
+        <td class="faint small">${esc(r.duration || "")}</td>
+        <td class="faint small">${esc(r.started_age || "")}</td>
+      </tr>`).join("")}
+    </table></div></section>`;
+}
+
+/* ---------------- what is left ---------------- */
+
+function left(){
+  const order = {run:0, axis:1, constraint:2, test:3, parked:4};
+  const subs = [...S.progress.subsections].sort((a,b) => order[a.kind]-order[b.kind]);
+  return `<section>
+    <div class="sech"><h2>What is left</h2>
+      <span class="note">the unit of work is a training run, and there are three ·
+        counts per kind are never summed</span></div>
+    <div class="cols3">
+      <div class="card wrapx"><table>
+        <tr><th></th><th>Item</th><th>Kind</th><th>State</th><th>Blocked by</th></tr>
+        ${subs.map(s => `<tr>
+          <td><span class="chip">${esc(s.id)}</span></td>
           <td><b>${esc(s.name)}</b>
-            <div class="dim small">${esc(s.bar_prose || s.rule)}</div>
-            ${s.trigger ? `<div class="small" style="color:var(--warn)">
-              un-parks when: ${esc(s.trigger)}</div>` : ""}
-            ${s.gap ? `<div class="small" style="color:var(--warn)">gap: ${esc(s.gap)}</div>` : ""}</td>
-          <td class="dim small">${esc(s.kind)}</td>
+            <div class="faint small">${esc(s.rule)}</div>
+            ${s.trigger ? `<div class="small" style="color:var(--warn)">un-parks when:
+              ${esc(s.trigger)}</div>` : ""}</td>
+          <td class="faint small">${esc(s.kind)}</td>
           <td class="dim small">${esc(s.state)}</td>
-          <td class="dim small">${esc(S.blockers[s.key] || "")}</td>
+          <td class="small ${/nothing/.test(S.blockers[s.key]||"") ? "" : "faint"}"
+              style="${/nothing/.test(S.blockers[s.key]||"") ? "color:var(--good)" : ""}">${
+            esc(S.blockers[s.key] || "")}</td>
         </tr>`).join("")}
       </table></div>
-    </div>
-    <div class="cols" style="margin-top:14px">
-      <div class="card">
-        <h3>Startable right now</h3>
-        ${S.startable.length
-          ? S.startable.map(x => `<div class="risk small"><b>${esc(x.what)}</b><br>
-              ${esc(x.why)}</div>`).join("")
-          : `<p class="small dim">Nothing &mdash; everything is waiting on something.</p>`}
+      <div>
+        <div class="card">
+          <h3>Startable today</h3>
+          ${S.startable.map(x => `<div style="padding:7px 0;border-bottom:1px solid var(--grid)">
+            <b class="small">${esc(x.what)}</b>
+            <div class="faint small">${esc(x.why)}</div></div>`).join("")}
+        </div>
+        <div class="card" style="margin-top:12px">
+          <h3>Stage 3 measures what stage 1 guesses</h3>
+          ${S.loop.edges.map(e => `<div style="padding:6px 0;border-bottom:1px solid var(--grid)">
+            <span class="chip">${esc(e.from)}</span>
+            <b class="small"> ${esc(e.what)}</b></div>`).join("")}
+          <div class="faint small" style="margin-top:9px">${esc(S.loop.cost)}</div>
+        </div>
       </div>
-      <div class="card">
-        <h3>The loop back to stage 1</h3>
-        <p class="why small">Stage 3 measures what stage 1 is guessing, which is why
-          it is not last.</p>
-        <div class="tw"><table>
-          <tr><th class="n">From</th><th>What it measures</th></tr>
-          ${S.loop.edges.map(e => `<tr>
-            <td class="n"><span class="chip">${esc(e.from)}</span></td>
-            <td><b>${esc(e.what)}</b><div class="dim small">feeds ${esc(e.to)}</div></td>
-          </tr>`).join("")}
-        </table></div>
-      </div>
-    </div>`;
+    </div></section>`;
 }
 
-function unknownPanel(){
+/* ---------------- not known ---------------- */
+
+function unknown(){
   const rows = [];
   for(const s of S.progress.subsections){
     for(const u of s.unmeasured)
-      rows.push({sub: s.id, what: u.name + " (" + (u.task || "").replace("Gray-", "") + ")",
-                 why: "the bar defines it but no run has measured it"});
-    for(const cl of s.unverified_clauses)
-      rows.push({sub: s.id, what: cl.split(" - ")[0], why: cl.split(" - ").slice(1).join(" - ")});
-    if(!s.verifiable)
-      rows.push({sub: s.id, what: s.name + " &mdash; the whole bar",
-                 why: "no verifier exists for this subsection"});
+      rows.push([s.id, `${u.name} (${(u.task||"").replace("Gray-","")})`,
+                 "the bar defines it, no run has measured it"]);
+    for(const c of s.unverified_clauses){
+      const i = c.indexOf(" - ");
+      rows.push([s.id, i > 0 ? c.slice(0, i) : c, i > 0 ? c.slice(i + 3) : ""]);
+    }
+    if(!s.verifiable) rows.push([s.id, `${s.name} — the whole bar`,
+                                 "no verifier has been written for this subsection"]);
   }
-  for(const o of S.stage1_open) rows.push({sub: "1", what: o.q, why: o.n});
-
-  return `<div class="eyebrow">Honesty</div>
-    <h1>What this page does not know</h1>
-    <p class="lede">The counterweight to the board. Without this, "criteria met"
-      reads as a fraction of the whole job &mdash; and most of the job has never
-      been measured at all.</p>
-    <div class="card">
-      <div class="tw scroller" style="max-height:60vh"><table>
-        <tr><th class="n"></th><th>Not known</th><th>Why</th></tr>
-        ${rows.map(r => `<tr>
-          <td class="n"><span class="chip">${esc(r.sub)}</span></td>
-          <td>${r.what}</td>
-          <td class="dim small">${esc(r.why)}</td></tr>`).join("")}
-      </table></div>
-    </div>`;
+  for(const o of S.stage1_open) rows.push(["1", o.q, o.n]);
+  return `<section>
+    <div class="sech"><h2>What this page does not know</h2>
+      <span class="note">the counterweight · without it, "criteria met" reads as a
+        fraction of the whole job</span></div>
+    <div class="card wrapx"><table>
+      <tr><th></th><th>Not known</th><th>Why</th></tr>
+      ${rows.map(r => `<tr><td><span class="chip">${esc(r[0])}</span></td>
+        <td>${esc(r[1])}</td><td class="faint small">${esc(r[2])}</td></tr>`).join("")}
+    </table></div></section>`;
 }
 
-/* ---------------- boot ---------------- */
+/* ---------------- draw ---------------- */
 
 function draw(){
-  document.getElementById("top").innerHTML = topbar("/overview",
-    S.progress.headline
-      ? `${esc(S.progress.headline.name)} ${fmtNum(S.progress.headline.times_over, 1)}&times; over bar`
-      : "nothing measured yet");
-  if(S.progress.headline)
-    document.title = `Gray — ${S.progress.headline.name} ${
-      fmtNum(S.progress.headline.times_over, 1)}× over bar`;
-
-  document.querySelector(".main").insertAdjacentHTML("afterbegin", "");
-  shell([
-    {id: "verdict", label: "Where it stands", html: () => strip() + verdictPanel()},
-    {id: "board", label: "The bar board",
-     count: S.progress.subsections.reduce((a, s) => a + s.criteria.length, 0) || null,
-     html: () => strip() + boardPanel()},
-    {id: "trend", label: "Is the gap closing", html: () => strip() + trendPanel()},
-    {id: "left", label: "What is left", html: () => strip() + leftPanel()},
-    {id: "unknown", label: "What is not known", html: () => strip() + unknownPanel()},
-  ]);
+  nav();
+  document.getElementById("body").innerHTML =
+    rail() + hero() + board() + trend() + runsPanel() + left() + unknown();
+  document.querySelectorAll("[data-run]").forEach(el =>
+    el.onclick = () => { location.href = "/runs#run=" + encodeURIComponent(el.dataset.run); });
 }
 
-fetch("/api/overview").then(r => r.json()).then(s => {
-  Object.assign(S, s);
-  draw();
-}).catch(fail);
+function load(){
+  fetch("/api/overview").then(r => r.json()).then(s => {
+    Object.assign(S, s);
+    draw();
+  }).catch(e => {
+    document.getElementById("body").innerHTML =
+      `<div class="empty" style="margin-top:24px">Could not load: ${esc(e)}</div>`;
+  });
+}
+load();
+setInterval(load, 15000);   // nothing here changes faster than a run finishing
 </script>
 </body>
 </html>

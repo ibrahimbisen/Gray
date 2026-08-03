@@ -16,8 +16,8 @@ function topbar(active, right) {
     `<a href="${href}" class="${href === active ? "on" : ""}">${label}</a>`;
   return `
     <div class="brand">Gray</div>
-    ${link("/", "Monitor")}
-    ${link("/overview", "Overview")}
+    ${link("/", "Overview")}
+    ${link("/runs", "Runs")}
     ${link("/summary", "Summary")}
     ${link("/stage1", "1 &middot; Prepare")}
     ${link("/stage2", "2 &middot; Train")}
