@@ -23,8 +23,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 RUNS = ROOT / "progress" / "runs"
 
-# A run is one attempt at one stage of the curriculum.
-STATUS = ("running", "done", "failed", "stopped")
+# What can have happened to a run. "finished" and "reached target" both mean the
+# training completed normally - the second means it stopped early because the
+# reward had nothing left to win (RULES.md rule 1). Neither says whether the
+# stage was passed: that is the verifier's word, carried separately as `verdict`.
+STATUS = ("running", "finished", "reached target", "cancelled", "failed",
+          "interrupted")
+
+# How long a run marked "running" can go without writing anything before we stop
+# believing it. A killed process never gets to update its own status, and a card
+# that says "running" three hours later is worse than no card.
+STALE_AFTER_S = 180.0
 
 
 def _read_json(path: Path) -> dict:
@@ -103,14 +112,30 @@ def read_run(folder: Path) -> dict:
     target = meta.get("iterations_target") or 0
     done = int(latest.get("iteration", len(rows)))
 
+    # A run that says it is running but has not written for a while was killed
+    # without getting the chance to say so.
+    # Runs made before the vocabulary was settled say "done" and "stopped".
+    status = {"done": "finished", "stopped": "cancelled"}.get(
+        meta.get("status", "unknown"), meta.get("status", "unknown"))
+    if status == "running":
+        newest = max((p.stat().st_mtime for p in folder.rglob("*") if p.is_file()),
+                     default=0.0)
+        if newest and (datetime.now().timestamp() - newest) > STALE_AFTER_S:
+            status = "interrupted"
+
+    # The distinguishing part of the folder name: 2026-08-03_00-56-36_push_v4
+    # matters to a person as "push_v4".
+    variant = folder.name.split("_", 2)[-1] if folder.name.count("_") >= 2 else folder.name
+
     return {
         "id": folder.name,
         "name": meta.get("name") or folder.name,
+        "variant": variant,
         "purpose": meta.get("purpose", ""),
         "stage": meta.get("stage"),
         "stage_name": meta.get("stage_name", ""),
         "task": meta.get("task", ""),
-        "status": meta.get("status", "unknown"),
+        "status": status,
         "bar": meta.get("bar", ""),
         "notes": meta.get("notes", ""),
         "started": meta.get("started"),
@@ -124,7 +149,11 @@ def read_run(folder: Path) -> dict:
         "latest": latest,
         "videos": videos,
         "checkpoints": checkpoints,
+        # Written by scripts/verify.py. Training finishing is not the same as the
+        # stage being passed, so the two are shown separately and never merged.
         "verdict": meta.get("verdict", ""),
+        "verdict_detail": meta.get("verdict_detail", ""),
+        "notes": meta.get("notes", ""),
         # What this run was scored on, recorded at launch. Kept per-run rather
         # than read from the task, so an old run still says what IT was scored on
         # after the rewards have been changed.
@@ -144,3 +173,14 @@ def all_runs() -> list[dict]:
 def active(runs: list[dict]) -> dict | None:
     """The one to show at the top: whatever is running, else the newest."""
     return next((r for r in runs if r["status"] == "running"), runs[0] if runs else None)
+
+
+def set_verdict(run_id: str, verdict: str, detail: str) -> None:
+    """Record what the verifier decided, on the run itself."""
+    path = RUNS / run_id / "run.json"
+    if not path.exists():
+        return
+    meta = json.loads(path.read_text())
+    meta["verdict"] = verdict
+    meta["verdict_detail"] = detail
+    path.write_text(json.dumps(meta, indent=2))

@@ -57,8 +57,16 @@
   .rc .mini{height:3px;background:var(--line);border-radius:99px;margin-top:7px;overflow:hidden}
   .rc .mini i{display:block;height:100%;background:var(--s1)}
   .dot{width:6px;height:6px;border-radius:50%;flex:0 0 auto;background:var(--muted)}
-  .dot.running{background:var(--live);animation:pulse 1.8s ease-in-out infinite}
-  .dot.done{background:var(--good)} .dot.failed{background:var(--crit)}
+  .dot.live{background:var(--live);animation:pulse 1.8s ease-in-out infinite}
+  .dot.ok{background:var(--good)} .dot.bad{background:var(--crit)}
+  .dot.warn{background:var(--warn)}
+  .badge{font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;padding:2px 6px;
+         border-radius:99px;border:1px solid var(--line);color:var(--muted);
+         white-space:nowrap;flex:0 0 auto}
+  .badge.live{color:var(--live);border-color:rgba(57,135,229,.5)}
+  .badge.ok{color:var(--good);border-color:rgba(12,163,12,.5)}
+  .badge.warn{color:var(--warn);border-color:rgba(250,178,25,.5)}
+  .badge.bad{color:var(--crit);border-color:rgba(208,59,59,.5)}
   @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(57,135,229,.5)}50%{box-shadow:0 0 0 4px rgba(57,135,229,0)}}
   .empty{font-size:12px;color:var(--muted);border:1px dashed var(--line);border-radius:8px;padding:12px}
 
@@ -171,6 +179,15 @@ const SLOTS = ["var(--s1)","var(--s2)","var(--s3)","var(--s4)","var(--s5)"];
 
 let STATE = null, SELECTED = null, VIDEO = null, TABLE = false;
 
+/* Statuses are words, not colours: a run that was cancelled and one that stopped
+   because it had won look identical as a coloured dot. */
+const STATE_CLASS = {
+  "running": "live", "reached target": "ok", "finished": "ok",
+  "cancelled": "warn", "interrupted": "warn", "failed": "bad",
+  "passed": "ok", "not passed": "bad",
+};
+const cls = s => STATE_CLASS[s] || "muted";
+
 /* A metric keeps its hue wherever it appears - tile, chart, table. Assigned by
    fixed order of first appearance, never by rank, so a chart never repaints. */
 const HUE = {};
@@ -200,13 +217,16 @@ function renderRuns(runs){
   }
   $("#runlist").innerHTML = runs.map(r => `
     <div class="rc ${r.id === SELECTED ? "sel" : ""}" data-id="${esc(r.id)}">
-      <div class="r1"><span class="dot ${esc(r.status)}"></span>
-        <span class="nm">${esc(r.name)}</span></div>
-      ${r.purpose ? `<div class="pp">${esc(r.purpose)}</div>` : ""}
+      <div class="r1"><span class="dot ${cls(r.status)}"></span>
+        <span class="nm">${esc(r.variant || r.name)}</span>
+        <span class="badge ${cls(r.status)}">${esc(r.status)}</span></div>
+      <div class="pp"><b>${esc(r.name)}</b>${r.stage != null
+        ? ` &middot; stage ${r.stage}` : ""}</div>
+      ${r.verdict ? `<div class="pp"><span class="badge ${
+        r.verdict === "passed" ? "ok" : "bad"}">${esc(r.verdict)}</span></div>` : ""}
       <div class="r3">
-        <span>${r.stage ?? "" ? "stage " + r.stage : esc(r.status)}</span>
-        <span class="tnum">${r.iterations_target
-          ? Math.round(100 * r.progress) + "%" : esc(r.started_age)}</span>
+        <span>${r.iterations_done.toLocaleString()} iterations</span>
+        <span class="tnum">${esc(r.started_age)}</span>
       </div>
       ${r.iterations_target ? `<div class="mini"><i style="width:${
         Math.round(100 * r.progress)}%"></i></div>` : ""}
@@ -229,14 +249,20 @@ function renderHead(run, model){
   $("#head").innerHTML = `
     <div class="top">
       <h1>${esc(run.name)}</h1>
-      <span class="pill ${esc(run.status)}">${esc(run.status)}</span>
+      <span class="pill tnum">${esc(run.variant || run.id)}</span>
+      <span class="badge ${cls(run.status)}">${esc(run.status)}</span>
+      ${run.verdict ? `<span class="badge ${cls(run.verdict)}">${
+        esc(run.verdict)}</span>` : ""}
       ${run.stage != null ? `<span class="pill">stage ${run.stage}</span>` : ""}
-      ${run.task ? `<span class="pill tnum">${esc(run.task)}</span>` : ""}
       <div class="grow"></div>
       <span class="pill ${model.passed === model.total ? "done" : "failed"}">model
         ${model.passed}/${model.total}</span>
     </div>
     ${run.purpose ? `<div class="purpose">${esc(run.purpose)}</div>` : ""}
+    ${run.verdict_detail ? `<div class="purpose" style="color:var(--muted)">
+      <b>Verified:</b> ${esc(run.verdict_detail)}</div>` : ""}
+    ${run.notes ? `<div class="purpose" style="color:var(--muted)">${
+      esc(run.notes)}</div>` : ""}
     <div class="prog"><i style="width:${pct}%"></i></div>
     <div class="proglab">
       <span class="tnum">${run.iterations_done.toLocaleString()} /

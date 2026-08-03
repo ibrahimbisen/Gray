@@ -332,14 +332,13 @@ def main() -> int:
 
     threading.Thread(target=watch, daemon=True).start()
 
-    status = "done"
+    status = "finished"
     try:
         launch_training(task_id=args.task, args=cfg)
     except KeyboardInterrupt:
         # Either Ctrl-C, or the reward hit its target and the bridge interrupted
-        # us on purpose. Reaching the target is a finished run, not an abandoned
-        # one, so do not mark it "stopped".
-        status = "done" if stop.is_set() else "stopped"
+        # us deliberately. Those are opposite outcomes and must not read the same.
+        status = "reached target" if stop.is_set() else "cancelled"
     except Exception:
         status = "failed"
         raise

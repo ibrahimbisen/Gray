@@ -215,6 +215,20 @@ def main() -> int:
 
     print()
     print(f"STAGE {spec['stage']} {'PASSED' if passed else 'NOT PASSED'}")
+
+    # Record it on the run itself. Training finishing and a stage being passed
+    # are different things, and the dashboard shows them as different things.
+    try:
+        from dashboard import runs as runs_mod  # noqa: PLC0415
+
+        detail = " · ".join(
+            f"{name}: {fmt.format(got)}" for name, got, _, _, _, fmt in checks)
+        runs_mod.set_verdict(log_dir.name, "passed" if passed else "not passed",
+                             f"{args.robots} robots x {seconds:.0f} s - {detail}")
+        print(f"recorded on the run: {log_dir.name}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"could not record the verdict: {exc}")
+
     env.close()
     return 0 if passed else 1
 
