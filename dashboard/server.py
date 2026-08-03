@@ -454,13 +454,23 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                               "text/html; charset=utf-8")
         if path in ("/summary", "/summary.html", "/plan"):
             return self._send((HERE / "index.html").read_bytes(), "text/html; charset=utf-8")
-        if path in ("/week", "/programme"):
+        if path == "/programme":
             return self._send((HERE / "week.html").read_bytes(),
                               "text/html; charset=utf-8")
-        # The three project stages, each its own page.
-        if path in ("/stage1", "/stage2", "/stage3"):
-            return self._send((HERE / f"{path[1:]}.html").read_bytes(),
-                              "text/html; charset=utf-8")
+
+        # Any page in dashboard/ by its own name: /stage2 serves stage2.html,
+        # /week serves week.html. Listed nowhere, so adding a page never needs
+        # this file edited - and server.py is the one module the dashboard does
+        # NOT hot-reload, so editing it means a restart, which has now cost two
+        # rounds of "why is my page a 404".
+        #
+        # resolve() then is_relative_to() is the path-traversal check: a request
+        # for /../../secret resolves outside HERE and is refused. Checking the
+        # string instead would miss symlinks and mixed separators.
+        if path.count("/") == 1 and path != "/":
+            page = (HERE / f"{path[1:]}.html").resolve()
+            if page.is_file() and page.is_relative_to(HERE.resolve()):
+                return self._send(page.read_bytes(), "text/html; charset=utf-8")
 
         # Videos and images produced by training. Served with range support, which
         # is what lets a browser scrub through a video instead of downloading it all.
