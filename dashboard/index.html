@@ -65,6 +65,12 @@
   .num.deploy { border-color:var(--warn); color:var(--warn); }
   .goal { margin:2px 0 12px; }
   .why { font-size:15px; color:var(--dim); margin-bottom:14px; }
+  .whynow { font-size:14px; color:var(--dim); border-left:2px solid var(--accent);
+            padding:2px 0 2px 14px; margin:0 0 14px; }
+  .whynow b { display:block; color:var(--ink); font-size:12px; text-transform:uppercase;
+              letter-spacing:.08em; margin-bottom:6px; }
+  .whynow p { margin:0 0 8px; }
+  .whynow p:last-child { margin-bottom:0; }
   .kv { display:grid; grid-template-columns:112px 1fr; gap:6px 14px; font-size:14px; margin-top:12px; }
   .kv dt { color:var(--dim); }
   .kv dd { margin:0; }
@@ -211,6 +217,8 @@ function renderStages(stages, rewardsByKey) {
         <h3>${esc(s.name)}</h3>
         <div class="goal">${esc(s.goal)}</div>
         <div class="why">${esc(s.why)}</div>
+        ${s.why_now ? `<div class="whynow"><b>Why this order</b>${
+          s.why_now.split("\n\n").map(p => `<p>${esc(p)}</p>`).join("")}</div>` : ""}
         ${s.teaches.length ? `<div class="chips">${s.teaches.map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>` : ""}
         <dl class="kv">
           ${s.rewarded.length ? `<dt>Scored on</dt><dd><div class="chips">${

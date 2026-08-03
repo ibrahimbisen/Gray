@@ -76,11 +76,26 @@ STAGES = [
         "name": "Take a push",
         "kind": "train",
         "goal": "Stay standing when shoved, and when the floor is not flat or not grippy.",
-        "why": "This is the first stage that actually needs the new position sensors. "
-               "Without feedback the robot cannot know it is being pushed. With the "
-               "potentiometers it can feel a joint move away from where it was told to "
-               "be, and push back. Nothing before this stage could have been done on "
-               "the old hardware.",
+        "why": "This is the first task that cannot be solved by memorising a pose. "
+               "Standing still can be: a policy could ignore every sensor, replay one "
+               "set of angles forever, and nobody would know. A push breaks that - the "
+               "robot has to notice it moved and do something about it. So this is "
+               "also the first real use of the potentiometers, and it proves the "
+               "observation space works before anything harder depends on it.",
+        "why_now": "Walking needs exactly this reflex. Every step is a disturbance the "
+                   "robot creates itself - weight shifts, a foot lands early, the trunk "
+                   "rocks - and a policy that only knows one still pose has no answer "
+                   "when that happens. The previous attempt hit this precisely: the "
+                   "hand-written gait walked but wandered about 140 mm, and the note "
+                   "recorded that it needed active balance.\n\n"
+                   "It is also where domain randomisation goes cheaply. Friction, mass, "
+                   "servo lag and uneven ground can all be varied while the task is "
+                   "still simple, for minutes of GPU time; learning the same robustness "
+                   "during walking costs hours.\n\n"
+                   "It is not strictly required. Stand then walk would work, and pushes "
+                   "could be added later. But then a fall while walking has two possible "
+                   "causes - the gait or the balance - and there is no way to tell which. "
+                   "Doing it now rules one of them out.",
         "teaches": [
             "React to a disturbance it did not cause",
             "Use measured joint angles, not just commanded ones",

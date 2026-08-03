@@ -98,6 +98,7 @@ def build() -> tuple[Path, float]:
     if world.find("light") is None:
         ET.SubElement(world, "light", {"pos": "0 0 2", "dir": "0 0 -1", "directional": "true"})
 
+    name_geoms(root)
     add_servos(root, tree)
 
     ET.indent(tree, space="  ")
@@ -105,6 +106,25 @@ def build() -> tuple[Path, float]:
 
     checked = mujoco.MjModel.from_xml_path(str(MJCF))
     return MJCF, float(sum(checked.body_mass))
+
+
+def name_geoms(root) -> None:
+    """Give every collision shape a name derived from the body it belongs to.
+
+    MuJoCo's URDF importer leaves geoms unnamed, and an unnamed geom cannot be
+    selected by anything downstream - randomising the friction under the feet,
+    rewarding a foot contact, telling a foot from a knee. It fails as "not all
+    regular expressions are matched", which does not point at the cause at all.
+    """
+    for body in root.iter("body"):
+        base = body.get("name")
+        if not base:
+            continue
+        geoms = body.findall("geom")
+        for i, geom in enumerate(geoms):
+            if geom.get("name"):
+                continue
+            geom.set("name", base if len(geoms) == 1 else f"{base}_{i}")
 
 
 def add_servos(root, tree) -> None:

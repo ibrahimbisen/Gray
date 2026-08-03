@@ -1,17 +1,19 @@
-"""Train stage 1 - stand still - and feed the dashboard while it runs.
+"""Train a stage, and feed the dashboard while it runs.
 
-    python scripts/train_stand.py                    # 8192 robots at once
-    python scripts/train_stand.py --num-envs 4096    # smaller, if VRAM is tight
-    python scripts/train_stand.py --iterations 1200
+    python scripts/train.py Gray-Stand
+    python scripts/train.py Gray-Push
+    python scripts/train.py Gray-Push --num-envs 2048 --iterations 2000
 
 mjlab writes its own logs under logs/rsl_rl/. The dashboard reads
 progress/runs/. This runs the training and bridges between the two, so the run
 appears at http://127.0.0.1:8000 the moment it starts and the curves fill in
-live - rather than being something you only see once it has finished.
+live - rather than being something you only see once it has finished. It also
+records what the run is scored on, so the dashboard can show that per run rather
+than reading a task file that may since have changed.
 
-It also avoids installing the project: mjlab normally discovers tasks through a
-packaging entry point, but importing gray.tasks here registers Gray-Stand just
-the same, and calling mjlab's launch_training directly skips the CLI.
+It avoids installing the project too: mjlab normally discovers tasks through a
+packaging entry point, but importing gray.tasks here registers them just the
+same, and calling mjlab's launch_training directly skips the CLI.
 """
 
 from __future__ import annotations
@@ -45,6 +47,40 @@ if "GIT_PYTHON_GIT_EXECUTABLE" not in os.environ:
 
 LOG_ROOT = ROOT / "logs" / "rsl_rl"
 RUNS = ROOT / "progress" / "runs"
+
+# What each task is and how it is judged. Kept here rather than in the task file
+# so the dashboard shows the same words the plan does, and so a finished run
+# still carries the bar it was actually held to.
+TASKS = {
+    "Gray-Stand": {
+        "name": "Stand still",
+        "stage": 1,
+        "purpose": "Can a policy hold the ride-height stance? The static check says "
+                   "twelve servos at 1.96 N-m have 3.57x the torque they need, so a "
+                   "failure here is the reward or the setup, not the robot.",
+        "bar": "30 s without falling. Trunk within 5 mm of 190 mm. "
+               "Uprightness above 0.99.",
+    },
+    "Gray-Push": {
+        "name": "Take a push",
+        "stage": 2,
+        "purpose": "The first task that cannot be solved by memorising a pose - the "
+                   "robot has to notice it was shoved and do something. That makes it "
+                   "the first real use of the potentiometers, and it builds the reflex "
+                   "walking needs, where every step is a disturbance the robot creates "
+                   "for itself.",
+        "bar": "Survives repeated shoves from any direction over 20 s, on ground "
+               "anywhere from slippery to grippy, with mass and servo gains varied.",
+    },
+}
+
+
+def reward_notes() -> dict[str, str]:
+    """Plain-English descriptions for every scoring term across the tasks."""
+    from gray.tasks.push_env_cfg import PUSH_NOTES  # noqa: PLC0415
+    from gray.tasks.stand_env_cfg import REWARD_NOTES  # noqa: PLC0415
+
+    return {**REWARD_NOTES, **PUSH_NOTES}
 
 # rsl_rl's tensorboard tags, and what to call them on the dashboard. Only the
 # handful worth watching - the run page is a monitor, not an archive.
@@ -131,20 +167,29 @@ def bridge(run_dir: Path, log_dir: Path, stop: threading.Event) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--num-envs", type=int, default=8192,
-                    help="robots trained at once. 8192 fills a 12 GB card")
-    ap.add_argument("--iterations", type=int, default=600)
-    ap.add_argument("--name", default="stand")
+    ap.add_argument("task", nargs="?", default="Gray-Stand", choices=sorted(TASKS),
+                    help="which stage to train")
+    ap.add_argument("--num-envs", type=int, default=3072,
+                    help="robots trained at once. 4096 is this card's ceiling; "
+                         "3072 leaves room for the video renderer")
+    ap.add_argument("--iterations", type=int, default=0,
+                    help="0 uses the task's own default")
+    ap.add_argument("--name", default="")
     ap.add_argument("--no-video", action="store_true")
     args = ap.parse_args()
 
-    import gray.tasks  # noqa: F401  - registers Gray-Stand
+    import gray.tasks  # noqa: F401  - registers the tasks
     from mjlab.scripts.train import TrainConfig, launch_training
 
-    cfg = TrainConfig.from_task("Gray-Stand")
+    meta = TASKS[args.task]
+    run_name = args.name or args.task.split("-")[-1].lower()
+
+    cfg = TrainConfig.from_task(args.task)
     cfg.env.scene.num_envs = args.num_envs
-    cfg.agent.max_iterations = args.iterations
-    cfg.agent.run_name = args.name
+    if args.iterations:
+        cfg.agent.max_iterations = args.iterations
+    iterations = cfg.agent.max_iterations
+    cfg.agent.run_name = run_name
     cfg = TrainConfig(
         env=cfg.env, agent=cfg.agent,
         video=not args.no_video,
@@ -161,36 +206,38 @@ def main() -> int:
     # Record what this run is actually scored on, so the dashboard can show it
     # without anyone reading the task file - and so an old run still says what it
     # was scored on after the rewards have been changed.
-    from gray.tasks.stand_env_cfg import REWARD_NOTES  # noqa: PLC0415
-
+    notes = reward_notes()
+    missing = [n for n in cfg.env.rewards if n not in notes]
+    if missing:
+        # A term with no description shows as a blank row on the dashboard, which
+        # is worse than no row - say so rather than let it slip through.
+        print(f"[warn] no description for scoring terms: {', '.join(missing)}")
     scoring = sorted(
-        ({"name": name, "weight": float(term.weight),
-          "what": REWARD_NOTES.get(name, "")}
+        ({"name": name, "weight": float(term.weight), "what": notes.get(name, "")}
          for name, term in cfg.env.rewards.items()),
         key=lambda r: -abs(r["weight"]),
     )
 
-    run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + f"_{args.name}"
+    run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + f"_{run_name}"
     run_dir = RUNS / run_id
     (run_dir / "videos").mkdir(parents=True, exist_ok=True)
     (run_dir / "run.json").write_text(json.dumps({
-        "name": "Stand still",
-        "purpose": "Can a policy hold the ride-height stance? The static check says "
-                   "twelve servos at 1.96 N-m have 3.58x the torque they need, so a "
-                   "failure here is the reward or the setup, not the robot.",
-        "stage": 1,
-        "stage_name": "Stand still",
-        "task": "Gray-Stand",
+        "name": meta["name"],
+        "purpose": meta["purpose"],
+        "stage": meta["stage"],
+        "stage_name": meta["name"],
+        "task": args.task,
         "status": "running",
-        "bar": "30 s without falling. Trunk within 5 mm of 164 mm. Uprightness above 0.99.",
+        "bar": meta["bar"],
         "started": datetime.now().isoformat(timespec="seconds"),
         "finished": None,
-        "iterations_target": args.iterations,
+        "iterations_target": iterations,
         "notes": f"{args.num_envs} robots at once, 50 Hz control.",
         "scoring": scoring,
     }, indent=2))
 
-    print(f"training      Gray-Stand, {args.num_envs} robots, {args.iterations} iterations")
+    print(f"training      {args.task} - {meta['name']}")
+    print(f"              {args.num_envs} robots, {iterations} iterations")
     print(f"dashboard     http://127.0.0.1:8000  ->  {run_id}")
     print(f"tensorboard   tensorboard --logdir {LOG_ROOT}\n")
 
@@ -211,7 +258,7 @@ def main() -> int:
 
     status = "done"
     try:
-        launch_training(task_id="Gray-Stand", args=cfg)
+        launch_training(task_id=args.task, args=cfg)
     except KeyboardInterrupt:
         status = "stopped"
     except Exception:
