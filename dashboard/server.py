@@ -25,14 +25,14 @@ from urllib.parse import parse_qs, unquote
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from dashboard import plan, queue, runs, skills  # noqa: E402
+from dashboard import plan, progress, queue, runs, skills  # noqa: E402
 from tools import check_urdf  # noqa: E402
 
 # Modules whose contents the pages are built from. The HTML is re-read on every
 # request, but these are imported once at startup - so editing a reward
 # description or a status rule and seeing no change on the page is a trap that
 # looks like a bug in the page. Reload them when the file on disk moves.
-_WATCHED = (skills, plan, runs, queue)
+_WATCHED = (skills, plan, runs, queue, progress)
 _MTIMES: dict[str, float] = {}
 
 
@@ -121,6 +121,29 @@ def monitor_state() -> dict:
         "stages": plan.STAGES,
         "model": model_status(),
         "metrics_available": runs.metrics_available(),
+    }
+
+
+def overview_state() -> dict:
+    """The project against its bars. Reuses one walk of progress/runs/.
+
+    all_summaries() is the only disk read here; everything progress.overview()
+    does is arithmetic over dicts already in memory. Sharing the list matters -
+    computing it twice would double the cost of the page that is meant to be the
+    cheap one.
+    """
+    _reload_if_edited()
+    summaries = runs.all_summaries()
+    live = next((r for r in summaries if r["status"] == "running"), None)
+    return {
+        "progress": progress.overview(summaries),
+        "queue": queue.load(),
+        "running": live,
+        "loop": plan.LOOP,
+        "stage1_open": plan.STAGE1["open"],
+        "blockers": progress.blockers(),
+        "startable": progress.startable(),
+        "model": model_status(),
     }
 
 
@@ -262,6 +285,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._send(json.dumps(monitor_state()).encode(), "application/json")
         if path == "/api/state":
             return self._send(json.dumps(summary_state()).encode(), "application/json")
+        if path == "/api/overview":
+            return self._send(json.dumps(overview_state()).encode(), "application/json")
         if path == "/api/queue":
             _reload_if_edited()
             return self._send(json.dumps(queue.load()).encode(), "application/json")
@@ -310,6 +335,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if path in ("/summary", "/summary.html", "/plan"):
             return self._send((HERE / "index.html").read_bytes(), "text/html; charset=utf-8")
         # The three project stages, each its own page.
+        if path in ("/overview", "/overview.html"):
+            return self._send((HERE / "overview.html").read_bytes(),
+                              "text/html; charset=utf-8")
         if path in ("/stage1", "/stage2", "/stage3"):
             return self._send((HERE / f"{path[1:]}.html").read_bytes(),
                               "text/html; charset=utf-8")

@@ -194,6 +194,10 @@ def read_run(folder: Path) -> dict:
         # stage being passed, so the two are shown separately and never merged.
         "verdict": meta.get("verdict", ""),
         "verdict_detail": meta.get("verdict_detail", ""),
+        "verdict_checks": meta.get("verdict_checks", []),
+        "verdict_structured": bool(meta.get("verdict_checks")),
+        "verdict_at": meta.get("verdict_at", ""),
+        "verdict_context": meta.get("verdict_context", {}),
         "notes": meta.get("notes", ""),
         # What this run was scored on, recorded at launch. Kept per-run rather
         # than read from the task, so an old run still says what IT was scored on
@@ -302,6 +306,14 @@ def all_summaries() -> list[dict]:
             "status": status,
             "verdict": meta.get("verdict", ""),
             "verdict_detail": meta.get("verdict_detail", ""),
+            # The structured result, so the overview can compare criteria across
+            # runs without re-reading every run.json. Six rows per run - a few KB
+            # across the whole list, against the metric arrays this call already
+            # refuses to carry.
+            "verdict_checks": meta.get("verdict_checks", []),
+            "verdict_structured": bool(meta.get("verdict_checks")),
+            "verdict_at": meta.get("verdict_at", ""),
+            "verdict_context": meta.get("verdict_context", {}),
             "started": meta.get("started"),
             "started_age": _age(meta.get("started")),
             "finished": meta.get("finished"),
@@ -398,12 +410,63 @@ def active(runs: list[dict]) -> dict | None:
     return next((r for r in runs if r["status"] == "running"), runs[0] if runs else None)
 
 
-def set_verdict(run_id: str, verdict: str, detail: str) -> None:
-    """Record what the verifier decided, on the run itself."""
+# Bumped when the shape of verdict_checks changes, so a reader can tell rather
+# than guess. Absent means "prose only" - every run verified before 3 Aug 2026.
+VERDICT_SCHEMA = 1
+
+
+def set_verdict(run_id: str, verdict: str, detail: str,
+                checks: list[dict] | None = None,
+                context: dict | None = None) -> None:
+    """Record what the verifier decided, on the run itself.
+
+    `detail` is the prose line and is written exactly as before. `checks` is the
+    same result with its structure intact - one row per criterion, with the
+    measured value, the bar, the direction and the verdict as separate fields.
+    The prose cannot be compared across runs or charted; the structure can.
+
+    The three-argument call still works, so nothing that used it breaks.
+    """
     path = RUNS / run_id / "run.json"
     if not path.exists():
+        # verify.py passes the MJLAB log directory name, which matches the
+        # progress run id only because both are stamped in the same second. Say
+        # so rather than returning silently - a verdict that vanishes with no
+        # error is indistinguishable from a verifier that never ran.
+        print(f"[verdict] no run.json at {path} - verdict NOT recorded. "
+              f"The mjlab log dir and the progress run id have diverged.")
         return
     meta = json.loads(path.read_text())
     meta["verdict"] = verdict
     meta["verdict_detail"] = detail
+    if checks is not None:
+        meta["verdict_checks"] = checks
+        meta["verdict_schema"] = VERDICT_SCHEMA
+        meta["verdict_at"] = datetime.now().isoformat(timespec="seconds")
+    if context is not None:
+        meta["verdict_context"] = context
     path.write_text(json.dumps(meta, indent=2))
+
+
+def verdict_of(meta: dict) -> dict:
+    """One run's verdict in a fixed shape, old format or new.
+
+    The single place the old/new fork is handled. Every page reads this rather
+    than testing for the field itself, so "this run predates structured
+    verdicts" is expressed once.
+
+    Deliberately does NOT parse verdict_detail. It looks parseable and it lies:
+    "stayed up for 30 s: 100%" carries no bar at all, and "covered 5 m: 6.03 m"
+    hides the bar inside the name, which changes whenever the bar does. A regex
+    over that yields a page that is confidently wrong.
+    """
+    checks = meta.get("verdict_checks")
+    return {
+        "verdict": meta.get("verdict", ""),
+        "detail": meta.get("verdict_detail", ""),
+        "at": meta.get("verdict_at", ""),
+        "schema": meta.get("verdict_schema", 0),
+        "structured": bool(checks),
+        "checks": checks or [],
+        "context": meta.get("verdict_context", {}),
+    }

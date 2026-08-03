@@ -50,6 +50,55 @@ const document = {
   addEventListener(){},
 };
 
+/* The overview page: same idea, different shape. It has no poll loop - it
+ * fetches once - so the boot call is cut by finding the fetch rather than a
+ * known pair of lines. */
+async function overviewPage() {
+  const html = fs.readFileSync(path.join(ROOT, "dashboard/overview.html"), "utf8");
+  const pagejs = fs.readFileSync(path.join(ROOT, "dashboard/page.js"), "utf8");
+  const whole = html.match(/<script>([\s\S]*?)<\/script>/g).pop()
+    .replace(/^<script>/, "").replace(/<\/script>$/, "");
+  const cut = whole.indexOf("fetch(\"/api/overview\")");
+  const src = cut > 0 ? whole.slice(0, cut) : whole;
+
+  const state = await get("http://127.0.0.1:8000/api/overview");
+  const el = () => ({
+    innerHTML: "", insertAdjacentHTML() {}, querySelector: () => null,
+    querySelectorAll: () => [], addEventListener() {}, dataset: {},
+    classList: { toggle() {}, add() {}, remove() {} }, scrollIntoView() {},
+  });
+  const sandbox = {
+    document: { querySelector: el, querySelectorAll: () => [], getElementById: el,
+                addEventListener() {}, title: "" },
+    window: { addEventListener() {} }, location: { hash: "" },
+    history: { replaceState() {} }, console,
+    CSS: { escape: (s) => s }, encodeURIComponent,
+    fetch: () => Promise.resolve({ ok: true, json: async () => ({}) }),
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(pagejs, sandbox);
+  vm.runInContext(src, sandbox);
+  vm.runInContext("Object.assign(S, __state)",
+    Object.assign(sandbox, { __state: state }));
+
+  let bad = 0;
+  console.log("\noverview.html:");
+  for (const fn of ["strip", "verdictPanel", "boardPanel", "trendPanel",
+                    "leftPanel", "unknownPanel"]) {
+    try {
+      const out = vm.runInContext(`${fn}()`, sandbox);
+      if (typeof out !== "string") throw new Error(`returned ${typeof out}`);
+      const junk = out.match(/undefined|\[object Object\]/);
+      console.log(`  ok   ${fn.padEnd(14)} ${String(out.length).padStart(6)} chars` +
+                  (junk ? `   WARN contains "${junk[0]}"` : ""));
+    } catch (e) {
+      bad++;
+      console.log(`  FAIL ${fn}: ${e.message}`);
+    }
+  }
+  return bad;
+}
+
 async function main() {
   const html = fs.readFileSync(path.join(ROOT, "dashboard/monitor.html"), "utf8");
   const m = html.match(/<script>([\s\S]*?)<\/script>/);
@@ -134,6 +183,8 @@ async function main() {
       console.log(`  ok   ${name.padEnd(14)} ${String(out).length} chars`);
     } catch (e) { bad++; console.log(`  FAIL ${name}: ${e.message}`); }
   }
+
+  bad += await overviewPage();
 
   console.log(bad ? `\n${bad} FAILURES` : "\nevery panel renders");
   process.exit(bad ? 1 : 0);

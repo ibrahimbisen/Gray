@@ -96,7 +96,7 @@ def trained_under(log_dir: Path) -> dict:
         return {}
 
 
-def report_drift(log_dir: Path, cfg) -> None:
+def report_drift(log_dir: Path, cfg) -> list[str]:
     """Say so when the task has changed since the run was trained.
 
     Scoring a policy against a task that has moved under it is not a verdict on
@@ -106,7 +106,7 @@ def report_drift(log_dir: Path, cfg) -> None:
     """
     was = trained_under(log_dir)
     if not was:
-        return
+        return []
     drift = []
 
     def numbers(x):
@@ -139,6 +139,10 @@ def report_drift(log_dir: Path, cfg) -> None:
         print("\n".join(drift))
         print("  The result below answers how this policy copes with today's task,")
         print("  not whether it passed the one it was trained for.\n")
+    # Returned as well as printed. Until now this only reached a job log nobody
+    # reads, so a verdict measured against a task that had moved sat unmarked
+    # beside verdicts that had not - and walk_m3100_b is exactly that case.
+    return drift
 
 
 def main() -> int:
@@ -243,17 +247,27 @@ def main() -> int:
     print(f"checkpoint  {ckpt.relative_to(ROOT)}")
     print(f"tested      {args.robots} robots, {seconds:.0f} s each, "
           f"target trunk height {target*1000:.1f} mm\n")
-    report_drift(log_dir, env_cfg)
+    drift_lines = report_drift(log_dir, env_cfg)
 
+    # (key, name, measured, bar, direction, worst, format, unit)
+    #
+    # `key` is a STABLE id and is deliberately not derived from `name`. The name
+    # has the bar number baked into it - "trunk within 40 mm of target" becomes
+    # "within 5 mm" the moment the tolerance changes - so it can never be used to
+    # match the same criterion across two runs. The key can.
     checks = [
-        (f"stayed up for {seconds:.0f} s", survived, spec["bar_survive"], "ge",
-         f"{int(fell.sum())} of {args.robots} fell", "{:.0%}"),
-        (f"trunk within {spec['bar_err_mm']:.0f} mm of target",
+        ("survive", f"stayed up for {seconds:.0f} s", survived,
+         spec["bar_survive"], "ge",
+         float(args.robots - int(fell.sum())) / args.robots,
+         "{:.0%}", "fraction", f"{int(fell.sum())} of {args.robots} fell"),
+        ("height_err", f"trunk within {spec['bar_err_mm']:.0f} mm of target",
          float(err_mm.mean()), spec["bar_err_mm"], "le",
-         f"worst {float(err_mm.max()):.1f} mm", "{:.2f} mm"),
-        (f"uprightness above {spec['bar_upright']}",
+         float(err_mm.max()), "{:.2f} mm", "mm",
+         f"worst {float(err_mm.max()):.1f} mm"),
+        ("upright", f"uprightness above {spec['bar_upright']}",
          float(up_alive.mean()), spec["bar_upright"], "ge",
-         f"worst {float(up_alive.min()):.4f}", "{:.4f}"),
+         float(up_alive.min()), "{:.4f}", "ratio",
+         f"worst {float(up_alive.min()):.4f}"),
     ]
 
     # Walking has three more, and they are the ones that actually say it walked.
@@ -274,21 +288,25 @@ def main() -> int:
         v_alive = v[:, alive] if bool(alive.any()) else v
         speed_err = (v_alive - spec["test_speed"]).abs()
         checks += [
-            (f"covered {spec['bar_distance_m']:.0f} m",
+            ("distance", f"covered {spec['bar_distance_m']:.0f} m",
              float(fwd.mean()), spec["bar_distance_m"], "ge",
-             f"worst {float(fwd.min()):.2f} m", "{:.2f} m"),
-            (f"speed within {spec['bar_speed_err']:.2f} m/s of {spec['test_speed']}",
+             float(fwd.min()), "{:.2f} m", "m",
+             f"worst {float(fwd.min()):.2f} m"),
+            ("speed_err",
+             f"speed within {spec['bar_speed_err']:.2f} m/s of {spec['test_speed']}",
              float(speed_err.mean()), spec["bar_speed_err"], "le",
-             f"worst {float(speed_err.max()):.3f} m/s", "{:.3f} m/s"),
-            (f"sideways drift under {spec['bar_drift_mm']:.0f} mm",
+             float(speed_err.max()), "{:.3f} m/s", "m/s",
+             f"worst {float(speed_err.max()):.3f} m/s"),
+            ("drift", f"sideways drift under {spec['bar_drift_mm']:.0f} mm",
              float(side.abs().mean() * 1000), spec["bar_drift_mm"], "le",
-             f"worst {float(side.abs().max() * 1000):.0f} mm", "{:.1f} mm"),
+             float(side.abs().max() * 1000), "{:.1f} mm", "mm",
+             f"worst {float(side.abs().max() * 1000):.0f} mm"),
         ]
 
     passed = True
     print(f"{'check':<32} {'measured':>12}  {'bar':>7}")
     print("-" * 78)
-    for name, got, bar, how, note, fmt in checks:
+    for _key, name, got, bar, how, _worst, fmt, _unit, note in checks:
         ok = got >= bar if how == "ge" else got <= bar
         passed &= ok
         print(f"{name:<32} {fmt.format(got):>12}  {bar:>7}   "
@@ -299,13 +317,61 @@ def main() -> int:
 
     # Record it on the run itself. Training finishing and a stage being passed
     # are different things, and the dashboard shows them as different things.
+    #
+    # The prose line is kept byte-identical - it is what older runs have and what
+    # the run page prints. The STRUCTURE goes alongside it. Flattening six
+    # measurements, six bars and six verdicts into one sentence is what stopped
+    # any page being able to answer "how far off are we, and is it closing".
     try:
         from dashboard import runs as runs_mod  # noqa: PLC0415
 
         detail = " · ".join(
-            f"{name}: {fmt.format(got)}" for name, got, _, _, _, fmt in checks)
-        runs_mod.set_verdict(log_dir.name, "passed" if passed else "not passed",
-                             f"{args.robots} robots x {seconds:.0f} s - {detail}")
+            f"{name}: {fmt.format(got)}"
+            for _k, name, got, _b, _h, _w, fmt, _u, _n in checks)
+
+        rows = []
+        for key, name, got, bar, how, worst, fmt, unit, note in checks:
+            ok = got >= bar if how == "ge" else got <= bar
+            # Normalised distance to the bar, in the same direction for every
+            # criterion: 1.0 is exactly at the bar, above 1.0 passes. That is
+            # what makes drift and distance comparable on one axis. None rather
+            # than infinity when a division would blow up - the page shows
+            # "unknown", which is true, instead of a number that is not.
+            if how == "ge":
+                ratio = (got / bar) if bar else None
+                margin = got - bar
+            else:
+                ratio = (bar / got) if got else None
+                margin = bar - got
+            rows.append({
+                "key": key, "name": name,
+                "measured": got, "bar": bar,
+                "unit": unit,
+                "better": "higher" if how == "ge" else "lower",
+                "passed": bool(ok),
+                "worst": worst,
+                "margin": margin,
+                "ratio": ratio,
+                "note": note,
+                "format": fmt,
+            })
+
+        runs_mod.set_verdict(
+            log_dir.name, "passed" if passed else "not passed",
+            f"{args.robots} robots x {seconds:.0f} s - {detail}",
+            checks=rows,
+            context={
+                "task": args.task,
+                "checkpoint": str(ckpt.relative_to(ROOT)).replace("\\", "/"),
+                "robots": args.robots,
+                "seconds": seconds,
+                "target_height_m": target,
+                "test_speed": spec.get("test_speed"),
+                # Whether the task moved under the policy since it trained. A
+                # verdict measured against a changed task answers a different
+                # question, and the page has to be able to say so.
+                "drift": drift_lines,
+            })
         print(f"recorded on the run: {log_dir.name}")
     except Exception as exc:  # noqa: BLE001
         print(f"could not record the verdict: {exc}")

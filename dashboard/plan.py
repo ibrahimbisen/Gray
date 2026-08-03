@@ -749,6 +749,46 @@ FEASIBILITY = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Which verifier tasks feed which subsection.
+#
+# This CANNOT be derived from anything on disk and has to be written by hand.
+# run.json carries a `stage` number, but it is legacy from scripts/train.py -
+# Stand is 1, Push is 2, Walk is 5 - and in today's STAGES, built from
+# skills.SUBSECTIONS, index 5 is C1 "fit for the real robot". Joining on it
+# would file every walking run under a constraint. Join on `task`.
+#
+# All three current tasks feed R1, because standing, being shoved and walking
+# are the same policy at different commands - which is the whole argument for
+# folding them into one run in the first place.
+# ---------------------------------------------------------------------------
+
+SUBSECTION_TASKS = {
+    "walk": ["Gray-Stand", "Gray-Push", "Gray-Walk"],
+    "recover": [],   # no verifier written yet
+    "tool": [],
+    "robust": [],    # a dial, not a run - see skills.py
+    "quality": [],   # a constraint, checked continuously, never "passed"
+    "chain": [],
+    "measure": [],   # its bar is explicitly "not a bar, a number written down"
+    "flight": [],    # parked
+    "see": [],       # parked
+}
+
+# Clauses of a bar that NOTHING measures, listed so the page can show them as
+# unknown rather than quietly dropping them. An unlisted clause is worse than a
+# failing one: it makes the count look complete.
+UNVERIFIED_CLAUSES = {
+    "walk": [
+        "holds any commanded height and attitude at zero speed for 30 s - the "
+        "command vector has no height, pitch or roll in it yet, so nothing can "
+        "ask for this",
+        "three-legged and two-legged diagonal stances, and holding one leg out - "
+        "these need a per-foot command that does not exist",
+    ],
+}
+
+
 def stage2_state() -> dict:
     """Stage 2 with the live skill library folded in."""
     lib = skills.load()

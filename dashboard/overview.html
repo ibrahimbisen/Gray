@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gray &mdash; overview</title>
+<link rel="stylesheet" href="/page.css">
+<style>
+  /* Distance to bar, as a multiple. Log scale, fixed domain 0.1x to 100x, so the
+     bar line sits at the same place in every row and rows are comparable by eye.
+     A linear "percent of bar" would put a criterion at 4% of where it needs to be
+     almost at the left edge of a bar that reads as nearly full. */
+  .track { position:relative; height:16px; min-width:150px; }
+  .track .axis { position:absolute; left:0; right:0; top:7px; height:1px;
+                 background:var(--line); }
+  .track .barline { position:absolute; top:1px; width:1px; height:14px;
+                    background:var(--accent); margin:0; padding:0; border:0; }
+  .track .dot { position:absolute; top:3px; width:9px; height:9px; border-radius:50%;
+                margin-left:-4.5px; }
+  .track .dot.ok  { background:var(--ok); }
+  .track .dot.bad { background:var(--bad); }
+  .track .dot.drifted { outline:1.5px dashed var(--warn); outline-offset:1.5px; }
+  .track .ghost { position:absolute; top:3px; width:9px; height:9px; border-radius:50%;
+                  margin-left:-4.5px; border:1.5px solid var(--faint); }
+  .scale { display:flex; justify-content:space-between; font-size:10px;
+           color:var(--faint); margin-top:2px; }
+
+  .huge { font-size:38px; font-weight:650; letter-spacing:-.03em; line-height:1.1;
+          margin:2px 0 6px; }
+  .huge.bad { color:var(--bad); } .huge.ok { color:var(--ok); }
+  .counts { display:flex; gap:22px; flex-wrap:wrap; margin-top:10px; }
+  .counts div { font-size:12.5px; color:var(--dim); }
+  .counts b { display:block; font-size:22px; color:var(--ink); font-weight:600; }
+  .strip { display:flex; gap:14px; align-items:center; flex-wrap:wrap;
+           font-size:12.5px; color:var(--dim); border:1px solid var(--line);
+           border-radius:9px; padding:9px 13px; margin-bottom:18px; }
+  .strip b { color:var(--ink); }
+  .dotlive { width:7px; height:7px; border-radius:50%; background:var(--accent);
+             display:inline-block; }
+  .dotdead { width:7px; height:7px; border-radius:50%; background:var(--bad);
+             display:inline-block; }
+  .spark { display:block; height:34px; width:100%; }
+</style>
+</head>
+<body>
+<div class="top" id="top"></div>
+<div class="shell">
+  <div class="side"></div>
+  <div class="main"></div>
+</div>
+
+<script src="/page.js"></script>
+<script>
+const S = {};
+
+const fmtNum = (v, dp) => (v === null || v === undefined || isNaN(v))
+  ? "&mdash;" : (+v).toFixed(dp === undefined ? 2 : dp);
+
+/* A failing criterion is reported as how many TIMES over its bar it is.
+   ratio is 1.0 at the bar and above 1.0 passing, so 1/ratio is the multiple. */
+function timesOver(c){
+  if(c.ratio === null || c.ratio === undefined || c.ratio <= 0) return null;
+  return c.ratio >= 1 ? null : (1 / c.ratio);
+}
+
+function fmtValue(v, unit){
+  if(v === null || v === undefined) return "&mdash;";
+  if(unit === "fraction") return (v * 100).toFixed(0) + "%";
+  if(unit === "ratio") return (+v).toFixed(4);
+  if(unit === "mm") return (+v).toFixed(1) + " mm";
+  if(unit === "m") return (+v).toFixed(2) + " m";
+  if(unit === "m/s") return (+v).toFixed(3) + " m/s";
+  return String(v);
+}
+
+/* log10(ratio) mapped onto a fixed 0.1x - 100x domain. The bar sits at 1.0,
+   which is one third along, always. */
+function trackPos(ratio){
+  if(!ratio || ratio <= 0) return null;
+  const l = Math.log10(ratio);            // -1 .. +2
+  return Math.max(0, Math.min(100, ((l + 1) / 3) * 100));
+}
+
+function track(c){
+  const pos = trackPos(c.ratio);
+  const latestPos = trackPos(c.latest_ratio);
+  if(pos === null) return `<span class="muted small">no scale</span>`;
+  const ok = c.passes_current_bar;
+  const drift = c.drifted_runs ? " drifted" : "";
+  // The ghost is the BEST ever seen; the solid dot is the latest. Only drawn
+  // when they differ - a page that shows best-ever by default hides regressions.
+  const ghost = (latestPos !== null && Math.abs(latestPos - pos) > 1.5)
+    ? `<span class="ghost" style="left:${pos}%" title="best seen"></span>` : "";
+  const solid = latestPos === null ? pos : latestPos;
+  return `<div class="track">
+      <div class="axis"></div>
+      <div class="barline" style="left:33.3%"></div>
+      ${ghost}
+      <span class="dot ${ok ? "ok" : "bad"}${drift}" style="left:${solid}%"></span>
+    </div>`;
+}
+
+/* ---------------- panels ---------------- */
+
+function strip(){
+  const q = S.queue, run = S.running;
+  return `<div class="strip">
+    <span>${q.runner.alive ? '<span class="dotlive"></span> runner up'
+                           : '<span class="dotdead"></span> <b>runner down</b>'}</span>
+    ${run ? `<span><b>${esc(run.variant)}</b> training &middot;
+      ${Math.round(100 * run.progress)}% of ${run.iterations_target.toLocaleString()}</span>`
+          : `<span>nothing training</span>`}
+    <span>${q.queued.length} queued${q.paused ? " &middot; <b>PAUSED</b>" : ""}</span>
+    <div class="sp" style="flex:1"></div>
+    <a class="plain small" href="/#queue">Queue &rarr;</a>
+  </div>`;
+}
+
+function verdictPanel(){
+  const o = S.progress, h = o.headline;
+  const head = h
+    ? `<div class="eyebrow">${esc(h.sub)} &middot; ${esc(h.sub_name)}</div>
+       <div class="huge bad">${esc(h.name)} is ${fmtNum(h.times_over, 1)}&times; over its bar</div>
+       <p class="lede">${fmtValue(h.latest, h.unit)} measured against a bar of
+         ${fmtValue(h.bar, h.unit)}, from <b>${esc(h.latest_label)}</b>.</p>`
+    : `<div class="eyebrow">Nothing measured yet</div>
+       <div class="huge">No structured verdict on any run</div>
+       <p class="lede">Runs verified before the verdict format changed carry only a
+         prose line, which cannot be compared or charted. The next run to finish
+         produces the first comparable numbers.</p>`;
+
+  const met = o.subsections.reduce((a, s) => a + s.met, 0);
+  const fail = o.subsections.reduce((a, s) => a + s.failing, 0);
+  const never = o.subsections.reduce((a, s) => a + s.never_measured, 0);
+
+  return `${head}
+    <div class="counts">
+      <div><b>${met}</b>criteria met</div>
+      <div><b>${fail}</b>failing</div>
+      <div><b>${never}</b>never measured</div>
+      <div><b>${o.runs_structured}</b>of ${o.runs_total} runs comparable</div>
+    </div>
+    <div class="note small" style="margin-top:16px">Three numbers, never one. There is
+      no project percentage on this page on purpose: ${met} of ${met + fail} criteria
+      met reads as good progress for a robot whose worst criterion is
+      ${h ? fmtNum(h.times_over, 0) + "&times;" : "many times"} over its bar. And
+      "never measured" is not a zero &mdash; most of it is criteria no verifier
+      exists for.</div>
+    <div class="note small">${o.runs_total} run folders exist; ${o.runs_verified}
+      have any verdict at all. The rest are smoke tests, cancellations and runs that
+      were interrupted. Counting folders as attempts would overstate everything.</div>`;
+}
+
+function boardPanel(){
+  const rows = [];
+  for(const s of S.progress.subsections)
+    for(const c of s.criteria) rows.push({...c, sub: s.id});
+  if(!rows.length)
+    return `<div class="eyebrow">Stage 2</div><h1>The bar board</h1>
+      <div class="note">Nothing has produced a structured verdict yet. The board
+      fills in as runs finish.</div>`;
+
+  rows.sort((a, b) => (a.ratio || 99) - (b.ratio || 99));
+  const anyDrift = rows.some(r => r.drifted_runs);
+  return `<div class="eyebrow">Stage 2</div>
+    <h1>The bar board</h1>
+    <p class="lede">Every criterion any run has measured, worst first. Distance is
+      shown as a multiple of the bar, not a percentage.</p>
+    <div class="card">
+      <div class="tw"><table>
+        <tr><th>Criterion</th><th>Task</th><th class="n">Measured</th>
+            <th class="n">Bar</th><th class="n">Worst robot</th>
+            <th style="min-width:170px">Distance
+              <div class="scale" style="font-weight:400"><span>0.1&times;</span>
+              <span style="color:var(--accent)">bar</span><span>100&times;</span></div>
+            </th><th>Verdict</th></tr>
+        ${rows.map(c => {
+          const over = timesOver(c);
+          return `<tr>
+            <td><b>${esc(c.name)}</b>
+              ${c.n > 1 ? `<div class="dim small">${c.n} measurements</div>` : ""}</td>
+            <td class="dim small">${esc((c.task || "").replace("Gray-", ""))}</td>
+            <td class="n">${fmtValue(c.latest, c.unit)}</td>
+            <td class="n dim">${fmtValue(c.bar, c.unit)}</td>
+            <td class="n dim">${fmtValue(c.worst_seen, c.unit)}</td>
+            <td>${track(c)}</td>
+            <td>${c.passes_current_bar
+                  ? `<span class="chip ok">met</span>`
+                  : `<span class="chip warn">${over ? fmtNum(over, 1) + "&times; over" : "failing"}</span>`}
+                ${c.stale ? `<span class="chip">bar moved</span>` : ""}
+                ${c.drifted_runs ? `<span class="chip warn">task drifted</span>` : ""}</td>
+          </tr>`;
+        }).join("")}
+      </table></div>
+      <div class="note small" style="margin-top:14px"><b>These came from different
+        policies.</b> Standing, being shoved and walking were each measured on a
+        different policy file. R1's bar asks ONE policy to meet all of them, and no
+        single policy has been measured against all of them yet.</div>
+      ${anyDrift ? `<div class="risk small"><b>Task drifted.</b> A dashed outline
+        means that run was scored against a task that had changed since it trained.
+        Its numbers answer a different question and should not be read beside the
+        others without noticing.</div>` : ""}
+    </div>`;
+}
+
+function trendPanel(){
+  const withHistory = [];
+  for(const s of S.progress.subsections)
+    for(const c of s.criteria) if(c.n >= 2) withHistory.push(c);
+  if(!withHistory.length)
+    return `<div class="eyebrow">Stage 2</div><h1>Is the gap closing?</h1>
+      <div class="note">Needs at least two structured verdicts for a criterion.
+      There ${S.progress.runs_structured === 1 ? "is 1" : "are " + S.progress.runs_structured}
+      so far.</div>`;
+
+  return `<div class="eyebrow">Stage 2</div>
+    <h1>Is the gap closing?</h1>
+    <p class="lede">One panel per criterion with more than one measurement, in the
+      order the runs were verified. The line at 1.0 is the bar.</p>
+    <div class="cols tight">
+      ${withHistory.map(c => {
+        const pts = c.history.filter(p => typeof p.value === "number");
+        const ratios = pts.map(p => {
+          const r = c.better === "higher" ? (p.value / p.bar) : (p.bar / p.value);
+          return isFinite(r) && r > 0 ? r : null;
+        });
+        const usable = ratios.filter(r => r !== null);
+        if(usable.length < 2) return "";
+        const W = 300, H = 34, PAD = 4;
+        const xs = pts.map((_, i) => PAD + (W - 2 * PAD) * (i / (pts.length - 1)));
+        const lo = Math.log10(Math.min(...usable, 1) * 0.7);
+        const hi = Math.log10(Math.max(...usable, 1) * 1.4);
+        const y = r => PAD + (H - 2 * PAD) * (1 - (Math.log10(r) - lo) / ((hi - lo) || 1));
+        const d = ratios.map((r, i) => r === null ? null
+          : `${i ? "L" : "M"}${xs[i].toFixed(1)},${y(r).toFixed(1)}`).filter(Boolean).join("");
+        return `<div class="card">
+          <h3>${esc(c.name)}
+            <span class="chip ${c.passes_current_bar ? "ok" : "warn"}"
+              style="margin-left:auto">${c.passes_current_bar ? "met"
+              : fmtNum(timesOver(c), 1) + "&times; over"}</span></h3>
+          <svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
+               role="img" aria-label="${esc(c.name)} against its bar over ${pts.length} runs">
+            <line x1="0" x2="${W}" y1="${y(1).toFixed(1)}" y2="${y(1).toFixed(1)}"
+                  stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 3"
+                  vector-effect="non-scaling-stroke"/>
+            <path d="${d}" fill="none" stroke="var(--ink2, #a8adb8)" stroke-width="2"
+                  vector-effect="non-scaling-stroke"/>
+            ${ratios.map((r, i) => r === null ? "" :
+              `<circle cx="${xs[i].toFixed(1)}" cy="${y(r).toFixed(1)}" r="3"
+                 fill="${pts[i].passed ? "var(--ok)" : "var(--bad)"}"/>`).join("")}
+          </svg>
+          <div class="tw"><table>
+            <tr><th>Run</th><th class="n">Measured</th><th class="n">Bar</th><th></th></tr>
+            ${pts.map(p => `<tr><td>${esc(p.label)}</td>
+              <td class="n">${fmtValue(p.value, c.unit)}</td>
+              <td class="n dim">${fmtValue(p.bar, c.unit)}</td>
+              <td>${p.passed ? `<span class="chip ok">met</span>`
+                             : `<span class="chip warn">failing</span>`}</td></tr>`).join("")}
+          </table></div>
+        </div>`;
+      }).join("")}
+    </div>
+    <div class="note small" style="margin-top:14px">No trend line is drawn. With a
+      handful of points whose spread is larger than the bar itself, a slope would be
+      a claim the data cannot support &mdash; and it would read as "improving" from
+      any two runs that happened to fall the right way.</div>`;
+}
+
+function leftPanel(){
+  const subs = S.progress.subsections;
+  const order = {run: 0, axis: 1, constraint: 2, test: 3, parked: 4};
+  const sorted = [...subs].sort((a, b) => order[a.kind] - order[b.kind]);
+  return `<div class="eyebrow">What is left</div>
+    <h1>What is left, in units that are real</h1>
+    <p class="lede">The unit of work is a training run, and there are three. The
+      rest are dials, constraints, tests and parked items &mdash; counted
+      separately, never summed.</p>
+    <div class="card">
+      <div class="tw"><table>
+        <tr><th class="n"></th><th>Item</th><th>Kind</th><th>State</th>
+            <th>Blocked by</th></tr>
+        ${sorted.map(s => `<tr>
+          <td class="n"><span class="chip" style="font-family:ui-monospace">${esc(s.id)}</span></td>
+          <td><b>${esc(s.name)}</b>
+            <div class="dim small">${esc(s.bar_prose || s.rule)}</div>
+            ${s.trigger ? `<div class="small" style="color:var(--warn)">
+              un-parks when: ${esc(s.trigger)}</div>` : ""}
+            ${s.gap ? `<div class="small" style="color:var(--warn)">gap: ${esc(s.gap)}</div>` : ""}</td>
+          <td class="dim small">${esc(s.kind)}</td>
+          <td class="dim small">${esc(s.state)}</td>
+          <td class="dim small">${esc(S.blockers[s.key] || "")}</td>
+        </tr>`).join("")}
+      </table></div>
+    </div>
+    <div class="cols" style="margin-top:14px">
+      <div class="card">
+        <h3>Startable right now</h3>
+        ${S.startable.length
+          ? S.startable.map(x => `<div class="risk small"><b>${esc(x.what)}</b><br>
+              ${esc(x.why)}</div>`).join("")
+          : `<p class="small dim">Nothing &mdash; everything is waiting on something.</p>`}
+      </div>
+      <div class="card">
+        <h3>The loop back to stage 1</h3>
+        <p class="why small">Stage 3 measures what stage 1 is guessing, which is why
+          it is not last.</p>
+        <div class="tw"><table>
+          <tr><th class="n">From</th><th>What it measures</th></tr>
+          ${S.loop.edges.map(e => `<tr>
+            <td class="n"><span class="chip">${esc(e.from)}</span></td>
+            <td><b>${esc(e.what)}</b><div class="dim small">feeds ${esc(e.to)}</div></td>
+          </tr>`).join("")}
+        </table></div>
+      </div>
+    </div>`;
+}
+
+function unknownPanel(){
+  const rows = [];
+  for(const s of S.progress.subsections){
+    for(const u of s.unmeasured)
+      rows.push({sub: s.id, what: u.name + " (" + (u.task || "").replace("Gray-", "") + ")",
+                 why: "the bar defines it but no run has measured it"});
+    for(const cl of s.unverified_clauses)
+      rows.push({sub: s.id, what: cl.split(" - ")[0], why: cl.split(" - ").slice(1).join(" - ")});
+    if(!s.verifiable)
+      rows.push({sub: s.id, what: s.name + " &mdash; the whole bar",
+                 why: "no verifier exists for this subsection"});
+  }
+  for(const o of S.stage1_open) rows.push({sub: "1", what: o.q, why: o.n});
+
+  return `<div class="eyebrow">Honesty</div>
+    <h1>What this page does not know</h1>
+    <p class="lede">The counterweight to the board. Without this, "criteria met"
+      reads as a fraction of the whole job &mdash; and most of the job has never
+      been measured at all.</p>
+    <div class="card">
+      <div class="tw scroller" style="max-height:60vh"><table>
+        <tr><th class="n"></th><th>Not known</th><th>Why</th></tr>
+        ${rows.map(r => `<tr>
+          <td class="n"><span class="chip">${esc(r.sub)}</span></td>
+          <td>${r.what}</td>
+          <td class="dim small">${esc(r.why)}</td></tr>`).join("")}
+      </table></div>
+    </div>`;
+}
+
+/* ---------------- boot ---------------- */
+
+function draw(){
+  document.getElementById("top").innerHTML = topbar("/overview",
+    S.progress.headline
+      ? `${esc(S.progress.headline.name)} ${fmtNum(S.progress.headline.times_over, 1)}&times; over bar`
+      : "nothing measured yet");
+  if(S.progress.headline)
+    document.title = `Gray — ${S.progress.headline.name} ${
+      fmtNum(S.progress.headline.times_over, 1)}× over bar`;
+
+  document.querySelector(".main").insertAdjacentHTML("afterbegin", "");
+  shell([
+    {id: "verdict", label: "Where it stands", html: () => strip() + verdictPanel()},
+    {id: "board", label: "The bar board",
+     count: S.progress.subsections.reduce((a, s) => a + s.criteria.length, 0) || null,
+     html: () => strip() + boardPanel()},
+    {id: "trend", label: "Is the gap closing", html: () => strip() + trendPanel()},
+    {id: "left", label: "What is left", html: () => strip() + leftPanel()},
+    {id: "unknown", label: "What is not known", html: () => strip() + unknownPanel()},
+  ]);
+}
+
+fetch("/api/overview").then(r => r.json()).then(s => {
+  Object.assign(S, s);
+  draw();
+}).catch(fail);
+</script>
+</body>
+</html>
