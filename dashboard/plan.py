@@ -221,6 +221,10 @@ STAGES = [
 # ---------------------------------------------------------------------------
 
 SCORING_INTRO = [
+    "The proper name for this is the reward function. Its parts are reward terms, "
+    "the multipliers on them are weights, and a term with a negative weight is a "
+    "penalty. Those are the words used everywhere else, so they are worth "
+    "knowing - but nothing below depends on them.",
     "Fifty times a second, the robot is given a score for what it just did. Good "
     "behaviour adds points, bad behaviour subtracts them. The scores are added up "
     "over an attempt, and the training process pushes the controller toward whatever "

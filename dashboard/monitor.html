@@ -447,7 +447,9 @@ function scoring(run){
   const table = (rows, positive) => `
     <div class="card wrapx">
       <table>
-        <tr><th>${positive ? "Earns points for" : "Loses points for"}</th>
+        <tr><th>${positive ? "Rewards" : "Penalties"}
+              <span style="text-transform:none;letter-spacing:0;font-weight:400">
+                &mdash; ${positive ? "earn" : "lose"} points</span></th>
             <th style="text-align:right">weight</th></tr>
         ${rows.map(t => `<tr>
           <td><b style="color:${positive ? "var(--good)" : "var(--crit)"}">${
@@ -458,12 +460,23 @@ function scoring(run){
       </table>
     </div>`;
 
+  // The ceiling is worth showing beside the terms: it is what makes the reward
+  // number mean something rather than being an arbitrary score. See RULES.md.
+  const perSec = earns.reduce((a, t) => a + t.weight, 0);
   return `<section>
-    <div class="sech"><h2>How points are given</h2><div class="grow"></div>
+    <div class="sech"><h2>Reward function</h2>
+      <span style="font-size:11.5px;color:var(--muted)">what earns and loses points,
+        every 1/50 s</span>
+      <div class="grow"></div>
       <a class="btn" href="/summary#scoring">Why each term exists &rarr;</a></div>
     <div class="twocol">
       ${table(earns, true)}
       ${table(loses, false)}
+    </div>
+    <div class="sub" style="margin-top:8px">
+      The rewards are capped at 1.0 each, so the most an episode can score is
+      <b>${perSec.toFixed(1)} per second</b>. Training stops at 98% of that
+      &mdash; past there only the penalties have any room left to move.
     </div>
   </section>`;
 }
