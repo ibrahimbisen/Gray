@@ -18,6 +18,7 @@ function topbar(active, right) {
     <div class="brand">Gray</div>
     ${link("/", "Overview")}
     ${link("/runs", "Runs")}
+    ${link("/week", "The week")}
     ${link("/summary", "Summary")}
     ${link("/stage1", "1 &middot; Prepare")}
     ${link("/stage2", "2 &middot; Train")}

@@ -115,6 +115,61 @@ def summary_state() -> dict:
     }
 
 
+def week_state() -> dict:
+    """The week's programme, with the live queue and results folded in.
+
+    The design lives in plan.WEEK; the runs live in the queue and in
+    progress/runs/. This joins them by name, so the page shows what was planned
+    against what actually happened rather than two lists that drift apart.
+    """
+    _reload_if_edited()
+    q = queue.load()
+    summaries = runs.all_summaries()
+    by_name = {r.get("variant") or r.get("name"): r for r in summaries}
+
+    # Jobs this programme queued, grouped by the round their name encodes.
+    rounds = []
+    for spec in plan.WEEK["rounds"]:
+        prefix = "w" + spec["id"][1:]
+        jobs = []
+        for job in q["jobs"]:
+            name = str(job.get("name") or "")
+            if not name.startswith(prefix):
+                continue
+            # A job carries `state`; a finished RUN carries `status`. They are
+            # different words for different things and mixing them up here
+            # silently reported every job as not queued.
+            done = by_name.get(name) or {}
+            jobs.append({
+                "name": name,
+                "note": job.get("note", ""),
+                "status": job.get("state", ""),
+                "seed": job.get("seed") or 0,
+                "command": job.get("command") or queue.command_line(job),
+                "verdict": done.get("verdict", ""),
+                "run_id": done.get("id", "") or job.get("run_id", ""),
+                "number": done.get("number"),
+                "iterations_done": done.get("iterations_done"),
+            })
+        rounds.append({**spec, "jobs": jobs,
+                       "queued_count": sum(1 for j in jobs
+                                           if j["status"] == "queued"),
+                       "done_count": sum(1 for j in jobs
+                                         if j["status"] == "done")})
+
+    live = next((r for r in summaries if r["status"] == "running"), None)
+    runner = q.get("runner") or {}
+    return {
+        **plan.WEEK,
+        "rounds": rounds,
+        "running": live,
+        "runner_up": bool(runner.get("alive")),
+        "paused": bool(q.get("paused")),
+        "queued_total": sum(1 for j in q["jobs"] if j.get("state") == "queued"),
+        "status": _bar_status(),
+    }
+
+
 def _bar_status() -> dict:
     """The three trained tasks against their bars, trimmed for the explainer."""
     over = progress.overview(runs.all_summaries())
@@ -346,6 +401,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._send(json.dumps(summary_state()).encode(), "application/json")
         if path == "/api/overview":
             return self._send(json.dumps(overview_state()).encode(), "application/json")
+        if path == "/api/week":
+            return self._send(json.dumps(week_state()).encode(), "application/json")
         if path == "/api/queue":
             _reload_if_edited()
             return self._send(json.dumps(queue.load()).encode(), "application/json")
@@ -397,6 +454,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                               "text/html; charset=utf-8")
         if path in ("/summary", "/summary.html", "/plan"):
             return self._send((HERE / "index.html").read_bytes(), "text/html; charset=utf-8")
+        if path in ("/week", "/programme"):
+            return self._send((HERE / "week.html").read_bytes(),
+                              "text/html; charset=utf-8")
         # The three project stages, each its own page.
         if path in ("/stage1", "/stage2", "/stage3"):
             return self._send((HERE / f"{path[1:]}.html").read_bytes(),

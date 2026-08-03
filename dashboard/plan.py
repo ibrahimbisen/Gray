@@ -1071,6 +1071,120 @@ def driven() -> dict:
             "source": str(newest.relative_to(ROOT)).replace("\\", "/")}
 
 
+# ---------------------------------------------------------------------------
+# The week. A designed set of experiments rather than a long run.
+#
+# The owner's ask: start training now, leave the machine going for about a week,
+# and come back to something better. The honest version of that is not one long
+# run - a run always starts from scratch, so repeating a config gives the same
+# answer twice. It is a TEST MATRIX: every run changes one declared thing, gets
+# scored against the same bar, and lands in a table you can read.
+#
+# What makes it work unattended is that the runner already claims jobs one at a
+# time and verify.py already scores each one. What it cannot do is design the
+# next round. So the machine runs continuously and the thinking happens between
+# rounds - which is what a DOE is, and the reason rounds get smaller as they go.
+# ---------------------------------------------------------------------------
+
+WEEK = {
+    "lede": "Continuous training for about a week, as a designed experiment "
+            "rather than one long run.",
+    "why": [
+        "A run always starts from scratch. There is no warm start yet, so "
+        "queueing the same config twice gives the same answer twice and a week "
+        "of it gives nothing a single run would not have.",
+        "So the week is a test matrix. Every run changes one declared thing, "
+        "every run is scored by verify.py against the same bar, and the result "
+        "is a table rather than an impression.",
+        "The one thing that has to be measured first is the NOISE FLOOR. Round 0 "
+        "runs the same config on three seeds. Whatever those three disagree by "
+        "is the number every later difference has to beat before it means "
+        "anything. Without it a sweep is just reading noise.",
+    ],
+    "at_a_glance": [
+        {"k": "Per run", "v": "~87 min", "n": "4,500 robots, 3,000 iterations"},
+        {"k": "Round 0 to 2", "v": "15 runs", "n": "queued now, about 23 hours"},
+        {"k": "A week holds", "v": "~115 runs", "n": "so there is room for 4 to 5 rounds"},
+        {"k": "Needs a person", "v": "between rounds", "n": "to read the table and design the next"},
+    ],
+    "rounds": [
+        {
+            "id": "R0", "name": "The fix, and the noise floor", "runs": 3,
+            "hours": 4.5,
+            "asks": "Did fixing `wandering` move drift at all - and by more than "
+                    "two identical runs differ from each other?",
+            "design": "One config, three seeds. Nothing varies but the random "
+                      "number stream.",
+            "reads": "If the three seeds land within a few hundred mm of each "
+                     "other and all well under 2,125 mm, the fix worked and the "
+                     "spread between them is the noise floor. If they scatter "
+                     "wildly, the noise floor is too high to sweep anything and "
+                     "the next job is reducing variance, not tuning weights.",
+        },
+        {
+            "id": "R1", "name": "The two straightness terms", "runs": 8,
+            "hours": 12.0,
+            "asks": "Now that both terms measure the same line, how hard should "
+                    "each one push?",
+            "design": "Full 2x2x2 on wandering, the veering ramp, and skidding. "
+                      "A factorial rather than one-at-a-time, because these three "
+                      "interact - wandering and veering were fighting each other "
+                      "until today, and one-at-a-time cannot see that.",
+            "reads": "Which corner has the lowest drift, and whether any pair "
+                     "matters more together than separately.",
+        },
+        {
+            "id": "R2", "name": "The speed bar", "runs": 4,
+            "hours": 6.0,
+            "asks": "Speed error is 0.071 m/s against a 0.05 bar. Does paying "
+                    "more for speed close it, or does it just trade drift for "
+                    "speed?",
+            "design": "2x2 on track_speed and ground_covered. Independent of "
+                      "R1, so it is queued alongside rather than after.",
+            "reads": "Whether the two bars are in tension. If every run that "
+                     "fixes speed worsens drift, the reward needs a different "
+                     "shape rather than different weights.",
+        },
+        {
+            "id": "R3", "name": "The winner, long and repeated", "runs": 3,
+            "hours": 9.0, "queued": False,
+            "asks": "Does the best config hold up at full length, and on seeds "
+                    "it has not seen?",
+            "design": "Best settings from R0 to R2, 6,000 iterations, three "
+                      "seeds. Designed after the earlier rounds are read.",
+            "reads": "If all three clear the bar, R1 is done. If one does, it "
+                     "was luck.",
+        },
+    ],
+    "rules": [
+        "One training process at a time. RULES.md rule 4, and the queue makes it "
+        "structural rather than something to remember.",
+        "Every run is verified when it finishes. A run nobody scored is a run "
+        "that did not happen.",
+        "Nothing in gray/tasks/ changes while a round is in flight. A weight "
+        "edited mid-round makes every run before it unreadable.",
+        "Films stay on. They cost about 4% of throughput at one clip per 100 "
+        "iterations, and they are the only way to see a robot doing something "
+        "the numbers do not describe.",
+    ],
+    "not_doing": [
+        {"what": "Stage 3.3, measuring the real servos",
+         "why": "The owner's call: not now. It stays the thing that settles the "
+                "three guessed numbers, and it is still the trigger for "
+                "un-parking jumping."},
+        {"what": "The CAD rebuild and the sensor mounts",
+         "why": "Not now either. Nothing in this week's plan waits on it - the "
+                "sensors are decided and recorded, and they go into the "
+                "observation as one batch when the mechanical work happens."},
+        {"what": "Widening the command range to backward and sideways",
+         "why": "Drift is failing on the narrowest range there is. Widening it "
+                "spreads a fixed number of draws over a harder problem and makes "
+                "the failing number worse. Also needs the _going_straight gate "
+                "fixed to abs(vx) first - see stage 2."},
+    ],
+}
+
+
 def stage2_state() -> dict:
     """Stage 2 with the live skill library folded in."""
     lib = skills.load()

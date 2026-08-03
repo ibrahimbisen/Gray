@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gray &mdash; the week</title>
+<link rel="stylesheet" href="/page.css">
+<style>
+/* The programme is a schedule, so it is laid out as one: rounds down the page,
+   each one a block of runs with a state. Reuses page.css's tokens - this is the
+   same dashboard, not a separate thing. */
+.round{ border:1px solid var(--line); border-radius:12px; overflow:hidden;
+        margin-bottom:16px; background:var(--panel); }
+.round > header{ display:grid; grid-template-columns:auto 1fr auto; gap:14px;
+  align-items:baseline; padding:16px 18px; border-bottom:1px solid var(--line);
+  background:var(--panel2); }
+.round .rid{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px;
+  font-weight:700; color:var(--accent); }
+.round h3{ margin:0; font-size:17px; letter-spacing:-.015em; }
+.round .meta{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:11.5px; color:var(--faint); font-variant-numeric:tabular-nums;
+  white-space:nowrap; }
+.round .body{ padding:16px 18px; }
+.qa{ display:grid; grid-template-columns:70px 1fr; gap:6px 12px; margin-bottom:14px;
+     font-size:13.5px; }
+.qa dt{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10.5px;
+  text-transform:uppercase; letter-spacing:.11em; color:var(--faint); padding-top:3px; }
+.qa dd{ margin:0; color:var(--dim); line-height:1.55; }
+.qa dd b{ color:var(--ink); }
+.jobs{ width:100%; border-collapse:collapse; font-size:12.5px; }
+.jobs th{ text-align:left; font-size:10px; text-transform:uppercase;
+  letter-spacing:.1em; color:var(--faint); padding:0 10px 7px 0;
+  border-bottom:1px solid var(--line); font-weight:600; }
+.jobs td{ padding:7px 10px 7px 0; border-bottom:1px solid var(--line);
+  vertical-align:top; }
+.jobs tr:last-child td{ border-bottom:0; }
+.jobs .nm{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; white-space:nowrap; }
+.jobs .cmd{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
+  color:var(--faint); word-break:break-all; }
+.st{ font-size:10px; text-transform:uppercase; letter-spacing:.09em; padding:2px 8px;
+  border-radius:99px; border:1px solid var(--line); color:var(--dim);
+  white-space:nowrap; display:inline-block; }
+.st.queued{ color:var(--dim); }
+.st.running{ color:var(--accent); border-color:color-mix(in srgb,var(--accent) 45%,transparent); }
+.st.done{ color:var(--ok); border-color:color-mix(in srgb,var(--ok) 40%,transparent); }
+.st.failed, .st.cancelled{ color:var(--bad);
+  border-color:color-mix(in srgb,var(--bad) 40%,transparent); }
+.st.notqueued{ color:var(--faint); border-style:dashed; }
+.banner{ border:1px solid var(--line); border-left-width:3px; border-radius:10px;
+  padding:14px 18px; margin-bottom:20px; background:var(--panel); }
+.banner.go{ border-left-color:var(--ok); }
+.banner.stop{ border-left-color:var(--bad); }
+.banner b{ display:block; margin-bottom:3px; }
+.banner p{ margin:0; color:var(--dim); font-size:13.5px; }
+</style>
+</head>
+<body>
+<div class="top" id="top"></div>
+<div class="shell">
+  <div class="side"></div>
+  <div class="main"></div>
+</div>
+
+<script src="/page.js"></script>
+<script>
+document.getElementById("top").innerHTML = topbar("/week", "Training programme");
+
+fetch("/api/week").then(r => r.json()).then(s => {
+
+const hours = s.rounds.reduce((a, r) => a + r.hours, 0);
+const totalRuns = s.rounds.reduce((a, r) => a + r.runs, 0);
+
+const jobRow = (j) => `<tr>
+  <td class="nm">${j.number ? `<a class="plain" href="/runs#${esc(j.run_id)}">#${j.number}</a> ` : ""}${esc(j.name)}</td>
+  <td><span class="st ${esc(j.status || "notqueued")}">${esc(j.status || "not queued")}</span></td>
+  <td class="dim">${j.seed ? `seed ${j.seed}` : ""}</td>
+  <td class="dim">${j.verdict ? esc(j.verdict) : j.iterations_done
+      ? `${j.iterations_done.toLocaleString()} iterations` : "&mdash;"}</td>
+  <td class="cmd">${esc((j.command || "").replace("python scripts/train.py Gray-Walk ", ""))}</td>
+</tr>`;
+
+const roundBlock = (r) => `
+  <div class="round">
+    <header>
+      <span class="rid">${esc(r.id)}</span>
+      <h3>${esc(r.name)}</h3>
+      <span class="meta">${r.runs} runs &middot; ~${r.hours} h${
+        r.jobs.length ? ` &middot; ${r.done_count}/${r.jobs.length} done` : ""}</span>
+    </header>
+    <div class="body">
+      <dl class="qa">
+        <dt>Asks</dt><dd><b>${esc(r.asks)}</b></dd>
+        <dt>Design</dt><dd>${esc(r.design)}</dd>
+        <dt>Reads</dt><dd>${esc(r.reads)}</dd>
+      </dl>
+      ${r.jobs.length ? `<div class="tw"><table class="jobs">
+        <tr><th>Run</th><th>State</th><th>Seed</th><th>Result</th><th>What varies</th></tr>
+        ${r.jobs.map(jobRow).join("")}
+      </table></div>`
+      : `<div class="note small"><b>Not queued yet.</b> This round is designed
+           from the rounds above it, so it goes in once they have been read.</div>`}
+    </div>
+  </div>`;
+
+shell([
+
+  { id: "now", label: "What is running", html: () => `
+    <div class="eyebrow">The week</div>
+    <h1>${esc(s.lede)}</h1>
+    ${!s.runner_up ? `<div class="banner stop"><b>The runner is not running.</b>
+      <p>Nothing will start, however much is queued. Start it in a second
+        terminal: <code>run.bat --runner</code></p></div>`
+      : s.paused ? `<div class="banner stop"><b>The queue is paused.</b>
+      <p>The runner is up but will not claim anything until it is unpaused.</p></div>`
+      : `<div class="banner go"><b>Running.</b>
+      <p>${s.running ? `${esc(s.running.variant || s.running.name)} &mdash;
+          ${(s.running.iterations_done || 0).toLocaleString()} of
+          ${(s.running.iterations_target || 0).toLocaleString()} iterations.`
+        : "Nothing in flight right now."}
+        ${s.queued_total} job${s.queued_total === 1 ? "" : "s"} waiting.</p></div>`}
+    ${facts(s.at_a_glance)}
+    <div class="cols">
+      <div class="card">
+        <h3>Why it is a matrix and not one long run</h3>
+        ${s.why.map(p => `<p class="why small">${esc(p)}</p>`).join("")}
+      </div>
+      <div class="card">
+        <h3>Rules while it runs</h3>
+        ${s.rules.map(p => `<div class="risk small">${esc(p)}</div>`).join("")}
+      </div>
+    </div>` },
+
+  { id: "rounds", label: "The rounds", count: totalRuns, html: () => `
+    <div class="eyebrow">The week &middot; ${s.rounds.length} rounds &middot; ~${hours} h queued</div>
+    <h1>The rounds</h1>
+    <p class="lede">Each run changes one declared thing and is scored against the
+      same bar. The machine runs continuously; the design happens between rounds,
+      because nothing can read a table and pick the next experiment on its own.</p>
+    ${s.rounds.map(roundBlock).join("")}` },
+
+  { id: "notdoing", label: "Not doing this week", count: s.not_doing.length,
+    html: () => `
+    <div class="eyebrow">The week</div>
+    <h1>Not doing this week</h1>
+    <p class="lede">Decided against on purpose, with the reason, so none of it
+      looks forgotten in three days.</p>
+    <div class="cols tight">
+      ${s.not_doing.map(x => `<div class="card">
+        <h3>${esc(x.what)}</h3>
+        <p class="why small">${esc(x.why)}</p></div>`).join("")}
+    </div>` },
+
+  { id: "bars", label: "What it has to beat", html: () => {
+    const r1 = (s.status.tasks || []).find(t => t.id === "R1");
+    return `
+    <div class="eyebrow">The week</div>
+    <h1>What it has to beat</h1>
+    <p class="lede">R1&rsquo;s bar, and the best any run has managed so far. Two
+      of six are failing, and every run this week is scored on all six.</p>
+    <div class="card"><div class="tw"><table>
+      <tr><th>Criterion</th><th class="n">Bar</th><th class="n">Best so far</th>
+          <th>State</th></tr>
+      ${r1 ? r1.criteria.map(c => {
+        const better = c.better === "lower";
+        const met = c.best == null ? null : better ? c.best <= c.bar : c.best >= c.bar;
+        const dp = c.bar < 1 ? 2 : 1;
+        return `<tr>
+          <td><b>${esc(c.name)}</b></td>
+          <td class="n dim">${better ? "&le;" : "&ge;"} ${c.bar.toFixed(dp)}
+            ${esc(c.unit || "")}</td>
+          <td class="n" style="color:${met ? "var(--ok)" : "var(--bad)"}">
+            ${c.best == null ? "&mdash;" : c.best.toFixed(dp)}</td>
+          <td>${met === null ? `<span class="chip">not measured</span>`
+              : met ? `<span class="chip ok">passing</span>`
+              : `<span class="chip warn">${(better ? c.best / c.bar : c.bar / c.best).toFixed(1)}&times; off</span>`}
+          </td></tr>`;
+      }).join("") : `<tr><td colspan="4" class="dim">Not measured yet.</td></tr>`}
+    </table></div></div>` } },
+
+]);
+
+}).catch(fail);
+</script>
+</body>
+</html>

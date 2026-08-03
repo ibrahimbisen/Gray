@@ -168,7 +168,11 @@ WALK_NOTES = {
                  "legs and tiny steps. Capped, so it buys a stride and not a flail.",
     "wandering": "Drifting sideways off the line it was sent along. Only charged "
                  "when it was told to go straight, and measured on where the robot "
-                 "has actually ended up rather than which way it is pointing.",
+                 "has actually ended up rather than which way it is pointing. "
+                 "Measured PERPENDICULAR TO THE HEADING IT WAS GIVEN, not against "
+                 "world Y - the world-Y version charged a robot spawned at 0.1 rad "
+                 "for 499 mm of drift it never committed, and fought 'veering' for "
+                 "it.",
     "shaking": "How hard the trunk is being jolted about, measured as its own "
                "acceleration. Smooth joints can still add up to a trunk that "
                "hammers, and the trunk is where the IMU and the electronics live.",
@@ -417,16 +421,54 @@ def veering(env, command_name: str = "walk"):
 
 
 def wandering(env, free: float, command_name: str = "walk"):
-    """Sideways drift off the line, when it was told to walk a straight one.
+    """Sideways drift off the line it was told to walk.
 
     Scored on displacement, not on sideways velocity. A robot can have zero
     lateral velocity at every instant this reward is sampled and still be a foot
     off course, which is exactly what the previous attempt did - it walked, and
     wandered about 140 mm doing it.
+
+    Measured PERPENDICULAR TO THE HEADING IT WAS SENT ALONG. This used to be
+    |world Y - spawn Y|, and that was the drift bug. Reset nudges each spawn yaw
+    by up to +/-0.1 rad, so a robot placed at +0.1 rad and walking a perfect
+    straight line accumulates 5.0 * sin(0.1) = 499 mm of world-Y offset over one
+    20 s episode - charged against a 50 mm allowance, at weight -1.0, every step,
+    for doing exactly the right thing.
+
+    Its only way to stop paying was to curve back toward world Y = 0, which means
+    turning off its own heading, which is what `veering` charges for at up to
+    -2.0. Two terms pulling opposite ways, with the random spawn yaw deciding
+    which won - so a robot spawned at 0 rad had no conflict and one at +/-0.1 rad
+    had the most, in opposite directions. That is the -7 to +18 degree spread
+    measured across 64 robots given the identical command, and verify.py was
+    scoring in the robot's own start-heading frame the whole time. Trained
+    against one line, scored against another.
+
+    The line is locked the moment a straight command begins: where the robot was
+    AND which way it pointed. A heading with no origin does not define a line.
     """
-    off = torch.abs(env.scene["robot"].data.root_link_pos_w[:, 1]
-                    - env.scene.env_origins[:, 1])
-    return torch.clamp(off - free, min=0.0) * _going_straight(env, command_name).float()
+    robot = env.scene["robot"]
+    heading = robot.data.heading_w
+    pos = robot.data.root_link_pos_w[:, :2] - env.scene.env_origins[:, :2]
+    straight = _going_straight(env, command_name)
+
+    ref_pos = getattr(env, "_gray_line_pos", None)
+    ref_head = getattr(env, "_gray_line_head", None)
+    if ref_pos is None or ref_pos.shape != pos.shape:
+        ref_pos = pos.clone()
+    if ref_head is None or ref_head.shape != heading.shape:
+        ref_head = heading.clone()
+    hold = straight & (env.episode_length_buf > 1)
+    ref_pos = torch.where(hold.unsqueeze(-1), ref_pos, pos)
+    ref_head = torch.where(hold, ref_head, heading)
+    env._gray_line_pos = ref_pos.detach()
+    env._gray_line_head = ref_head.detach()
+
+    # Cross-track distance, the same rotation verify.py scores drift with.
+    moved = pos - ref_pos
+    off = torch.abs(-moved[:, 0] * torch.sin(ref_head)
+                    + moved[:, 1] * torch.cos(ref_head))
+    return torch.clamp(off - free, min=0.0) * straight.float()
 
 
 # ---------------------------------------------------------------------------

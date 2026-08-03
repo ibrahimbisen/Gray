@@ -276,10 +276,22 @@ def main() -> int:
                          "On 1.99 kg, 1 m/s is about 2.0 N-s.")
     ap.add_argument("--push-spin", type=float, nargs=2, metavar=("MIN", "MAX"),
                     help="how much spin each shove adds, rad/s about the vertical")
+    ap.add_argument("--seed", type=int, default=0, metavar="N",
+                    help="random seed. 0 keeps the task's own (42). Without this "
+                         "every run of one config gives the same answer, so a "
+                         "sweep cannot tell a real difference from noise - run "
+                         "the same config on two seeds and the gap between them "
+                         "is the noise floor everything else has to beat.")
     ap.add_argument("--reward", action="append", default=[], metavar="NAME=WEIGHT",
-                    help="change one scoring weight, e.g. --reward twitching=-1.5. "
+                    help="change one scoring weight, e.g. --reward dragging=-3. "
                          "Repeatable. The change is recorded in the run, so the "
-                         "dashboard shows what this run was actually scored on.")
+                         "dashboard shows what this run was actually scored on. "
+                         "Refused for terms a curriculum drives - use --ramp.")
+    ap.add_argument("--ramp", action="append", default=[], metavar="NAME=W0,W1,W2,W3",
+                    help="change every stage of a term's curriculum, e.g. "
+                         "--ramp veering=-0.4,-1.0,-2.4,-4.0. One weight per "
+                         "stage. Needed because a curriculum re-applies its own "
+                         "weight, so --reward on a ramped term is a silent no-op.")
     args = ap.parse_args()
 
     import gray.tasks  # noqa: F401  - registers the tasks
@@ -294,6 +306,8 @@ def main() -> int:
         cfg.agent.max_iterations = args.iterations
     iterations = cfg.agent.max_iterations
     cfg.agent.run_name = run_name
+    if args.seed:
+        cfg.agent.seed = args.seed
 
     shove = cfg.env.events.get("shove")
     if shove is None and (args.push_speed or args.push_spin):
@@ -308,15 +322,50 @@ def main() -> int:
         shove.params["spin_range"] = tuple(args.push_spin)
         print(f"shove         spin: {was} -> {tuple(args.push_spin)} rad/s")
 
+    # Which terms a curriculum drives, and therefore which ones --reward cannot
+    # touch: the curriculum re-applies its own weight on every evaluation, so a
+    # --reward on a ramped term is silently overwritten a few seconds in. That is
+    # the worst kind of no-op - the run records the weight it was asked for and
+    # trains on a different one.
+    ramped = {c.params["reward_name"]: c
+              for c in (cfg.env.curriculum or {}).values()
+              if c.params.get("reward_name")}
+
     for change in args.reward:
         term, _, weight = change.partition("=")
         if term not in cfg.env.rewards:
             raise SystemExit(
                 f"no scoring term called {term!r}. This run has: "
                 f"{', '.join(sorted(cfg.env.rewards))}")
+        if term in ramped:
+            raise SystemExit(
+                f"{term!r} is driven by a curriculum, so --reward on it would be "
+                f"overwritten within seconds and the run would record a weight it "
+                f"never trained on. Use --ramp {term}=w0,w1,w2,w3 instead.")
         was = cfg.env.rewards[term].weight
         cfg.env.rewards[term].weight = float(weight)
         print(f"scoring       {term}: {was} -> {float(weight)}")
+
+    for change in args.ramp:
+        term, _, spec = change.partition("=")
+        if term not in ramped:
+            raise SystemExit(
+                f"{term!r} has no curriculum. Ramped terms are: "
+                f"{', '.join(sorted(ramped)) or 'none'}. Use --reward for the rest.")
+        stages = ramped[term].params["stages"]
+        want = [float(x) for x in spec.split(",") if x.strip()]
+        if len(want) != len(stages):
+            raise SystemExit(
+                f"{term!r} has {len(stages)} ramp stages "
+                f"(at steps {', '.join(str(s['step']) for s in stages)}), "
+                f"but {len(want)} weights were given.")
+        was = [s["weight"] for s in stages]
+        for stage, w in zip(stages, want):
+            stage["weight"] = w
+        # The first stage is what the term starts at, so set it directly too -
+        # the curriculum does not run until the first evaluation.
+        cfg.env.rewards[term].weight = want[0]
+        print(f"ramp          {term}: {was} -> {want}")
     cfg = TrainConfig(
         env=cfg.env, agent=cfg.agent,
         video=not args.no_video,
@@ -345,6 +394,15 @@ def main() -> int:
         key=lambda r: -abs(r["weight"]),
     )
 
+    # What the ramped terms actually end at. `scoring` above records term.weight,
+    # which for a ramped term is only its stage-0 value - so a run whose veering
+    # reaches -2.0 by iteration 500 recorded it as -0.2 and the dashboard showed
+    # a penalty four times weaker than the one it trained on.
+    ramps = [{"name": name,
+              "stages": [{"step": s["step"], "weight": s["weight"]}
+                         for s in c.params["stages"]]}
+             for name, c in sorted(ramped.items())]
+
     run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + f"_{run_name}"
     run_dir = RUNS / run_id
     (run_dir / "videos").mkdir(parents=True, exist_ok=True)
@@ -366,11 +424,15 @@ def main() -> int:
         # first few hundred iterations - exactly when someone is watching.
         "num_envs": args.num_envs,
         "num_steps_per_env": cfg.agent.num_steps_per_env,
+        # Recorded so two runs of one config can be told apart. Without it a
+        # sweep has no noise floor and every difference looks meaningful.
+        "seed": cfg.agent.seed,
         "notes": f"{args.num_envs} robots at once, 50 Hz control."
                  + (f" Shoves {shove.params['speed_range'][0]}-"
                     f"{shove.params['speed_range'][1]} m/s from any angle, spin "
                     f"{shove.params['spin_range'][1]} rad/s." if shove else ""),
         "scoring": scoring,
+        "ramps": ramps,
     }, indent=2))
 
     ceiling = reward_ceiling(cfg.env.rewards) * cfg.env.episode_length_s

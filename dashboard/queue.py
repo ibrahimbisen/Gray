@@ -113,10 +113,12 @@ DEFAULTS: dict[str, Any] = {
     "name": "",             # run name; train.py derives one if blank
     "note": "",             # why this run exists, in the owner's words
     "num_envs": 4500,
+    "seed": 0,              # 0 = the task's own (42). Vary it to measure noise.
     "iterations": 0,        # 0 = the task's own default
     "stop_at": 0.965,       # RULES.md rule 1
     "no_video": False,
     "rewards": {},          # term -> weight, overriding the task
+    "ramps": {},            # ramped term -> [w0, w1, w2, w3] for its curriculum
     "push_speed": None,     # [min, max] m/s, or None to leave alone
     "push_spin": None,      # [min, max] rad/s
     "film": True,           # film checkpoints alongside training
@@ -447,7 +449,7 @@ def _clean(spec: dict) -> dict:
     for key in ("no_video", "film", "verify"):
         if spec.get(key) is not None:
             job[key] = _as_bool(spec[key])
-    for key in ("num_envs", "iterations"):
+    for key in ("num_envs", "iterations", "seed"):
         if spec.get(key) is not None:
             job[key] = _as_int(spec[key], DEFAULTS[key])
     if spec.get("stop_at") is not None:
@@ -468,6 +470,21 @@ def _clean(spec: dict) -> dict:
             except (TypeError, ValueError):
                 continue
     job["rewards"] = clean_rewards
+    # Same treatment for ramps, which are a term name against a LIST of stage
+    # weights. A ramp that will not coerce is dropped rather than written back,
+    # for the same reason: train.py would reject the whole job and the runner
+    # would mark it skipped, which reads as "the queue is broken".
+    ramps = spec.get("ramps")
+    clean_ramps: dict[str, list[float]] = {}
+    if isinstance(ramps, dict):
+        for term, stages in ramps.items():
+            if not isinstance(stages, (list, tuple)):
+                continue
+            try:
+                clean_ramps[str(term)] = [float(w) for w in stages]
+            except (TypeError, ValueError):
+                continue
+    job["ramps"] = clean_ramps
     if job["task"] not in TASKS:
         job["task"] = DEFAULTS["task"]
     job["iterations"] = max(0, job["iterations"])
@@ -664,6 +681,8 @@ def train_argv(job: dict) -> list[str]:
         argv += ["--name", str(job["name"])]
     if job.get("no_video"):
         argv += ["--no-video"]
+    if job.get("seed"):
+        argv += ["--seed", str(_as_int(job["seed"], 0))]
     argv += ["--stop-at", str(_as_float(job.get("stop_at"), DEFAULTS["stop_at"]))]
     # `.items()` only if it really is a mapping. _clean guarantees that for
     # anything added from now on, but a queue.json written before it did would
@@ -673,6 +692,14 @@ def train_argv(job: dict) -> list[str]:
     if isinstance(rewards, dict):
         for term, weight in rewards.items():
             argv += ["--reward", f"{term}={weight}"]
+    # Ramped terms take every stage at once. train.py refuses --reward on these,
+    # because a curriculum re-applies its own weight and would silently overwrite
+    # it - so a run would record a weight it never trained on.
+    ramps = job.get("ramps")
+    if isinstance(ramps, dict):
+        for term, stages in ramps.items():
+            if isinstance(stages, (list, tuple)) and stages:
+                argv += ["--ramp", f"{term}=" + ",".join(str(w) for w in stages)]
     for flag in ("push_speed", "push_spin"):
         pair = _as_pair(job.get(flag))
         if pair:
