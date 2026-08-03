@@ -131,7 +131,7 @@ def _write(state: dict) -> None:
     _publish(QUEUE, json.dumps(state, indent=2))
 
 
-def _publish(dest: Path, text: str, tries: int = 80) -> None:
+def _publish(dest: Path, text: str, tries: int = 30) -> None:
     """Write `text` to `dest` atomically, retrying the replace.
 
     Used for both the queue and the heartbeat. Both are written by one process
@@ -173,7 +173,14 @@ class _Lock:
     failure than a rare double write.
     """
 
-    def __init__(self, timeout: float = 5.0, stale_after: float = 30.0):
+    # The timeout MUST comfortably exceed _publish's retry window (30 x 50 ms =
+    # 1.5 s), because _publish runs while this lock is held. If a contended
+    # replace could burn most of a waiter's patience, the waiter would time out,
+    # proceed unlocked by design, read the state just before the holder's replace
+    # landed, and write over it. The lost write is usually the runner marking a
+    # job done - which leaves it "running", so claim() hands out nothing and the
+    # whole queue stalls. 15 s against 1.5 s leaves an order of magnitude.
+    def __init__(self, timeout: float = 15.0, stale_after: float = 45.0):
         self.timeout = timeout
         self.stale_after = stale_after
         self.held = False

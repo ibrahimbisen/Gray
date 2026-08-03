@@ -332,6 +332,40 @@ def run_job(job: dict) -> None:
         _kill_all(f"{job_id} finishing")
 
 
+def _pid_alive(pid) -> bool:
+    """Is that process id actually running?
+
+    NOT os.kill(pid, 0): on Windows os.kill only understands SIGTERM and the
+    CTRL_* events, and anything else calls TerminateProcess - so the "harmless
+    existence check" every other platform uses would kill the process here.
+    """
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid <= 0:
+        return False
+    if not WIN:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        return True
+    import ctypes  # noqa: PLC0415
+
+    SYNCHRONIZE = 0x00100000
+    handle = ctypes.windll.kernel32.OpenProcess(SYNCHRONIZE, False, pid)
+    if not handle:
+        return False
+    # WAIT_TIMEOUT (258) means it is still running; WAIT_OBJECT_0 means it exited
+    # but the handle is not yet closed everywhere.
+    alive = ctypes.windll.kernel32.WaitForSingleObject(handle, 0) == 258
+    ctypes.windll.kernel32.CloseHandle(handle)
+    return alive
+
+
 def reconcile() -> None:
     """Clear jobs left marked running by a runner that died.
 
@@ -348,13 +382,21 @@ def reconcile() -> None:
     if not stuck:
         return
     runner = state["runner"]
-    if runner.get("alive"):
-        _say(f"another runner is alive (pid {runner.get('pid')}, last seen "
+    # A fresh heartbeat is not proof: HEARTBEAT_STALE_S is 30 s, so a runner
+    # killed a moment ago still looks alive and would block its own replacement
+    # for half a minute, printing the dead pid and telling you to stop it. Ask
+    # the operating system whether that process still exists.
+    other = runner.get("pid")
+    if runner.get("alive") and other != os.getpid() and _pid_alive(other):
+        _say(f"another runner is alive (pid {other}, last seen "
              f"{runner.get('age_s')}s ago) and holds "
              f"{', '.join(j['id'] for j in stuck)}.")
         _say("refusing to start - two trainers on one card is RULES.md rule 4. "
              "Stop the other runner first.")
         raise SystemExit(1)
+    if runner.get("alive"):
+        _say(f"the previous runner (pid {other}) left a fresh heartbeat but is "
+             f"gone - clearing its job rather than waiting the heartbeat out")
     for job in stuck:
         queue.update(job["id"], state="failed", finished=_now(),
                      error="the runner stopped while this was training - "

@@ -398,17 +398,36 @@ function axes(sc, geo){
 }
 
 function chartCard(rows, key, colour){
-  const xs = rows.map(r => r.iteration ?? 0);
-  const ys = rows.map(r => +r[key]);
+  // Only rows that actually HAVE this metric. `+null` and `+""` are both 0, so
+  // mapping every row plotted a fabricated zero wherever a value was missing:
+  // a metric that starts logging at iteration 50 drew a flat zero line before
+  // it, dragging the y-axis down and squashing the real curve. Worse, a NaN
+  // reward showed as "0.00" on the chart while the tile and the table both said
+  // "—" - three numbers for one cell, and the chart's was the invented one.
+  const pts = [];
+  for(const r of rows){
+    const v = r[key];
+    if(typeof v === "number" && isFinite(v))
+      pts.push({x: r.iteration ?? pts.length, y: v});
+  }
+  if(pts.length < 2) return `<div class="card">
+    <h3><span class="swatch" style="background:${colour}"></span>${esc(label(key))}
+      <span class="now" style="color:var(--muted)">—</span></h3>
+    <div class="rng">only ${pts.length} usable sample${pts.length === 1 ? "" : "s"}
+      out of ${rows.length} rows</div></div>`;
+
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
   const sc = scales(xs, ys, GEO);
-  const d = rows.map((r, i) => `${i ? "L" : "M"}${sc.px(xs[i]).toFixed(1)},${sc.py(ys[i]).toFixed(1)}`).join("");
+  const d = pts.map((p, i) =>
+    `${i ? "L" : "M"}${sc.px(p.x).toFixed(1)},${sc.py(p.y).toFixed(1)}`).join("");
   const endX = sc.px(xs[xs.length - 1]), endY = sc.py(ys[ys.length - 1]);
+  const gaps = rows.length - pts.length;
 
   return `<div class="card" data-key="${esc(key)}">
     <h3><span class="swatch" style="background:${colour}"></span>${esc(label(key))}
       <span class="now" style="color:${colour}">${fmt(ys[ys.length - 1])}</span></h3>
     <div class="rng tnum">${fmt(Math.min(...ys))} to ${fmt(Math.max(...ys))} over
-      ${rows.length} samples</div>
+      ${pts.length} samples${gaps ? ` &middot; ${gaps} row(s) had no value` : ""}</div>
     <div class="plot">
       <svg viewBox="0 0 ${GEO.W} ${GEO.H}" preserveAspectRatio="none" role="img"
            aria-label="${esc(label(key))} against training iteration">
@@ -437,7 +456,17 @@ function wireHover(rows){
     if(!hit || !g) return;
     const line = g.querySelector("line"), dotEl = g.querySelector("circle");
     const tip = card.querySelector(".tip");
-    const xs = rows.map(r => r.iteration ?? 0), ys = rows.map(r => +r[key]);
+    // Filtered exactly as chartCard filters. If these disagree the crosshair
+    // lands on a different sample than the line it is tracking, and reports a
+    // number that is not the one under the cursor.
+    const pts = [];
+    for(const r of rows){
+      const v = r[key];
+      if(typeof v === "number" && isFinite(v))
+        pts.push({x: r.iteration ?? pts.length, y: v});
+    }
+    if(pts.length < 2) return;
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
     const sc = scales(xs, ys, GEO);
 
     hit.addEventListener("mousemove", ev => {
@@ -967,13 +996,25 @@ function bodySignature(){
     return base + `|${COMPARE.join(",")}|${METRIC}|` + (COMPARE_DATA
       ? COMPARE_DATA.series.map(x => `${x.id}:${x.n}`).join(",") : "none");
   if(TAB === "jobs")
-    return base + `|${JOBLOG}|${JOBLOG_TEXT.length}|${q.jobs.length}`;
-  return base;
+    // The TAIL, not the length. The server caps the reply at 40 000 chars, so
+    // once a log passes that the length is pinned there for ever - and the one
+    // tab whose entire job is watching output live would stop updating, on
+    // exactly the long runs you want to watch. j0006.log is already 817 KB.
+    return base + `|${JOBLOG}|${q.jobs.length}|${JOBLOG_TEXT.length}|` +
+      JOBLOG_TEXT.slice(-160);
+  // Everything else, the plan tab included. model_status() re-runs the URDF
+  // checks on every poll and the header pill shows the result, so the plan tab's
+  // own copy of that number has to move with it or the page contradicts itself.
+  return base + `|${s.model.passed}/${s.model.total}`;
 }
 
-/* Even when a redraw IS needed, whatever is half-typed survives it. */
+/* Even when a redraw IS needed, whatever is half-typed - or half-watched -
+   survives it. The live run's metric count ticks up every five seconds, so the
+   live panel genuinely does have to redraw while a checkpoint film is playing;
+   without carrying the video's position across, it restarts from zero and can
+   never be watched, which is precisely the case worth watching. */
 function saveInputs(){
-  const out = {focus: null, start: null, end: null, values: {}};
+  const out = {focus: null, start: null, end: null, values: {}, video: null};
   document.querySelectorAll("#body input,#body select,#body textarea").forEach(el => {
     if(el.id) out.values[el.id] = el.type === "checkbox" ? el.checked : el.value;
   });
@@ -982,6 +1023,8 @@ function saveInputs(){
     out.focus = a.id;
     try{ out.start = a.selectionStart; out.end = a.selectionEnd; }catch(e){}
   }
+  const v = document.querySelector("#body video");
+  if(v) out.video = {src: v.getAttribute("src"), time: v.currentTime, paused: v.paused};
   return out;
 }
 
@@ -991,6 +1034,15 @@ function restoreInputs(saved){
     if(el.type === "checkbox") el.checked = saved.values[el.id];
     else el.value = saved.values[el.id];
   });
+  const v = saved.video && document.querySelector("#body video");
+  // Only if it is the SAME film. Restoring a timestamp onto a different video
+  // would drop the viewer into the middle of something they did not choose.
+  if(v && v.getAttribute("src") === saved.video.src){
+    try{
+      v.currentTime = saved.video.time;
+      if(saved.video.paused) v.pause();
+    }catch(e){}
+  }
   if(!saved.focus) return;
   const el = document.getElementById(saved.focus);
   if(!el) return;
@@ -1077,12 +1129,19 @@ async function fetchDetail(){
 
 async function fetchCompare(){
   if(!COMPARE.length) return;
+  // Same stale-reply guard as fetchDetail. Toggle two runs quickly and the
+  // slower reply can land last, leaving COMPARE_DATA describing a selection
+  // that is no longer on screen - and because the signature is then stable,
+  // draw() never corrects it. A lit button with no line, permanently.
+  const want = COMPARE.join(",") + "|" + METRIC;
   try{
     const r = await fetch(`/api/compare?runs=${encodeURIComponent(COMPARE.join(","))}` +
                           `&metric=${encodeURIComponent(METRIC)}`);
-    COMPARE_DATA = await r.json();
+    const got = await r.json();
+    if(COMPARE.join(",") + "|" + METRIC !== want) return;
+    COMPARE_DATA = got;
     if(TAB === "compare") draw();
-  }catch(e){ /* leave the placeholder up */ }
+  }catch(e){ /* leave the placeholder up; the next click retries */ }
 }
 
 async function fetchLog(){
