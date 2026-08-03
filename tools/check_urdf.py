@@ -30,6 +30,10 @@ LEGS = ("fl", "fr", "bl", "br")
 SEGMENTS = ("hip", "thigh", "calf")
 EXPECTED_PARTS = {(l, s) for l in LEGS for s in SEGMENTS}
 
+# "world" is a bookkeeping link that exists only so the URDF can say the robot is
+# not bolted down. It has no geometry and no mass, and that is correct.
+MASSLESS_LINKS = {"world"}
+
 
 def leg_seg(name: str) -> tuple[str, str] | None:
     """('fr_thigh') -> ('fr', 'thigh'). None if it is not a leg part."""
@@ -210,6 +214,8 @@ def check_axes(root, checks):
     )
     worst = 0.0
     for j in root.findall("joint"):
+        if j.get("type") in ("fixed", "floating"):
+            continue  # no axis to be wrong about
         axis_el = j.find("axis")
         if axis_el is None:
             c.rows.append(f"{j.get('name')}: no <axis> at all")
@@ -281,6 +287,8 @@ def check_mass(root, checks):
     )
     total = 0.0
     for link in root.findall("link"):
+        if link.get("name") in MASSLESS_LINKS:
+            continue
         inertial = link.find("inertial")
         if inertial is None:
             c.rows.append(f"{link.get('name')}: no <inertial> at all")
@@ -363,9 +371,10 @@ def check_collision(root, checks):
         "A link with no collision shape passes through the floor and through the "
         "other legs. Feet especially.",
     )
-    without = [l.get("name") for l in root.findall("link") if l.find("collision") is None]
+    real = [l for l in root.findall("link") if l.get("name") not in MASSLESS_LINKS]
+    without = [l.get("name") for l in real if l.find("collision") is None]
     c.passed = not without
-    c.detail = f"{len(root.findall('link')) - len(without)} of {len(root.findall('link'))} links"
+    c.detail = f"{len(real) - len(without)} of {len(real)} links"
     for n in without:
         c.rows.append(f"{n}: no <collision>")
     checks.append(c)

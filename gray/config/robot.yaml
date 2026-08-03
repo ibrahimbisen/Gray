@@ -1,0 +1,43 @@
+# Gray - the numbers that describe the real robot.
+#
+# This file exists because the SolidWorks URDF exporter cannot be trusted with
+# mass. It ignores a component's overridden mass and writes the part's volume in
+# cm3 instead, which is the same as assuming everything is made of water. Every
+# mass in a raw export is wrong by whatever the real density is.
+#
+# tools/prepare_model.py reads this and corrects the export.
+
+mass:
+  # Source: SolidWorks mass properties, 2 Aug 2026, taken per component.
+  # These four add up to 2378.70 g, which is exactly what SolidWorks reports for
+  # the whole assembly - so nothing is missing and nothing is counted twice.
+  #
+  # They are still CAD numbers, not scale readings. Weigh the real parts during
+  # reassembly and replace them.
+  units: g
+  trunk: 1198.66     # Main Body Assembly, includes electronics and battery
+  hip: 172.07        # "right hip" and "HIp Part", 4 off
+  thigh: 75.51       # Left_Thigh and Right_Thigh, 4 off
+  calf: 47.43        # "calves", 4 off
+  total_expected: 2378.70
+
+servo:
+  # 12x DS3218MG on a PCA9685 over I2C.
+  model: DS3218MG
+  count: 12
+  stall_torque_nm: 1.96      # 20 kg-cm at 6.8 V
+  no_load_speed_rad_s: 6.54  # 0.16 s per 60 degrees at 6.8 V
+  travel_deg: 270
+  control_hz: 50             # hard ceiling: the PWM period is 20 ms
+
+feedback:
+  # Potentiometers the owner is fitting - rotary on the rotating joints, linear
+  # on the knee pushrod. Analog, so the Raspberry Pi needs an external ADC.
+  type: potentiometer
+  channels: 12
+  calibrated: false          # raw ADC counts -> radians, per joint, not yet measured
+
+joint_limits:
+  # Measured by driving each joint in the assembly until it collides.
+  # Until these exist the simulated robot can fold itself through its own body.
+  measured: false

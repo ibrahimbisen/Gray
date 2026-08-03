@@ -195,6 +195,83 @@ def retarget_base(root, rot: np.ndarray, origin: np.ndarray) -> None:
                 rotate_inertia(el, rt)
 
 
+def add_floating_base(root) -> None:
+    """Say out loud that the robot is not bolted to the ground.
+
+    A URDF with no floating joint is a fixed-base robot, and MuJoCo honours that
+    by welding base_link into the world - silently taking its 1198.66 g with it,
+    more than half the robot. The previous attempt at this project shipped a model
+    reporting 901 g instead of 1625 g for exactly this reason.
+    """
+    if any(j.get("type") == "floating" for j in root.findall("joint")):
+        return
+    ET.SubElement(root, "link", {"name": "world"})
+    j = ET.SubElement(root, "joint", {"name": "floating_base", "type": "floating"})
+    ET.SubElement(j, "parent", {"link": "world"})
+    ET.SubElement(j, "child", {"link": "base_link"})
+
+
+def fix_masses(root, cfg: dict) -> list[str]:
+    """Replace the exporter's water-density masses with the real ones.
+
+    The exporter writes each part's volume in cm3 as its mass. Geometry is right,
+    density is not - so scaling a link's mass and its inertia tensor by the same
+    factor gives the correct model. Inertia is linear in density, so one factor
+    does both.
+    """
+    m = cfg["mass"]
+    want = {"trunk": m["trunk"], "hip": m["hip"], "thigh": m["thigh"], "calf": m["calf"]}
+    report, total = [], 0.0
+    donor: dict[str, tuple[float, dict]] = {}
+
+    links = {l.get("name"): l for l in root.findall("link")}
+    for name, link in links.items():
+        part = leg_seg(name)
+        key = part[1] if part else ("trunk" if name == "base_link" else None)
+        if key is None or key not in want:
+            continue
+        inertial = link.find("inertial")
+        if inertial is None:
+            report.append(f"{name:10s} has no <inertial> at all - skipped")
+            continue
+        mass_el = inertial.find("mass")
+        old = float(mass_el.get("value"))
+        new = want[key] / 1000.0  # the yaml is in grams, URDF is in kg
+        i_el = inertial.find("inertia")
+        terms = {k: float(i_el.get(k, 0.0)) for k in ("ixx", "iyy", "izz", "ixy", "ixz", "iyz")}
+
+        if old > 0:
+            scale = new / old
+            donor.setdefault(key, (old, dict(terms)))
+            for k, v in terms.items():
+                i_el.set(k, f"{v * scale:.10g}")
+            report.append(f"{name:10s} {old*1000:8.2f} -> {new*1000:8.2f} g   inertia x{scale:.3f}")
+        else:
+            # The exporter drops a link occasionally - bl_hip came out at 0 g with
+            # perfectly normal geometry. Borrow the tensor from another link of the
+            # same segment. Same part, same size, so this is close; it is still an
+            # assumption and says so.
+            src = donor.get(key)
+            if src is None:
+                report.append(f"{name:10s} 0 g and no other {key} to borrow from - LEFT BROKEN")
+                continue
+            src_mass, src_terms = src
+            scale = new / src_mass
+            for k, v in src_terms.items():
+                # Mirror across the robot's mid-plane: the y-coupling terms flip.
+                sign = -1.0 if k in ("ixy", "iyz") else 1.0
+                i_el.set(k, f"{v * scale * sign:.10g}")
+            report.append(
+                f"{name:10s} {old*1000:8.2f} -> {new*1000:8.2f} g   ASSUMED - the "
+                f"exporter gave it no mass, tensor copied from the other {key}"
+            )
+        mass_el.set("value", f"{new:.10g}")
+        total += new
+
+    report.append(f"{'TOTAL':10s} {total*1000:8.2f} g   (expected {m['total_expected']:.2f} g)")
+    return report
+
+
 def rotate_inertia(inertial, rt: np.ndarray) -> None:
     """An inertia tensor is expressed in the link frame, so it rotates too."""
     i = inertial.find("inertia")
@@ -283,7 +360,13 @@ def main() -> int:
     root = tree.getroot()
     root.set("name", ROBOT_NAME)
 
+    import yaml  # noqa: PLC0415
+
+    cfg = yaml.safe_load((ROOT / "gray" / "config" / "robot.yaml").read_text())
+
     before = forward_kinematics(root)
+    add_floating_base(root)
+    mass_report = fix_masses(root, cfg)
     rot, origin, notes = derive_base_frame(root)
     retarget_base(root, rot, origin)
     n_meshes = rewrite_mesh_paths(root)
@@ -298,6 +381,9 @@ def main() -> int:
 
     print(f"source   {src}")
     print(f"output   {OUT_URDF.relative_to(ROOT)}   ({n_meshes} mesh references)")
+    print("\nmass, from gray/config/robot.yaml:")
+    for line in mass_report:
+        print(f"  {line}")
     print("\nmeshes:")
     for line in mesh_report:
         print(f"  {line}")
