@@ -259,6 +259,21 @@ BLOCKED_CLASSES = {
         "fix": "Add the numbers to the command. Cheap to write, and it still grows "
                "the input list, so it is still a retrain.",
     },
+    "sampled": {
+        "label": "The range was never sampled",
+        "why": "The command exists and the reward already scores it. The policy "
+               "simply never once saw that value. A policy knows the BOX it was "
+               "sampled over and nothing outside it, so a corner that was never "
+               "visited is a corner it cannot do - and it does not refuse, it "
+               "guesses. Measured on run #25: asked to walk backward it stood "
+               "still for 8 s; asked for a 45 degree diagonal, which is outside "
+               "the sampled range, it managed 26 degrees.",
+        "fix": "One line in walk_env_cfg.py and a retrain. By far the cheapest "
+               "class on this page - no hardware, no new input, no new reward "
+               "term. The cost is dilution: the sample budget is fixed, so a "
+               "wider box means fewer draws everywhere, and these corners are "
+               "harder than straight-ahead rather than equal to it.",
+    },
     "reward": {
         "label": "The reward stops working",
         "why": "Not a sensing problem at all - detection here is already perfect. "
@@ -321,6 +336,19 @@ _COVERAGE_OVERRIDE = {
     10: ("blocked", "holding one leg out is a per-foot command"),
     21: ("blocked", "placing a foot on a marked target needs to see the target"),
     22: ("emerges", "a low object is felt through the leg, not seen"),
+    # ---- measured, not assumed. scripts/drive.py on run #25, 64 robots ------
+    # These four were filed as commands because vx and vy exist in the vector.
+    # Driving the policy showed that is not the same as the value having been
+    # SAMPLED, and three of the four do not work at all.
+    26: ("blocked", "backward walked 0.00 m in 8 s - vx is sampled (0.15, 0.35) "
+                    "and is never negative"),
+    27: ("blocked", "pure sideways walked 3 cm in 8 s - vx is never zero either, "
+                    "so sideways only ever existed as a lean on forward motion"),
+    28: ("blocked", "'all 8 headings' needs backward too. The forward diagonals "
+                    "work and are asymmetric: +0.10 bends the track +11.4 deg off "
+                    "baseline, -0.10 only -4.7"),
+    30: ("blocked", "'full command box' is exactly the claim that fails - the box "
+                    "sampled is a corner of the box written down"),
     37: ("emerges", "a cable or rug edge is felt on contact"),
     59: ("emerges", "an unseen hole is exactly that - felt, not seen"),
     90: ("blocked", "clearance to 60% body height is a crouch, and a crouch is a "
@@ -368,6 +396,19 @@ BLOCKED_NEEDS = {
                        "height, pitch and roll into the command. Ten rows at once. "
                        "It grows the input list by three, so every existing policy "
                        "file becomes unreadable and all three runs restart."},
+    "range":  {"label": "A wider command range", "class": "sampled",
+               "why": "WALK_SPEED is (0.15, 0.35) and WALK_SIDE is (-0.10, 0.10). "
+                      "vx is never zero and never negative, so backward and pure "
+                      "sideways were not sampled once in 864,000 draws. Confirmed "
+                      "by driving run #25: backward moved 0.00 m in 8 s.",
+               "cost": "Widen WALK_SPEED to (-0.35, 0.35) and let vy stand without "
+                       "vx. Cheap to write, and it invalidates every current run. "
+                       "TRAP FIRST: _going_straight() gates on `command[:, 0] > "
+                       "MOVING`, which is positive-only - so `veering` and "
+                       "`wandering`, the two penalties that hold a line, switch "
+                       "off entirely for a backward command. Widen the range "
+                       "without fixing that gate to abs(vx) and backward walking "
+                       "trains with no straightness penalty at all."},
     "foot":   {"label": "A per-foot command", "class": "command",
                "why": "Nothing in the command addresses one leg, so a three-legged "
                       "stance or a raised foot cannot be asked for.",
@@ -425,7 +466,8 @@ _NEED_BY_SUBSECTION = {"flight": "flight", "see": "camera"}
 # Rows whose blocker is not what their category implies.
 _NEED_OVERRIDE = {8: "foot", 9: "foot", 10: "foot",
                   21: "camera", 99: "camera", 130: "camera", 199: "camera",
-                  90: "height"}
+                  90: "height",
+                  26: "range", 27: "range", 28: "range", 30: "range"}
 
 # Where a category goes by default...
 _DEFAULT = {

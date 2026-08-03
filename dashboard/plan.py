@@ -28,6 +28,7 @@ hand-written list did.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from dashboard import skills
@@ -807,6 +808,41 @@ UNVERIFIED_CLAUSES = {
 # number is recoverable, a number that used to be true is not.
 # ---------------------------------------------------------------------------
 
+# The single idea this whole page rests on, written down once.
+BOX = {
+    "lede": "A policy knows the BOX it was sampled over, and nothing outside it.",
+    "paras": [
+        "The command is not a list of options. It is a continuous box with one "
+        "axis per number, and every robot on every attempt is dropped at a random "
+        "point inside it. That is why 'walk forward slow to sprint' and 'walk "
+        "diagonally' are not two jobs - they are two corners of one box that is "
+        "already being sampled.",
+        "It also means the policy has never seen the exact command you give it, "
+        "and does not need to. It has never been asked for 0.23 m/s with 0.07 "
+        "sideways. It handles it because it saw thousands of points around it. "
+        "Filling a box is what 864,000 draws buys.",
+        "Outside the box it does not refuse - it guesses, and the guess is not "
+        "trustworthy. Both failure modes have now been measured on run #25. Asked "
+        "for a 45 degree diagonal, which is past the sampled edge, it managed 26 "
+        "degrees: it extrapolated partway. Asked to walk backward, which is on "
+        "the far side of an edge it has never crossed, it stood still for eight "
+        "seconds.",
+        "The budget is fixed, and this is the trade. 864,000 draws is 864,000 "
+        "whether the box is small or huge, so doubling the box halves the density "
+        "everywhere. Worse, the corners being added are harder than the middle "
+        "rather than equal to it - backward and sideways need MORE samples per "
+        "unit of box, not the same. That is why rel_forward_envs is 0.8: four in "
+        "five draws are spent on straight ahead, deliberately, because straight "
+        "ahead is what is being solved right now.",
+        "And it is not only the command. Every axis of randomisation is another "
+        "dimension of the same box - ground friction, mass, centre of mass, servo "
+        "stiffness, joint friction. That is all D1 is. Never sample friction "
+        "below 0.3 and the robot has no answer for ice, however good its walking "
+        "is. The question is never 'did we train that skill'. It is 'was that "
+        "point inside the box'.",
+    ],
+}
+
 _SAMPLING_READS = (
     {"key": "iterations", "label": "Iterations in the run", "unit": "",
      "file": "gray/tasks/walk_env_cfg.py", "re": r"max_iterations\s*=\s*(\d+)",
@@ -835,8 +871,6 @@ def _fmt(x: float) -> str:
 
 def sampling() -> dict:
     """One run, in numbers: how many different commands it actually tries."""
-    import re  # noqa: PLC0415
-
     from dashboard import queue as job_queue  # noqa: PLC0415
 
     inputs, missing, val = [], [], {}
@@ -851,6 +885,22 @@ def sampling() -> dict:
         inputs.append({**spec, "value": _fmt(val[spec["key"]]),
                        "source": spec["file"]})
 
+    # The box itself, read off the three module constants that define it. Shown
+    # beside the arithmetic because the count of commands tried is meaningless
+    # without the region they were drawn from.
+    walk_src = (ROOT / "gray/tasks/walk_env_cfg.py")
+    src = walk_src.read_text(encoding="utf-8") if walk_src.is_file() else ""
+    axes = []
+    for const, name, unit, note in (
+        ("WALK_SPEED", "forward", "m/s", "never zero and never negative"),
+        ("WALK_SIDE", "sideways", "m/s", "only ever a lean on forward motion"),
+        ("WALK_TURN", "turn", "rad/s", "symmetric, and the widest axis"),
+    ):
+        hit = re.search(rf"{const}\s*=\s*\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)", src)
+        if hit:
+            axes.append({"axis": name, "const": const, "unit": unit, "note": note,
+                         "lo": float(hit.group(1)), "hi": float(hit.group(2))})
+
     envs = float(job_queue.DEFAULTS.get("num_envs") or 0)
     inputs.insert(0, {
         "key": "num_envs", "label": "Robots at once", "unit": "", "value": _fmt(envs),
@@ -861,7 +911,7 @@ def sampling() -> dict:
 
     if missing:
         return {"error": "Could not read: " + "; ".join(missing),
-                "inputs": inputs, "derived": [], "headline": {}}
+                "inputs": inputs, "derived": [], "axes": axes, "headline": {}}
 
     step_dt = 1.0 / val["control_hz"]
     seconds = val["iterations"] * val["num_steps_per_env"] * step_dt
@@ -884,7 +934,7 @@ def sampling() -> dict:
          "unit": "h", "how": f"{_fmt(seconds)} s × {_fmt(envs)} robots",
          "aside": "in roughly 1.5 hours of wall clock"},
     ]
-    return {"error": "", "inputs": inputs, "derived": derived,
+    return {"error": "", "inputs": inputs, "derived": derived, "axes": axes,
             "headline": {"sims": 1, "commands": _fmt(total), "envs": _fmt(envs)}}
 
 
@@ -955,10 +1005,69 @@ def sensors() -> dict:
             "source": "gray/config/sensors.yaml"}
 
 
+# ---------------------------------------------------------------------------
+# What a policy actually did when it was told to.
+#
+# Every other number about R1 on this page is a claim about what the reward and
+# the command CAN cover. This one is a measurement of what one trained file DID,
+# and the two disagreed - which is the reason the section exists. Read live out
+# of the newest drive.json rather than typed here, because a hand-copied
+# measurement is a measurement that will be wrong by next week.
+# ---------------------------------------------------------------------------
+
+_LOG_ROOT = ROOT / "logs" / "rsl_rl"
+
+
+def driven() -> dict:
+    """The most recent scripts/drive.py result, if there is one."""
+    files = sorted(_LOG_ROOT.glob("*/*/drive/drive.json"),
+                   key=lambda p: p.stat().st_mtime) if _LOG_ROOT.is_dir() else []
+    if not files:
+        return {"exists": False, "cases": []}
+    import json  # noqa: PLC0415
+
+    newest = files[-1]
+    try:
+        data = json.loads(newest.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        return {"exists": False, "cases": [],
+                "error": f"{type(exc).__name__}: {exc}"}
+
+    # The run's number, so the page can say "#25" rather than a timestamp. Same
+    # rule as dashboard/runs.py - oldest is 1.
+    runs_dir = ROOT / "progress" / "runs"
+    names = sorted(d.name for d in runs_dir.iterdir() if d.is_dir()) \
+        if runs_dir.is_dir() else []
+    number = names.index(data["run"]) + 1 if data.get("run") in names else None
+
+    cases = []
+    for c in data.get("cases", []):
+        told, got = c["commanded"], c["walked"]
+        moved = abs(got["along_m"]) + abs(got["across_m"])
+        cases.append({
+            **c,
+            "number": number,
+            # A robot that did not move has no heading, and printing the angle it
+            # "walked" would be reporting the direction of its own noise.
+            "moved": moved,
+            "went_nowhere": moved < 0.10,
+            "asked_deg": told["angle_deg"],
+            "got_deg": got["angle_deg"],
+            "sd_deg": got.get("angle_sd_deg"),
+            "lo_deg": got.get("angle_min_deg"),
+            "hi_deg": got.get("angle_max_deg"),
+        })
+    return {"exists": True, "run": data.get("run"), "number": number,
+            "checkpoint": data.get("checkpoint"), "seconds": data.get("seconds"),
+            "robots": data.get("robots"), "cases": cases,
+            "source": str(newest.relative_to(ROOT)).replace("\\", "/")}
+
+
 def stage2_state() -> dict:
     """Stage 2 with the live skill library folded in."""
     lib = skills.load()
     for s in lib["subsections"]:
         s["bar"] = STAGE2["bars"].get(s["key"], "")
         s["unverified"] = UNVERIFIED_CLAUSES.get(s["key"], [])
-    return {**STAGE2, **lib, "sampling": sampling(), "sensors": sensors()}
+    return {**STAGE2, **lib, "sampling": sampling(), "sensors": sensors(),
+            "driven": driven(), "box": BOX}
