@@ -810,36 +810,30 @@ UNVERIFIED_CLAUSES = {
 
 # The single idea this whole page rests on, written down once.
 BOX = {
-    "lede": "A policy knows the BOX it was sampled over, and nothing outside it.",
+    "lede": "The policy works inside the range it was sampled on, and not "
+            "outside it.",
     "paras": [
-        "The command is not a list of options. It is a continuous box with one "
-        "axis per number, and every robot on every attempt is dropped at a random "
-        "point inside it. That is why 'walk forward slow to sprint' and 'walk "
-        "diagonally' are not two jobs - they are two corners of one box that is "
-        "already being sampled.",
-        "It also means the policy has never seen the exact command you give it, "
-        "and does not need to. It has never been asked for 0.23 m/s with 0.07 "
-        "sideways. It handles it because it saw thousands of points around it. "
-        "Filling a box is what 864,000 draws buys.",
-        "Outside the box it does not refuse - it guesses, and the guess is not "
-        "trustworthy. Both failure modes have now been measured on run #25. Asked "
-        "for a 45 degree diagonal, which is past the sampled edge, it managed 26 "
-        "degrees: it extrapolated partway. Asked to walk backward, which is on "
-        "the far side of an edge it has never crossed, it stood still for eight "
+        "The command is three numbers, each with a range. Every attempt draws a "
+        "random point inside those ranges. So 'walk forward slow to sprint' and "
+        "'walk diagonally' are not separate jobs - they are different points in "
+        "the same range, already being drawn from.",
+        "The policy has never been given the exact command you give it, and does "
+        "not need to be. It has never been asked for 0.23 m/s with 0.07 sideways. "
+        "It handles that because it drew thousands of points nearby.",
+        "Outside the range it does not refuse. It guesses, and the guess is not "
+        "reliable. Both cases were measured on run #25. Asked for a 45 degree "
+        "diagonal, past the sampled edge, it walked 26 degrees. Asked to walk "
+        "backward, which is outside the range entirely, it moved 0.00 m in eight "
         "seconds.",
-        "The budget is fixed, and this is the trade. 864,000 draws is 864,000 "
-        "whether the box is small or huge, so doubling the box halves the density "
-        "everywhere. Worse, the corners being added are harder than the middle "
-        "rather than equal to it - backward and sideways need MORE samples per "
-        "unit of box, not the same. That is why rel_forward_envs is 0.8: four in "
-        "five draws are spent on straight ahead, deliberately, because straight "
-        "ahead is what is being solved right now.",
-        "And it is not only the command. Every axis of randomisation is another "
-        "dimension of the same box - ground friction, mass, centre of mass, servo "
-        "stiffness, joint friction. That is all D1 is. Never sample friction "
-        "below 0.3 and the robot has no answer for ice, however good its walking "
-        "is. The question is never 'did we train that skill'. It is 'was that "
-        "point inside the box'.",
+        "The number of draws is fixed at 864,000 whether the range is narrow or "
+        "wide, so widening it lowers the density everywhere. Backward and "
+        "sideways also need more draws than straight ahead, not the same number. "
+        "This is why rel_forward_envs is 0.8: four in five draws go to straight "
+        "ahead, because that is the case being solved now.",
+        "The same applies to everything else that is randomised - ground "
+        "friction, mass, centre of mass, servo stiffness, joint friction. That is "
+        "what D1 is. Friction is never sampled below 0.3, so the robot has no "
+        "response to ice regardless of how well it walks.",
     ],
 }
 

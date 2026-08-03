@@ -246,7 +246,7 @@ const stale = !s.observation || !s.status || !s.sampling;
 /* ------------------------------------------------------------------ 1 ---- */
 const chain = () => `
   <div class="dwg">
-    <div class="cap">the deliverable &mdash; one function, 50 times a second</div>
+    <div class="cap">the policy &middot; one file</div>
     <div class="chain">
       <div class="blk">
         <h4>what it senses</h4>
@@ -268,11 +268,11 @@ const chain = () => `
         <h4>what it moves</h4>
         <div class="big">12<small>joint angles</small></div>
         <p class="mono" style="font-size:11.5px;color:var(--dim);margin:10px 0 0">
-          every 20 ms, forever.<br>The PWM period is the<br>ceiling, not a choice.</p>
+          one set every 20 ms.<br>The servo PWM period<br>sets that limit.</p>
       </div>
     </div>
-    <div class="foot">It has never seen your exact situation. It answers anyway
-      &mdash; that is the whole trick, and plate 4 is why it works.</div>
+    <div class="foot">These exact inputs have not occurred before. Section 4
+      covers why that still works.</div>
   </div>`;
 
 /* ------------------------------------------------------------------ 2 ---- */
@@ -343,77 +343,71 @@ ${stale ? `<div class="callout warn" style="max-width:none;margin:26px 0 0">
     <span class="mono">run.bat</span></p></div>` : ""}
 
 <header class="mast">
-  <div class="kicker mono">Gray &middot; a 12-joint quadruped &middot; read top to bottom</div>
-  <h1>How this whole project actually works</h1>
-  <p>${esc(s.goal.one_line)} Six plates: what is being built, how it gets made,
-    why two hundred skills are three files, the one idea everything rests on,
-    what happens on the real robot, and where it stands today.</p>
+  <div class="kicker mono">Gray &middot; 12-joint quadruped</div>
+  <h1>How the training works</h1>
+  <p>${esc(s.goal.one_line)} Six sections: what gets deployed, how it is trained,
+    why there are three files, the command range, what runs on the real robot,
+    and current status.</p>
   <div class="meta">
     <div><b>${obs.total || 0}</b><span>numbers in</span></div>
     <div><b>12</b><span>joint angles out</span></div>
-    <div><b>50 Hz</b><span>forever</span></div>
+    <div><b>50 Hz</b><span>control rate</span></div>
     <div><b>${lib.total || 0}</b><span>skills in the library</span></div>
-    <div><b>${(lib.runs || []).length}</b><span>files that ship</span></div>
+    <div><b>${(lib.runs || []).length}</b><span>files</span></div>
     <div><b>${cmds}</b><span>commands per run</span></div>
   </div>
 </header>
 
 <section class="plate">
   <header><div class="pnum">01</div><div>
-    <h2>You are not building a robot that walks. You are building a function.</h2>
-    <p>One file. Sensor readings and your command go in, twelve joint angles come
-      out, fifty times a second. That is the entire deliverable &mdash; everything
-      else in this project exists to produce it and to check it is any good.</p>
+    <h2>What gets deployed</h2>
+    <p>One file. ${obs.total || 0} numbers in, 12 joint angles out, 50 times a
+      second. Everything else in the project exists to produce that file and
+      check it.</p>
   </div></header>
   ${chain()}
-  <div class="callout"><b>What it is not.</b>
-    <p>It is not a recording of a good walk. There is no library of motions, no
-      keyframes, and no inverse kinematics solved at runtime. It is a lookup that
-      has never seen your exact situation and answers anyway.</p></div>
+  <div class="callout"><b>It is not a stored motion.</b>
+    <p>No library of movements, no keyframes, no inverse kinematics at runtime.
+      It computes 12 angles from ${obs.total || 0} inputs, every step.</p></div>
 </section>
 
 <section class="plate">
   <header><div class="pnum">02</div><div>
-    <h2>You cannot write those twelve numbers. So you write down what good means.</h2>
-    <p>Nobody can hand-author joint angles for every situation. Instead you write
-      the <b>reward</b> &mdash; ${walk.terms.length} small opinions, added up every
-      step &mdash; and let a search find the function that scores well.</p>
+    <h2>How it is trained</h2>
+    <p>Joint angles cannot be written by hand for every situation. Instead the
+      <b>reward</b> is written by hand: ${walk.terms.length} terms, each scoring
+      one thing about the step just taken. They are added up.</p>
   </div></header>
   <div class="split">
     <div class="dwg">
-      <div class="cap">R1&rsquo;s reward &middot; read live from gray/tasks/</div>
+      <div class="cap">R1 reward &middot; read from gray/tasks/</div>
       <div class="split" style="gap:22px">
         <table class="pts"><tbody>${earn.map(ptrow).join("")}</tbody></table>
         <table class="pts"><tbody>${lose.map(ptrow).join("")}</tbody></table>
       </div>
       <div class="foot"><span class="mono">ceiling ${walk.ceiling}</span> per step
-        before penalties. ${earn.length} things earn points, ${lose.length} lose them.</div>
+        before penalties. ${earn.length} terms add, ${lose.length} subtract.</div>
     </div>
     <div class="prose">
-      <p>Then <b>${envs} robots</b> try it at once. Each gets its own random
-        command and its own randomised world. They all fail. The scores say which
-        failures were <i>less bad</i>. Nudge the function toward those. Repeat
-        three thousand times.</p>
-      <p>Every robot&rsquo;s experience pours into <b>one</b> update to <b>one</b>
-        function. That is what makes it a single policy rather than a collection.</p>
-      <div class="callout warn"><b>Training never improves the reward.</b>
-        <p>The reward is your input, not an output. Nothing in that loop edits it
-          except you or me changing numbers in a file. If a behaviour is not in
-          the table, the robot has no reason to do it &mdash; and if something
-          unwanted scores well by accident, it will do that instead. This is the
-          only lever there is.</p></div>
+      <p>${envs} robots run at once, each with its own random command and its own
+        randomised world. The scores rank the attempts. The function is adjusted
+        toward the higher-scoring ones. This repeats 3,000 times.</p>
+      <p>All ${envs} robots feed one update to one function.</p>
+      <div class="callout warn"><b>Training does not change the reward.</b>
+        <p>The reward is an input. It changes when someone edits the file and at
+          no other time. A behaviour not in the table will not appear. A
+          behaviour that scores well by accident will.</p></div>
     </div>
   </div>
 </section>
 
 <section class="plate">
   <header><div class="pnum">03</div><div>
-    <h2>Two hundred skills are three files, and the test is not what they look like.</h2>
-    <p>The question is never &ldquo;do these look different?&rdquo; It is
-      <b>would the reward function have to change?</b> Walking sideways is the same
-      equation with a different setpoint, so it shares a file. Getting up off its
-      back has no commanded velocity to track, so every tracking term is
-      meaningless and it needs its own.</p>
+    <h2>Why there are three files</h2>
+    <p>Two skills share a file if they share a reward function. Walking sideways
+      is the same equation with a different setpoint, so it shares one. Getting
+      up has no commanded velocity, so every tracking term is meaningless and it
+      needs its own. That test applied to ${lib.total || 0} rows gives three.</p>
   </div></header>
   <div class="split">
     <div>
@@ -426,69 +420,66 @@ ${stale ? `<div class="callout warn" style="max-width:none;margin:26px 0 0">
           <span class="pill">${r.count} rows</span>
         </div>`).join("")}
       </div>
-      <div class="callout"><b>Runtime, in one line.</b>
-        <p>Power on into <span class="mono">R2</span>, get upright, hand over to
-          <span class="mono">R1</span> and you steer. Fall over, hand back to
-          <span class="mono">R2</span>. A rule at runtime does the handover
-          &mdash; not a third brain.</p></div>
+      <div class="callout"><b>Runtime.</b>
+        <p>Power on into <span class="mono">R2</span>. Once upright,
+          <span class="mono">R1</span> takes over and you steer. On a fall,
+          <span class="mono">R2</span> takes over again. A rule does the
+          handover, not a third file.</p></div>
     </div>
     <div class="dwg">
-      <div class="cap">everything else &middot; not a file, not a brain</div>
+      <div class="cap">the other kinds &middot; not files</div>
       <ul class="notfiles">
         ${(lib.kinds || []).filter(k => k.key !== "run").map(k => `<li>
           <span class="k">${esc(k.items.join(" "))}</span>
           <span><b>${esc(k.name)}</b> &mdash; ${k.count} rows</span></li>`).join("")}
       </ul>
-      <div class="foot"><b style="color:var(--ink)">D1 is the one worth
-        understanding.</b> Gravel is not a skill and not a file. During R1&rsquo;s
-        training the ground friction, the robot&rsquo;s mass, its centre of mass
-        and the servo stiffness are randomised on every attempt. The policy never
-        sees the word gravel &mdash; it sees the same ${obs.total || 0} numbers
-        arriving in a different pattern.</div>
+      <div class="foot"><b style="color:var(--ink)">D1 is randomisation, not
+        skills.</b> Ground friction, mass, centre of mass and servo stiffness
+        change on every attempt during R1&rsquo;s training. The policy does not
+        see the word gravel. It sees the same ${obs.total || 0} numbers in a
+        different pattern.</div>
     </div>
   </div>
 </section>
 
 <section class="plate">
   <header><div class="pnum">04</div><div>
-    <h2>${esc((s.box || {}).lede || "")}</h2>
-    <p>The command is not a list of options. It is a continuous box with one axis
-      per number, and every robot on every attempt is dropped at a random point
-      inside it. Fill the box with ${cmds} draws and the whole box works &mdash;
-      including points it never saw exactly.</p>
+    <h2>The command range</h2>
+    <p><b>${esc((s.box || {}).lede || "")}</b>
+      The command is three numbers, each with a range. Every attempt draws a
+      random point inside that range. After ${cmds} draws, points inside work,
+      including ones never drawn exactly. Points outside do not.</p>
   </div></header>
   <div class="split">
     <div class="dwg">
-      <div class="cap">R1&rsquo;s box today &middot; read live from walk_env_cfg.py</div>
+      <div class="cap">R1 command range &middot; read from walk_env_cfg.py</div>
       ${axes.map(track).join("")}
-      <div class="foot">The blue span is what was sampled. The grey line is zero.
+      <div class="foot">Blue is the sampled range. Grey is zero.
         ${drive.cases && drive.cases.some(c => c.went_nowhere)
-          ? `The red pin is a command that was asked for and produced
-             <b style="color:var(--bad)">no movement at all</b> &mdash; it sits
-             outside the span, and that is the entire explanation.` : ""}</div>
+          ? `Red is a command that was given and produced
+             <b style="color:var(--bad)">no movement</b>. It sits outside the
+             range.` : ""}</div>
     </div>
     <div class="prose">
       ${((s.box || {}).paras || []).slice(1).map(p => `<p>${esc(p)}</p>`).join("")}
-      ${drive.exists ? `<div class="callout warn"><b>Measured, not argued.</b>
-        <p>Run #${drive.number} driven with a held command, ${drive.robots} robots:
-        asked for a 45&deg; diagonal &mdash; past the sampled edge &mdash; it
-        managed 26&deg;. Asked to walk backward, which is on the far side of an
-        edge it has never crossed, it stood still for eight seconds.
-        <a class="plain" href="/stage2#measured">The full table &rarr;</a></p></div>` : ""}
+      ${drive.exists ? `<div class="callout warn"><b>Measured on run #${drive.number}.</b>
+        <p>${drive.robots} robots, one command held throughout. 45&deg; diagonal
+        asked, 26&deg; walked. Backward asked, 0.00 m in 8 seconds. Both are
+        outside the range above.
+        <a class="plain" href="/stage2#measured">Full table &rarr;</a></p></div>` : ""}
     </div>
   </div>
 </section>
 
 <section class="plate">
   <header><div class="pnum">05</div><div>
-    <h2>There is no conversion step. That is the answer, and it is why it took so long to explain.</h2>
-    <p>Nothing is compiled, translated, or turned into inverse kinematics. You
-      copy the same few hundred kilobytes onto the Pi and feed it real numbers
-      instead of simulated ones. The function does not change and cannot tell
-      the difference.</p>
+    <h2>Running on the real robot</h2>
+    <p>The same file is copied onto the Pi. Nothing is converted, compiled or
+      rewritten, and there is no inverse kinematics step. The
+      ${obs.total || 0} inputs come from sensors instead of the simulator.</p>
   </div></header>
   <div class="dwg">
-    <div class="cap">the handover &middot; one file, two worlds</div>
+    <div class="cap">same file, both sides</div>
     <div class="mirror">
       <div>
         <h4 class="l">in simulation</h4>
@@ -509,52 +500,44 @@ ${stale ? `<div class="callout warn" style="max-width:none;margin:26px 0 0">
         </ul>
       </div>
       <div class="bridge">
-        <span>identical, unchanged</span>
+        <span>unchanged</span>
         <b>the policy file</b>
       </div>
     </div>
-    <div class="foot">The box drawn across the divide is not a diagram
-      convenience &mdash; it is the same file, byte for byte.</div>
+    <div class="foot">The box spans both sides because it is the same file.</div>
   </div>
-  <div class="callout warn"><b>Which is exactly why every honest number matters.</b>
-    <p>The policy cannot tell it moved. If the simulated numbers were wrong
-      &mdash; wrong mass, wrong joint limits, a sensor the real robot does not
-      have &mdash; it fails on contact with the floor and you have no way to know
-      which lie caused it. That is what killed the previous attempt: the policy
-      read joint angles the hardware could not measure, so it could never have
-      run at all.</p></div>
+  <div class="callout warn"><b>The policy cannot detect the difference.</b>
+    <p>If a simulated number was wrong &mdash; mass, joint limits, a sensor the
+      real robot does not have &mdash; it fails on the floor, and nothing
+      indicates which number. The previous attempt failed this way: the policy
+      read joint angles the hardware could not measure.</p></div>
 </section>
 
 <section class="plate">
   <header><div class="pnum">06</div><div>
-    <h2>Where it actually stands</h2>
-    <p>Standing and taking a push both pass their bars. Walking does not, and
-      today the failure got a name.</p>
+    <h2>Current status</h2>
+    <p>Standing and taking a push pass their bars. Walking fails on two of six
+      criteria: sideways drift and speed tracking.</p>
   </div></header>
   <div class="split">
     <div class="dwg">
-      <div class="cap">R1 locomotion &middot; best of ${status.runs_total || 0} runs, against the bar</div>
+      <div class="cap">R1 &middot; best of ${status.runs_total || 0} runs</div>
       ${r1 ? r1.criteria.map(barRow).join("") : `<p class="muted">Not measured yet.</p>`}
-      <div class="foot">Green has passed. Red is the distance still to go, drawn
-        honestly &mdash; drift at ${n(head.best, 0)} mm against
-        a ${n(head.bar, 0)} mm bar is almost nothing done, not
-        nearly finished.</div>
+      <div class="foot">Green has passed. Bar length is the fraction of the way
+        to passing, so drift at ${n(head.best, 0)} mm against a
+        ${n(head.bar, 0)} mm bar reads near zero.</div>
     </div>
     <div class="prose">
-      <p><b>The drift failure is not that it cannot steer.</b> Driven with a held
-        command over 64 robots, the average obeys: told to go left it goes left,
-        told right it goes right. What it does not do is steer the same way
-        twice.</p>
-      <p>Straight ahead spans &minus;7&deg; to +18&deg; across 64 robots given the
-        <i>identical</i> command. At five metres, a 4&deg; heading error is
-        already 350 mm &mdash; three and a half times the whole bar.</p>
-      <p>Next, in order: fix the spread on the box as it stands, then R2 getting
-        up, then the sensor batch &mdash; ${(s.batch || {}).added || 0} more
-        numbers on the input list, which is one retrain for all of them at once
-        &mdash; then the real robot.</p>
-      <div class="callout"><b>Stage 3 starts now, in parallel.</b>
-        <p>Not last. Deploy R1 while only one policy rides on stage 1&rsquo;s
-          three guessed numbers, rather than after all three do.
+      <p>Driven with a held command over 64 robots, the average obeys: left when
+        told left, right when told right. The spread is the problem. Straight
+        ahead ranges from &minus;7&deg; to +18&deg; for the identical command.</p>
+      <p>At 5 m, a 4&deg; heading error is 350 mm. The bar is 100 mm.</p>
+      <p>Next: reduce the spread, then R2, then the sensor batch
+        (+${(s.batch || {}).added || 0} inputs, one retrain for all of them),
+        then the real robot.</p>
+      <div class="callout"><b>Stage 3 runs in parallel.</b>
+        <p>It measures three numbers stage 1 is currently guessing. Running it
+          now means one policy depends on those guesses instead of three.
           <a class="plain" href="/stage3">Stage 3 &rarr;</a></p></div>
     </div>
   </div>
@@ -562,7 +545,7 @@ ${stale ? `<div class="callout warn" style="max-width:none;margin:26px 0 0">
 
 <section class="plate">
   <header><div class="pnum">&rarr;</div><div>
-    <h2>Where to go next</h2>
+    <h2>Pages</h2>
   </div></header>
   <div class="files">
     ${s.project.map(p => `<div class="file">
