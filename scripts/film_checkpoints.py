@@ -175,8 +175,11 @@ def main() -> int:
     # Training saves a checkpoint every 25 iterations, so --every 2 is one film
     # per 50 iterations - the owner's setting, and the finest this can go without
     # dropping to 25.
-    ap.add_argument("--every", type=int, default=2,
-                    help="film 1 in N checkpoints; 2 is every 50 iterations")
+    ap.add_argument("--every", type=int, default=4,
+                    help="film 1 in N checkpoints. Training saves one every 25 "
+                         "iterations, so 4 is every 100. Each film stalls training "
+                         "for a couple of iterations while the renderer has the "
+                         "card, so this is a throughput dial as much as a taste one")
     ap.add_argument("--seconds", type=float, default=6.0,
                     help="clip length. Kept at 6 s: what made the old films useless "
                          "was the camera sitting 1 m away and locked on the trunk, "

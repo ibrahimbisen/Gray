@@ -82,20 +82,28 @@ TASKS = ("Gray-Stand", "Gray-Push", "Gray-Walk")
 # Filming reads checkpoints off disk and the first one does not exist until
 # iteration 25, so starting it early bought nothing and cost a run.
 #
-# THE NUMBER ITSELF is 5500 - deliberately below the 6400 probe_envs.py measured,
-# on the owner's call, for headroom. Measured on this card with the renderer also
-# loaded:
-#     6400 robots -> 11,828 MiB of 12,282   (96%)
-#     6000 robots -> 11,755 MiB             (96%)
+# THE NUMBER ITSELF is 4500, well under the 6400 probe_envs.py measured. This is
+# a settled choice, not a dial to keep turning - the owner asked for it to stay.
 #
-# Note how little the robot count actually moves it: 400 fewer robots freed
-# 73 MB. Most of that 11.7 GB is fixed cost - CUDA context, the model, the
-# renderer - not the robots. So headroom here is bought in small amounts, and
-# going much lower would cost throughput without buying much back.
+# Measured on this card, walking, with the renderer loaded:
 #
-# Running out mid-run costs the whole run, which is why the trade is worth
-# making at all.
-CARD_ENV_CEILING = 5500
+#     robots   memory        steps/s    s per iteration   3000 iters
+#      3072    ~6.9 GB        48,500        1.52 s          76 min
+#      4500   ~10.6 GB       ~62,000        1.74 s          87 min
+#      5500   ~11.1 GB        72,000        1.89 s          94 min
+#      6400   ~11.8 GB        82,000        1.87 s          94 min
+#
+# Two things that table says. Throughput is SUB-linear - 2.08x the robots buys
+# 1.69x the steps, because the card is already pinned at 100% and the extra
+# robots queue rather than run alongside. And more robots makes each iteration
+# BIGGER, not faster, so wall-clock per run goes up.
+#
+# So the trade is: more robots means a less noisy gradient, fewer robots means a
+# faster experiment loop. While the reward function is still being debugged - and
+# sideways drift is currently 21x its bar, which is a reward-alignment problem
+# and not a gradient-noise one - turnaround is worth more than batch size.
+# 4500 is comfortably past the ~4096 that legged-robot RL usually needs.
+CARD_ENV_CEILING = 4500
 FILMING_ENV_CEILING = CARD_ENV_CEILING
 
 # A job, with every field defaulted. Anything the UI does not send falls back to
@@ -104,7 +112,7 @@ DEFAULTS: dict[str, Any] = {
     "task": "Gray-Walk",
     "name": "",             # run name; train.py derives one if blank
     "note": "",             # why this run exists, in the owner's words
-    "num_envs": 3072,
+    "num_envs": 4500,
     "iterations": 0,        # 0 = the task's own default
     "stop_at": 0.965,       # RULES.md rule 1
     "no_video": False,
