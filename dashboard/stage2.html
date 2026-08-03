@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gray &mdash; stage 2, Train</title>
+<link rel="stylesheet" href="/page.css">
+</head>
+<body>
+<div class="top" id="top"></div>
+<div class="shell">
+  <div class="side"></div>
+  <div class="main"></div>
+</div>
+
+<script src="/page.js"></script>
+<script>
+document.getElementById("top").innerHTML =
+  topbar("/stage2", "Stage 2 of 3 &middot; in progress");
+
+const chipFor = (state) =>
+  /^(done|passed)/.test(state) ? "ok"
+  : /^(in progress|partly|ongoing)/.test(state) ? "now" : "warn";
+
+/* A kind is a claim about how much work something is, so it gets its own colour
+   of language rather than being another row in the same table. */
+const KIND_LEDE = {
+  run: "A piece of work in its own right.",
+  axis: "Not a piece of work &mdash; a number changed inside one.",
+  constraint: "Never finished, never a stage.",
+  test: "Read off a trained policy, not trained toward.",
+  parked: "Not being worked. Each one names its trigger.",
+};
+
+function overview(s) {
+  const kindRow = (k) => `<tr>
+      <td class="n"><span class="chip">${esc(k.items.join(" "))}</span></td>
+      <td><b>${esc(k.name)}</b><div class="dim small">${esc(KIND_LEDE[k.key] || "")}</div></td>
+      <td class="n">${k.subsections}</td>
+      <td class="n">${k.count}</td>
+    </tr>`;
+  return `
+    <div class="eyebrow">Stage 2 &middot; Train</div>
+    <h1>200 skills, ${s.runs} training runs</h1>
+    <p class="lede">${esc(s.lede)}</p>
+    ${facts([
+      {k:"Skills in the library", v:s.total, n:"read live from your CSV"},
+      {k:"Training runs", v:s.runs, n:"the only unit of work that is a piece of work"},
+      {k:"Skills in R1 alone", v:(s.subsections.find(x => x.id === "R1") || {}).count || 0,
+       n:"one policy, one reward, six commands"},
+      {k:"Difficulty dial written", v:s.dialled, n:"the randomisation ranges, already yours"},
+    ])}
+    <div class="cols">
+      <div class="card">
+        <h3>What each kind means</h3>
+        <div class="tw"><table>
+          <tr><th class="n"></th><th>Kind</th><th class="n">Items</th><th class="n">Skills</th></tr>
+          ${s.kinds.map(kindRow).join("")}
+        </table></div>
+        <p class="why small" style="margin-top:12px">Counts are shown per kind and
+          never added together. One combined total is what made the previous version
+          of this page misleading &mdash; it put a training run and a friction value
+          in the same number.</p>
+      </div>
+      <div class="card">
+        <h3>The runs, and what each one costs</h3>
+        <div class="tw"><table>
+          <tr><th class="n"></th><th>Run</th><th class="n">Skills</th><th>State</th></tr>
+          ${s.subsections.filter(x => x.kind === "run").map(x => `<tr>
+            <td class="n"><span class="chip ${chipFor(x.state)}"
+                  style="font-family:ui-monospace">${esc(x.id)}</span></td>
+            <td><b>${esc(x.name)}</b><div class="dim small">${esc(x.rule)}</div></td>
+            <td class="n">${x.count}</td>
+            <td class="dim">${esc(x.state)}</td></tr>`).join("")}
+        </table></div>
+        <p class="why small" style="margin-top:12px">Three files ship. Everything else
+          on this page is a number inside one of them, a property checked across all
+          of them, or a measurement taken afterwards.</p>
+      </div>
+    </div>`;
+}
+
+function methodPanel(s) {
+  return `
+    <div class="eyebrow">Stage 2</div>
+    <h1>How it is sorted, and in what order</h1>
+    <p class="lede">Why 200 things is ${s.runs} pieces of work rather than 200.</p>
+    <div class="cols">
+      <div class="card">
+        <h3>How it is sorted</h3>
+        ${s.intro.map(p => `<p class="why small">${esc(p)}</p>`).join("")}
+        <div class="note key small"><b>Source:</b>
+          <code>${esc(s.path)}</code> &mdash; edit it and this page follows.</div>
+      </div>
+      <div class="card">
+        <h3>What order, and why</h3>
+        ${s.order.map(o => `<div class="risk small">${esc(o)}</div>`).join("")}
+      </div>
+    </div>`;
+}
+
+function kindPanel(s, k) {
+  const items = s.subsections.filter(x => x.kind === k.key);
+  return `
+    <div class="eyebrow">Stage 2 &middot; kind</div>
+    <h1>${esc(k.name)}</h1>
+    <p class="lede">${esc(k.blurb)}</p>
+    ${facts([
+      {k:"Items", v:k.subsections, n:esc(k.items.join(", "))},
+      {k:"Skills", v:k.count, n:"never added to another kind's count"},
+    ])}
+    <div class="cols tight">
+      ${items.map(x => `<div class="card">
+        <h3>${esc(x.id)} &nbsp;${esc(x.name)}
+          <span class="chip ${chipFor(x.state)}">${esc(x.state)}</span></h3>
+        <p class="small">${esc(x.what)}</p>
+        <div class="dim small" style="margin-top:8px">${x.count} skills &middot;
+          ${esc(x.rule)}</div>
+      </div>`).join("")}
+    </div>`;
+}
+
+function subPanel(x) {
+  return `
+    <div class="eyebrow">${esc(x.id)} &middot; ${esc(x.kind)}</div>
+    <h1>${esc(x.name)} <span class="chip ${chipFor(x.state)}"
+      style="vertical-align:6px;margin-left:6px">${esc(x.state)}</span></h1>
+    <p class="lede">${esc(x.rule)} &mdash; ${x.count} skills.</p>
+    <div class="cols">
+      <div class="card">
+        <h3>What is in it</h3>
+        <p class="small">${esc(x.what)}</p>
+        ${x.commands ? `<div class="note key small" style="margin-top:12px">
+          <b>Commands:</b> <code>${esc(x.commands)}</code></div>` : ""}
+        <h3 style="margin-top:16px">Why it is its own ${esc(x.kind)}</h3>
+        <p class="why small">${esc(x.why)}</p>
+        ${x.gap ? `<div class="risk small"><b>Known gap.</b> ${esc(x.gap)}</div>` : ""}
+        ${x.trigger ? `<div class="note key small"><b>Un-parks when:</b>
+          ${esc(x.trigger)}</div>` : ""}
+        ${x.bar ? `<div class="barline"><b>Passes when</b>${esc(x.bar)}</div>` : ""}
+      </div>
+      <div class="card">
+        <h3>The ${x.count} skills</h3>
+        <div class="tw scroller"><table>
+          <tr><th class="n">#</th><th>Skill</th><th>Difficulty dial</th></tr>
+          ${x.skills.map(k => `<tr>
+            <td class="n dim">${k.n}</td>
+            <td>${esc(k.name)}</td>
+            <td class="dim">${k.dial ? esc(k.dial) : "&mdash;"}</td></tr>`).join("")}
+        </table></div>
+      </div>
+    </div>`;
+}
+
+function movedPanel(s) {
+  return `
+    <div class="eyebrow">Stage 2</div>
+    <h1>Judgement calls</h1>
+    <p class="lede">${s.moved.length} skills ended up somewhere other than the
+      category they were filed under. These are the debatable ones, listed so
+      they can be argued with rather than buried.</p>
+    <div class="card">
+      <div class="tw scroller" style="max-height:66vh"><table>
+        <tr><th class="n">#</th><th>Skill</th><th>Filed under</th>
+            <th>Moved to</th><th>Kind</th><th>Why</th></tr>
+        ${s.moved.map(m => `<tr>
+          <td class="n dim">${m.n}</td>
+          <td>${esc(m.skill)}</td>
+          <td class="dim">${esc(m.from)}</td>
+          <td>${esc(m.to_name)}</td>
+          <td class="dim">${esc(m.to_kind)}</td>
+          <td class="dim">${esc(m.reason)}</td></tr>`).join("")}
+      </table></div>
+    </div>`;
+}
+
+fetch("/api/stage/2").then(r => r.json()).then(s => {
+  const sections = [
+    { id: "overview", label: "Overview", html: () => overview(s) },
+    { id: "method", label: "How it is sorted", html: () => methodPanel(s) },
+  ];
+  // Grouped by kind, in the order skills.py declares them, so the sidebar itself
+  // says how much work each thing is before anything is opened.
+  for (const k of s.kinds) {
+    sections.push({ id: "kind-" + k.key, group: k.name, label: "What this kind is",
+                    count: k.count, html: () => kindPanel(s, k) });
+    for (const x of s.subsections.filter(v => v.kind === k.key)) {
+      sections.push({ id: x.id, group: k.name, label: x.name,
+                      badge: x.id, count: x.count, html: () => subPanel(x) });
+    }
+  }
+  sections.push({ id: "calls", group: "Reference", label: "Judgement calls",
+                  count: s.moved.length, html: () => movedPanel(s) });
+  shell(sections);
+}).catch(fail);
+</script>
+</body>
+</html>

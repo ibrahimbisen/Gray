@@ -3,278 +3,153 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gray</title>
-<style>
-  :root {
-    --bg:#0f1115; --panel:#171a21; --line:#252a34; --ink:#e7e9ee; --dim:#98a0ae;
-    --ok:#4ade80; --bad:#f87171; --warn:#fbbf24; --accent:#60a5fa; --pos:#4ade80; --neg:#f87171;
-  }
-  @media (prefers-color-scheme: light) {
-    :root { --bg:#f7f8fa; --panel:#fff; --line:#e3e6ec; --ink:#141821; --dim:#5b6472;
-            --ok:#15803d; --bad:#b91c1c; --warn:#a16207; --accent:#1d4ed8; --pos:#15803d; --neg:#b91c1c; }
-  }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink);
-         font:16px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
-  .wrap { max-width:940px; margin:0 auto; padding:0 24px 96px; }
-
-  header { padding:56px 0 32px; border-bottom:1px solid var(--line); margin-bottom:40px; }
-  h1 { margin:0; font-size:44px; letter-spacing:-.02em; }
-  .tag { color:var(--dim); font-size:18px; margin-top:8px; }
-
-  nav { position:sticky; top:0; background:var(--bg); border-bottom:1px solid var(--line);
-        display:flex; gap:4px; flex-wrap:wrap; padding:10px 0; margin-bottom:36px; z-index:5; }
-  nav a { color:var(--dim); text-decoration:none; font-size:14px; padding:6px 12px; border-radius:6px; }
-  nav a:hover { color:var(--ink); background:var(--panel); }
-
-  section { margin-bottom:64px; scroll-margin-top:64px; }
-  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.12em; color:var(--dim);
-       margin:0 0 20px; font-weight:600; }
-  h3 { font-size:20px; margin:0 0 6px; }
-  p { margin:0 0 14px; }
-  .lede { font-size:22px; line-height:1.45; letter-spacing:-.01em; margin-bottom:20px; }
-
-  .panel { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:22px; }
-  .muted { color:var(--dim); }
-  .small { font-size:14px; }
-
-  /* status strip */
-  .status { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
-  .score { font-size:34px; font-weight:600; font-variant-numeric:tabular-nums; }
-  .bar { flex:1; min-width:180px; height:8px; background:var(--line); border-radius:99px; overflow:hidden; }
-  .bar i { display:block; height:100%; background:var(--ok); }
-
-  .check { display:flex; gap:14px; padding:14px 0; border-top:1px solid var(--line); }
-  .check:first-child { border-top:0; }
-  .mark { flex:0 0 auto; width:20px; height:20px; border-radius:50%; margin-top:3px;
-          display:grid; place-items:center; font-size:12px; font-weight:700; color:#0f1115; }
-  .mark.y { background:var(--ok); } .mark.n { background:var(--bad); }
-  .check b { font-weight:600; }
-  .check .detail { color:var(--dim); font-size:14px; font-variant-numeric:tabular-nums; }
-  .check ul { margin:8px 0 0; padding-left:18px; font-size:14px; color:var(--bad); }
-  .check .why { margin-top:8px; font-size:14px; color:var(--dim); border-left:2px solid var(--line);
-                padding-left:12px; }
-
-  /* stages */
-  .stage { display:grid; grid-template-columns:52px 1fr; gap:20px; padding:24px 0;
-           border-top:1px solid var(--line); }
-  .stage:first-child { border-top:0; }
-  .num { width:40px; height:40px; border-radius:10px; background:var(--panel); border:1px solid var(--line);
-         display:grid; place-items:center; font-weight:600; font-variant-numeric:tabular-nums; }
-  .num.setup { border-color:var(--accent); color:var(--accent); }
-  .num.deploy { border-color:var(--warn); color:var(--warn); }
-  .goal { margin:2px 0 12px; }
-  .why { font-size:15px; color:var(--dim); margin-bottom:14px; }
-  .whynow { font-size:14px; color:var(--dim); border-left:2px solid var(--accent);
-            padding:2px 0 2px 14px; margin:0 0 14px; }
-  .whynow b { display:block; color:var(--ink); font-size:12px; text-transform:uppercase;
-              letter-spacing:.08em; margin-bottom:6px; }
-  .whynow p { margin:0 0 8px; }
-  .whynow p:last-child { margin-bottom:0; }
-  .kv { display:grid; grid-template-columns:112px 1fr; gap:6px 14px; font-size:14px; margin-top:12px; }
-  .kv dt { color:var(--dim); }
-  .kv dd { margin:0; }
-  .chips { display:flex; gap:6px; flex-wrap:wrap; }
-  .chip { font-size:12px; padding:3px 9px; border-radius:99px; border:1px solid var(--line);
-          color:var(--dim); white-space:nowrap; }
-  .chip.pos { color:var(--pos); border-color:color-mix(in srgb,var(--pos) 40%,transparent); }
-  .chip.neg { color:var(--neg); border-color:color-mix(in srgb,var(--neg) 40%,transparent); }
-
-  /* rewards */
-  .rw { padding:16px 0; border-top:1px solid var(--line); display:grid;
-        grid-template-columns:26px 1fr; gap:14px; }
-  .rw:first-child { border-top:0; }
-  .sign { font-size:20px; font-weight:700; line-height:1.2; }
-  .sign.p { color:var(--pos); } .sign.m { color:var(--neg); }
-  .rw .key { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; color:var(--dim); }
-  .rw .note { font-size:14px; color:var(--dim); margin-top:6px; }
-
-  /* feasibility */
-  .facts { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1px;
-           background:var(--line); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
-  .fact { background:var(--panel); padding:16px 18px; }
-  .fact .k { font-size:13px; color:var(--dim); }
-  .fact .v { font-size:19px; font-weight:600; margin:2px 0; }
-  .fact .n { font-size:12px; color:var(--dim); }
-  .risk { border-top:1px solid var(--line); padding:16px 0; }
-  .risk:first-child { border-top:0; }
-  .lv { font-size:11px; text-transform:uppercase; letter-spacing:.08em; padding:2px 8px;
-        border-radius:99px; margin-left:8px; vertical-align:2px; }
-  .lv.high { background:color-mix(in srgb,var(--bad) 20%,transparent); color:var(--bad); }
-  .lv.medium { background:color-mix(in srgb,var(--warn) 20%,transparent); color:var(--warn); }
-
-  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.9em;
-         background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:1px 5px; }
-  @media (max-width:640px) {
-    .stage { grid-template-columns:1fr; } .num { display:none; }
-    h1 { font-size:32px; } .lede { font-size:19px; }
-  }
-</style>
+<title>Gray &mdash; project summary</title>
+<link rel="stylesheet" href="/page.css">
 </head>
 <body>
-<div class="wrap">
-
-<header>
-  <h1>Gray</h1>
-  <div class="tag" id="tagline">Loading…</div>
-</header>
-
-<nav>
-  <a href="/">&larr; Training monitor</a>
-  <a href="/pose">Pose editor</a>
-  <a href="#goal">What we are training for</a>
-  <a href="#model">Model status</a>
-  <a href="#curriculum">What gets taught</a>
-  <a href="#scoring">Reward function</a>
-  <a href="#feasibility">Can it train</a>
-</nav>
-
-<section id="goal">
-  <h2>What we are training for</h2>
-  <div id="goal-body"></div>
-</section>
-
-<section id="model">
-  <h2>Model status</h2>
-  <div class="panel" id="model-body"></div>
-</section>
-
-<section id="curriculum">
-  <h2>What gets taught, in order</h2>
-  <p class="muted small" style="margin-bottom:24px">
-    Each stage starts only once the one before it has passed its bar. Nothing gets
-    built on top of something that has not been measured.
-  </p>
-  <div id="stages"></div>
-</section>
-
-<section id="scoring">
-  <h2>Reward function &mdash; how points are given</h2>
-  <div id="scoring-intro"></div>
-  <div class="panel" style="margin-top:20px"><div id="rewards"></div></div>
-</section>
-
-<section id="feasibility">
-  <h2>Can this machine train it</h2>
-  <div id="feas"></div>
-</section>
-
+<div class="top" id="top"></div>
+<div class="shell">
+  <div class="side"></div>
+  <div class="main"></div>
 </div>
 
+<script src="/page.js"></script>
 <script>
-const $ = (s) => document.querySelector(s);
-const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const el = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; };
+document.getElementById("top").innerHTML = topbar("/summary", "Project summary");
 
-function renderGoal(g) {
-  $("#tagline").textContent = g.one_line;
-  $("#goal-body").innerHTML =
-    `<p class="lede">${esc(g.one_line)}</p>` +
-    g.paragraphs.map(p => `<p>${esc(p)}</p>`).join("") +
-    `<div class="panel" style="margin-top:20px">
-       <div class="small muted">Done looks like</div>
-       <div style="font-size:18px;margin-top:4px">${esc(g.success)}</div>
-     </div>`;
-}
+/* Stage 1 is amber rather than green on purpose: eleven of eleven checks passing
+   says the model is self-consistent, not that it is the robot. */
+const CLS  = { "provisional": "later", "in progress": "now", "start now": "now" };
+const CHIP = { "provisional": "warn",  "in progress": "now", "start now": "now" };
 
-function renderModel(m) {
-  if (!m.exists) {
-    $("#model-body").innerHTML =
-      `<h3>No model yet</h3>
-       <p class="muted">Nothing can be simulated or trained until SolidWorks produces a
-       URDF at <code>${esc(m.urdf)}</code>.</p>
-       <p class="muted small">Once it exists this panel checks it against all ten
-       requirements every time the page is opened, and names the exact number that is
-       wrong. Run the same checks in a terminal with
-       <code>python tools/check_urdf.py</code>.</p>`;
-    return;
+function rewardTable(t) {
+  if (t.error) {
+    return `<div class="card"><h3>${esc(t.title)}</h3>
+      <div class="risk small"><b>Could not build this config.</b> ${esc(t.error)}</div>
+    </div>`;
   }
-  const pct = m.total ? Math.round(100 * m.passed / m.total) : 0;
-  const colour = m.passed === m.total ? "var(--ok)" : (m.passed > m.total / 2 ? "var(--warn)" : "var(--bad)");
-  $("#model-body").innerHTML =
-    `<div class="status">
-       <div class="score" style="color:${colour}">${m.passed}/${m.total}</div>
-       <div class="bar"><i style="width:${pct}%;background:${colour}"></i></div>
-       <div class="small muted">${esc(m.urdf)}</div>
-     </div>` +
-    m.checks.map(c => `
-      <div class="check">
-        <div class="mark ${c.passed ? "y" : "n"}">${c.passed ? "✓" : "✕"}</div>
-        <div style="flex:1">
-          <b>${esc(c.title)}</b>
-          ${c.detail ? `<div class="detail">${esc(c.detail)}</div>` : ""}
-          ${c.rows.length ? `<ul>${c.rows.map(r => `<li>${esc(r)}</li>`).join("")}</ul>` : ""}
-          ${c.passed ? "" : `<div class="why">${esc(c.why)}</div>`}
-        </div>
-      </div>`).join("");
+  const earn = t.terms.filter(x => x.sign === "+");
+  const lose = t.terms.filter(x => x.sign === "-");
+  const rows = (list) => list.map(r => `<tr>
+      <td class="n" style="color:${r.sign === "+" ? "var(--ok)" : "var(--bad)"};
+          font-size:17px;font-weight:700">${r.sign}</td>
+      <td><b>${esc(r.label)}</b>
+        <div class="dim" style="margin-top:2px">${
+          r.described ? esc(r.note)
+            : `<i>No written explanation. It is in the code and not on this page
+               &mdash; that gap is shown rather than hidden.</i>`}</div></td>
+      <td class="n dim" style="text-align:right">${r.weight}</td>
+    </tr>`).join("");
+  return `<div class="card">
+    <h3>${esc(t.title)}
+      <span class="chip">${t.terms.length} terms</span>
+      ${t.undescribed ? `<span class="chip warn">${t.undescribed} unexplained</span>` : ""}</h3>
+    <p class="why small">${esc(t.note)}</p>
+    <div class="tw scroller"><table>
+      <tr><th class="n"></th><th>What it measures</th><th class="n">weight</th></tr>
+      ${rows(earn)}${rows(lose)}
+    </table></div>
+    <div class="note small" style="margin-top:12px"><b>Ceiling:</b> the rewards are
+      capped at 1.0 each, so the most this run can score is
+      <b>${t.ceiling}</b> per step before penalties.</div>
+  </div>`;
 }
 
-function renderStages(stages, rewardsByKey) {
-  $("#stages").innerHTML = stages.map(s => `
-    <div class="stage">
-      <div><div class="num ${esc(s.kind)}">${s.n}</div></div>
-      <div>
-        <h3>${esc(s.name)}</h3>
-        <div class="goal">${esc(s.goal)}</div>
-        <div class="why">${esc(s.why)}</div>
-        ${s.why_now ? `<div class="whynow"><b>Why this order</b>${
-          s.why_now.split("\n\n").map(p => `<p>${esc(p)}</p>`).join("")}</div>` : ""}
-        ${s.teaches.length ? `<div class="chips">${s.teaches.map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>` : ""}
-        <dl class="kv">
-          ${s.rewarded.length ? `<dt>Scored on</dt><dd><div class="chips">${
-            s.rewarded.map(k => {
-              const r = rewardsByKey[k];
-              const cls = r && r.sign === "-" ? "neg" : "pos";
-              const label = r ? r.name : k;
-              return `<span class="chip ${cls}" title="${esc(k)}">${r ? esc(r.sign) : ""} ${esc(label)}</span>`;
-            }).join("")}</div></dd>` : ""}
-          <dt>Passes when</dt><dd>${esc(s.bar)}</dd>
-          <dt>Roughly</dt><dd class="muted">${esc(s.effort)}</dd>
-        </dl>
+fetch("/api/state").then(r => r.json()).then(s => shell([
+
+  { id: "stages", label: "The project, in three stages", html: () => `
+    <div class="eyebrow">Gray</div>
+    <h1>${esc(s.goal.one_line)}</h1>
+    <p class="lede">Three stages, and they are a loop rather than a line. Stage 1
+      is provisional &mdash; three of its numbers have no datasheet. Stage 2 is
+      where the project lives for a long time. Stage 3 measures what stage 1 is
+      guessing, which is why it starts now instead of last.</p>
+    <div class="cols tight">
+      ${s.project.map(p => `
+        <div class="stagecard ${CLS[p.state] || ""}">
+          <div class="num">${p.n}</div>
+          <h3>${esc(p.name)}</h3>
+          <p class="small" style="margin-bottom:10px">${esc(p.one_line)}
+            <span class="chip ${CHIP[p.state] || "warn"}">${esc(p.state)}</span></p>
+          <p class="why small">${esc(p.summary)}</p>
+          <div class="grow"></div>
+          <div class="note small" style="margin:8px 0 12px"><b>Where it stands:</b>
+            ${esc(p.headline)}</div>
+          <a class="plain small" href="${esc(p.page)}">Open stage ${p.n} &rarr;</a>
+        </div>`).join("")}
+    </div>` },
+
+  { id: "loop", label: "Why it is a loop", count: s.loop.edges.length, html: () => `
+    <div class="eyebrow">Stage 3 &rarr; Stage 1</div>
+    <h1>Why it is a loop, not a line</h1>
+    <p class="lede">${esc(s.loop.one_line)}</p>
+    <div class="card">
+      <div class="tw"><table>
+        <tr><th class="n">From</th><th>What it measures</th><th>Why it cannot be
+          settled any other way</th></tr>
+        ${s.loop.edges.map(e => `<tr>
+          <td class="n"><span class="chip" style="font-family:ui-monospace">${
+            esc(e.from)}</span></td>
+          <td><b>${esc(e.what)}</b>
+            <div class="dim small">feeds ${esc(e.to)}</div></td>
+          <td class="dim">${esc(e.why)}</td></tr>`).join("")}
+      </table></div>
+      <div class="note key small" style="margin-top:14px"><b>What the loop costs:</b>
+        ${esc(s.loop.cost)}</div>
+    </div>` },
+
+  { id: "goal", label: "What we are training for", html: () => `
+    <div class="eyebrow">Gray</div>
+    <h1>What we are training for</h1>
+    <p class="lede">${esc(s.goal.one_line)}</p>
+    <div class="cols">
+      ${s.goal.paragraphs.map(p => `<div class="card">
+        <p class="small">${esc(p)}</p></div>`).join("")}
+    </div>
+    <div class="note key" style="margin-top:18px"><b>Done looks like:</b>
+      ${esc(s.goal.success)}</div>` },
+
+  { id: "model", label: "Model status",
+    count: s.model && s.model.total ? `${s.model.passed}/${s.model.total}` : null,
+    html: () => `
+    <div class="eyebrow">Stage 1 output</div>
+    <h1>Model status</h1>
+    <p class="lede">The simulator's robot, checked against the real one. Run
+      live on every page load. These checks say the model is self-consistent
+      &mdash; they cannot say it is the robot.</p>
+    <div class="card">${modelBlock(s.model)}</div>` },
+
+  { id: "scoring", label: "Reward function",
+    count: (s.rewards.tasks || []).length, html: () => `
+    <div class="eyebrow">How points are given</div>
+    <h1>Reward function</h1>
+    <p class="lede">${esc(s.scoring_intro[0])}</p>
+    ${s.rewards.error ? `<div class="card"><div class="risk small">
+      <b>Not shown.</b> ${esc(s.rewards.error)}</div></div>` : ""}
+    <div class="cols">
+      <div class="card">
+        <h3>How it works</h3>
+        ${s.scoring_intro.slice(1).map(p => `<p class="why small">${esc(p)}</p>`).join("")}
+        <div class="note key small" style="margin-top:12px"><b>Source:</b>
+          <code>${esc(s.rewards.source)}</code>. Nothing on this page is a copy
+          &mdash; an earlier hand-written list drifted and named four terms that
+          no longer existed while missing four that did.</div>
       </div>
-    </div>`).join("");
-}
+      ${(s.rewards.tasks || []).map(rewardTable).join("")}
+    </div>` },
 
-function renderScoring(intro, rewards) {
-  $("#scoring-intro").innerHTML = intro.map(p => `<p>${esc(p)}</p>`).join("");
-  $("#rewards").innerHTML = rewards.map(r => `
-    <div class="rw">
-      <div class="sign ${r.sign === "+" ? "p" : "m"}">${esc(r.sign)}</div>
-      <div>
-        <b>${esc(r.name)}</b> <span class="key">${esc(r.key)}</span>
-        <div class="small">${esc(r.measures)}</div>
-        ${r.note ? `<div class="note">${esc(r.note)}</div>` : ""}
-      </div>
-    </div>`).join("");
-}
+  { id: "feasibility", label: "Can this machine train it", html: () => `
+    <div class="eyebrow">Measured, not assumed</div>
+    <h1>Can this machine train it</h1>
+    <p class="lede">${esc(s.feasibility.verdict)}</p>
+    ${facts(s.feasibility.facts)}
+    <div class="cols tight">
+      ${s.feasibility.risks.map(r => `<div class="card">
+        <h3>${esc(r.risk)}<span class="lv ${esc(r.level)}">${esc(r.level)}</span></h3>
+        <p class="why small">${esc(r.detail)}</p></div>`).join("")}
+    </div>` },
 
-function renderFeas(f) {
-  $("#feas").innerHTML =
-    `<p class="lede">${esc(f.verdict)}</p>
-     <div class="facts">${f.facts.map(x => `
-       <div class="fact">
-         <div class="k">${esc(x.k)}</div>
-         <div class="v">${esc(x.v)}</div>
-         <div class="n">${esc(x.note)}</div>
-       </div>`).join("")}</div>
-     <h2 style="margin-top:36px">What could stop it</h2>
-     <div class="panel">${f.risks.map(r => `
-       <div class="risk">
-         <b>${esc(r.risk)}</b><span class="lv ${esc(r.level)}">${esc(r.level)}</span>
-         <div class="small muted" style="margin-top:6px">${esc(r.detail)}</div>
-       </div>`).join("")}</div>`;
-}
-
-fetch("/api/state").then(r => r.json()).then(s => {
-  const byKey = Object.fromEntries(s.rewards.map(r => [r.key, r]));
-  renderGoal(s.goal);
-  renderModel(s.model);
-  renderStages(s.stages, byKey);
-  renderScoring(s.scoring_intro, s.rewards);
-  renderFeas(s.feasibility);
-}).catch(e => {
-  $("#tagline").textContent = "Could not load the plan: " + e;
-});
+])).catch(fail);
 </script>
 </body>
 </html>

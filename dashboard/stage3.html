@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gray &mdash; stage 3, Deploy</title>
+<link rel="stylesheet" href="/page.css">
+</head>
+<body>
+<div class="top" id="top"></div>
+<div class="shell">
+  <div class="side"></div>
+  <div class="main"></div>
+</div>
+
+<script src="/page.js"></script>
+<script>
+document.getElementById("top").innerHTML =
+  topbar("/stage3", "Stage 3 of 3 &middot; start now, in parallel");
+
+fetch("/api/stage/3").then(r => r.json()).then(s => shell([
+
+  { id: "where", label: "Where it stands", html: () => `
+    <div class="eyebrow">Stage 3 &middot; Deploy</div>
+    <h1>Put it on the real Gray</h1>
+    <p class="lede">${esc(s.lede)}</p>
+    <div class="cols">
+      ${s.intro.map(p => `<div class="card"><p class="small">${esc(p)}</p></div>`).join("")}
+    </div>` },
+
+  { id: "steps", label: "The steps", count: s.steps.length, html: () => `
+    <div class="eyebrow">Stage 3</div>
+    <h1>The steps</h1>
+    <p class="lede">Five of them. Step 3.3 points back at stage 1 on purpose
+      &mdash; measuring the real servos changes the model, and everything
+      trained afterwards is more honest for it.</p>
+    <div class="cols tight">
+      ${s.steps.map(st => `<div class="card">
+        <div class="num" style="width:auto;padding:0 10px;height:26px;
+             display:inline-grid;border:1px solid var(--warn);color:var(--warn);
+             border-radius:7px;font-size:12px;font-weight:700;margin-bottom:10px">
+          ${esc(st.n)}</div>
+        <h3>${esc(st.name)}</h3>
+        <p class="why small">${esc(st.d)}</p></div>`).join("")}
+    </div>` },
+
+  { id: "software", label: "Software to write first",
+    count: s.software_first.length, html: () => `
+    <div class="eyebrow">Stage 3</div>
+    <h1>Software worth writing before the hardware exists</h1>
+    <p class="lede">None of these need the robot. All of them are cheaper now
+      than on the day it is back together and something does not work.</p>
+    <div class="cols tight">
+      ${s.software_first.map(x => `<div class="card">
+        <p class="small">${esc(x)}</p></div>`).join("")}
+    </div>` },
+
+])).catch(fail);
+</script>
+</body>
+</html>

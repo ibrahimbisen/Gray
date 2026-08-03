@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gray &mdash; stage 1, Prepare</title>
+<link rel="stylesheet" href="/page.css">
+</head>
+<body>
+<div class="top" id="top"></div>
+<div class="shell">
+  <div class="side"></div>
+  <div class="main"></div>
+</div>
+
+<script src="/page.js"></script>
+<script>
+document.getElementById("top").innerHTML =
+  topbar("/stage1", "Stage 1 of 3 &middot; provisional");
+
+fetch("/api/stage/1").then(r => r.json()).then(s => shell([
+
+  { id: "why", label: "Why this stage exists", html: () => `
+    <div class="eyebrow">Stage 1 &middot; Prepare</div>
+    <h1>A digital Gray worth trusting</h1>
+    <p class="lede">${esc(s.lede)}</p>
+    ${facts(s.facts)}
+    <div class="cols">
+      ${s.story.map(p => `<div class="card"><p class="small">${esc(p)}</p></div>`).join("")}
+    </div>` },
+
+  { id: "checks", label: "The model, checked live",
+    count: s.model && s.model.total ? `${s.model.passed}/${s.model.total}` : null,
+    html: () => `
+    <div class="eyebrow">Stage 1</div>
+    <h1>The model, checked live</h1>
+    <p class="lede">These run against the current model every time this page
+      loads, so nothing here can quietly go stale.</p>
+    <div class="card">${modelBlock(s.model)}</div>` },
+
+  { id: "parts", label: "The parts session", count: s.parts.needed.length, html: () => `
+    <div class="eyebrow">Stage 1 &middot; next</div>
+    <h1>The parts session</h1>
+    <p class="lede">${esc(s.parts.intro)}</p>
+    <div class="cols">
+      <div class="card">
+        <h3>What is needed, in one go</h3>
+        <div class="tw"><table>
+          <tr><th>Item</th><th>What is needed</th></tr>
+          ${s.parts.needed.map(p => `<tr>
+            <td><b>${esc(p.item)}</b></td>
+            <td class="dim">${esc(p.ask)}</td></tr>`).join("")}
+        </table></div>
+      </div>
+      <div class="card">
+        <h3>Why the slicer number matters most</h3>
+        <p class="why small">${esc(s.parts.why_slicer)}</p>
+        <div class="note key small" style="margin-top:12px"><b>Output:</b>
+          ${esc(s.parts.output)}</div>
+        <div class="risk small"><b>What it cannot fix.</b> ${esc(s.parts.cannot_fix)}</div>
+      </div>
+    </div>` },
+
+  { id: "mass", label: "Where the mass came from", html: () => `
+    <div class="eyebrow">Stage 1</div>
+    <h1>Where the mass came from</h1>
+    <p class="lede">${esc(s.mass.intro)}</p>
+    <div class="cols">
+      <div class="card">
+        <h3>The numbers</h3>
+        <div class="tw"><table>
+          <tr><th>Part</th><th class="n">Mass</th><th>What is in it</th></tr>
+          ${s.mass.rows.map(r => `<tr><td><b>${esc(r.part)}</b></td>
+            <td class="n">${r.g} g</td><td class="dim">${esc(r.n)}</td></tr>`).join("")}
+          <tr><td><b>Total</b></td><td class="n"><b>${s.mass.total} g</b></td>
+              <td class="dim">estimated, not weighed</td></tr>
+        </table></div>
+      </div>
+      <div class="card">
+        <h3>Why the CAD numbers were dropped</h3>
+        ${s.mass.notes.map(n => `<p class="why small">${esc(n)}</p>`).join("")}
+      </div>
+    </div>` },
+
+  { id: "limits", label: "How far each joint turns", html: () => `
+    <div class="eyebrow">Stage 1</div>
+    <h1>How far each joint turns</h1>
+    <p class="lede">${esc(s.limits.intro)}</p>
+    <div class="cols">
+      <div class="card">
+        <div class="tw"><table>
+          <tr><th>Joint</th><th class="n">Travel</th><th>Which way is positive</th></tr>
+          ${s.limits.rows.map(r => `<tr><td><b>${esc(r.joint)}</b></td>
+            <td class="n">${esc(r.range)}</td>
+            <td class="dim">${esc(r.n)}</td></tr>`).join("")}
+        </table></div>
+      </div>
+      <div class="card">
+        <h3>Why this is measured twice</h3>
+        <p class="why small">A limit written into a file is a claim. Turning the
+          joint in the simulator and reading back where it actually stopped is a
+          measurement. They have disagreed before &mdash; two legs exported
+          rotated 180 degrees, which makes every sign in that leg backwards
+          while the file still looks correct.</p>
+      </div>
+    </div>` },
+
+  { id: "fixed", label: "What had to be fixed", count: s.fixed.length, html: () => `
+    <div class="eyebrow">Stage 1</div>
+    <h1>What had to be fixed in the export</h1>
+    <p class="lede">Each of these was found by a check failing or by the robot
+      behaving impossibly. None of them announce themselves.</p>
+    <div class="cols tight">
+      ${s.fixed.map(f => `<div class="card">
+        <h3>${esc(f.t)}</h3>
+        <p class="why small">${esc(f.d)}</p></div>`).join("")}
+    </div>` },
+
+  { id: "open", label: "Still assumed", count: s.open.length, html: () => `
+    <div class="eyebrow">Stage 1</div>
+    <h1>Still assumed</h1>
+    <p class="lede">An honest list of what this model does not actually know, and
+      the reason this stage reads <i>provisional</i> rather than done. Three of
+      these have no datasheet anywhere &mdash; only the physical robot can settle
+      them, which is stage 3.3. They are randomised rather than guessed, and a
+      policy that survives the range survives whatever the truth turns out to be.</p>
+    <div class="cols tight">
+      ${s.open.map(o => `<div class="card">
+        <h3>${esc(o.q)}</h3>
+        <p class="why small">${esc(o.n)}</p></div>`).join("")}
+    </div>` },
+
+])).catch(fail);
+</script>
+</body>
+</html>
