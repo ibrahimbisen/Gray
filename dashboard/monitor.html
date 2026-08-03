@@ -488,32 +488,33 @@ function metricTable(run, keys){
 /* ---------------- compare ---------------- */
 
 function compareChart(data){
-  const live = (data.series || []).filter(s => s.points.length);
+  const live = (data.series || []).filter(ser => ser.points.length);
   if(!live.length) return `<div class="empty">No run in the selection recorded
     <b>${esc(data.metric)}</b>.</div>`;
 
   const geo = {...GEO, H: 260, R: 96};   // room on the right for direct labels
-  const xs = live.flatMap(s => s.points.map(p => p.x));
-  const ys = live.flatMap(s => s.points.map(p => p.y));
+  const xs = live.flatMap(ser => ser.points.map(p => p.x));
+  const ys = live.flatMap(ser => ser.points.map(p => p.y));
   const sc = scales(xs, ys, geo);
 
   // Colour by position in the SELECTION, not in the filtered list. A selected
   // run with no data for this metric is dropped from `live`, which used to shift
   // every colour after it - the button green and its own line orange.
-  const hue = s => SLOTS[Math.max(0, COMPARE.indexOf(s.id)) % SLOTS.length];
+  // Named `ser`, not `s`: `s` is STATE everywhere else in this file.
+  const hue = ser => SLOTS[Math.max(0, COMPARE.indexOf(ser.id)) % SLOTS.length];
 
-  const paths = live.map(s => {
-    const c = hue(s);
-    const d = s.points.map((p, n) =>
+  const paths = live.map(ser => {
+    const c = hue(ser);
+    const d = ser.points.map((p, n) =>
       `${n ? "L" : "M"}${sc.px(p.x).toFixed(1)},${sc.py(p.y).toFixed(1)}`).join("");
-    const last = s.points[s.points.length - 1];
+    const last = ser.points[ser.points.length - 1];
     return `
       <path d="${d}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"
             stroke-linecap="round" vector-effect="non-scaling-stroke"/>
       <circle cx="${sc.px(last.x).toFixed(1)}" cy="${sc.py(last.y).toFixed(1)}" r="3.2"
               fill="${c}" stroke="var(--surface)" stroke-width="2"/>
       <text x="${(sc.px(last.x) + 7).toFixed(1)}" y="${(sc.py(last.y) + 3.5).toFixed(1)}"
-            font-size="10" fill="var(--ink2)">${esc(s.label)}</text>`;
+            font-size="10" fill="var(--ink2)">${esc(ser.label)}</text>`;
   }).join("");
 
   return `
@@ -524,10 +525,10 @@ function compareChart(data){
           ${axes(sc, geo)}${paths}
         </svg>
       </div>
-      <div class="legend">${live.map(s => `<span>
-        <i style="background:${hue(s)}"></i>${esc(s.label)}
+      <div class="legend">${live.map(ser => `<span>
+        <i style="background:${hue(ser)}"></i>${esc(ser.label)}
         <span class="tnum" style="color:var(--muted)">${fmt(
-          s.points[s.points.length - 1].y)}</span></span>`).join("")}</div>
+          ser.points[ser.points.length - 1].y)}</span></span>`).join("")}</div>
       ${(data.series || []).length > live.length ? `<div class="sub"
         style="margin-top:6px">${(data.series || []).length - live.length} selected
         run(s) recorded no <b>${esc(data.metric)}</b> and are not drawn.</div>` : ""}
@@ -535,10 +536,10 @@ function compareChart(data){
     <div class="card wrapx" style="margin-top:12px"><table>
       <tr><th>Run</th><th>Task</th><th class="tnum">samples</th>
           <th class="tnum">first</th><th class="tnum">last</th><th class="tnum">change</th></tr>
-      ${live.map(s => {
-        const a = s.points[0].y, b = s.points[s.points.length - 1].y;
-        return `<tr><td><b>${esc(s.label)}</b></td><td class="sub">${esc(s.task)}</td>
-          <td class="tnum">${s.n}</td><td class="tnum">${fmt(a)}</td>
+      ${live.map(ser => {
+        const a = ser.points[0].y, b = ser.points[ser.points.length - 1].y;
+        return `<tr><td><b>${esc(ser.label)}</b></td><td class="sub">${esc(ser.task)}</td>
+          <td class="tnum">${ser.n}</td><td class="tnum">${fmt(a)}</td>
           <td class="tnum">${fmt(b)}</td>
           <td class="tnum" style="color:${b >= a ? "var(--good)" : "var(--crit)"}">${
             b >= a ? "+" : ""}${fmt(b - a)}</td></tr>`;
@@ -674,8 +675,8 @@ function queuePanel(){
           <td><b>${esc(j.name || j.task)}</b><div class="sub">${esc(j.task)}</div>
             ${j.error ? `<div class="sub" style="color:var(--crit)">${esc(j.error)}</div>` : ""}</td>
           <td><span class="badge ${cls(j.state)}">${esc(j.state)}</span></td>
-          <td class="sub">${(j.steps || []).map(s =>
-            `${esc(s.name)} ${Math.round(s.seconds)}s`).join("<br>") || "—"}</td>
+          <td class="sub">${(j.steps || []).map(st =>
+            `${esc(st.name)} ${Math.round(st.seconds)}s`).join("<br>") || "—"}</td>
           <td class="sub tnum">${esc(j.finished || "")}</td>
           <td style="white-space:nowrap">
             ${j.run_id ? `<button class="btn tiny" data-open="${esc(j.run_id)}">run</button>` : ""}

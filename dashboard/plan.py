@@ -89,7 +89,7 @@ PROJECT = [
                "the real ones can, then every hour of training after that teaches a "
                "robot that does not exist. This is the stage the last attempt got "
                "wrong, and it cost the entire project.",
-        "headline": "11 of 11 checks pass. 2030 g, 13 links, 12 joints, travel limits "
+        "headline": "11 of 11 checks pass. 3100 g, 13 links, 12 joints, travel limits "
                     "verified in the simulator. Not done: the mass is a parts-list "
                     "estimate until the parts session, and three numbers have no "
                     "datasheet at all.",
@@ -186,11 +186,12 @@ STAGE1 = {
         "have no datasheet and can only come off the physical machine.",
     ],
     "facts": [
-        {"k": "Mass", "v": "2030 g", "n": "parts-list estimate - the parts session replaces this"},
+        {"k": "Mass", "v": "3100 g", "n": "2030 g robot + 1070 g payload, rounded up"},
         {"k": "Links / joints", "v": "13 / 12", "n": "trunk, four hips, four thighs, four calves"},
         {"k": "Ride height", "v": "190 mm", "n": "70% of the 272 mm it can reach"},
         {"k": "Footprint", "v": "280 x 186 mm", "n": "feet 34 mm outboard of each hip"},
-        {"k": "Torque margin", "v": "4.18x", "n": "worst joint needs 0.47 of 1.96 N-m"},
+        {"k": "Torque margin", "v": "2.73x", "n": "worst joint needs 0.72 of 1.96 N-m"},
+        {"k": "Leg mass", "v": "36%", "n": "was 55% - the payload is all trunk, so legs got lighter"},
         {"k": "Control rate", "v": "50 Hz", "n": "hard limit - the servo PWM period is 20 ms"},
     ],
 
@@ -233,12 +234,12 @@ STAGE1 = {
                  "replaced them is a parts list, which is better - and which the parts "
                  "session replaces again with datasheet and slicer numbers.",
         "rows": [
-            {"part": "Trunk", "g": 914, "n": "holds 4 of the 12 servos"},
+            {"part": "Trunk", "g": 1984, "n": "714 structural + 4 servos + 1070 payload"},
             {"part": "Hip (x4)", "g": 165, "n": "two servos each - thigh drive and calf drive"},
             {"part": "Thigh (x4)", "g": 65, "n": "no servo; a printed arm and a pushrod"},
             {"part": "Calf (x4)", "g": 49, "n": "no servo"},
         ],
-        "total": 2030,
+        "total": 3100,
         "notes": [
             "The thigh and calf came out of SolidWorks at almost exactly 1.0 g/cm3 - "
             "water. That is the exporter writing volume in cm3 into the mass field, so "
@@ -258,6 +259,22 @@ STAGE1 = {
             "Every number above is still an estimate. The parts session is what turns "
             "the printed-plastic rows into slicer output and the rest into datasheet "
             "lookups, and weighing three parts during reassembly checks the answer.",
+            "THE PAYLOAD, added 3 Aug 2026. A Jetson Orin Nano dev kit (~250 g), "
+            "twelve 18650 cells in 3S4P (540 g, 89 Wh, about 1.5 h of walking), five "
+            "cameras (~50 g) and 200 g besides. The 200 g 3S LiPo it replaces comes "
+            "out, so the net is +840 g - rounded up to a 3100 g total on the owner's "
+            "call, because shaving mass off a model later is far cheaper than finding "
+            "the real robot heavier than everything was trained against.",
+            "It is all on the trunk as one lump, because none of it is in the CAD yet. "
+            "That is honest now and wrong later: a battery underneath and a Jetson on "
+            "top are not the same as 1070 g at the trunk's centre, and the difference "
+            "shows up in roll inertia. Redistribute when the mounts are modelled.",
+            "The good news is where it landed. Every gram is trunk, so leg mass fell "
+            "from 55% of the robot to 36% - and leg mass is what a swing costs and "
+            "what a shove has to arrest. Torque margin went 4.18x to 2.73x, still "
+            "comfortable. The cost is to dynamics and servo speed under load, not to "
+            "standing up: stand and push both passed their bars on the heavier robot "
+            "the same night the mass changed.",
         ],
     },
     "limits": {
@@ -616,10 +633,11 @@ PHASES = [
     {
         "n": 1, "name": "Prepare", "state": "provisional",
         "one_line": "A digital Gray worth trusting.",
-        "detail": "Rebuilt from SolidWorks. 11 of 11 checks pass: 2030 g, joint axes "
-                  "exact, and the owner's measured travel limits on all twelve joints, "
-                  "verified in the simulator. Still provisional - the mass is a "
-                  "parts-list estimate and three numbers have no datasheet.",
+        "detail": "Rebuilt from SolidWorks. 11 of 11 checks pass: 3100 g with the "
+                  "payload, joint axes exact, and the owner's measured travel limits "
+                  "on all twelve joints, verified in the simulator. Still provisional "
+                  "- the mass is a parts-list estimate and three numbers have no "
+                  "datasheet.",
         "needs_robot": False,
     },
     {
@@ -671,10 +689,11 @@ NEXT_UP = {
                  "randomised rather than guessed, which is the right handling - but "
                  "the range is itself a guess until stage 3.3 measures them."},
         {"q": "The mass is a parts-list estimate.",
-         "note": "2030 g, built from 12 servos at 60 g, a 3S LiPo, the Pi and boards, "
-                 "and PLA costed at 22% infill. The parts session replaces the plastic "
-                 "rows with slicer output; weighing one calf, one thigh and one hip "
-                 "during reassembly checks the split."},
+         "note": "3100 g: a 2030 g robot built from 12 servos at 60 g, the Pi and "
+                 "boards and PLA costed at 22% infill, plus a 1070 g payload of "
+                 "Jetson, 18650 pack and cameras that is not in the CAD yet. The parts "
+                 "session replaces the plastic rows with slicer output; weighing one "
+                 "calf, one thigh and one hip during reassembly checks the split."},
         {"q": "Three-legged stance is filed under R1 but is not commandable.",
          "note": "Standing on three legs, on two diagonal legs, and holding one leg "
                  "out need a per-foot command that the vector does not have. Listed on "
