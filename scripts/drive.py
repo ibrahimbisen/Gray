@@ -250,6 +250,15 @@ def main() -> None:
         got_deg = math.degrees(math.atan2(c, a))
         want_deg = math.degrees(math.atan2(case["vy"], case["vx"]))
 
+        # The SPREAD, not just the mean. Eight robots gave +5.1 deg on one draw
+        # and -0.4 deg on the next for the same command, which was read as a
+        # constant veer until the second draw disagreed with it. A mean with no
+        # spread beside it invites exactly that mistake: it looks like one
+        # number when it is the centre of a wide one.
+        per_deg = torch.rad2deg(torch.atan2(across[keep], along[keep]))
+        spread = float(per_deg.std()) if int(keep.sum()) > 1 else 0.0
+        lo, hi = float(per_deg.min()), float(per_deg.max())
+
         name = label(case)
         dst = out_dir / f"{name}.mp4"
         tmp = dst.with_name(dst.stem + ".writing.mp4")
@@ -272,6 +281,9 @@ def main() -> None:
                           "angle_deg": round(want_deg, 1)},
             "walked": {"along_m": round(a, 3), "across_m": round(c, 3),
                        "angle_deg": round(got_deg, 1),
+                       "angle_sd_deg": round(spread, 1),
+                       "angle_min_deg": round(lo, 1),
+                       "angle_max_deg": round(hi, 1),
                        "speed_along": round(a / args.seconds, 3),
                        "speed_across": round(c / args.seconds, 3)},
             "fell": int(fell.sum()),
@@ -279,9 +291,10 @@ def main() -> None:
             "video": str(dst.relative_to(ROOT)).replace("\\", "/"),
         }
         results.append(row)
-        print(f"{name:16} told {case['vx']:+.2f},{case['vy']:+.2f} "
-              f"({want_deg:+5.1f} deg)   walked {a:+.2f},{c:+.2f} m "
-              f"({got_deg:+5.1f} deg)   fell {int(fell.sum())}/{args.robots}")
+        print(f"{name:17} told {case['vx']:+.2f},{case['vy']:+.2f} "
+              f"({want_deg:+6.1f})   walked {a:+.2f},{c:+.2f} m "
+              f"({got_deg:+6.1f} +/-{spread:4.1f}, {lo:+.0f}..{hi:+.0f})   "
+              f"fell {int(fell.sum())}/{args.robots}")
 
     (out_dir / "drive.json").write_text(
         json.dumps({"run": log_dir.name, "checkpoint": ckpt.name,
