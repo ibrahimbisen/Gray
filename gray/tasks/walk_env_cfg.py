@@ -282,6 +282,41 @@ def swing_height(env, target: float, sensor_name: str = "feet",
     return cost * moving.float()
 
 
+def touchdown_speed(env, sensor_name: str = "feet", asset_cfg=FOOT_SITES):
+    """How fast a foot is still travelling downward at the instant it lands.
+
+    The owner's observation: a leg should be slowing as it arrives, the way a
+    servo eases into the end of its travel, rather than running at speed into the
+    floor. This is that, priced.
+
+    **Why speed and not force.** `hard_landing` already charges for contact FORCE
+    at touchdown, and it is set to -1e-4, which is off. Turning it up would work,
+    but force in the simulator is a function of the contact stiffness - a
+    parameter nobody measured, on a robot whose mass just rose 53%. Optimising
+    hard against a guessed parameter is how a gait comes out smooth in simulation
+    and harsh on a real floor. Foot velocity is plain kinematics with no guess in
+    the path, and it is the one of the two that could be checked on the real
+    robot: there are no force sensors, but the potentiometers give joint rates.
+
+    **Why only at touchdown.** Charging for deceleration in general would tax the
+    fast corrections that catch a stumble - which is exactly what push_v3 did
+    with a large smoothness penalty, and the robot stopped being able to catch
+    itself. `landed` restricts this to the single step a foot arrives on.
+
+    Downward only: `clamp(-vz, min=0)`. A foot moving UP as it grazes something
+    is not a hard landing and should not be billed as one.
+
+    compute_first_contact is a pure read of the air-time state, so calling it
+    here as well as in swing_height advances nothing twice - unlike the running
+    averages in this file, which must each have exactly one caller.
+    """
+    contact = env.scene[sensor_name]
+    landed = contact.compute_first_contact(dt=env.step_dt)
+    asset = env.scene[asset_cfg.name]
+    vz = asset.data.site_lin_vel_w[:, asset_cfg.site_ids, 2]
+    return torch.sum(torch.clamp(-vz, min=0.0) * landed.float(), dim=1)
+
+
 def _going_straight(env, command_name: str = "walk") -> torch.Tensor:
     """True where the robot has been told to go forward and not to turn."""
     command = env.command_manager.get_command(command_name)
@@ -523,6 +558,11 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
     # --- protecting the hardware ---
     cfg.rewards["joint_shock"] = RewardTermCfg(func=mdp.joint_acc_l2, weight=-2.5e-7)
+    # Arriving slowly. Ramped in with the other tidiness terms rather than set
+    # from step 0 - a robot that cannot yet walk lands hard on every step, and
+    # charging full price for that before it has a gait just teaches it not to
+    # pick its feet up.
+    cfg.rewards["landing_speed"] = RewardTermCfg(func=touchdown_speed, weight=-0.1)
 
     # Everything that asks the robot to be TIDY is ramped in, rather than set at
     # full weight from step 0. docs/REWARDS.md is emphatic about this and so is
@@ -550,6 +590,8 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         # the robot can actually hold a direction, and charging for it early just
         # fines a robot for falling over in a way that happens to rotate it.
         "ease_in_straightness": _ramp("veering", (-0.2, -0.5, -1.2, -2.0)),
+        # arriving slowly rather than running into the floor
+        "ease_in_landing": _ramp("landing_speed", (-0.1, -0.3, -0.6, -0.8)),
     }
 
     if not play:

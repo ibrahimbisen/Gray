@@ -1,6 +1,6 @@
 {
   "paused": false,
-  "next_id": 23,
+  "next_id": 24,
   "jobs": [
     {
       "task": "Gray-Push",
@@ -261,6 +261,30 @@
       "steps": [],
       "owner": "31132@061706",
       "log": "progress/jobs/j0010.log"
+    },
+    {
+      "task": "Gray-Walk",
+      "name": "walk_m3100_h",
+      "note": "Tests the new landing_speed term alone. Charges a foot for how fast it is still travelling downward at the instant it touches down - the owner asked for the leg to ease in at the end of its movement rather than run into the floor. Deliberately 3072 robots and no reward overrides, so it matches walk_g exactly and the landing term is the ONLY difference. Changing the robot count too would make the result unreadable.",
+      "num_envs": 3072,
+      "iterations": 3000,
+      "stop_at": 0.965,
+      "no_video": false,
+      "rewards": {},
+      "push_speed": null,
+      "push_spin": null,
+      "film": true,
+      "verify": true,
+      "clamped": "",
+      "id": "j0023",
+      "state": "queued",
+      "created": "2026-08-03T12:01:34",
+      "started": null,
+      "finished": null,
+      "run_id": null,
+      "exit_code": null,
+      "error": "",
+      "steps": []
     },
     {
       "task": "Gray-Walk",
