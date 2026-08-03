@@ -231,6 +231,34 @@ def _find_run_dir(before: set[str], deadline: float, job_id: str) -> str | None:
     return None
 
 
+def _training_started(run_id: str | None, job_id: str, deadline: float) -> bool:
+    """Wait until training has actually completed an iteration.
+
+    metrics.csv gets a data row only once train.py's bridge has read a scalar out
+    of the tensorboard file, which cannot happen until the simulator is stepping.
+    By then CUDA graph capture is long finished, so a second process starting on
+    the device is safe.
+
+    Returns False if it never gets there - cancelled, or training died on
+    startup - in which case there is nothing to film anyway.
+    """
+    if not run_id:
+        return False
+    metrics = RUNS / run_id / "metrics.csv"
+    while time.time() < deadline:
+        try:
+            # Header plus at least one row.
+            if metrics.is_file() and len(metrics.read_text().splitlines()) >= 2:
+                return True
+        except OSError:
+            pass
+        _beat(state="starting", job=job_id)
+        if _cancelled(job_id):
+            return False
+        time.sleep(2.0)
+    return False
+
+
 def _step(job_id: str, name: str, started: float, code: int | None) -> None:
     """Record one pipeline step on the job, so the page can show what happened."""
     try:
@@ -272,10 +300,23 @@ def run_job(job: dict) -> None:
         # Filming reads the checkpoints training writes, so it runs alongside
         # rather than after. Its own process and its own failure: a broken
         # renderer should cost the videos, not the run.
+        #
+        # But NOT until training is actually iterating. Starting it five seconds
+        # after train.py cost a whole run: the film process created its own CUDA
+        # context on the same device while training was capturing its forward
+        # graph, and training died with "Warp CUDA error 600: device not ready"
+        # out of wp.capture_launch. That was misread as the card running out of
+        # memory and blamed on the robot count for half a day; it was a race.
+        #
+        # Nothing is lost by waiting. Filming works from checkpoints on disk and
+        # the first one is not written until iteration 25.
         film = None
         if job.get("film") and not job.get("no_video"):
-            film = _popen(["scripts/film_checkpoints.py", "--watch"],
-                          LOGS / f"{job_id}.film.log")
+            if _training_started(run_id, job_id, started + RUN_DIR_TIMEOUT_S):
+                film = _popen(["scripts/film_checkpoints.py", "--watch"],
+                              LOGS / f"{job_id}.film.log")
+            else:
+                _say(f"{job_id}  training never reported an iteration - not filming")
 
         code = _wait(train, job_id, "train")
         _step(job_id, "train", started, code)

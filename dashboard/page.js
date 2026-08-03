@@ -103,11 +103,11 @@ function modelBlock(m) {
       &mdash; re-run every time this page loads</div>
     ${m.checks.map(c => `
       <div class="check">
-        <div class="mark ${c.ok ? "y" : "n"}">${c.ok ? "&#10003;" : "&#10007;"}</div>
-        <div><b>${esc(c.name)}</b>
+        <div class="mark ${c.passed ? "y" : "n"}">${c.passed ? "&#10003;" : "&#10007;"}</div>
+        <div><b>${esc(c.title)}</b>
           <div class="detail">${esc(c.detail || "")}</div>
-          ${(c.problems || []).length
-            ? `<ul>${c.problems.map(p => `<li>${esc(p)}</li>`).join("")}</ul>` : ""}
+          ${(c.rows || []).length
+            ? `<ul>${c.rows.map(p => `<li>${esc(p)}</li>`).join("")}</ul>` : ""}
         </div></div>`).join("")}`;
 }
 

@@ -57,30 +57,32 @@ FINISHED = ("done", "failed", "cancelled", "skipped")
 TASKS = ("Gray-Stand", "Gray-Push", "Gray-Walk")
 
 # How many robots fit on the card, measured by scripts/probe_envs.py - see
-# RULES.md rule 3.
+# RULES.md rule 3. 6400 for the push task was 10.2 GB of 12.3.
 #
-#   CARD    the ceiling with nothing else on the GPU.
-#   FILMING the ceiling when scripts/film_checkpoints.py is also running, because
-#           the video renderer needs its own GPU memory.
+# THE 4096 CRASH WAS NOT MEMORY, and this file said it was for half a day.
 #
-# This is not a style preference, it is a crash. A stand run queued at 4096 WITH
-# filming on died 26 seconds in with "Warp CUDA error 600: device not ready" -
-# the renderer and the trainer both wanted memory that was not there. The number
-# is enforced here rather than remembered, because the failure arrives minutes
-# later and looks like a broken model rather than a full card.
-CARD_ENV_CEILING = 4096
-
-# Raised 3072 -> 3600 on the owner's call, 3 Aug 2026.
+# A stand run at 4096 with filming on died 26 s in, and the obvious reading was
+# that the trainer and the video renderer had run the card out of memory. The
+# owner then measured it: 3072 uses 6.9 GB and 3600 uses 7.3 GB, so 4096 would
+# have been about 7.8 GB of 12.0. Nowhere near.
 #
-# What is actually known, rather than assumed:
-#   3072 + filming   works. Measured at 6.9 GB of 12.0 across several runs.
-#   4096 + filming   died 26 s in with CUDA error 600.
+# Reading the traceback properly says the same thing. The failure was
 #
-# 3600 is between them and has not been run yet. It is a 17% step up from
-# known-good, not a jump to the known-bad number. If a run dies with error 600
-# again, this is the line to put back to 3072 - the failure is fast and obvious,
-# so it costs a minute rather than a night.
-FILMING_ENV_CEILING = 3600
+#     wp_cuda_graph_launch ... Warp CUDA error 600: device not ready
+#
+# raised from wp.capture_launch. Error 600 is cudaErrorNotReady - a CUDA GRAPH
+# LAUNCH failure. An allocation failure reports a memory error and looks nothing
+# like this. And the timeline was: train.py at 05:56:52, film_checkpoints.py at
+# 05:56:57, crash at 05:57:23. The film process was creating its own CUDA context
+# on the same device while training was mid graph-capture, which is a documented
+# way to get exactly this error.
+#
+# So there is one ceiling, it is the measured one, and the real fix lives in
+# scripts/runner.py: filming now waits until training is actually iterating.
+# Filming reads checkpoints off disk and the first one does not exist until
+# iteration 25, so starting it early bought nothing and cost a run.
+CARD_ENV_CEILING = 6400
+FILMING_ENV_CEILING = CARD_ENV_CEILING
 
 # A job, with every field defaulted. Anything the UI does not send falls back to
 # the same value train.py would have used on its own.
@@ -449,21 +451,17 @@ def _clean(spec: dict) -> dict:
     job["iterations"] = max(0, job["iterations"])
     job["stop_at"] = min(max(job["stop_at"], 0.0), 1.0)
 
-    # Robots on the card. Filming needs its own GPU memory, so the ceiling drops
-    # when it is on. Clamped rather than rejected - a job that silently does not
-    # exist is worse than one that runs slightly smaller - but the clamp is
-    # RECORDED so the page can say it happened. A silent clamp would look like
-    # the settings were ignored.
+    # Robots on the card, against the ceiling scripts/probe_envs.py measured.
+    # Clamped rather than rejected - a job that silently does not exist is worse
+    # than one that runs slightly smaller - but the clamp is RECORDED so the page
+    # can say it happened. A silent clamp looks like the settings were ignored.
     asked = max(1, int(job["num_envs"]))
     ceiling = FILMING_ENV_CEILING if job.get("film") else CARD_ENV_CEILING
     job["num_envs"] = min(asked, ceiling)
     job["clamped"] = ""
     if asked > ceiling:
-        job["clamped"] = (
-            f"asked for {asked} robots, capped at {ceiling}"
-            + (" because filming needs its own GPU memory - 4096 with the video "
-               "renderer running crashes with CUDA error 600"
-               if job.get("film") else " - the card's measured ceiling"))
+        job["clamped"] = (f"asked for {asked} robots, capped at {ceiling} - the "
+                          f"card's measured ceiling (probe_envs.py)")
     return job
 
 
