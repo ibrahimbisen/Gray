@@ -32,10 +32,10 @@ from mjlab.managers import EventTermCfg, RewardTermCfg, SceneEntityCfg
 
 from gray.tasks.stand_env_cfg import ALL_JOINTS, ROBOT, stand_env_cfg, stand_ppo_cfg
 
-# How hard the shoves are, as a change in trunk velocity. 0.6 m/s applied to
-# 2.379 kg is about 1.4 N-s - a firm nudge with a finger, not a kick. The bar
-# talks in impulse; this is the mass-independent equivalent mjlab provides.
-PUSH_MS = 0.6
+# How hard the shoves are, as an instant change in trunk speed. On 2.379 kg,
+# 1.2 m/s is about 2.9 N-s - a proper shove rather than a nudge.
+PUSH_MS = (0.4, 1.2)
+PUSH_SPIN = (-1.5, 1.5)      # rad/s about the vertical, either way
 PUSH_EVERY_S = (2.0, 4.0)
 
 FEET = SceneEntityCfg("robot", geom_names=(".*calf.*",))
@@ -53,21 +53,44 @@ def trunk_spin(env, asset_cfg=ROBOT):
     return torch.sum(torch.square(asset.data.root_link_ang_vel_b), dim=1)
 
 
+def shove_from_any_angle(env, env_ids, speed_range, spin_range, asset_cfg=ROBOT):
+    """Shove the trunk in a direction picked uniformly from the whole circle.
+
+    Sampling x and y independently, which is what mjlab's own push event does,
+    draws from a SQUARE: a diagonal shove comes out 1.41 times harder than a
+    sideways one, and the robot gets pushed towards its corners more often than
+    along its axes. Picking an angle and a magnitude separately gives every
+    direction the same weight and the same range of strengths.
+    """
+    from mjlab.envs.mdp.events import resolve_env_ids  # noqa: PLC0415
+
+    env_ids = resolve_env_ids(env, env_ids)
+    asset = env.scene[asset_cfg.name]
+    n = len(env_ids)
+
+    angle = torch.rand(n, device=env.device) * (2 * torch.pi)
+    speed = (torch.rand(n, device=env.device)
+             * (speed_range[1] - speed_range[0]) + speed_range[0])
+    spin = (torch.rand(n, device=env.device)
+            * (spin_range[1] - spin_range[0]) + spin_range[0])
+
+    vel = asset.data.root_link_vel_w[env_ids].clone()
+    vel[:, 0] += speed * torch.cos(angle)
+    vel[:, 1] += speed * torch.sin(angle)
+    vel[:, 5] += spin
+    asset.write_root_link_velocity_to_sim(vel, env_ids=env_ids)
+
+
 def push_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     cfg = stand_env_cfg(play=play)
 
-    # A shove every two to four seconds, from any direction, including spin.
-    # Applied as an instant change in trunk velocity, which is the cheap
-    # mass-independent disturbance and the standard one for locomotion.
+    # A shove every two to four seconds, from a direction drawn uniformly from
+    # the whole circle, with a spin on top.
     cfg.events["shove"] = EventTermCfg(
-        func=mdp.push_by_setting_velocity,
+        func=shove_from_any_angle,
         mode="interval",
         interval_range_s=PUSH_EVERY_S,
-        params={"velocity_range": {
-            "x": (-PUSH_MS, PUSH_MS),
-            "y": (-PUSH_MS, PUSH_MS),
-            "yaw": (-1.0, 1.0),
-        }},
+        params={"speed_range": PUSH_MS, "spin_range": PUSH_SPIN},
     )
 
     # A world that is not the same every time. Each of these is a number we do

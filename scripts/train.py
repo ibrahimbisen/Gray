@@ -176,6 +176,10 @@ def main() -> int:
                     help="0 uses the task's own default")
     ap.add_argument("--name", default="")
     ap.add_argument("--no-video", action="store_true")
+    ap.add_argument("--reward", action="append", default=[], metavar="NAME=WEIGHT",
+                    help="change one scoring weight, e.g. --reward twitching=-1.5. "
+                         "Repeatable. The change is recorded in the run, so the "
+                         "dashboard shows what this run was actually scored on.")
     args = ap.parse_args()
 
     import gray.tasks  # noqa: F401  - registers the tasks
@@ -190,6 +194,16 @@ def main() -> int:
         cfg.agent.max_iterations = args.iterations
     iterations = cfg.agent.max_iterations
     cfg.agent.run_name = run_name
+
+    for change in args.reward:
+        term, _, weight = change.partition("=")
+        if term not in cfg.env.rewards:
+            raise SystemExit(
+                f"no scoring term called {term!r}. This run has: "
+                f"{', '.join(sorted(cfg.env.rewards))}")
+        was = cfg.env.rewards[term].weight
+        cfg.env.rewards[term].weight = float(weight)
+        print(f"scoring       {term}: {was} -> {float(weight)}")
     cfg = TrainConfig(
         env=cfg.env, agent=cfg.agent,
         video=not args.no_video,
