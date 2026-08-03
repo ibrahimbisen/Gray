@@ -184,6 +184,8 @@ def read_run(folder: Path) -> dict:
         "finished": meta.get("finished"),
         "iterations_done": done,
         "iterations_target": target,
+        "num_envs": meta.get("num_envs"),
+        "num_steps_per_env": meta.get("num_steps_per_env"),
         "progress": (done / target) if target else 0.0,
         "metric_columns": cols,
         "metrics": rows,
@@ -320,6 +322,8 @@ def all_summaries() -> list[dict]:
             "duration": _duration(meta.get("started"), meta.get("finished")),
             "iterations_done": done,
             "iterations_target": target,
+        "num_envs": meta.get("num_envs"),
+        "num_steps_per_env": meta.get("num_steps_per_env"),
             "progress": (done / target) if target else 0.0,
             "metric_columns": cols,
             "samples": len(rows),
@@ -330,6 +334,13 @@ def all_summaries() -> list[dict]:
             "scoring": len(meta.get("scoring", [])),
         })
     out.sort(key=lambda r: (r["started"] or "", r["id"]), reverse=True)
+    # A sequential number, oldest = 1. Names are not unique and never were - a
+    # cancelled-and-requeued job keeps its name, so the list can show four runs
+    # called walk_m3100_h with nothing to tell them apart but a relative
+    # timestamp. The number is what a person can actually say out loud.
+    total = len(out)
+    for i, run in enumerate(out):
+        run["number"] = total - i
     return out
 
 

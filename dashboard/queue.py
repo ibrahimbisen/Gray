@@ -77,11 +77,25 @@ TASKS = ("Gray-Stand", "Gray-Push", "Gray-Walk")
 # on the same device while training was mid graph-capture, which is a documented
 # way to get exactly this error.
 #
-# So there is one ceiling, it is the measured one, and the real fix lives in
+# So there is one ceiling rather than two, and the real fix lives in
 # scripts/runner.py: filming now waits until training is actually iterating.
 # Filming reads checkpoints off disk and the first one does not exist until
 # iteration 25, so starting it early bought nothing and cost a run.
-CARD_ENV_CEILING = 6400
+#
+# THE NUMBER ITSELF is 5500 - deliberately below the 6400 probe_envs.py measured,
+# on the owner's call, for headroom. Measured on this card with the renderer also
+# loaded:
+#     6400 robots -> 11,828 MiB of 12,282   (96%)
+#     6000 robots -> 11,755 MiB             (96%)
+#
+# Note how little the robot count actually moves it: 400 fewer robots freed
+# 73 MB. Most of that 11.7 GB is fixed cost - CUDA context, the model, the
+# renderer - not the robots. So headroom here is bought in small amounts, and
+# going much lower would cost throughput without buying much back.
+#
+# Running out mid-run costs the whole run, which is why the trade is worth
+# making at all.
+CARD_ENV_CEILING = 5500
 FILMING_ENV_CEILING = CARD_ENV_CEILING
 
 # A job, with every field defaulted. Anything the UI does not send falls back to

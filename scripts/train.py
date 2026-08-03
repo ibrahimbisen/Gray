@@ -359,6 +359,13 @@ def main() -> int:
         "started": datetime.now().isoformat(timespec="seconds"),
         "finished": None,
         "iterations_target": iterations,
+        # Written as fields, not only prose. The dashboard needs them to work out
+        # seconds per iteration: one iteration is num_envs x num_steps_per_env
+        # robot-steps, and Perf/total_fps counts robot-steps. Deriving pace from
+        # wall-clock instead folds in 40 s of startup and reads 30% slow for the
+        # first few hundred iterations - exactly when someone is watching.
+        "num_envs": args.num_envs,
+        "num_steps_per_env": cfg.agent.num_steps_per_env,
         "notes": f"{args.num_envs} robots at once, 50 Hz control."
                  + (f" Shoves {shove.params['speed_range'][0]}-"
                     f"{shove.params['speed_range'][1]} m/s from any angle, spin "

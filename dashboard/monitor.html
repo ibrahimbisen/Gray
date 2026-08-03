@@ -302,7 +302,8 @@ function renderRuns(runs){
   $("#runlist").innerHTML = runs.map(r => `
     <div class="rc ${r.id === SELECTED ? "sel" : ""}" data-id="${esc(r.id)}">
       <div class="r1"><span class="dot ${cls(r.status)}"></span>
-        <span class="nm">${esc(r.variant || r.name)}</span>
+        <span class="nm"><span style="color:var(--muted)">#${r.number}</span>
+          ${esc(r.variant || r.name)}</span>
         <span class="badge ${cls(r.status)}">${esc(r.status)}</span></div>
       <div class="pp"><b>${esc(r.name)}</b>${r.task ? ` &middot; ${esc(r.task)}` : ""}</div>
       ${r.verdict ? `<div class="pp"><span class="badge ${
@@ -776,11 +777,56 @@ function tiles(run){
   }).join("")}</div>`;
 }
 
+/* Seconds per iteration, and what is left, from the clock rather than from
+   steps_per_second. total_fps counts robot-steps and one iteration is
+   robots x 24 of them, so reading pace off it means carrying that factor around
+   and getting it wrong when num_steps_per_env changes. Elapsed / done cannot
+   drift out of step with reality. */
+function pace(run){
+  const left = Math.max(0, (run.iterations_target || 0) - (run.iterations_done || 0));
+  const running = run.status === "running";
+
+  // Preferred: the rate training itself reports. Perf/total_fps counts
+  // robot-steps and one iteration is num_envs x num_steps_per_env of them, so
+  // this is the CURRENT pace and owes nothing to how long startup took.
+  const rows = run.metrics || [];
+  const envs = run.num_envs, per_env = run.num_steps_per_env;
+  if(envs && per_env && rows.length){
+    const recent = rows.slice(-20)
+      .map(r => r.steps_per_second)
+      .filter(v => typeof v === "number" && v > 0);
+    if(recent.length){
+      const sps = recent.reduce((a, b) => a + b, 0) / recent.length;
+      const per = (envs * per_env) / sps;
+      return {per, left, eta: left * per, running, source: "measured"};
+    }
+  }
+
+  // Fallback for older runs with no num_envs recorded. Elapsed-since-start
+  // INCLUDES the 40 s of building the environment and loading torch, so it
+  // reads slow - about 2.4 s/iter against a true 1.9 at 90 iterations in. Say
+  // so rather than presenting it as the same number.
+  if(!run.started || !run.iterations_done) return null;
+  const from = new Date(run.started).getTime();
+  const to = run.finished ? new Date(run.finished).getTime() : Date.now();
+  const secs = (to - from) / 1000;
+  if(!(secs > 0)) return null;
+  const per = secs / run.iterations_done;
+  return {per, left, eta: left * per, running, source: "wall clock, incl. startup"};
+}
+
+function clock(secs){
+  if(!isFinite(secs) || secs < 0) return "—";
+  const h = Math.floor(secs / 3600), m = Math.round((secs % 3600) / 60);
+  return h ? `${h} h ${String(m).padStart(2, "0")} min` : `${Math.max(1, m)} min`;
+}
+
 function runHeader(run){
   const pct = Math.round(100 * (run.progress || 0));
+  const p = pace(run);
   return `
     <div class="top" style="margin-bottom:4px">
-      <h1 style="font-size:19px">${esc(run.name)}</h1>
+      <h1 style="font-size:19px">${run.number ? "#" + run.number + " " : ""}${esc(run.name)}</h1>
       <span class="pill tnum">${esc(run.variant || run.id)}</span>
       <span class="badge ${cls(run.status)}">${esc(run.status)}</span>
       ${run.verdict ? `<span class="badge ${cls(run.verdict)}">${esc(run.verdict)}</span>` : ""}
@@ -797,7 +843,16 @@ function runHeader(run){
       <span class="tnum">${(run.iterations_done || 0).toLocaleString()} /
         ${(run.iterations_target || 0).toLocaleString()} iterations</span>
       <span class="tnum">${pct}% &middot; started ${esc(run.started_age || "")}</span>
-    </div>`;
+    </div>
+    ${p ? `<div class="proglab" style="margin-top:3px">
+      <span class="tnum"><b>${p.per.toFixed(2)} s</b> per iteration
+        ${run.num_envs ? `&middot; ${run.num_envs.toLocaleString()} robots` : ""}
+        <span style="color:var(--muted)">${p.source === "measured" ? "" :
+          "&middot; " + p.source}</span></span>
+      <span class="tnum">${p.running
+        ? `${p.left.toLocaleString()} left &middot; <b>~${clock(p.eta)}</b> to go`
+        : `${clock(p.per * (run.iterations_done || 0))} of training`}</span>
+    </div>` : ""}`;
 }
 
 function films(run){
@@ -882,11 +937,12 @@ function historyPanel(){
     <div class="sech"><h2>Every run</h2><div class="grow"></div>
       <span class="pill">${runs.length}</span></div>
     <div class="card wrapx"><table>
-      <tr><th>Run</th><th>Task</th><th>Status</th><th>Verdict</th>
+      <tr><th class="n">#</th><th>Run</th><th>Task</th><th>Status</th><th>Verdict</th>
           <th class="tnum">iterations</th><th class="tnum">reward</th>
           <th>Took</th><th class="tnum">films</th><th>Started</th></tr>
       ${runs.map(r => `<tr class="click ${r.id === SELECTED ? "now" : ""}"
           data-open="${esc(r.id)}">
+        <td class="n tnum">${r.number}</td>
         <td><b>${esc(r.variant)}</b><div class="sub">${esc(r.name)}</div></td>
         <td class="sub">${esc(r.task)}</td>
         <td><span class="badge ${cls(r.status)}">${esc(r.status)}</span></td>

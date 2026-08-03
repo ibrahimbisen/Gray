@@ -138,7 +138,7 @@ def overview_state() -> dict:
     # The run list, trimmed. The overview links INTO runs, so it needs enough to
     # label and rank them - but never their metric rows, which is what made the
     # monitor's payload 1.6 MB.
-    keep = ("id", "variant", "name", "task", "status", "verdict", "started_age",
+    keep = ("id", "number", "variant", "name", "task", "status", "verdict", "started_age",
             "duration", "iterations_done", "iterations_target", "progress",
             "videos", "verdict_structured")
     return {

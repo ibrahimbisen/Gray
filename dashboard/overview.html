@@ -369,7 +369,7 @@ function runsPanel(){
       <span class="note">click any row to open its curves, films and reward table</span>
       <div class="grow"></div><a href="/runs" class="chip live">all ${S.runs.length} →</a></div>
     <div class="card wrapx"><table>
-      <tr><th>Run</th><th>Task</th><th>Status</th><th>Verdict</th>
+      <tr><th class="n">#</th><th>Run</th><th>Task</th><th>Status</th><th>Verdict</th>
           <th class="n">Iterations</th><th class="n">Reward</th>
           <th class="n">Films</th><th>Took</th><th>Started</th></tr>
       ${rs.map(r => `<tr class="click" data-run="${esc(r.id)}">

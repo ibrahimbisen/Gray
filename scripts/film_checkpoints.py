@@ -175,7 +175,7 @@ def main() -> int:
     # Training saves a checkpoint every 25 iterations, so --every 2 is one film
     # per 50 iterations - the owner's setting, and the finest this can go without
     # dropping to 25.
-    ap.add_argument("--every", type=int, default=2,
+    ap.add_argument("--every", type=int, default=5,
                     help="film 1 in N checkpoints; 2 is every 50 iterations")
     ap.add_argument("--seconds", type=float, default=20.0,
                     help="clip length. 20 s at 0.25 m/s is the 5 m the walk bar "
