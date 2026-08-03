@@ -203,8 +203,10 @@ def main() -> int:
         print(f"  drift          {r['drift_mm']:7.1f} mm")
         print(f"  contacts       {r['contacts']:7d}")
         if r["uprightness"] < 0.9:
-            print("\n  It fell over. Expected until the joints have travel limits -")
-            print("  nothing is stopping the legs folding through the body.")
+            print("\n  It fell over, which is what should happen. Nothing is driving the")
+            print("  joints yet, so the legs are free to fold and there is nothing holding")
+            print("  the robot up. What this test proves is that the model loads, weighs")
+            print("  the right amount, and collides with the floor.")
     return 0
 
 
