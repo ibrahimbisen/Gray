@@ -421,6 +421,31 @@ const sensorsSection = () => {
     not been checked against a datasheet &mdash; confirm mass, current and update
     rate against whatever is actually bought.</p>
 
+  <h3 style="margin-top:26px">Fitting them</h3>
+  <p class="lede">The mechanical design is the owner&rsquo;s. This is only the
+    part the software depends on: a sensor mounted somewhere other than where
+    the simulator thinks it is produces wrong numbers, and produces them
+    silently. For most of the list that does not matter. For three of them the
+    mounting position is <b>in the maths</b>.</p>
+  <div class="tw"><table>
+    <tr><th>Sensor</th><th class="n">Off</th><th>Position matters</th>
+        <th>What the software needs</th><th>Watch for</th></tr>
+    ${(m.fitting || []).map(f => `<tr>
+      <td><b>${esc(f.name)}</b></td>
+      <td class="n dim">&times;${f.count}</td>
+      <td><span class="chip ${f.matters === "critical" ? "warn"
+                            : f.matters === "none" ? "" : "now"}">${esc(f.matters)}</span></td>
+      <td class="dim small">${esc(f.need || "")}</td>
+      <td class="dim small">${esc(f.watch_for || "")}</td></tr>`).join("")}
+  </table></div>
+  ${(m.wiring || {}).notes ? `
+  <div class="card" style="margin-top:16px">
+    <h3>Buses, once all of it is on</h3>
+    <p class="why small">Not mechanical, and the part most likely to be found
+      late &mdash; after the wiring is routed.</p>
+    ${m.wiring.notes.map(x => `<div class="risk small">${esc(x)}</div>`).join("")}
+  </div>` : ""}
+
   <h3 style="margin-top:26px">Bigger servos</h3>
   <p class="lede">Available and not expensive in money. The column that matters
     is <b>mass</b>, not torque.</p>

@@ -74,6 +74,7 @@ sensors:
     name: Trunk IMU, three of them
     part: "9-DOF, front / exact middle / back"
     status: committed
+    count: 3
     spec_checked: false
     measures: >-
       Which way is down, and how fast the trunk is turning. Being 9-DOF they also
@@ -100,6 +101,7 @@ sensors:
     name: Joint potentiometers
     part: "rotary on the rotating joints, linear on the knee pushrod, 12 channels"
     status: committed
+    count: 12
     spec_checked: false
     measures: "Where every joint actually is."
     adds: 0
@@ -451,6 +453,112 @@ sensors:
     fake_it: "Would need a thermal model. Nothing has one and nothing needs one."
     trust_it: "Fine - it is a threshold, not a control input."
     mass_g: 12
+
+# ---------------------------------------------------------------------------
+# Fitting them. The mechanical design is the owner's - this is only the part the
+# SOFTWARE depends on, which is a shorter list than it looks.
+#
+# The rule: a sensor mounted somewhere other than where the simulator thinks it
+# is produces wrong numbers, and produces them silently. For most of this list
+# that does not matter, because the reading has no geometry in it - a current
+# reading is a current reading wherever the shunt sits. For three of them the
+# mounting position is IN THE MATH, and those are the ones to fix in CAD before
+# anything is printed.
+# ---------------------------------------------------------------------------
+
+mounting:
+  # --- the three where position is in the math -----------------------------
+  - key: optical_flow
+    matters: critical
+    need: >-
+      The (x, y) offset of each of the five units from the trunk origin, in mm.
+      These are not documentation - they are coefficients. Each unit reads
+      v + omega x r, so recovering body velocity and ground yaw rate from five
+      readings requires knowing r for each one. Get a position wrong by 20 mm
+      and the yaw rate it computes is wrong by a fixed factor forever.
+    watch_for: >-
+      All five need an unobstructed view of the floor, and the legs swing
+      through that view. The front and rear units are the most likely to be
+      shadowed mid-stride. A shadowed unit does not fail cleanly, it returns
+      plausible garbage - so the fusion needs a per-unit validity flag, and the
+      simulator has to model the flag as well as the reading.
+  - key: imu_trunk
+    matters: critical
+    need: >-
+      The offset of the MIDDLE unit from the trunk's centre of mass. That is the
+      one the simulation models, because projected_gravity and base_ang_vel are
+      defined at the centre of mass. Front and rear need their offsets too, for
+      the pitch-by-differencing trick to have a baseline.
+    watch_for: >-
+      Twelve servos vibrate. Rigid mounting couples that straight into the two
+      signals the policy reads every step. Averaging three units is the answer
+      to it, which only works if they are far enough apart to be uncorrelated.
+  - key: tof_array
+    matters: critical
+    need: >-
+      Mount position and aim vector for each of the six. The simulator produces
+      these with raycasts, and a raycast needs an origin and a direction - so
+      the CAD numbers become config numbers directly.
+    watch_for: >-
+      Aim is the whole design. Too flat and it reads the far wall instead of the
+      step in front; too steep and it reads the floor a body-length ahead and
+      nothing else.
+
+  # --- the ones where position barely matters ------------------------------
+  - key: downward_tof
+    matters: moderate
+    need: >-
+      Its height above the floor at ride height, because that is what turns the
+      optical flow angle into millimetres per second.
+    watch_for: "Needs a clear line to the floor, same conflict as the flow units."
+  - key: foot_contact
+    matters: low
+    need: "At the foot's contact point, which the simulator already has as a site."
+    watch_for: >-
+      A foot that lands on its edge should still trigger. Wire routing down a
+      swinging leg is the harder half.
+  - key: foot_force
+    matters: low
+    need: "In the foot's load path. Same site as the contact switch."
+    watch_for: "Thin-film sensors drift with temperature and wear."
+  - key: current_sense
+    matters: none
+    need: "None. A current reading has no geometry in it."
+    watch_for: >-
+      Worth putting all twelve shunts at the power distribution end rather than
+      at each servo - the current is the same either way, and it keeps twelve
+      more wires out of the legs.
+  - key: battery
+    matters: none
+    need: "None."
+    watch_for: "Sense at the pack, before the distribution losses."
+  - key: joint_pots
+    matters: none
+    need: >-
+      None geometric - the mapping is a calibration file, raw ADC counts to
+      radians, per joint. But it does have to be MADE, and the model is only as
+      good as it.
+    watch_for: "Already in the CAD rebuild's scope. This does not add to it."
+
+# What the buses look like once all of this is on. Not mechanical, and the part
+# most likely to be discovered late.
+wiring:
+  spec_checked: false
+  notes:
+    - "PMW3901 optical flow is SPI, not I2C. Five of them need five chip
+       selects, or a shared bus with five CS lines off the Pi's GPIO."
+    - "VL53L5CX range finders all boot at the same I2C address, 0x29. Six on one
+       bus means either sequencing their XSHUT pins at startup to re-address
+       them one at a time, or an I2C multiplexer. Decide which before the wiring
+       is routed, because it changes the pin count."
+    - "Counting I2C devices with everything fitted: 6 range finders, 12 current
+       shunts, 3 IMUs, the 12-channel ADC for the potentiometers, the downward
+       range finder, and the PCA9685 servo driver. That is a busy bus. Splitting
+       across the Pi's second I2C or a mux is likely, and bus contention shows
+       up as late readings, which the policy sees as stale sensing."
+    - "The control loop is 50 Hz, so every sensor on the list has 20 ms to be
+       read, fused and handed to the policy. Anything slower than that is not a
+       sensor the policy can use, whatever its datasheet says."
 
 # ---------------------------------------------------------------------------
 # Actuators. Not a sensor, but the owner's question came in the same breath and

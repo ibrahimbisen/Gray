@@ -986,7 +986,21 @@ def sensors() -> dict:
               and s["adds"] > 0]
     added = sum(s["adds"] for s in adding)
 
+    # Mounting requirements, joined to the sensor they belong to so the page can
+    # show them together. Ordered by how much the position matters, because that
+    # is the only thing separating "get this right in CAD" from "put it anywhere".
+    rank = {"critical": 0, "moderate": 1, "low": 2, "none": 3}
+    by_key = {x["key"]: x for x in out}
+    fitting = sorted(
+        ({**m, "name": by_key.get(m["key"], {}).get("name", m["key"]),
+          "count": by_key.get(m["key"], {}).get("count", 1),
+          "status": by_key.get(m["key"], {}).get("status", "")}
+         for m in raw.get("mounting", [])),
+        key=lambda m: rank.get(m["matters"], 9))
+
     return {"error": "", "sensors": out,
+            "fitting": fitting,
+            "wiring": raw.get("wiring", {}),
             "observation_now": raw.get("observation_now", {}),
             "batch": {
                 "sensors": len(adding),
