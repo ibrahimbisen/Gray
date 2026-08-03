@@ -6,10 +6,10 @@
   "task": "Gray-Push",
   "status": "running",
   "bar": "Survives repeated shoves from any direction over 20 s, on ground anywhere from slippery to grippy, with mass and servo gains varied.",
-  "started": "2026-08-02T23:36:39",
+  "started": "2026-08-02T23:49:43",
   "finished": null,
   "iterations_target": 1500,
-  "notes": "3072 robots at once, 50 Hz control.",
+  "notes": "6400 robots at once, 50 Hz control.",
   "scoring": [
     {
       "name": "fell_over",

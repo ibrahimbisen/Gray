@@ -1,17 +1,18 @@
-"""Film every saved checkpoint, so you can watch the robot learn.
+"""Film every checkpoint as training saves it, so the robot can be watched learning.
 
-    python scripts/film_checkpoints.py                  # every checkpoint of the newest run
-    python scripts/film_checkpoints.py --every 50       # thin them out
-    python scripts/film_checkpoints.py --run 2026-08-02_22-56-35_stand_v1
+    python scripts/film_checkpoints.py --watch      # follow whatever is training
+    python scripts/film_checkpoints.py              # one pass over the newest run
+    python scripts/film_checkpoints.py --task Gray-Push --every 4
 
-Training saves a checkpoint every 25 iterations regardless, so the films can be
-made afterwards rather than during. That is better than filming as it trains:
-the recorder inside mjlab counts calls to env.step() rather than robot-steps,
-which is easy to get wrong by a factor of num_envs, and rendering mid-run
-competes with training for the same card.
+mjlab's own recorder counts calls to env.step() rather than robot-steps, so its
+interval is easy to get wrong by a factor of num_envs. This films from the saved
+checkpoints instead - training writes one every 25 iterations regardless - and
+with --watch each new one is filmed within half a minute of appearing.
 
-Each film is one robot holding its stance for a few seconds, written straight
-into progress/runs/<run>/videos/ where the dashboard picks it up.
+It follows whichever run is currently being written to, across every task. An
+earlier version hardcoded one task's log folder and sat watching a run that had
+already finished, reporting "waiting for the next checkpoint" forever while the
+real run filmed nothing.
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 os.environ.setdefault("GIT_PYTHON_REFRESH", "quiet")
 
-LOG_ROOT = ROOT / "logs" / "rsl_rl" / "gray_stand"
+LOG_ROOT = ROOT / "logs" / "rsl_rl"
 RUNS = ROOT / "progress" / "runs"
 
 
@@ -37,9 +38,109 @@ def iteration_of(path: Path) -> int:
     return int(m.group(1)) if m else -1
 
 
+def experiment_to_task() -> dict[str, str]:
+    """Which task writes to which log folder, asked of the registry not guessed."""
+    import gray.tasks  # noqa: F401,PLC0415
+    from mjlab.tasks.registry import list_tasks, load_rl_cfg  # noqa: PLC0415
+
+    out = {}
+    for task in list_tasks():
+        if not task.startswith("Gray-"):
+            continue
+        out[load_rl_cfg(task).experiment_name] = task
+    return out
+
+
+def newest_run(mapping: dict[str, str], want_task: str | None) -> tuple[Path, str] | None:
+    """The most recently written run directory, and the task that made it."""
+    best = None
+    for exp_dir in LOG_ROOT.iterdir() if LOG_ROOT.is_dir() else []:
+        task = mapping.get(exp_dir.name)
+        if task is None or (want_task and task != want_task):
+            continue
+        for run in exp_dir.iterdir():
+            if not run.is_dir():
+                continue
+            # Sort on the checkpoints, not the folder: the folder's timestamp
+            # stops moving while training is still writing into it.
+            stamps = [p.stat().st_mtime for p in run.glob("model_*.pt")]
+            when = max(stamps) if stamps else run.stat().st_mtime
+            if best is None or when > best[0]:
+                best = (when, run, task)
+    return (best[1], best[2]) if best else None
+
+
+class Filmer:
+    """Holds one env and runner, rebuilt only when the task changes."""
+
+    def __init__(self, seconds: float, envs: int) -> None:
+        self.seconds, self.envs = seconds, envs
+        self.task: str | None = None
+
+    def _build(self, task: str) -> None:
+        import mujoco  # noqa: PLC0415
+
+        import gray.tasks  # noqa: F401,PLC0415
+        from mjlab.envs import ManagerBasedRlEnv  # noqa: PLC0415
+        from mjlab.rl import MjlabOnPolicyRunner, RslRlVecEnvWrapper  # noqa: PLC0415
+        from mjlab.tasks.registry import load_env_cfg, load_rl_cfg  # noqa: PLC0415
+
+        if self.task is not None:
+            self.env.close()
+        env_cfg = load_env_cfg(task, play=True)
+        env_cfg.scene.num_envs = self.envs
+        agent_cfg = load_rl_cfg(task)
+        self.env = RslRlVecEnvWrapper(ManagerBasedRlEnv(env_cfg, device="cuda:0"),
+                                      clip_actions=agent_cfg.clip_actions)
+        self.runner = MjlabOnPolicyRunner(self.env, asdict(agent_cfg), device="cuda:0")
+        self.model = self.env.unwrapped.sim.mj_model
+        self.renderer = mujoco.Renderer(self.model, height=480, width=854)
+        self.data = mujoco.MjData(self.model)
+        self.cam = mujoco.MjvCamera()
+        mujoco.mjv_defaultCamera(self.cam)
+        self.cam.distance, self.cam.elevation, self.cam.azimuth = 1.0, -12.0, 125.0
+        self.task = task
+        print(f"[film] built environment for {task}", flush=True)
+
+    def film(self, ckpt: Path, task: str, dst: Path) -> int:
+        import imageio.v2 as imageio  # noqa: PLC0415
+        import mujoco  # noqa: PLC0415
+        import numpy as np  # noqa: PLC0415
+        import torch  # noqa: PLC0415
+
+        if task != self.task:
+            self._build(task)
+        self.runner.load(str(ckpt), load_cfg={"actor": True}, strict=True,
+                         map_location="cuda:0")
+        policy = self.runner.get_inference_policy(device="cuda:0")
+
+        obs, _ = self.env.reset()
+        frames = []
+        with torch.inference_mode():
+            for _ in range(int(self.seconds * 50)):
+                obs = self.env.step(policy(obs))[0]
+                sim = self.env.unwrapped.sim.data
+                self.data.qpos[:] = sim.qpos[0].detach().cpu().numpy()
+                self.data.qvel[:] = sim.qvel[0].detach().cpu().numpy()
+                mujoco.mj_forward(self.model, self.data)
+                self.cam.lookat[:] = self.data.xpos[1]
+                self.renderer.update_scene(self.data, self.cam)
+                frames.append(np.asarray(self.renderer.render()))
+
+        # Write under a temporary name and move it into place, so the dashboard
+        # never serves a half-encoded file. Keep the .mp4: imageio picks its
+        # writer from the extension and cannot open a file called .part.
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dst.with_name(dst.stem + ".writing.mp4")
+        imageio.mimwrite(tmp, frames, fps=50, codec="libx264", quality=7,
+                         macro_block_size=1)
+        tmp.replace(dst)
+        return len(frames)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--run", help="run folder name; default is the newest")
+    ap.add_argument("--task", help="only follow this task")
     ap.add_argument("--every", type=int, default=1, help="film 1 in N checkpoints")
     ap.add_argument("--seconds", type=float, default=6.0)
     ap.add_argument("--envs", type=int, default=1)
@@ -47,113 +148,50 @@ def main() -> int:
                     help="keep running alongside training, filming each new checkpoint")
     args = ap.parse_args()
 
-    if not LOG_ROOT.is_dir():
-        raise SystemExit(f"no training logs under {LOG_ROOT}")
-    log_dir = (LOG_ROOT / args.run if args.run
-               else max(LOG_ROOT.iterdir(), key=lambda p: p.stat().st_mtime))
-    run_dir = RUNS / log_dir.name
-    if not run_dir.is_dir():
-        raise SystemExit(f"no dashboard run at {run_dir}")
+    mapping = experiment_to_task()
+    filmer = Filmer(args.seconds, args.envs)
+    print(f"mode     {'following whatever is training' if args.watch else 'one pass'}")
+    print(f"tasks    {', '.join(sorted(mapping.values()))}\n", flush=True)
 
-    def pending() -> list[Path]:
-        found = sorted(log_dir.glob("model_*.pt"), key=iteration_of)
-        found = [c for i, c in enumerate(found) if i % args.every == 0]
-        return [c for c in found
-                if not (run_dir / "videos" / f"iter_{iteration_of(c):04d}.mp4").exists()]
-
-    if not args.watch and not pending():
-        raise SystemExit(f"nothing new to film in {log_dir}")
-
-    import imageio.v2 as imageio  # noqa: PLC0415
-    import mujoco  # noqa: PLC0415
-    import numpy as np  # noqa: PLC0415
-    import torch  # noqa: PLC0415
-
-    import gray.tasks  # noqa: F401,PLC0415
-    from mjlab.envs import ManagerBasedRlEnv  # noqa: PLC0415
-    from mjlab.rl import MjlabOnPolicyRunner, RslRlVecEnvWrapper  # noqa: PLC0415
-    from mjlab.tasks.registry import load_env_cfg, load_rl_cfg  # noqa: PLC0415
-
-    env_cfg = load_env_cfg("Gray-Stand", play=True)
-    env_cfg.scene.num_envs = args.envs
-    agent_cfg = load_rl_cfg("Gray-Stand")
-    env = RslRlVecEnvWrapper(ManagerBasedRlEnv(env_cfg, device="cuda:0"),
-                             clip_actions=agent_cfg.clip_actions)
-    runner = MjlabOnPolicyRunner(env, asdict(agent_cfg), device="cuda:0")
-
-    model = env.unwrapped.sim.mj_model
-    renderer = mujoco.Renderer(model, height=480, width=854)
-    cam = mujoco.MjvCamera()
-    mujoco.mjv_defaultCamera(cam)
-    cam.distance, cam.elevation, cam.azimuth = 1.0, -12.0, 125.0
-
-    data = mujoco.MjData(model)
-    steps = int(args.seconds * 50)
-    every = 1  # the env already runs at 50 Hz; film every control step
-
-    out_dir = run_dir / "videos"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    print(f"run      {log_dir.name}")
-    print(f"mode     {'watching for new checkpoints' if args.watch else 'one pass'}")
-    print(f"output   {out_dir.relative_to(ROOT)}\n", flush=True)
-
-    def film(ckpt: Path) -> None:
-        it = iteration_of(ckpt)
-        dst = out_dir / f"iter_{it:04d}.mp4"
-        runner.load(str(ckpt), load_cfg={"actor": True}, strict=True, map_location="cuda:0")
-        policy = runner.get_inference_policy(device="cuda:0")
-
-        obs, _ = env.reset()
-        frames = []
-        with torch.inference_mode():
-            for i in range(steps):
-                obs = env.step(policy(obs))[0]
-                if i % every:
-                    continue
-                # Copy the first robot's state into a plain MjData to render it.
-                # The simulator's state lives on the GPU, so it has to come back
-                # to the host first.
-                sim_data = env.unwrapped.sim.data
-                data.qpos[:] = sim_data.qpos[0].detach().cpu().numpy()
-                data.qvel[:] = sim_data.qvel[0].detach().cpu().numpy()
-                mujoco.mj_forward(model, data)
-                cam.lookat[:] = data.xpos[1]
-                renderer.update_scene(data, cam)
-                frames.append(np.asarray(renderer.render()))
-        # Write beside the target then move, so the dashboard never serves a
-        # half-written file to a browser that is polling every ten seconds.
-        # Keep the .mp4 on the end: imageio picks its writer from the extension
-        # and cannot open a file called .part at all.
-        tmp = dst.with_name(dst.stem + ".writing.mp4")
-        imageio.mimwrite(tmp, frames, fps=50, codec="libx264", quality=7,
-                         macro_block_size=1)
-        tmp.replace(dst)
-        print(f"  iteration {it:>4}  ->  {dst.name}  ({len(frames)} frames)", flush=True)
-
-    try:
-        while True:
-            todo = pending()
+    current: Path | None = None
+    while True:
+        found = newest_run(mapping, args.task)
+        if found is None:
+            print("  (no runs yet)", flush=True)
+        else:
+            log_dir, task = found
+            if log_dir != current:
+                current = log_dir
+                print(f"[film] following {task}  {log_dir.name}", flush=True)
+            out_dir = RUNS / log_dir.name / "videos"
+            todo = [c for i, c in enumerate(sorted(log_dir.glob("model_*.pt"),
+                                                   key=iteration_of))
+                    if i % args.every == 0
+                    and not (out_dir / f"iter_{iteration_of(c):04d}.mp4").exists()]
             for ckpt in todo:
+                it = iteration_of(ckpt)
                 try:
-                    film(ckpt)
+                    n = filmer.film(ckpt, task, out_dir / f"iter_{it:04d}.mp4")
+                    print(f"  iteration {it:>5}  ->  iter_{it:04d}.mp4  ({n} frames)",
+                          flush=True)
                 except Exception as exc:  # noqa: BLE001
-                    # A checkpoint being written as we read it is normal when
-                    # this runs alongside training; try it again next pass.
-                    print(f"  iteration {iteration_of(ckpt):>4}  skipped: "
-                          f"{type(exc).__name__}: {str(exc)[:70]}", flush=True)
-            if not args.watch:
-                break
-            if not todo:
-                print("  (waiting for the next checkpoint)", flush=True)
-            time.sleep(30.0)
-    except KeyboardInterrupt:
-        print("\nstopped")
-    finally:
-        env.close()
+                    # A checkpoint half-written as we read it is normal alongside
+                    # training; it gets picked up on the next pass.
+                    print(f"  iteration {it:>5}  skipped: {type(exc).__name__}: "
+                          f"{str(exc)[:70]}", flush=True)
+            if not todo and args.watch:
+                print("  (up to date)", flush=True)
+
+        if not args.watch:
+            break
+        time.sleep(20.0)
 
     print("\nReload the dashboard to see them.")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except KeyboardInterrupt:
+        print("\nstopped")
