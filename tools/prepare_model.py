@@ -243,6 +243,30 @@ def level_legs(root) -> list[str]:
     return report
 
 
+def apply_reversals(root, cfg: dict) -> list[str]:
+    """Negate the axis of any joint the owner marked as turning the wrong way.
+
+    Which way a joint turns is measured off the model, but that measurement
+    assumes every leg is assembled the same way round. Where it disagrees with
+    what the owner sees in the pose editor, the owner wins.
+    """
+    want = set(cfg.get("joint_direction", {}).get("invert") or [])
+    if not want:
+        return ["none marked"]
+    report = []
+    for j in root.findall("joint"):
+        part = leg_seg(j.get("name")) or leg_seg(j.find("child").get("link"))
+        if part is None or f"{part[0]}_{part[1]}" not in want:
+            continue
+        el = j.find("axis")
+        if el is None:
+            el = ET.SubElement(j, "axis", {"xyz": "1 0 0"})
+        v = -_np_vec(el.get("xyz", "1 0 0"))
+        el.set("xyz", " ".join(f"{c:.10g}" for c in v))
+        report.append(f"{part[0]}_{part[1]} reversed")
+    return report or ["none matched a joint in the model"]
+
+
 def apply_joint_limits(root, cfg: dict) -> list[str]:
     """Write the owner's measured travel into all 12 joints, per-joint sign included.
 
@@ -513,6 +537,7 @@ def main() -> int:
     mass_report = fix_masses(root, cfg)
     rot, origin, notes = derive_base_frame(root)
     retarget_base(root, rot, origin)
+    reversal_report = apply_reversals(root, cfg)
     limit_report = apply_joint_limits(root, cfg)
     n_meshes = rewrite_mesh_paths(root)
 
@@ -531,6 +556,9 @@ def main() -> int:
         print(f"  {line}")
     print("\nmass, from gray/config/robot.yaml:")
     for line in mass_report:
+        print(f"  {line}")
+    print("\njoint reversals, from gray/config/robot.yaml:")
+    for line in reversal_report:
         print(f"  {line}")
     print("\njoint travel, from the owner's measured stops:")
     for line in limit_report:

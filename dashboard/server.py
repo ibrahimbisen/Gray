@@ -85,13 +85,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):  # noqa: N802
-        if unquote(self.path.split("?")[0]) != "/api/pose/limits":
+        path = unquote(self.path.split("?")[0])
+        if path not in ("/api/pose/limits", "/api/pose/directions"):
             return self.send_error(404)
         from dashboard import poser  # noqa: PLC0415
 
         n = int(self.headers.get("Content-Length", 0))
+        body = json.loads(self.rfile.read(n) or b"{}")
         try:
-            saved = poser.save_limits(json.loads(self.rfile.read(n) or b"{}"))
+            saved = (poser.save_limits(body) if path.endswith("limits")
+                     else poser.save_directions(body.get("invert", [])))
         except Exception as exc:  # noqa: BLE001
             return self._send(json.dumps({"error": str(exc)}).encode(), "application/json")
         return self._send(json.dumps(saved).encode(), "application/json")
@@ -109,11 +112,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             import base64  # noqa: PLC0415
 
             from dashboard import poser  # noqa: PLC0415
-            angles = json.loads(query.get("angles", ["{}"])[0])
             png, facts = poser.pose_report(
-                angles,
+                json.loads(query.get("angles", ["{}"])[0]),
                 azimuth=float(query.get("az", [125])[0]),
+                elevation=float(query.get("el", [-12])[0]),
                 distance=float(query.get("dist", [1.05])[0]),
+                invert=json.loads(query.get("invert", ["{}"])[0]),
             )
             return self._send(json.dumps({
                 "png": base64.b64encode(png).decode(), "facts": facts,

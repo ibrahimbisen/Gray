@@ -31,9 +31,12 @@
   .btn.go{color:#fff;background:var(--s1);border-color:var(--s1)}
 
   .stage{background:#000;border:1px solid var(--line);border-radius:10px;overflow:hidden;
-         position:relative}
-  .stage img{display:block;width:100%;background:#000}
+         position:relative;cursor:grab;user-select:none;touch-action:none}
+  .stage.drag{cursor:grabbing}
+  .stage img{display:block;width:100%;background:#000;pointer-events:none}
   .stage.busy img{opacity:.65}
+  .camlab{position:absolute;top:8px;left:10px;font-size:11px;color:var(--muted);
+          background:rgba(0,0,0,.5);border-radius:5px;padding:2px 7px}
   .warnbar{position:absolute;left:0;right:0;bottom:0;background:rgba(208,59,59,.92);
            color:#fff;font-size:12.5px;padding:7px 12px}
   .viewrow{display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap}
@@ -48,9 +51,14 @@
   .grp{margin-bottom:16px}
   .grph{font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);
         font-weight:600;margin:0 0 8px;display:flex;align-items:center;gap:8px}
-  .row{display:grid;grid-template-columns:52px 1fr 62px;gap:8px;align-items:center;
+  .row{display:grid;grid-template-columns:46px 22px 1fr 62px;gap:7px;align-items:center;
        margin-bottom:7px}
   .row label{font-size:12px;color:var(--ink2)}
+  .flip{border:1px solid var(--line);background:var(--surface2);color:var(--muted);
+        border-radius:5px;font-size:12px;line-height:1;padding:4px 0;cursor:pointer;
+        font-family:inherit}
+  .flip:hover{color:var(--ink)}
+  .flip.on{color:#fff;background:var(--warn);border-color:var(--warn)}
   .row input[type=range]{width:100%;accent-color:var(--s1);height:20px}
   .row .val{font-size:12.5px;text-align:right}
   .row .val input{width:56px;background:var(--surface2);border:1px solid var(--line);
@@ -81,18 +89,19 @@
 
     <div class="stage" id="stage">
       <img id="shot" alt="the robot in the current pose">
+      <div class="camlab" id="camlab"></div>
       <div class="warnbar" id="clash" style="display:none"></div>
     </div>
 
     <div class="viewrow">
-      <button class="btn" data-az="125">3/4 view</button>
-      <button class="btn" data-az="180">side</button>
-      <button class="btn" data-az="90">front</button>
-      <button class="btn" data-az="270">back</button>
+      <span style="font-size:12px;color:var(--muted)">drag to orbit &middot; scroll to zoom</span>
       <span style="flex:1"></span>
-      <label style="font-size:12px;color:var(--ink2)">zoom
-        <input type="range" id="zoom" min="0.6" max="2.0" step="0.05" value="1.05"
-               style="vertical-align:middle;width:120px;accent-color:var(--s1)"></label>
+      <button class="btn" data-view="125,-12">3/4</button>
+      <button class="btn" data-view="180,0">side</button>
+      <button class="btn" data-view="90,0">front</button>
+      <button class="btn" data-view="270,0">back</button>
+      <button class="btn" data-view="180,-89">top</button>
+      <button class="btn" data-view="180,45">below</button>
     </div>
 
     <div class="facts" id="facts"></div>
@@ -104,7 +113,15 @@
       <button class="btn" id="link">link legs</button>
       <button class="btn" id="zeroall">reset</button>
     </div>
+    <div class="note" style="margin:-2px 0 12px">
+      The <b>&#8644;</b> button next to a dial reverses that joint. Use it when a
+      limb moves the opposite way to the others &mdash; then save it, and the
+      reversal goes into the model itself.
+    </div>
     <div id="dials"></div>
+    <button class="btn" id="savedirs" style="width:100%;margin-top:4px">
+      Save reversals to robot.yaml</button>
+    <div class="note" id="dirnote"></div>
 
     <div class="grph" style="margin-top:22px">Record the travel</div>
     <div class="limbox">
@@ -129,7 +146,8 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const LEGNAME = {fr:"front right", fl:"front left", br:"back right", bl:"back left"};
 
-let CFG = null, ANG = {}, LINK = true, AZ = 125, ZOOM = 1.05, PENDING = false, AGAIN = false;
+let CFG = null, ANG = {}, INV = {}, LINK = true;
+let AZ = 125, EL = -12, ZOOM = 1.05, PENDING = false, AGAIN = false;
 
 function key(leg, seg){ return leg + "_" + seg; }
 
@@ -140,6 +158,8 @@ function buildDials(){
       ${CFG.segments.map(seg => `
         <div class="row">
           <label>${esc(seg)}</label>
+          <button class="flip ${INV[key(leg, seg)] ? "on" : ""}"
+                  data-flip="${key(leg, seg)}" title="reverse this joint">&#8644;</button>
           <input type="range" min="-135" max="135" step="0.5" value="0"
                  data-leg="${leg}" data-seg="${seg}">
           <span class="val"><input type="text" data-num="${key(leg, seg)}" value="0"></span>
@@ -148,6 +168,14 @@ function buildDials(){
 
   document.querySelectorAll("input[type=range]").forEach(el => {
     el.addEventListener("input", () => setAngle(el.dataset.leg, el.dataset.seg, +el.value));
+  });
+  document.querySelectorAll("[data-flip]").forEach(el => {
+    el.onclick = () => {
+      const k = el.dataset.flip;
+      INV[k] = !INV[k];
+      el.classList.toggle("on", INV[k]);
+      render();
+    };
   });
   document.querySelectorAll("input[data-num]").forEach(el => {
     el.addEventListener("change", () => {
@@ -183,7 +211,9 @@ function render(){
   if(PENDING){ AGAIN = true; return; }
   PENDING = true;
   $("#stage").classList.add("busy");
-  const q = new URLSearchParams({angles: JSON.stringify(ANG), az: AZ, dist: ZOOM});
+  $("#camlab").textContent = `az ${Math.round(AZ)}°  el ${Math.round(EL)}°`;
+  const q = new URLSearchParams({angles: JSON.stringify(ANG), invert: JSON.stringify(INV),
+                                 az: AZ, el: EL, dist: ZOOM});
   fetch("/api/pose?" + q).then(r => r.json()).then(d => {
     $("#shot").src = "data:image/png;base64," + d.png;
     facts(d.facts);
@@ -215,6 +245,7 @@ function facts(f){
 fetch("/api/pose/config").then(r => r.json()).then(c => {
   CFG = c;
   c.legs.forEach(l => c.segments.forEach(s => { ANG[key(l, s)] = 0; }));
+  (c.invert || []).forEach(k => { INV[k] = true; });
   $("#zero").textContent = "zero = " + c.zero;
   $("#hint").innerHTML =
     `<b>+ hip</b> ${esc(c.convention.hip.replace("+ ",""))} &middot;
@@ -232,9 +263,51 @@ $("#zeroall").onclick = () => {
   Object.keys(ANG).forEach(k => { ANG[k] = 0; });
   syncInputs(); render();
 };
-document.querySelectorAll("[data-az]").forEach(b =>
-  b.onclick = () => { AZ = +b.dataset.az; render(); });
-$("#zoom").oninput = e => { ZOOM = +e.target.value; render(); };
+document.querySelectorAll("[data-view]").forEach(b =>
+  b.onclick = () => { const [a, e] = b.dataset.view.split(",").map(Number);
+                      AZ = a; EL = e; render(); });
+
+/* Free orbit. Drag turns the camera round the robot and tilts it; the wheel
+   pulls in and out. Rendering happens server-side, so a drag coalesces into one
+   request in flight at a time rather than queueing a hundred. */
+(() => {
+  const stage = $("#stage");
+  let dragging = false, lx = 0, ly = 0;
+  stage.addEventListener("pointerdown", e => {
+    dragging = true; lx = e.clientX; ly = e.clientY;
+    stage.classList.add("drag"); stage.setPointerCapture(e.pointerId);
+  });
+  stage.addEventListener("pointermove", e => {
+    if(!dragging) return;
+    AZ = (AZ + (e.clientX - lx) * 0.45) % 360;
+    EL = Math.max(-89, Math.min(89, EL + (e.clientY - ly) * 0.35));
+    lx = e.clientX; ly = e.clientY;
+    render();
+  });
+  const stop = e => {
+    dragging = false; stage.classList.remove("drag");
+    try { stage.releasePointerCapture(e.pointerId); } catch (_) { /* already gone */ }
+  };
+  stage.addEventListener("pointerup", stop);
+  stage.addEventListener("pointercancel", stop);
+  stage.addEventListener("wheel", e => {
+    e.preventDefault();
+    ZOOM = Math.max(0.45, Math.min(3.0, ZOOM * (e.deltaY > 0 ? 1.08 : 0.926)));
+    render();
+  }, {passive: false});
+})();
+
+$("#savedirs").onclick = () => {
+  const inv = Object.keys(INV).filter(k => INV[k]);
+  fetch("/api/pose/directions", {method: "POST", body: JSON.stringify({invert: inv})})
+    .then(r => r.json()).then(d => {
+      $("#dirnote").innerHTML = d.length
+        ? `<span class="ok">Saved.</span> Reversed: ${d.map(esc).join(", ")}.
+           Rebuild with <span class="tnum">tools/prepare_model.py</span> to apply.`
+        : `<span class="ok">Saved.</span> No joints reversed.`;
+    })
+    .catch(e => { $("#dirnote").innerHTML = `<span class="bad">Failed: ${esc(e)}</span>`; });
+};
 
 $("#save").onclick = () => {
   const out = {};

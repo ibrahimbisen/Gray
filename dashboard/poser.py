@@ -62,24 +62,35 @@ def state() -> dict:
         return _STATE
 
 
-def to_raw(s: dict, physical_deg: dict[str, float]) -> dict[tuple[str, str], float]:
-    """Degrees away from sitting -> the model's own joint angles."""
+def to_raw(s: dict, physical_deg: dict[str, float],
+           invert: dict[str, bool] | None = None) -> dict[tuple[str, str], float]:
+    """Degrees away from sitting -> the model's own joint angles.
+
+    `invert` flips individual joints. The direction of each joint is measured off
+    the model at startup, but that measurement assumes every leg is built the same
+    way round - and on this robot some are not. Where the measurement disagrees
+    with what the owner sees, the owner is right.
+    """
+    invert = invert or {}
     out = {}
     for leg in LEGS:
         for seg in SEGS:
-            v = float(physical_deg.get(f"{leg}_{seg}", 0.0))
-            out[(leg, seg)] = s["signs"][(leg, seg)] * math.radians(v)
+            name = f"{leg}_{seg}"
+            v = float(physical_deg.get(name, 0.0))
+            flip = -1.0 if invert.get(name) else 1.0
+            out[(leg, seg)] = flip * s["signs"][(leg, seg)] * math.radians(v)
     return out
 
 
 def pose_report(physical_deg: dict[str, float], azimuth: float = 125.0,
-                elevation: float = -12.0, distance: float = 1.05) -> tuple[bytes, dict]:
+                elevation: float = -12.0, distance: float = 1.05,
+                invert: dict[str, bool] | None = None) -> tuple[bytes, dict]:
     """Render the pose and measure it. Returns (png, facts)."""
     s = state()
     rb, mj = s["rb"], s["mujoco"]
 
     with _LOCK:
-        angles = to_raw(s, physical_deg)
+        angles = to_raw(s, physical_deg, invert)
         rb.set_pose(0.6, angles)
 
         # Drop it until the lowest point of the robot rests on the floor, so the
@@ -152,7 +163,31 @@ def defaults() -> dict:
         "convention": lim["convention"],
         "servo_travel_deg": cfg["servo"]["travel_deg"],
         "zero": "the sitting pose, as exported from SolidWorks",
+        "invert": cfg.get("joint_direction", {}).get("invert", []),
     }
+
+
+def save_directions(inverted: list[str]) -> list[str]:
+    """Record which joints turn the opposite way to what the model measured.
+
+    tools/prepare_model.py reads this and negates those joints' axes, so the
+    correction lives in the model rather than only in this page.
+    """
+    import yaml  # noqa: PLC0415
+
+    path = ROOT / "gray" / "config" / "robot.yaml"
+    text = path.read_text()
+    cfg = yaml.safe_load(text)
+    clean = sorted({j for j in inverted if j.count("_") == 1})
+    cfg["joint_direction"] = {
+        "note": "Joints whose measured direction disagreed with the owner's eye. "
+                "prepare_model.py negates the axis of each one.",
+        "invert": clean,
+    }
+    head = text.split("\njoint_direction:")[0].rstrip() + "\n\n"
+    path.write_text(head + yaml.safe_dump(
+        {"joint_direction": cfg["joint_direction"]}, sort_keys=False))
+    return clean
 
 
 def save_limits(new: dict[str, list[float]]) -> dict:
