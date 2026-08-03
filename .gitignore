@@ -35,5 +35,9 @@ venv/
 MUJOCO_LOG.TXT
 
 # Videos and renders produced by scripts. Overview/ is build photography and stays.
+# A run's run.json and metrics.csv ARE committed - they are the record of what was
+# tried and what happened. The videos and checkpoints are not.
 /progress/**/*.mp4
+/progress/**/checkpoints/
+/progress/runs/0000-00-00_demo/
 /reference/**/*.mp4

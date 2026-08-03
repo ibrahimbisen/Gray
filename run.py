@@ -86,7 +86,7 @@ def main() -> int:
 
     sys.path.insert(0, str(ROOT))
     try:
-        from dashboard.server import serve, state
+        from dashboard.server import monitor_state, serve
     except ImportError as exc:
         print(f"Cannot import the dashboard: {exc}")
         print(f"Running under: {sys.executable}")
@@ -95,10 +95,11 @@ def main() -> int:
 
     args = [a for a in sys.argv[1:] if a != "--check"]
     if "--check" in sys.argv[1:]:
-        s = state()
+        s = monitor_state()
         print(f"interpreter : {sys.executable}")
+        print(f"runs        : {len(s['runs'])}")
+        print(f"phases      : {len(s['phases'])}")
         print(f"stages      : {len(s['stages'])}")
-        print(f"rewards     : {len(s['rewards'])}")
         print(f"model       : {s['model']['passed']}/{s['model']['total']} checks pass")
         return 0
 

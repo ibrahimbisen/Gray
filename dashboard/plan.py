@@ -271,6 +271,80 @@ REWARDS = [
 # Can this machine actually train it
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# The plan, in four lines. This is the front page - the long version is the
+# curriculum above, on the summary page.
+# ---------------------------------------------------------------------------
+
+PHASES = [
+    {
+        "n": 1,
+        "name": "Digital twin",
+        "state": "done",
+        "one_line": "A simulated Gray that matches the real one.",
+        "detail": "Rebuilt from SolidWorks. 11 of 11 checks pass: 2378.70 g, joint "
+                  "axes exact, and the owner's measured travel limits on all twelve "
+                  "joints, verified by turning each one in the simulator.",
+        "needs_robot": False,
+    },
+    {
+        "n": 2,
+        "name": "Move it by hand",
+        "state": "next",
+        "one_line": "Work out where a foot is from three angles, and back again. "
+                    "Then a hand-written walk.",
+        "detail": "No learning yet. This is the thing the learned controller is "
+                  "measured against, so it has to exist first. Ends with a number: "
+                  "mm/s, and whether it walks straight.",
+        "needs_robot": False,
+    },
+    {
+        "n": 3,
+        "name": "Teach it",
+        "state": "later",
+        "one_line": "Stand still, stand up, take a push, then walk.",
+        "detail": "Each stage has to pass its bar before the next starts. Cheapest "
+                  "failures first: standing still takes minutes and answers whether "
+                  "the servos can hold the robot up at all.",
+        "needs_robot": False,
+    },
+    {
+        "n": 4,
+        "name": "The real robot",
+        "state": "blocked",
+        "one_line": "Reassemble, fit the potentiometers, calibrate, deploy.",
+        "detail": "Everything above needs no hardware. This needs the robot back "
+                  "together and the position sensors fitted.",
+        "needs_robot": True,
+    },
+]
+
+# What has to be true before the next stage can start. Short, checkable, honest.
+NEXT_UP = {
+    "title": "Stand still",
+    "why": "Can twelve servos at 1.96 N-m hold up 2.378 kg? Minutes of training, "
+           "and it decides whether anything else is possible.",
+    "before": [
+        {"task": "Static torque check", "who": "code",
+         "note": "Work out what each joint needs to hold a standing pose, against "
+                 "the servo's 1.96 N-m. A calculation, not a training run."},
+        {"task": "Actuators in the simulation", "who": "code",
+         "note": "The model has twelve free-swinging joints and nothing driving "
+                 "them. Position servos at 50 Hz."},
+        {"task": "A standing pose", "who": "code",
+         "note": "The exported zero is the sprawl the CAD was posed in - feet 557 mm "
+                 "apart front to back."},
+    ],
+    "open": [
+        {"q": "bl_hip's inertia is the one assumed number in the model.",
+         "note": "The exporter gave that link no mass, so its tensor is copied from "
+                 "another hip and mirrored. Same part, so it is close."},
+        {"q": "The masses are CAD numbers, not scale readings.",
+         "note": "2378.70 g comes from SolidWorks. Weigh the real parts during "
+                 "reassembly and replace them."},
+    ],
+}
+
 FEASIBILITY = {
     "verdict": "Yes. The hardware is not the limiting factor - the model is.",
     "facts": [
