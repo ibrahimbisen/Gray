@@ -1,0 +1,417 @@
+# What Gray can be given to sense, and what each addition actually costs.
+#
+# Written 3 Aug 2026, after the owner's question: "we are adding cameras and
+# sensors, so why is anything blocked?"
+#
+# ---------------------------------------------------------------------------
+# THE RULE THAT ORDERS THIS WHOLE FILE
+#
+# A sensor is only useful to a trained policy if the SIMULATOR can produce a
+# believable fake of it. The policy learns entirely in simulation. If the sim
+# cannot generate the reading, the policy never sees it during training, and a
+# reading it has never seen is noise on the real robot - worse than nothing,
+# because it displaces a number that meant something.
+#
+# So every sensor here is judged on three separate costs, and they are not the
+# same cost:
+#
+#   1. FIT IT      - money, mass, wiring, a board. Usually the smallest cost.
+#   2. FAKE IT     - what the simulator has to compute, for every robot, every
+#                    step, 4500 x 50 times a second. This is where a camera
+#                    becomes expensive and a contact switch stays free.
+#   3. TRUST IT    - how far the fake is from the real thing. A perfect
+#                    simulated heightmap against a noisy 30 Hz depth camera
+#                    full of holes is the hardest gap in the field.
+#
+# And one more, which applies to every row without exception:
+#
+#   4. ANY sensor added to the observation changes the length of the policy's
+#      input list. That makes it a different policy. Every existing policy
+#      file becomes unreadable and every run restarts from zero. So sensors
+#      are added in BATCHES, at a deliberate moment - never one at a time.
+#
+# ---------------------------------------------------------------------------
+# HONESTY NOTE ON PART NUMBERS
+#
+# Part numbers below are examples of the CLASS of device, chosen because they
+# are common and cheap. Their specs are approximate and have NOT been checked
+# against a datasheet. Confirm mass, current draw and update rate against the
+# part actually bought. `spec_checked: false` marks every one of these.
+# ---------------------------------------------------------------------------
+
+# What the policy reads today. 45 numbers, and nothing else reaches it.
+# Source: gray/tasks/stand_env_cfg.py, the "policy" observation group.
+observation_now:
+  total: 45
+  terms:
+    - {name: projected_gravity, n: 3,  from: IMU,
+       note: "which way is down, in the trunk's own frame"}
+    - {name: base_ang_vel,      n: 3,  from: IMU,
+       note: "how fast the trunk is rotating"}
+    - {name: joint_pos,         n: 12, from: potentiometers,
+       note: "where each joint actually is"}
+    - {name: joint_vel,         n: 12, from: potentiometers,
+       note: "differentiated from joint_pos"}
+    - {name: last_action,       n: 12, from: software,
+       note: "the twelve targets it sent last step"}
+    - {name: command,           n: 3,  from: operator,
+       note: "forward, sideways, turn"}
+
+# ---------------------------------------------------------------------------
+# The sensors, ordered by value for what they cost. Best first.
+#
+#   status:   fitted | committed | candidate | not_recommended
+#   unblocks: which BLOCKED_NEEDS keys in dashboard/skills.py this clears, and
+#             roughly how many library rows that is. "-" means it unblocks no
+#             library row but is still worth fitting, and says why.
+# ---------------------------------------------------------------------------
+
+sensors:
+
+  # --- already decided ----------------------------------------------------
+
+  - key: imu_trunk
+    name: Trunk IMU, three of them
+    part: "6-DOF, front / exact middle / back"
+    status: committed
+    spec_checked: false
+    measures: "Which way is down, and how fast the trunk is turning."
+    adds: 0
+    already_in_observation: true
+    unblocks: {}
+    why_anyway: >-
+      Not an accuracy improvement. The policy reads two IMU signals every single
+      step, so without one no trained policy can run on the real robot at all.
+      The middle unit is the one the simulation models, because it sits nearest
+      the trunk's centre of mass. The front and back pair are worth more than
+      spares: differencing them measures pitch directly, and averaging all three
+      cuts the vibration noise a single unit would feed straight into the policy.
+    fake_it: "Exact and free. The simulator knows the trunk's true orientation."
+    trust_it: >-
+      Good, provided the sim adds the noise and bias the real part has. Vibration
+      from twelve servos is the thing that bites, and three units averaged is the
+      answer to it.
+    mass_g: 5
+
+  - key: joint_pots
+    name: Joint potentiometers
+    part: "rotary on the rotating joints, linear on the knee pushrod, 12 channels"
+    status: committed
+    spec_checked: false
+    measures: "Where every joint actually is."
+    adds: 0
+    already_in_observation: true
+    unblocks: {}
+    why_anyway: >-
+      24 of the 45 numbers the policy reads are joint_pos and joint_vel. Without
+      these they have no source on the real robot and the policy cannot run. The
+      linear pot on the pushrod also measures the true knee angle directly, which
+      removes the servo-angle-is-not-joint-angle problem the linkage creates.
+    fake_it: "Exact and free."
+    trust_it: >-
+      Depends entirely on calibration - raw ADC counts to radians, per joint, in
+      a file. The model is only as good as that mapping. Also needs an external
+      ADC: the potentiometers are analog and the Pi has no analog inputs.
+    mass_g: 60
+
+  # --- cheap, high value, not yet planned ---------------------------------
+
+  - key: foot_contact
+    name: Foot contact switches
+    part: "microswitch or FSR under each foot, 4 off"
+    status: candidate
+    spec_checked: false
+    measures: "Which feet are on the ground."
+    adds: 4
+    unblocks: {}
+    why_anyway: >-
+      The best value on this list. The simulator ALREADY computes perfect foot
+      contact and the reward already leans on it heavily - foot_clearance,
+      stepping, dragging, ground_covered and landing_speed are all gated on it.
+      But contact is used only while TRAINING; the policy itself is never told
+      which feet are down, so on the real robot it is guessing. Four switches and
+      four numbers close that gap, and the simulator side is already built.
+    fake_it: "Free. It is already computed every step for the reward terms."
+    trust_it: >-
+      Good. A switch is binary and a foot either touches or it does not. The
+      failure mode is a switch that sticks or a foot that lands on its edge.
+    mass_g: 12
+
+  - key: foot_force
+    name: Foot load cells
+    part: "thin-film force sensor or a small load cell per foot, 4 off"
+    status: candidate
+    spec_checked: false
+    measures: "How hard each foot is pressing, not just whether it is."
+    adds: 4
+    unblocks: {}
+    why_anyway: >-
+      The graded version of foot_contact. Turns the landing_speed reward from
+      'did it slam' into a measured number, and is the natural signal for the
+      smoother-arrival behaviour already added to the walk reward. Also the
+      honest way to detect an imminent slip.
+    fake_it: "Free. The simulator already has the contact force."
+    trust_it: "Medium. Thin-film sensors drift with temperature and wear."
+    mass_g: 20
+
+  - key: current_sense
+    name: Servo current sensing
+    part: "INA219 / INA226 on the servo rail, or one per servo"
+    status: candidate
+    spec_checked: false
+    measures: "How hard the servos are actually working."
+    adds: 1
+    unblocks: {}
+    why_anyway: >-
+      The only way to know a servo is stalling, overheating, or being asked for
+      more than it has. It is also the measurement that would replace the guessed
+      servo gains with real ones - the stage 3.3 job. Worth fitting for safety
+      even if it never enters the observation.
+    fake_it: "Available - the simulator knows the actuator force it applied."
+    trust_it: >-
+      Medium. A rail-level reading is the sum of twelve servos, so it says
+      'something is loaded', not which. Per-servo sensing is twelve more channels.
+    mass_g: 10
+
+  - key: battery
+    name: Battery voltage and current
+    part: "on the same INA-class shunt, or the BMS if the pack has one"
+    status: candidate
+    spec_checked: false
+    measures: "Pack voltage under load, and what is left."
+    adds: 2
+    unblocks: {}
+    why_anyway: >-
+      Several library rows are 'same quality at low battery'. Right now those are
+      a scene dial with nothing behind them, because a sagging pack means weaker
+      servos and the simulator has no battery in it at all.
+    fake_it: >-
+      Needs a battery model that does not exist - voltage sag against current
+      draw. Not hard, but it has to be written.
+    trust_it: "Good. Voltage is voltage."
+    mass_g: 8
+
+  # --- the cheap answer to "knowing where it is" --------------------------
+
+  - key: optical_flow
+    name: Downward optical flow
+    part: "PMW3901 or similar, pointing at the floor"
+    status: candidate
+    spec_checked: false
+    measures: "How fast the robot is sliding over the ground, in two axes."
+    adds: 2
+    unblocks: {need: where, extent: partly}
+    why_anyway: >-
+      This is the cheap answer to 'knowing where it is', and it is how a drone
+      holds position. Integrated over time it gives DEAD RECKONING - a position
+      relative to where it started. That is enough for 'walk two metres and
+      stop', 'hold this line', and the drift measurement that is currently R1's
+      failing bar. It is NOT enough for 'find the stairs' or 'back out of a
+      corner', which need to know where the room is, not where the robot has
+      been.
+    fake_it: >-
+      Cheap. The simulator already knows the trunk's true velocity - this is that
+      number with noise and a scale error on it.
+    trust_it: >-
+      Medium. Needs texture on the floor and a height reference to convert angle
+      to distance, so it pairs with the downward ToF below. Dead reckoning drifts
+      without bound, so it is a rate sensor pretending to be a position sensor.
+    mass_g: 3
+    pairs_with: [downward_tof]
+
+  - key: downward_tof
+    name: Downward range finder
+    part: "VL53L1X or similar, one under the trunk"
+    status: candidate
+    spec_checked: false
+    measures: "Height of the trunk above the floor."
+    adds: 1
+    unblocks: {}
+    why_anyway: >-
+      Ride height is currently inferred from joint angles and the assumption
+      that the floor is flat. This measures it. It is also the height reference
+      optical flow needs to turn its angle into a distance, and it detects a step
+      down or a hole directly under the robot.
+    fake_it: "Cheap - a single downward raycast."
+    trust_it: >-
+      Medium. Fails on dark carpet, glass and polished floors, and reads the top
+      of an obstacle rather than the floor when one passes underneath.
+    mass_g: 2
+
+  # --- seeing ahead: the cheap way and the expensive way ------------------
+
+  - key: tof_array
+    name: Forward and side range finders
+    part: "VL53L5CX multi-zone, 8x8 zones each, three to five around the robot"
+    status: candidate
+    spec_checked: false
+    measures: "Distance to whatever is ahead, in a coarse grid."
+    adds: "64 per unit, or a handful of summary numbers per unit"
+    unblocks: {need: camera, extent: partly}
+    why_anyway: >-
+      The cheap alternative to a depth camera, and it should be considered before
+      one. A ring of these gives 'there is something 300 mm ahead and 40 mm tall'
+      - which is most of what obstacle ANTICIPATION needs, and anticipation is
+      the only thing a camera buys that touch does not. Reacting to an obstacle
+      is already blind and already covered: step, feel the contact, correct.
+    fake_it: >-
+      Cheap. It is a raycast per zone, which the simulator does natively. Nothing
+      has to be rendered. This is the whole reason it beats a camera.
+    trust_it: >-
+      Good, by the standards of this list. Low resolution, but low resolution
+      that matches between sim and reality beats high resolution that does not.
+      Fails on dark and glossy surfaces like any ToF.
+    mass_g: 6
+
+  - key: depth_camera
+    name: Depth camera
+    part: "RealSense D435i, OAK-D, or an Arducam ToF"
+    status: candidate
+    spec_checked: false
+    measures: "A height map of the ground ahead."
+    adds: "hundreds - a heightmap patch, typically 10x16 or larger"
+    unblocks: {need: camera, extent: fully}
+    why_anyway: >-
+      The full answer to seeing. Finds stairs from a metre away, follows a path,
+      picks a foothold. Nothing else on this list does those.
+    fake_it: >-
+      EXPENSIVE, and this is the real cost - not the camera. The simulator has to
+      produce a heightmap for every robot every step: 4500 robots at 50 Hz. That
+      is a different class of computation from a raycast and it will cut the
+      number of robots that fit on the card.
+    trust_it: >-
+      The worst on this list, and it is not close. In simulation the heightmap is
+      perfect, complete and free. On the robot it is a noisy 30 Hz depth image
+      full of holes, with a different field of view, mounted somewhere slightly
+      different from where the sim thinks it is. This is the hardest sim-to-real
+      gap in the whole field. Its own project, after the robot walks.
+    mass_g: 75
+
+  # --- heading, and absolute position -------------------------------------
+
+  - key: magnetometer
+    name: Magnetometer
+    part: "the third axis set of a 9-DOF IMU"
+    status: candidate
+    spec_checked: false
+    measures: "Absolute heading, against the earth's field."
+    adds: 2
+    unblocks: {}
+    why_anyway: >-
+      The IMU measures how fast the trunk is TURNING, not which way it is
+      POINTING. Heading has to be integrated from that rate, and an integrated
+      rate drifts. A magnetometer is the only cheap absolute heading reference.
+      Note carefully: R1's current drift failure is a TRAINING problem, not a
+      sensing one - in simulation the heading is exact. This helps on the real
+      robot, not in the run that is failing now.
+    fake_it: "Trivially exact - the simulator knows the true heading."
+    trust_it: >-
+      Poor, and this is why it is not higher up. Twelve servos, their currents
+      and any steel in the frame distort the local field badly. A magnetometer
+      bolted near a motor reads the motor. It needs careful placement and
+      hard-iron calibration, and it may still be unusable.
+    mass_g: 2
+
+  - key: uwb_anchors
+    name: Ultra-wideband anchors
+    part: "DW1000-class tags, three or more anchors around the room"
+    status: candidate
+    spec_checked: false
+    measures: "True absolute position, to a few centimetres."
+    adds: 3
+    unblocks: {need: where, extent: fully}
+    why_anyway: >-
+      The honest answer to 'knowing where it is', and the only one on this list
+      that gives a position rather than a rate to integrate. Turns 'walk to a
+      point' and 'back out of a corner' into ordinary commanded skills.
+    fake_it: "Free. The simulator knows the true position exactly."
+    trust_it: >-
+      Good where it works. The catch is not accuracy, it is that the room has to
+      be instrumented: the robot only knows where it is inside the volume the
+      anchors cover. That may be exactly right for a workshop and useless
+      outside it.
+    mass_g: 15
+
+  - key: gps
+    name: GNSS
+    part: "any u-blox module"
+    status: not_recommended
+    spec_checked: false
+    measures: "Absolute position, outdoors, to metres."
+    adds: 2
+    unblocks: {}
+    why_anyway: >-
+      Listed so the option is closed rather than forgotten. Metre-level accuracy
+      against a robot whose drift bar is 100 mm is two orders of magnitude too
+      coarse, and it does not work indoors, which is where Gray is.
+    fake_it: "Trivial."
+    trust_it: "Irrelevant - the resolution is wrong for the job."
+    mass_g: 5
+
+  # --- safety, not skills -------------------------------------------------
+
+  - key: servo_temp
+    name: Servo temperature
+    part: "thermistor or an IR spot on each servo case"
+    status: candidate
+    spec_checked: false
+    measures: "How hot each servo is getting."
+    adds: 0
+    unblocks: {}
+    why_anyway: >-
+      Not for the policy - for the operator and for a shutdown rule. A hobby
+      servo held against a load cooks itself quietly, and twelve of them in a
+      closed printed body have nowhere to dump heat. Cheap insurance during the
+      first hours of hardware testing.
+    fake_it: "Would need a thermal model. Nothing has one, and nothing needs one."
+    trust_it: "Fine - it is a threshold, not a control input."
+    mass_g: 12
+
+# ---------------------------------------------------------------------------
+# Actuators. Not a sensor, but the owner's question came in the same breath and
+# the answer is the same shape: the obvious upgrade is not free, and the cost is
+# not money.
+# ---------------------------------------------------------------------------
+
+actuators:
+  now:
+    model: DS3218MG
+    torque_kgcm: 20
+    torque_nm: 1.96
+    speed_s_per_60deg: 0.16
+    mass_g: 60
+    note: "12 off. Torque margin today is 2.73x - the worst-loaded joint needs
+           0.72 of 1.96 N-m at ride height."
+
+  # The point of this table is the MASS column, not the torque column.
+  options:
+    - {torque_kgcm: 25, case: "standard 20 mm", mass_g: 60,  verdict: "near-free"}
+    - {torque_kgcm: 35, case: "standard 20 mm", mass_g: 65,  verdict: "still cheap"}
+    - {torque_kgcm: 45, case: "oversize",       mass_g: 150, verdict: "expensive in mass"}
+    - {torque_kgcm: 60, case: "oversize",       mass_g: 165, verdict: "expensive in mass"}
+  options_spec_checked: false
+
+  the_catch: >-
+    There is a cliff between about 35 kg-cm and about 45 kg-cm. Up to roughly
+    35 the servo stays in the standard 20 mm case and the mass barely moves, so
+    it is close to a free upgrade. Past that the case grows and each servo goes
+    from about 60 g to about 150 g. Twelve of those is about +1080 g, which puts
+    Gray near 4.2 kg - and the extra torque was needed because of mass in the
+    first place.
+
+  the_worse_catch: >-
+    Eight of the twelve servos live in the hip modules, on the legs. Adding 90 g
+    each puts about 720 g INTO THE LEGS. Leg mass is already 36% of the robot,
+    and leg inertia is what limits how fast a leg can be swung and how hard a
+    stumble is to arrest. Heavier servos make the legs harder to move, which
+    eats part of the torque they just bought. Body-mounted servos - the four hip
+    abductors - do not have this problem and could be upgraded on their own.
+
+  and_the_real_point: >-
+    Torque is not what blocks jumping. SPEED is. Rough arithmetic puts a push-off
+    at roughly 60 degrees of knee travel in about 0.13 s, against the DS3218's
+    0.16 s per 60 degrees no-load - already marginal before any load is applied.
+    And higher torque in a hobby servo usually comes from MORE gear reduction,
+    which makes it SLOWER. So a 45 kg-cm servo can easily be worse for jumping
+    than the 20 kg-cm one it replaced. Read the speed line of the datasheet, not
+    the torque line, and measure it under load in stage 3.3 before buying.

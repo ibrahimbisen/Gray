@@ -234,7 +234,112 @@ const unreachable = () => {
   </table></div>`;
 };
 
-/* ------------------------------------------------------- 6. five kinds --- */
+/* ------------------------------------------------------- 6. sensors ------ */
+const STATUS_CHIP = { committed: "ok", candidate: "now", not_recommended: "warn" };
+const STATUS_WORD = { committed: "decided", candidate: "on the menu",
+                      not_recommended: "no" };
+
+const sensorsSection = () => {
+  const m = s.sensors;
+  if (m.error) return `<div class="risk small"><b>Could not read the menu.</b>
+    ${esc(m.error)}</div>`;
+  const obs = m.observation_now || {};
+  const menu = m.sensors || [];
+  const act = m.actuators || {};
+  return `
+  <p class="lede">Section 5 says what is missing. This is the menu of things that
+    would supply it, and what each one really costs.</p>
+  <div class="note key" style="margin-bottom:18px"><b>The rule that orders this
+    whole list.</b> A sensor only helps a trained policy if the SIMULATOR can fake
+    it convincingly. The policy learns entirely in simulation, so a reading the sim
+    cannot generate is one the policy never sees in training &mdash; and on the real
+    robot that reading is noise occupying a slot that used to mean something.
+    Fitting the part is usually the smallest of the three costs.</div>
+  ${facts([
+    {k:"Numbers the policy reads now", v:obs.total || 0, n:"and nothing else reaches it"},
+    {k:"Sensors on the menu", v:menu.length, n:"2 decided, the rest open"},
+    {k:"Rows a camera would clear", v:(menu.find(x => x.key === "depth_camera") || {}).unblocks_rows || 0,
+     n:"the most expensive way to do it"},
+    {k:"Rows range finders would clear", v:(menu.find(x => x.key === "tof_array") || {}).unblocks_rows || 0,
+     n:"partly, and far cheaper — consider first"},
+  ])}
+
+  <h3>What the policy reads today</h3>
+  <div class="tw"><table>
+    <tr><th>Term</th><th class="n">Numbers</th><th>Comes from</th><th>What it is</th></tr>
+    ${(obs.terms || []).map(t => `<tr>
+      <td><code>${esc(t.name)}</code></td>
+      <td class="n"><b>${t.n}</b></td>
+      <td class="dim">${esc(t.from)}</td>
+      <td class="dim small">${esc(t.note)}</td></tr>`).join("")}
+    <tr><td><b>Total</b></td><td class="n"><b>${obs.total || 0}</b></td>
+      <td class="dim" colspan="2">Adding to this list changes its length, which
+        makes it a different policy. Every run restarts from zero &mdash; so
+        sensors get added in one batch, at a chosen moment, never one at a time.</td></tr>
+  </table></div>
+
+  <h3 style="margin-top:24px">The menu</h3>
+  <div class="tw scroller" style="max-height:none"><table>
+    <tr><th>Sensor</th><th>Status</th><th class="n">Adds</th><th>Unblocks</th>
+        <th>Why fit it</th><th>Faking it &mdash; the sim cost</th>
+        <th>Trusting it &mdash; sim to real</th><th class="n">g</th></tr>
+    ${menu.map(x => `<tr>
+      <td><b>${esc(x.name)}</b>
+        <div class="dim small">${esc(x.part || "")}</div></td>
+      <td><span class="chip ${STATUS_CHIP[x.status] || ""}">${esc(
+          STATUS_WORD[x.status] || x.status)}</span></td>
+      <td class="n dim small">${esc(String(x.adds))}</td>
+      <td>${x.unblocks_need
+            ? `<span class="dot blocked"></span><b>${x.unblocks_rows} rows</b>
+               <div class="dim small">${esc(x.unblocks_label)}, ${esc(x.unblocks_extent)}</div>`
+            : `<span class="dim">&mdash;</span>`}</td>
+      <td class="dim small">${esc(x.why_anyway || "")}</td>
+      <td class="dim small">${esc(x.fake_it || "")}</td>
+      <td class="dim small">${esc(x.trust_it || "")}</td>
+      <td class="n dim">${x.mass_g != null ? x.mass_g : "&mdash;"}</td></tr>`).join("")}
+  </table></div>
+  <p class="why small" style="margin-top:10px">Part numbers are examples of the
+    CLASS of device, picked because they are common and cheap. Their specs have
+    not been checked against a datasheet &mdash; confirm mass, current and update
+    rate against whatever is actually bought.</p>
+
+  <h3 style="margin-top:26px">Bigger servos</h3>
+  <p class="lede">Available and not expensive in money. The column that matters
+    is <b>mass</b>, not torque.</p>
+  <div class="cols">
+    <div class="card">
+      <div class="tw"><table>
+        <tr><th class="n">Torque</th><th>Case</th><th class="n">Each</th>
+            <th class="n">All 12</th><th>Verdict</th></tr>
+        <tr><td class="n"><b>${(act.now || {}).torque_kgcm} kg&middot;cm</b></td>
+          <td class="dim">${esc((act.now || {}).model || "")} &mdash; now</td>
+          <td class="n">${(act.now || {}).mass_g} g</td>
+          <td class="n dim">&mdash;</td>
+          <td class="dim small">${(act.now || {}).speed_s_per_60deg} s / 60&deg;</td></tr>
+        ${(act.options || []).map(o => `<tr>
+          <td class="n"><b>${o.torque_kgcm} kg&middot;cm</b></td>
+          <td class="dim">${esc(o.case)}</td>
+          <td class="n">${o.mass_g} g</td>
+          <td class="n" style="color:${o.mass_g > 100 ? "var(--bad)" : "var(--ok)"}">
+            ${o.mass_g > (act.now || {}).mass_g
+              ? "+" + (12 * (o.mass_g - (act.now || {}).mass_g)) + " g" : "0 g"}</td>
+          <td class="dim small">${esc(o.verdict)}</td></tr>`).join("")}
+      </table></div>
+      <div class="risk small"><b>Specs unchecked.</b> These are typical figures for
+        the class, not datasheet values. Confirm before buying.</div>
+    </div>
+    <div class="card">
+      <h3>The catch</h3>
+      <p class="why small">${esc(act.the_catch || "")}</p>
+      <h3 style="margin-top:14px">The worse catch</h3>
+      <p class="why small">${esc(act.the_worse_catch || "")}</p>
+      <div class="note key small" style="margin-top:14px"><b>And the real point.</b>
+        ${esc(act.and_the_real_point || "")}</div>
+    </div>
+  </div>`;
+};
+
+/* ------------------------------------------------------- 7. five kinds --- */
 const KIND_LEDE = {
   run: "A piece of work in its own right.",
   axis: "Not a piece of work &mdash; a number changed inside one.",
@@ -342,6 +447,8 @@ paper([
   { id: "trained",   label: "What the runs train for", count: s.runs, html: trained },
   { id: "sim",       label: "One simulation, not forty", html: sim },
   { id: "blocked",   label: "What no reward reaches", count: blockedTotal, html: unreachable },
+  { id: "sensors",   label: "What would unblock it", count: (s.sensors.sensors || []).length,
+    html: sensorsSection },
   { id: "kinds",     label: "The five kinds", count: s.kinds.length, html: kinds },
   { id: "bars",      label: "Pass bars", count: s.subsections.length, html: bars },
   { id: "every",     label: "Every skill", count: s.total, html: every },

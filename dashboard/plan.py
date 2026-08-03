@@ -707,8 +707,12 @@ FEASIBILITY = {
     "facts": [
         {"k": "Graphics card", "v": "NVIDIA RTX 4070 Ti", "note": "12.3 GB, measured on this machine"},
         {"k": "Simulator", "v": "MuJoCo 3.10 via mjlab", "note": "runs the physics on the GPU"},
-        {"k": "Robots trained at once", "v": "6,400", "note": "11.5 GB - probed, not guessed"},
-        {"k": "Throughput", "v": "~90,000 steps/s", "note": "GPU 94% busy, CPU 5.9%"},
+        # Settled at 4500 after measuring the throughput curve: 6400 runs 1.87 s
+        # per iteration against 3072's 1.52, because the card is already at 100%
+        # and more robots buy sub-linear steps. 4500 is the ceiling in
+        # dashboard/queue.py, and asking for more is clamped with the reason.
+        {"k": "Robots trained at once", "v": "4,500", "note": "measured, and the queue's cap"},
+        {"k": "Throughput", "v": "~76,000 steps/s", "note": "GPU saturated, ~1.9 s per iteration"},
         {"k": "Control rate", "v": "50 Hz", "note": "hard limit, set by the servo PWM period"},
         {"k": "Time for one run", "v": "1 - 6 hours", "note": "R1 locomotion is 3000 iterations"},
     ],
@@ -884,10 +888,61 @@ def sampling() -> dict:
             "headline": {"sims": 1, "commands": _fmt(total), "envs": _fmt(envs)}}
 
 
+# ---------------------------------------------------------------------------
+# What Gray could be given to sense.
+#
+# The owner's question: "we are fitting cameras and sensors, so why is anything
+# blocked?" The answer is a menu with three separate costs on it, and it lives in
+# gray/config/sensors.yaml rather than here - it is a fact about the robot, not
+# about the dashboard. Read live, and the row counts each sensor would clear are
+# joined from skills.py so the two can never disagree.
+# ---------------------------------------------------------------------------
+
+_SENSORS_FILE = ROOT / "gray" / "config" / "sensors.yaml"
+
+_STATUS_ORDER = {"committed": 0, "candidate": 1, "not_recommended": 2}
+
+
+def sensors() -> dict:
+    """The sensor menu, with each entry joined to what it would unblock."""
+    try:
+        import yaml  # noqa: PLC0415
+
+        raw = yaml.safe_load(_SENSORS_FILE.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"Could not read gray/config/sensors.yaml "
+                         f"({type(exc).__name__}: {exc})",
+                "sensors": [], "observation_now": {}, "actuators": {}}
+
+    # How many library rows each blocker actually holds up, counted live rather
+    # than written into the yaml where it would go stale the moment a row moves.
+    held = {n["key"]: n for n in skills.load()["needs"]}
+
+    out = []
+    for s in raw.get("sensors", []):
+        un = s.get("unblocks") or {}
+        need = held.get(un.get("need"))
+        out.append({
+            **s,
+            "unblocks_need": un.get("need", ""),
+            "unblocks_extent": un.get("extent", ""),
+            "unblocks_label": (need or {}).get("label", ""),
+            # "partly" never claims the whole pile. An unqualified count beside
+            # a partial fix is the kind of number that gets believed.
+            "unblocks_rows": (need or {}).get("count", 0) if need else 0,
+        })
+    out.sort(key=lambda s: (_STATUS_ORDER.get(s["status"], 9), -s["unblocks_rows"]))
+
+    return {"error": "", "sensors": out,
+            "observation_now": raw.get("observation_now", {}),
+            "actuators": raw.get("actuators", {}),
+            "source": "gray/config/sensors.yaml"}
+
+
 def stage2_state() -> dict:
     """Stage 2 with the live skill library folded in."""
     lib = skills.load()
     for s in lib["subsections"]:
         s["bar"] = STAGE2["bars"].get(s["key"], "")
         s["unverified"] = UNVERIFIED_CLAUSES.get(s["key"], [])
-    return {**STAGE2, **lib, "sampling": sampling()}
+    return {**STAGE2, **lib, "sampling": sampling(), "sensors": sensors()}
