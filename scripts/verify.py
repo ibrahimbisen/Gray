@@ -210,6 +210,13 @@ def main() -> int:
     heights, uprights, speeds = [], [], []
     fell = torch.zeros(args.robots, dtype=torch.bool, device="cuda:0")
     start_xy = (robot.data.root_link_pos_w[:, :2] - origins[:, :2]).clone()
+    # The heading each robot STARTED on. Drift is measured against this, not
+    # against world X: reset nudges the spawn yaw by up to +/-0.1 rad, and a
+    # robot walking perfectly straight from a 0.1 rad start would show 0.6 m of
+    # world-frame lateral offset over 6 m. That is the test's randomisation, not
+    # the policy's error, and charging the policy for it makes the bar unfair by
+    # an amount nobody could see.
+    start_heading = robot.data.heading_w.clone()
     with torch.inference_mode():
         for _ in range(int(seconds * 50)):
             obs = env.step(policy(obs))[0]
@@ -254,9 +261,15 @@ def main() -> int:
     # travelled no further, and averaging it in would report the FALL as a speed
     # error rather than as the fall it already is.
     if spec.get("walk"):
+        # Rotate the displacement into each robot's own starting frame, so
+        # "forward" means the way it was pointing and "sideways" means off that
+        # line - rather than both being measured against an arbitrary world axis.
         moved = end_xy - start_xy
-        fwd = moved[:, 0][alive] if bool(alive.any()) else moved[:, 0]
-        side = moved[:, 1][alive] if bool(alive.any()) else moved[:, 1]
+        cos_h, sin_h = torch.cos(start_heading), torch.sin(start_heading)
+        along = moved[:, 0] * cos_h + moved[:, 1] * sin_h
+        across = -moved[:, 0] * sin_h + moved[:, 1] * cos_h
+        fwd = along[alive] if bool(alive.any()) else along
+        side = across[alive] if bool(alive.any()) else across
         v = torch.stack(speeds)
         v_alive = v[:, alive] if bool(alive.any()) else v
         speed_err = (v_alive - spec["test_speed"]).abs()
