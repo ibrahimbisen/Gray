@@ -54,14 +54,27 @@
       "verify": true,
       "clamped": "",
       "id": "j0007",
-      "state": "running",
+      "state": "done",
       "created": "2026-08-03T06:00:40",
       "started": "2026-08-03T06:17:27",
-      "finished": null,
+      "finished": "2026-08-03T06:20:17",
       "run_id": "2026-08-03_06-17-31_stand_m3100",
-      "exit_code": null,
+      "exit_code": 0,
       "error": "",
-      "steps": [],
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 111.1,
+          "exit_code": 0,
+          "at": "2026-08-03T06:19:18"
+        },
+        {
+          "name": "verify",
+          "seconds": 20.0,
+          "exit_code": 0,
+          "at": "2026-08-03T06:20:17"
+        }
+      ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0007.log"
     },
@@ -80,14 +93,16 @@
       "verify": true,
       "clamped": "",
       "id": "j0008",
-      "state": "queued",
+      "state": "running",
       "created": "2026-08-03T06:00:40",
-      "started": null,
+      "started": "2026-08-03T06:20:17",
       "finished": null,
-      "run_id": null,
+      "run_id": "2026-08-03_06-20-22_walk_m3100_a",
       "exit_code": null,
       "error": "",
-      "steps": []
+      "steps": [],
+      "owner": "31132@061706",
+      "log": "progress/jobs/j0008.log"
     },
     {
       "task": "Gray-Walk",

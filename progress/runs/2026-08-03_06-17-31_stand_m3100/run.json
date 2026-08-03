@@ -4,10 +4,10 @@
   "stage": 1,
   "stage_name": "Stand still",
   "task": "Gray-Stand",
-  "status": "running",
+  "status": "reached target",
   "bar": "30 s without falling. Trunk within 5 mm of 190 mm. Uprightness above 0.99.",
   "started": "2026-08-03T06:17:31",
-  "finished": null,
+  "finished": "2026-08-03T06:19:15",
   "iterations_target": 600,
   "notes": "3072 robots at once, 50 Hz control.",
   "scoring": [
@@ -61,5 +61,7 @@
       "weight": -0.0002,
       "what": "Total torque across the twelve joints. Keeps the pose inside what a 20 kg-cm servo can hold, and saves battery."
     }
-  ]
+  ],
+  "verdict": "passed",
+  "verdict_detail": "64 robots x 30 s - stayed up for 30 s: 100% \u00b7 trunk within 5 mm of target: 1.11 mm \u00b7 uprightness above 0.99: 1.0000"
 }
