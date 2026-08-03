@@ -25,14 +25,14 @@ from urllib.parse import parse_qs, unquote
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from dashboard import plan, runs  # noqa: E402
+from dashboard import plan, queue, runs, skills  # noqa: E402
 from tools import check_urdf  # noqa: E402
 
 # Modules whose contents the pages are built from. The HTML is re-read on every
 # request, but these are imported once at startup - so editing a reward
 # description or a status rule and seeing no change on the page is a trap that
 # looks like a bug in the page. Reload them when the file on disk moves.
-_WATCHED = (plan, runs)
+_WATCHED = (skills, plan, runs, queue)
 _MTIMES: dict[str, float] = {}
 
 
@@ -73,25 +73,68 @@ def summary_state() -> dict:
     _reload_if_edited()
     return {
         "goal": plan.GOAL,
+        "project": plan.PROJECT,
+        "loop": plan.LOOP,
         "stages": plan.STAGES,
         "scoring_intro": plan.SCORING_INTRO,
-        "rewards": plan.REWARDS,
+        # Read off gray/tasks/ rather than hand-written here. Slow the first time
+        # (it imports torch) and cached against the task files' mtime after that.
+        "rewards": plan.rewards(),
         "feasibility": plan.FEASIBILITY,
         "model": model_status(),
     }
 
 
-def monitor_state() -> dict:
+def stage_state(n: int) -> dict | None:
+    """One project stage, with anything live it depends on folded in."""
     _reload_if_edited()
-    all_runs = runs.all_runs()
+    if n == 1:
+        return {**plan.STAGE1, "model": model_status()}
+    if n == 2:
+        return plan.stage2_state()
+    if n == 3:
+        return plan.STAGE3
+    return None
+
+
+def monitor_state() -> dict:
+    """The training centre's poll. Deliberately light.
+
+    No metric rows: this is fetched every few seconds and used to grow forever,
+    because it carried every metric row of every run. At sixteen runs that was
+    1.6 MB per poll and rising. The curves for the ONE run being looked at come
+    from /api/run/<id> instead.
+
+    No reward table either - the monitor scores a RUN, and a run carries its own
+    terms in its own metadata. Serving the plan's copy as well would be a second
+    source for the same thing on the same page.
+    """
+    _reload_if_edited()
+    summaries = runs.all_summaries()
+    live = next((r for r in summaries if r["status"] == "running"), None)
     return {
-        "runs": all_runs,
-        "active": runs.active(all_runs),
+        "runs": summaries,
+        "active": live or (summaries[0] if summaries else None),
+        "queue": queue.load(),
         "phases": plan.PHASES,
         "next_up": plan.NEXT_UP,
         "stages": plan.STAGES,
-        "rewards": plan.REWARDS,
         "model": model_status(),
+        "metrics_available": runs.metrics_available(),
+    }
+
+
+def run_detail(run_id: str, points: int = 0) -> dict | None:
+    _reload_if_edited()
+    return runs.detail(run_id, points=points)
+
+
+def compare_state(run_ids: list[str], metric: str) -> dict:
+    _reload_if_edited()
+    return {
+        "metric": metric,
+        "available": runs.metrics_available(),
+        "series": runs.series(run_ids, metric),
     }
 
 
@@ -107,20 +150,59 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _json(self, payload) -> None:
+        self._send(json.dumps(payload).encode(), "application/json")
+
+    def _queue_post(self, path: str, body: dict):
+        """Queue control. Every one of these ends by returning the whole queue,
+        so the page never has to guess what its edit did - it redraws from the
+        server's answer rather than from an optimistic local copy."""
+        _reload_if_edited()
+        job_id = str(body.get("id", ""))
+        if path == "/api/queue/add":
+            queue.add(body.get("job") or body, position=body.get("position", "end"))
+        elif path == "/api/queue/edit":
+            queue.edit(job_id, body.get("job") or {})
+        elif path == "/api/queue/remove":
+            queue.remove(job_id)
+        elif path == "/api/queue/move":
+            queue.move(job_id, int(body.get("delta", 0)))
+        elif path == "/api/queue/duplicate":
+            queue.duplicate(job_id)
+        elif path == "/api/queue/pause":
+            queue.set_paused(bool(body.get("paused", True)))
+        elif path == "/api/queue/clear":
+            queue.clear_finished()
+        else:
+            return self.send_error(404)
+        return self._json(queue.load())
+
     def do_POST(self):  # noqa: N802
         path = unquote(self.path.split("?")[0])
+        n = int(self.headers.get("Content-Length", 0))
+        try:
+            body = json.loads(self.rfile.read(n) or b"{}")
+        except ValueError:
+            return self._json({"error": "body was not JSON"})
+        if not isinstance(body, dict):
+            body = {}
+
+        if path.startswith("/api/queue/"):
+            try:
+                return self._queue_post(path, body)
+            except Exception as exc:  # noqa: BLE001
+                return self._json({"error": f"{type(exc).__name__}: {exc}"})
+
         if path not in ("/api/pose/limits", "/api/pose/directions"):
             return self.send_error(404)
         from dashboard import poser  # noqa: PLC0415
 
-        n = int(self.headers.get("Content-Length", 0))
-        body = json.loads(self.rfile.read(n) or b"{}")
         try:
             saved = (poser.save_limits(body) if path.endswith("limits")
                      else poser.save_directions(body.get("invert", [])))
         except Exception as exc:  # noqa: BLE001
-            return self._send(json.dumps({"error": str(exc)}).encode(), "application/json")
-        return self._send(json.dumps(saved).encode(), "application/json")
+            return self._json({"error": str(exc)})
+        return self._json(saved)
 
     def do_GET(self):  # noqa: N802, C901
         path = unquote(self.path.split("?")[0])
@@ -150,11 +232,57 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._send(json.dumps(monitor_state()).encode(), "application/json")
         if path == "/api/state":
             return self._send(json.dumps(summary_state()).encode(), "application/json")
+        if path == "/api/queue":
+            _reload_if_edited()
+            return self._send(json.dumps(queue.load()).encode(), "application/json")
+        if path.startswith("/api/run/"):
+            # points= thins the curve for drawing. 0 means every sample, which is
+            # what the table twin needs - a value must never be reachable only by
+            # hovering a chart.
+            pts = int(query.get("points", ["0"])[0] or 0)
+            state = run_detail(unquote(path[len("/api/run/"):]), points=pts)
+            if state is None:
+                return self.send_error(404)
+            return self._send(json.dumps(state).encode(), "application/json")
+        if path == "/api/compare":
+            ids = [r for r in (query.get("runs", [""])[0]).split(",") if r]
+            metric = query.get("metric", ["reward"])[0]
+            return self._send(
+                json.dumps(compare_state(ids, metric)).encode(), "application/json")
+        if path == "/api/job-log":
+            # The runner's own output for one job. This is where "why did that
+            # fail" actually lives, and it is otherwise only in a terminal that
+            # may have been closed.
+            name = query.get("id", [""])[0]
+            log = ROOT / "progress" / "jobs" / f"{name}.log"
+            if not name or ".." in name or "/" in name or not log.is_file():
+                return self._send(json.dumps({"text": ""}).encode(), "application/json")
+            text = log.read_text(encoding="utf-8", errors="replace")
+            return self._send(
+                json.dumps({"text": text[-40000:]}).encode(), "application/json")
+        if path.startswith("/api/stage/"):
+            try:
+                state = stage_state(int(path.rsplit("/", 1)[1]))
+            except ValueError:
+                state = None
+            if state is None:
+                return self.send_error(404)
+            return self._send(json.dumps(state).encode(), "application/json")
+
+        if path == "/page.css":
+            return self._send((HERE / "page.css").read_bytes(), "text/css; charset=utf-8")
+        if path == "/page.js":
+            return self._send((HERE / "page.js").read_bytes(),
+                              "text/javascript; charset=utf-8")
 
         if path in ("/", "/index.html", "/monitor"):
             return self._send((HERE / "monitor.html").read_bytes(), "text/html; charset=utf-8")
         if path in ("/summary", "/summary.html", "/plan"):
             return self._send((HERE / "index.html").read_bytes(), "text/html; charset=utf-8")
+        # The three project stages, each its own page.
+        if path in ("/stage1", "/stage2", "/stage3"):
+            return self._send((HERE / f"{path[1:]}.html").read_bytes(),
+                              "text/html; charset=utf-8")
 
         # Videos and images produced by training. Served with range support, which
         # is what lets a browser scrub through a video instead of downloading it all.
@@ -205,8 +333,11 @@ def serve(port: int = 8000, open_browser: bool = True) -> None:
     with socketserver.TCPServer(("127.0.0.1", port), Handler) as httpd:
         url = f"http://127.0.0.1:{port}/"
         print(f"Dashboard: {url}")
-        print(f"Pose:      {url}pose")
         print(f"Summary:   {url}summary")
+        print(f"  stage 1: {url}stage1     Prepare - the model (provisional)")
+        print(f"  stage 2: {url}stage2     Train - 200 skills, three training runs")
+        print(f"  stage 3: {url}stage3     Deploy - the real robot (start now)")
+        print(f"Pose:      {url}pose")
         print("Ctrl-C to stop.")
         if open_browser:
             webbrowser.open(url)

@@ -17,7 +17,10 @@
 
     /* Categorical slots, dark steps. Validated on this surface:
        lightness band, chroma floor, CVD separation, normal-vision floor and
-       contrast all pass. One hue per metric, fixed - never reassigned by rank. */
+       contrast all pass. One hue per metric, fixed - never reassigned by rank.
+       There are five and there is no sixth: a cycled hue would say two different
+       things are the same thing. Comparing more than five runs folds into
+       "deselect one" rather than into a repeated colour. */
     --s1:#3987e5;  --s2:#d95926;  --s3:#199e70;  --s4:#c98500;  --s5:#d55181;
 
     --good:#0ca30c; --warn:#fab219; --crit:#d03b3b; --live:#3987e5;
@@ -70,6 +73,14 @@
   @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(57,135,229,.5)}50%{box-shadow:0 0 0 4px rgba(57,135,229,0)}}
   .empty{font-size:12px;color:var(--muted);border:1px dashed var(--line);border-radius:8px;padding:12px}
 
+  /* ---- tabs ---- */
+  .tabs{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 18px;border-bottom:1px solid var(--line)}
+  .tab{font:inherit;font-size:12.5px;color:var(--ink2);background:none;border:0;
+       border-bottom:2px solid transparent;padding:9px 13px;cursor:pointer}
+  .tab:hover{color:var(--ink)}
+  .tab.on{color:var(--ink);border-bottom-color:var(--s1)}
+  .tab .n{font-size:10.5px;color:var(--muted);margin-left:6px}
+
   /* ---- header ---- */
   .top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
   .top h1{margin:0;font-size:24px;letter-spacing:-.02em}
@@ -84,11 +95,23 @@
        font-family:inherit}
   .btn:hover{color:var(--ink);border-color:#333945}
   .btn.on{color:var(--ink);border-color:var(--s1)}
+  .btn.go{color:var(--good);border-color:rgba(12,163,12,.45)}
+  .btn.stop{color:var(--crit);border-color:rgba(208,59,59,.45)}
+  .btn.tiny{padding:3px 7px;font-size:11px}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
   .purpose{color:var(--ink2);font-size:13px;margin-top:5px;max-width:78ch}
 
   .prog{margin:16px 0 4px;height:6px;background:var(--line);border-radius:99px;overflow:hidden}
   .prog i{display:block;height:100%;background:var(--s1);transition:width .5s}
   .proglab{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)}
+
+  /* ---- banner ---- */
+  .banner{border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:8px;
+          padding:11px 14px;margin-bottom:16px;font-size:12.5px;color:var(--ink2);
+          background:var(--surface);display:flex;align-items:center;gap:12px}
+  .banner.bad{border-left-color:var(--crit)}
+  .banner.ok{border-left-color:var(--good)}
+  .banner b{color:var(--ink)}
 
   /* ---- stat tiles ---- */
   .tiles{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
@@ -109,16 +132,24 @@
            color:var(--muted);font-weight:600}
   .charts{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 12px 6px}
+  .card.pad{padding:14px 14px 16px}
   .card h3{margin:0;font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:7px}
   .card h3 .swatch{width:8px;height:8px;border-radius:2px}
   .card h3 .now{margin-left:auto;font-size:15px;font-weight:600;letter-spacing:-.01em}
   .card .rng{font-size:10.5px;color:var(--muted);margin:2px 0 4px 15px}
   .plot{position:relative}
   .plot svg{display:block;width:100%;height:132px;overflow:visible}
+  .plot.big svg{height:260px}
   .tip{position:absolute;pointer-events:none;background:#0b0d11;border:1px solid var(--line);
        border-radius:6px;padding:5px 8px;font-size:11.5px;white-space:nowrap;opacity:0;
        transition:opacity .1s;z-index:3;transform:translate(-50%,-130%)}
   .tip b{font-weight:600}
+
+  /* legend: identity is never colour alone - swatch AND name, always present
+     for two or more series. */
+  .legend{display:flex;flex-wrap:wrap;gap:12px;margin:10px 0 2px;font-size:11.5px}
+  .legend span{display:flex;align-items:center;gap:6px;color:var(--ink2)}
+  .legend i{width:11px;height:3px;border-radius:2px;display:block}
 
   /* ---- videos ---- */
   .vwrap{display:grid;gap:12px;grid-template-columns:minmax(0,2.1fr) minmax(190px,1fr)}
@@ -144,30 +175,54 @@
   td{padding:8px 10px;border-bottom:1px solid var(--grid);vertical-align:top}
   tr:last-child td{border-bottom:0}
   tr.now td{background:rgba(57,135,229,.07)}
+  tr.click{cursor:pointer}
+  tr.click:hover td{background:rgba(255,255,255,.03)}
   td.n{color:var(--muted);width:26px}
   .st{font-size:11px}
-  .st.done{color:var(--good)} .st.now{color:var(--live)}
+  .st.done{color:var(--good)} .st.now{color:var(--live)} .st.bad{color:var(--crit)}
   .sub{color:var(--ink2);font-size:11.5px;margin-top:2px}
   .chip{font-size:10.5px;padding:1px 7px;border-radius:99px;border:1px solid var(--line);
         color:var(--muted);display:inline-block;margin:2px 3px 0 0;white-space:nowrap}
   .chip.pos{color:var(--good);border-color:rgba(12,163,12,.4)}
   .chip.neg{color:var(--crit);border-color:rgba(208,59,59,.4)}
   .hide{display:none}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;
+       color:var(--ink2);background:var(--surface2);padding:1px 5px;border-radius:4px}
+  pre.log{background:#0b0d11;border:1px solid var(--line);border-radius:8px;padding:12px;
+          font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;
+          color:var(--ink2);max-height:420px;overflow:auto;white-space:pre-wrap;
+          word-break:break-word;margin:0}
+
+  /* ---- form ---- */
+  .form{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .f label{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;
+           color:var(--muted);margin-bottom:5px}
+  .f input,.f select,.f textarea{width:100%;background:var(--surface2);color:var(--ink);
+       border:1px solid var(--line);border-radius:7px;padding:7px 9px;font:inherit;
+       font-size:12.5px}
+  .f input:focus,.f select:focus,.f textarea:focus{outline:0;border-color:var(--s1)}
+  .f .hint{font-size:11px;color:var(--muted);margin-top:4px}
+  .f.wide{grid-column:1/-1}
+  .checks{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+  .checks label{display:flex;gap:7px;align-items:center;font-size:12.5px;color:var(--ink2);
+                text-transform:none;letter-spacing:0;margin:0}
+  .checks input{width:auto}
 </style>
 </head>
 <body>
 <div class="app">
   <aside>
-    <div class="brand">Gray<small>training monitor</small></div>
+    <div class="brand">Gray<small>training centre</small></div>
     <a class="btn" style="display:block;text-align:center;margin-top:12px" href="/pose">
       Pose editor &rarr;</a>
     <a class="btn" style="display:block;text-align:center;margin-top:6px" href="/summary">
-      Project summary &rarr;</a>
+      Project plan &rarr;</a>
     <div class="side-h"><span>Runs</span><span id="runcount"></span></div>
     <div id="runlist"></div>
   </aside>
   <main>
     <div id="head"></div>
+    <div id="tabs"></div>
     <div id="body"></div>
   </main>
 </div>
@@ -176,15 +231,20 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const SLOTS = ["var(--s1)","var(--s2)","var(--s3)","var(--s4)","var(--s5)"];
+const MAX_COMPARE = SLOTS.length;   // never cycle a hue: see the palette comment
 
-let STATE = null, SELECTED = null, VIDEO = null, TABLE = false;
+let STATE = null, DETAIL = null, DETAIL_FOR = null;
+let SELECTED = null, VIDEO = null, TABLE = false;
+let TAB = location.hash.slice(1) || "live";
+let COMPARE = [], METRIC = "reward", COMPARE_DATA = null;
+let JOBLOG = null, JOBLOG_TEXT = "";
+let BUSY = false;
 
-/* Statuses are words, not colours: a run that was cancelled and one that stopped
-   because it had won look identical as a coloured dot. */
 const STATE_CLASS = {
   "running": "live", "reached target": "ok", "finished": "ok",
   "cancelled": "warn", "interrupted": "warn", "failed": "bad",
   "passed": "ok", "not passed": "bad",
+  "queued": "warn", "done": "ok", "skipped": "warn",
 };
 const cls = s => STATE_CLASS[s] || "muted";
 
@@ -206,6 +266,19 @@ function fmt(v){
 }
 const label = k => k.replace(/_/g, " ").replace(/\bmm\b/, "(mm)");
 
+async function post(path, body){
+  if(BUSY) return null;
+  BUSY = true;
+  try{
+    const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"},
+                                body: JSON.stringify(body || {})});
+    const out = await r.json();
+    if(out && out.error) alert(out.error);
+    return out;
+  }catch(e){ alert(String(e)); return null; }
+  finally{ BUSY = false; await load(); }
+}
+
 /* ---------------- sidebar ---------------- */
 
 function renderRuns(runs){
@@ -220,8 +293,7 @@ function renderRuns(runs){
       <div class="r1"><span class="dot ${cls(r.status)}"></span>
         <span class="nm">${esc(r.variant || r.name)}</span>
         <span class="badge ${cls(r.status)}">${esc(r.status)}</span></div>
-      <div class="pp"><b>${esc(r.name)}</b>${r.stage != null
-        ? ` &middot; stage ${r.stage}` : ""}</div>
+      <div class="pp"><b>${esc(r.name)}</b>${r.task ? ` &middot; ${esc(r.task)}` : ""}</div>
       ${r.verdict ? `<div class="pp"><span class="badge ${
         r.verdict === "passed" ? "ok" : "bad"}">${esc(r.verdict)}</span></div>` : ""}
       <div class="r3">
@@ -232,49 +304,417 @@ function renderRuns(runs){
         Math.round(100 * r.progress)}%"></i></div>` : ""}
     </div>`).join("");
   document.querySelectorAll(".rc").forEach(el =>
-    el.onclick = () => { SELECTED = el.dataset.id; VIDEO = null; draw(); });
+    el.onclick = () => { SELECTED = el.dataset.id; VIDEO = null; DETAIL = null;
+                         TAB = "live"; draw(); fetchDetail(); });
 }
 
-/* ---------------- header + tiles ---------------- */
+/* ---------------- header ---------------- */
 
-function renderHead(run, model){
-  if(!run){
-    $("#head").innerHTML = `<div class="top"><h1>Idle</h1>
-      <span class="pill ${model.passed === model.total ? "done" : "failed"}">model
-      ${model.passed}/${model.total}</span><div class="grow"></div></div>
-      <div class="purpose">Nothing is training. The model is ready; the plan is below.</div>`;
-    return;
-  }
-  const pct = Math.round(100 * (run.progress || 0));
+function renderHead(){
+  const s = STATE, q = s.queue, m = s.model;
+  const run = s.runs.find(r => r.id === SELECTED) || s.active || null;
+  const live = s.runs.find(r => r.status === "running");
   $("#head").innerHTML = `
     <div class="top">
-      <h1>${esc(run.name)}</h1>
-      <span class="pill tnum">${esc(run.variant || run.id)}</span>
-      <span class="badge ${cls(run.status)}">${esc(run.status)}</span>
-      ${run.verdict ? `<span class="badge ${cls(run.verdict)}">${
-        esc(run.verdict)}</span>` : ""}
-      ${run.stage != null ? `<span class="pill">stage ${run.stage}</span>` : ""}
+      <h1>${live ? esc(live.name) : "Idle"}</h1>
+      ${live ? `<span class="badge live">training</span>` : ""}
+      <span class="pill ${q.runner.alive ? "running" : "failed"}">runner ${
+        q.runner.alive ? "up" : "down"}</span>
+      <span class="pill">${q.queued.length} queued</span>
       <div class="grow"></div>
-      <span class="pill ${model.passed === model.total ? "done" : "failed"}">model
-        ${model.passed}/${model.total}</span>
+      <button class="btn ${q.paused ? "go" : "stop"}" id="pausebtn">${
+        q.paused ? "Resume queue" : "Pause queue"}</button>
+      <span class="pill ${m.passed === m.total ? "done" : "failed"}">model ${
+        m.passed}/${m.total}</span>
     </div>
-    ${run.purpose ? `<div class="purpose">${esc(run.purpose)}</div>` : ""}
-    ${run.verdict_detail ? `<div class="purpose" style="color:var(--muted)">
-      <b>Verified:</b> ${esc(run.verdict_detail)}</div>` : ""}
-    ${run.notes ? `<div class="purpose" style="color:var(--muted)">${
-      esc(run.notes)}</div>` : ""}
-    <div class="prog"><i style="width:${pct}%"></i></div>
-    <div class="proglab">
-      <span class="tnum">${run.iterations_done.toLocaleString()} /
-        ${(run.iterations_target || 0).toLocaleString()} iterations</span>
-      <span class="tnum">${pct}% &middot; started ${esc(run.started_age)}</span>
-    </div>`;
+    ${!q.runner.alive ? `<div class="banner bad"><b>The runner is not running.</b>
+      Nothing queued will start. In a second terminal:
+      <code>python run.py --runner</code></div>` : ""}
+    ${q.paused ? `<div class="banner"><b>Queue paused.</b> Whatever is training
+      carries on; nothing new will be picked up.</div>` : ""}`;
+  const pb = $("#pausebtn");
+  if(pb) pb.onclick = () => post("/api/queue/pause", {paused: !q.paused});
+  return run;
 }
+
+function renderTabs(){
+  const q = STATE.queue;
+  const tabs = [
+    ["live", "Live", null],
+    ["queue", "Queue", q.queued.length || null],
+    ["history", "History", STATE.runs.length || null],
+    ["compare", "Compare", COMPARE.length || null],
+    ["jobs", "Job log", q.jobs.length || null],
+    ["plan", "Plan", null],
+  ];
+  $("#tabs").innerHTML = `<div class="tabs">${tabs.map(([id, name, n]) =>
+    `<button class="tab ${TAB === id ? "on" : ""}" data-tab="${id}">${esc(name)}${
+      n ? `<span class="n">${n}</span>` : ""}</button>`).join("")}</div>`;
+  document.querySelectorAll(".tab").forEach(el => el.onclick = () => {
+    TAB = el.dataset.tab; history.replaceState(null, "", "#" + TAB); draw();
+    if(TAB === "compare") fetchCompare();
+  });
+}
+
+/* ---------------- charts ----------------
+   One chart per metric. Never two y-scales on one plot: the alignment would be
+   arbitrary and would invent a correlation that is not in the data. */
+
+const GEO = {W:480, H:132, L:44, R:10, T:8, B:22};
+
+function scales(xs, ys, geo){
+  const x0 = Math.min(...xs), x1 = Math.max(...xs) || 1;
+  let lo = Math.min(...ys), hi = Math.max(...ys);
+  if(hi === lo){ hi = lo + 1; lo -= 1; }
+  const pad = (hi - lo) * 0.12; lo -= pad; hi += pad;
+  return {
+    x0, x1, lo, hi,
+    px: v => geo.L + (geo.W - geo.L - geo.R) * ((v - x0) / ((x1 - x0) || 1)),
+    py: v => geo.T + (geo.H - geo.T - geo.B) * (1 - (v - lo) / ((hi - lo) || 1)),
+  };
+}
+
+function axes(sc, geo){
+  const ticksY = [sc.lo + (sc.hi - sc.lo) * 0.08, (sc.lo + sc.hi) / 2,
+                  sc.hi - (sc.hi - sc.lo) * 0.08];
+  const ticksX = [sc.x0, (sc.x0 + sc.x1) / 2, sc.x1];
+  return `
+    ${ticksY.map(t => `<line x1="${geo.L}" x2="${geo.W - geo.R}" y1="${sc.py(t).toFixed(1)}"
+       y2="${sc.py(t).toFixed(1)}" stroke="var(--grid)" stroke-width="1"
+       vector-effect="non-scaling-stroke"/>`).join("")}
+    <line x1="${geo.L}" x2="${geo.L}" y1="${geo.T}" y2="${geo.H - geo.B}" stroke="var(--line)"
+          stroke-width="1" vector-effect="non-scaling-stroke"/>
+    <line x1="${geo.L}" x2="${geo.W - geo.R}" y1="${geo.H - geo.B}" y2="${geo.H - geo.B}"
+          stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+    ${ticksY.map(t => `<text x="${geo.L - 6}" y="${(sc.py(t) + 3.5).toFixed(1)}" text-anchor="end"
+       font-size="9" fill="var(--muted)" class="tnum">${fmt(t)}</text>`).join("")}
+    ${ticksX.map((t, i) => `<text x="${sc.px(t).toFixed(1)}" y="${geo.H - geo.B + 13}"
+       text-anchor="${i === 0 ? "start" : i === 2 ? "end" : "middle"}"
+       font-size="9" fill="var(--muted)" class="tnum">${Math.round(t)}</text>`).join("")}`;
+}
+
+function chartCard(rows, key, colour){
+  const xs = rows.map(r => r.iteration ?? 0);
+  const ys = rows.map(r => +r[key]);
+  const sc = scales(xs, ys, GEO);
+  const d = rows.map((r, i) => `${i ? "L" : "M"}${sc.px(xs[i]).toFixed(1)},${sc.py(ys[i]).toFixed(1)}`).join("");
+  const endX = sc.px(xs[xs.length - 1]), endY = sc.py(ys[ys.length - 1]);
+
+  return `<div class="card" data-key="${esc(key)}">
+    <h3><span class="swatch" style="background:${colour}"></span>${esc(label(key))}
+      <span class="now" style="color:${colour}">${fmt(ys[ys.length - 1])}</span></h3>
+    <div class="rng tnum">${fmt(Math.min(...ys))} to ${fmt(Math.max(...ys))} over
+      ${rows.length} samples</div>
+    <div class="plot">
+      <svg viewBox="0 0 ${GEO.W} ${GEO.H}" preserveAspectRatio="none" role="img"
+           aria-label="${esc(label(key))} against training iteration">
+        ${axes(sc, GEO)}
+        <path d="${d}" fill="none" stroke="${colour}" stroke-width="2"
+              stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+        <circle cx="${endX.toFixed(1)}" cy="${endY.toFixed(1)}" r="3.2" fill="${colour}"
+                stroke="var(--surface)" stroke-width="2"/>
+        <g class="cross" opacity="0">
+          <line y1="${GEO.T}" y2="${GEO.H - GEO.B}" stroke="var(--muted)" stroke-width="1"
+                vector-effect="non-scaling-stroke"/>
+          <circle r="4" fill="${colour}" stroke="var(--surface)" stroke-width="2"/>
+        </g>
+        <rect x="${GEO.L}" y="0" width="${GEO.W - GEO.L - GEO.R}" height="${GEO.H}"
+              fill="transparent" class="hit"/>
+      </svg>
+      <div class="tip"></div>
+    </div>
+  </div>`;
+}
+
+function wireHover(rows){
+  document.querySelectorAll(".card[data-key]").forEach(card => {
+    const key = card.dataset.key, svg = card.querySelector("svg");
+    const hit = card.querySelector(".hit"), g = card.querySelector(".cross");
+    if(!hit || !g) return;
+    const line = g.querySelector("line"), dotEl = g.querySelector("circle");
+    const tip = card.querySelector(".tip");
+    const xs = rows.map(r => r.iteration ?? 0), ys = rows.map(r => +r[key]);
+    const sc = scales(xs, ys, GEO);
+
+    hit.addEventListener("mousemove", ev => {
+      const b = svg.getBoundingClientRect();
+      const vx = ((ev.clientX - b.left) / b.width) * GEO.W;
+      let best = 0, bd = Infinity;
+      xs.forEach((x, i) => { const dd = Math.abs(sc.px(x) - vx); if(dd < bd){ bd = dd; best = i; } });
+      const cx = sc.px(xs[best]), cy = sc.py(ys[best]);
+      g.setAttribute("opacity", "1");
+      line.setAttribute("x1", cx); line.setAttribute("x2", cx);
+      dotEl.setAttribute("cx", cx); dotEl.setAttribute("cy", cy);
+      tip.style.opacity = "1";
+      tip.style.left = (cx / GEO.W * 100) + "%";
+      tip.style.top = (cy / GEO.H * b.height) + "px";
+      tip.innerHTML = `<b>${fmt(ys[best])}</b> &middot; iteration
+        <span class="tnum">${xs[best]}</span>`;
+    });
+    hit.addEventListener("mouseleave", () => {
+      g.setAttribute("opacity", "0"); tip.style.opacity = "0";
+    });
+  });
+}
+
+function charts(run){
+  const keys = (run.metric_columns || []).filter(k => k !== "iteration");
+  const rows = run.metrics || [];
+  if(!keys.length || rows.length < 2) return "";
+  return `<section>
+    <div class="sech"><h2>Metrics</h2><div class="grow"></div>
+      <button class="btn ${TABLE ? "on" : ""}" id="tbtn">${TABLE ? "Charts" : "Table"}</button>
+    </div>
+    <div class="charts ${TABLE ? "hide" : ""}">${
+      keys.map((k, i) => chartCard(rows, k, hueOf(k, i))).join("")}</div>
+    ${TABLE ? metricTable(run, keys) : ""}
+  </section>`;
+}
+
+/* Every chart has a table twin - a value is never reachable only by hovering. */
+function metricTable(run, keys){
+  const rows = (run.metrics || []).slice().reverse();
+  return `<div class="card wrapx"><table>
+    <tr><th>iteration</th>${keys.map(k => `<th>${esc(label(k))}</th>`).join("")}</tr>
+    ${rows.map(r => `<tr><td class="tnum">${r.iteration}</td>${
+      keys.map(k => `<td class="tnum">${fmt(r[k])}</td>`).join("")}</tr>`).join("")}
+  </table></div>`;
+}
+
+/* ---------------- compare ---------------- */
+
+function compareChart(data){
+  const live = (data.series || []).filter(s => s.points.length);
+  if(!live.length) return `<div class="empty">No run in the selection recorded
+    <b>${esc(data.metric)}</b>.</div>`;
+
+  const geo = {...GEO, H: 260, R: 96};   // room on the right for direct labels
+  const xs = live.flatMap(s => s.points.map(p => p.x));
+  const ys = live.flatMap(s => s.points.map(p => p.y));
+  const sc = scales(xs, ys, geo);
+
+  const paths = live.map((s, i) => {
+    const c = SLOTS[i];
+    const d = s.points.map((p, n) =>
+      `${n ? "L" : "M"}${sc.px(p.x).toFixed(1)},${sc.py(p.y).toFixed(1)}`).join("");
+    const last = s.points[s.points.length - 1];
+    return `
+      <path d="${d}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"
+            stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+      <circle cx="${sc.px(last.x).toFixed(1)}" cy="${sc.py(last.y).toFixed(1)}" r="3.2"
+              fill="${c}" stroke="var(--surface)" stroke-width="2"/>
+      <text x="${(sc.px(last.x) + 7).toFixed(1)}" y="${(sc.py(last.y) + 3.5).toFixed(1)}"
+            font-size="10" fill="var(--ink2)">${esc(s.label)}</text>`;
+  }).join("");
+
+  return `
+    <div class="card pad">
+      <div class="plot big">
+        <svg viewBox="0 0 ${geo.W} ${geo.H}" preserveAspectRatio="none" role="img"
+             aria-label="${esc(data.metric)} for ${live.length} runs against iteration">
+          ${axes(sc, geo)}${paths}
+        </svg>
+      </div>
+      <div class="legend">${live.map((s, i) => `<span>
+        <i style="background:${SLOTS[i]}"></i>${esc(s.label)}
+        <span class="tnum" style="color:var(--muted)">${fmt(
+          s.points[s.points.length - 1].y)}</span></span>`).join("")}</div>
+    </div>
+    <div class="card wrapx" style="margin-top:12px"><table>
+      <tr><th>Run</th><th>Task</th><th class="tnum">samples</th>
+          <th class="tnum">first</th><th class="tnum">last</th><th class="tnum">change</th></tr>
+      ${live.map(s => {
+        const a = s.points[0].y, b = s.points[s.points.length - 1].y;
+        return `<tr><td><b>${esc(s.label)}</b></td><td class="sub">${esc(s.task)}</td>
+          <td class="tnum">${s.n}</td><td class="tnum">${fmt(a)}</td>
+          <td class="tnum">${fmt(b)}</td>
+          <td class="tnum" style="color:${b >= a ? "var(--good)" : "var(--crit)"}">${
+            b >= a ? "+" : ""}${fmt(b - a)}</td></tr>`;
+      }).join("")}
+    </table></div>`;
+}
+
+function comparePanel(){
+  const runs = STATE.runs;
+  const metrics = STATE.metrics_available || [];
+  return `<section style="margin-top:0">
+    <div class="sech"><h2>Compare runs</h2><div class="grow"></div>
+      <select id="metricsel" style="background:var(--surface2);color:var(--ink);
+        border:1px solid var(--line);border-radius:7px;padding:6px 9px;font:inherit;
+        font-size:12px">
+        ${metrics.map(m => `<option value="${esc(m)}" ${m === METRIC ? "selected" : ""}>${
+          esc(label(m))}</option>`).join("")}
+      </select>
+      <button class="btn" id="clearcmp">Clear</button>
+    </div>
+    <div class="card pad" style="margin-bottom:12px">
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:9px">
+        Pick up to ${MAX_COMPARE} runs. There are five colours and no sixth &mdash; a
+        repeated colour would say two different runs are the same run.
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${runs.map(r => {
+          const on = COMPARE.indexOf(r.id);
+          const full = COMPARE.length >= MAX_COMPARE && on < 0;
+          return `<button class="btn tiny ${on >= 0 ? "on" : ""}" data-cmp="${esc(r.id)}"
+            ${full ? "disabled" : ""}
+            style="${on >= 0 ? `border-color:${SLOTS[on]};color:var(--ink)` : ""}">
+            ${on >= 0 ? `<span style="display:inline-block;width:8px;height:8px;
+              border-radius:2px;background:${SLOTS[on]};margin-right:5px"></span>` : ""}
+            ${esc(r.variant)}</button>`;
+        }).join("")}
+      </div>
+    </div>
+    ${COMPARE.length === 0
+      ? `<div class="empty">Select runs above to lay their curves over each other.
+         This is the view that answers "is it getting better?", which no single run
+         page can.</div>`
+      : (COMPARE_DATA ? compareChart(COMPARE_DATA) : `<div class="empty">Loading…</div>`)}
+  </section>`;
+}
+
+/* ---------------- queue ---------------- */
+
+function jobRow(j, i, n){
+  const canMove = j.state === "queued";
+  return `<tr class="${j.state === "running" ? "now" : ""}">
+    <td class="n tnum">${i + 1}</td>
+    <td><b>${esc(j.name || j.task)}</b>
+      <div class="sub">${esc(j.task)} &middot; ${j.num_envs} robots${
+        j.iterations ? ` &middot; ${j.iterations} iterations` : ""} &middot; stop at ${
+        Math.round(j.stop_at * 100)}%</div>
+      ${j.note ? `<div class="sub">${esc(j.note)}</div>` : ""}
+      ${Object.keys(j.rewards || {}).length ? `<div class="sub">${
+        Object.entries(j.rewards).map(([k, v]) =>
+          `<span class="chip ${v >= 0 ? "pos" : "neg"}">${esc(k)} = ${v}</span>`).join("")
+      }</div>` : ""}
+      <div class="sub"><code>${esc(j.command || "")}</code></div></td>
+    <td><span class="badge ${cls(j.state)}">${esc(j.state)}</span>
+      ${j.film ? `<span class="chip">film</span>` : ""}
+      ${j.verify ? `<span class="chip">verify</span>` : ""}
+      ${j.error ? `<div class="sub" style="color:var(--crit)">${esc(j.error)}</div>` : ""}
+      ${j.run_id ? `<div class="sub"><a class="btn tiny" data-open="${esc(j.run_id)}"
+        >open run &rarr;</a></div>` : ""}</td>
+    <td style="white-space:nowrap">
+      ${canMove ? `<button class="btn tiny" data-move="${esc(j.id)}" data-d="-1"
+        ${i === 0 ? "disabled" : ""}>&uarr;</button>
+      <button class="btn tiny" data-move="${esc(j.id)}" data-d="1"
+        ${i === n - 1 ? "disabled" : ""}>&darr;</button>` : ""}
+      <button class="btn tiny" data-dup="${esc(j.id)}">copy</button>
+      <button class="btn tiny stop" data-del="${esc(j.id)}">${
+        j.state === "running" ? "stop" : "×"}</button>
+    </td>
+  </tr>`;
+}
+
+function queuePanel(){
+  const q = STATE.queue;
+  const active = q.jobs.filter(j => j.state === "queued" || j.state === "running");
+  return `<section style="margin-top:0">
+    <div class="sech"><h2>Queue</h2><div class="grow"></div>
+      <button class="btn" id="clearfin">Clear finished</button></div>
+    ${active.length
+      ? `<div class="card wrapx"><table>
+          <tr><th class="n"></th><th>Job</th><th>State</th><th></th></tr>
+          ${active.map((j, i) => jobRow(j, i, active.length)).join("")}
+        </table></div>`
+      : `<div class="empty">Queue is empty. Add a job below and the runner picks it
+         up within a few seconds.</div>`}
+
+    <div class="sech" style="margin-top:28px"><h2>Add a job</h2></div>
+    <div class="card pad">
+      <div class="form">
+        <div class="f"><label>Task</label>
+          <select id="j_task">${q.tasks.map(t =>
+            `<option ${t === "Gray-Walk" ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
+        <div class="f"><label>Name</label><input id="j_name" placeholder="walk_v5">
+          <div class="hint">blank = the task's own name</div></div>
+        <div class="f"><label>Robots at once</label>
+          <input id="j_envs" type="number" value="3072" min="1" max="8192">
+          <div class="hint">4096 is this card's ceiling</div></div>
+        <div class="f"><label>Iterations</label>
+          <input id="j_iters" type="number" value="0" min="0">
+          <div class="hint">0 = the task default</div></div>
+        <div class="f"><label>Stop at</label>
+          <input id="j_stop" type="number" value="0.965" step="0.005" min="0" max="1">
+          <div class="hint">fraction of the reward ceiling &mdash; RULES.md rule 1</div></div>
+        <div class="f wide"><label>Why this run exists</label>
+          <input id="j_note" placeholder="what this one is testing"></div>
+        <div class="f wide"><label>Reward overrides</label>
+          <input id="j_rewards" placeholder="twitching=-0.05, leg_swing=1.5">
+          <div class="hint">comma separated, term=weight. Recorded on the run, so it
+            always says what it was actually scored on.</div></div>
+        <div class="f wide checks">
+          <label><input type="checkbox" id="j_film" checked> film checkpoints</label>
+          <label><input type="checkbox" id="j_verify" checked> verify against the bar</label>
+          <label><input type="checkbox" id="j_first"> put it next in the queue</label>
+          <div class="grow"></div>
+          <button class="btn go" id="j_add">Add to queue</button>
+        </div>
+      </div>
+    </div>
+
+    ${q.history.length ? `
+      <div class="sech" style="margin-top:28px"><h2>Finished jobs</h2></div>
+      <div class="card wrapx"><table>
+        <tr><th>Job</th><th>State</th><th class="tnum">steps</th><th>Finished</th><th></th></tr>
+        ${q.history.map(j => `<tr>
+          <td><b>${esc(j.name || j.task)}</b><div class="sub">${esc(j.task)}</div>
+            ${j.error ? `<div class="sub" style="color:var(--crit)">${esc(j.error)}</div>` : ""}</td>
+          <td><span class="badge ${cls(j.state)}">${esc(j.state)}</span></td>
+          <td class="sub">${(j.steps || []).map(s =>
+            `${esc(s.name)} ${Math.round(s.seconds)}s`).join("<br>") || "—"}</td>
+          <td class="sub tnum">${esc(j.finished || "")}</td>
+          <td style="white-space:nowrap">
+            ${j.run_id ? `<button class="btn tiny" data-open="${esc(j.run_id)}">run</button>` : ""}
+            <button class="btn tiny" data-dup="${esc(j.id)}">requeue</button></td>
+        </tr>`).join("")}
+      </table></div>` : ""}
+  </section>`;
+}
+
+function wireQueue(){
+  const g = id => $("#" + id);
+  const add = g("j_add");
+  if(add) add.onclick = () => {
+    const rewards = {};
+    (g("j_rewards").value || "").split(",").forEach(part => {
+      const [k, v] = part.split("=").map(s => (s || "").trim());
+      if(k && v !== undefined && v !== "" && !isNaN(+v)) rewards[k] = +v;
+    });
+    post("/api/queue/add", {
+      position: g("j_first").checked ? "next" : "end",
+      job: {
+        task: g("j_task").value, name: g("j_name").value.trim(),
+        note: g("j_note").value.trim(),
+        num_envs: +g("j_envs").value, iterations: +g("j_iters").value,
+        stop_at: +g("j_stop").value, rewards,
+        film: g("j_film").checked, verify: g("j_verify").checked,
+      },
+    });
+  };
+  const cf = g("clearfin");
+  if(cf) cf.onclick = () => post("/api/queue/clear", {});
+  document.querySelectorAll("[data-move]").forEach(el => el.onclick = () =>
+    post("/api/queue/move", {id: el.dataset.move, delta: +el.dataset.d}));
+  document.querySelectorAll("[data-dup]").forEach(el => el.onclick = () =>
+    post("/api/queue/duplicate", {id: el.dataset.dup}));
+  document.querySelectorAll("[data-del]").forEach(el => el.onclick = () => {
+    if(confirm("Remove this job? A running job is stopped."))
+      post("/api/queue/remove", {id: el.dataset.del});
+  });
+  document.querySelectorAll("[data-open]").forEach(el => el.onclick = () => {
+    SELECTED = el.dataset.open; DETAIL = null; VIDEO = null; TAB = "live";
+    draw(); fetchDetail();
+  });
+}
+
+/* ---------------- live run ---------------- */
 
 function tiles(run){
   const keys = (run.metric_columns || []).filter(k => k !== "iteration");
   if(!keys.length) return "";
-  const rows = run.metrics, last = rows[rows.length - 1] || {}, first = rows[0] || {};
+  const rows = run.metrics || [], last = rows[rows.length - 1] || {}, first = rows[0] || {};
   return `<div class="tiles">${keys.map((k, i) => {
     const c = hueOf(k, i), now = last[k], was = first[k];
     const d = (typeof now === "number" && typeof was === "number") ? now - was : null;
@@ -287,126 +727,29 @@ function tiles(run){
   }).join("")}</div>`;
 }
 
-/* ---------------- charts ----------------
-   One chart per metric. Never two y-scales on one plot: the alignment would be
-   arbitrary and would invent a correlation that is not in the data. */
-
-function chartCard(run, key, colour){
-  const rows = run.metrics;
-  const xs = rows.map(r => r.iteration ?? 0);
-  const ys = rows.map(r => +r[key]);
-  const x0 = Math.min(...xs), x1 = Math.max(...xs) || 1;
-  let lo = Math.min(...ys), hi = Math.max(...ys);
-  if(hi === lo){ hi = lo + 1; lo -= 1; }
-  const pad = (hi - lo) * 0.12; lo -= pad; hi += pad;
-
-  const W = 480, H = 132, L = 44, R = 10, T = 8, B = 22;
-  const px = v => L + (W - L - R) * ((v - x0) / ((x1 - x0) || 1));
-  const py = v => T + (H - T - B) * (1 - (v - lo) / ((hi - lo) || 1));
-
-  const ticksY = [lo + (hi - lo) * 0.08, (lo + hi) / 2, hi - (hi - lo) * 0.08];
-  const ticksX = [x0, (x0 + x1) / 2, x1];
-  const d = rows.map((r, i) => `${i ? "L" : "M"}${px(xs[i]).toFixed(1)},${py(ys[i]).toFixed(1)}`).join("");
-  const endX = px(xs[xs.length - 1]), endY = py(ys[ys.length - 1]);
-
-  return `<div class="card" data-key="${esc(key)}">
-    <h3><span class="swatch" style="background:${colour}"></span>${esc(label(key))}
-      <span class="now" style="color:${colour}">${fmt(ys[ys.length - 1])}</span></h3>
-    <div class="rng tnum">${fmt(Math.min(...ys))} to ${fmt(Math.max(...ys))} over
-      ${rows.length} samples</div>
-    <div class="plot">
-      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
-           aria-label="${esc(label(key))} against training iteration">
-        ${ticksY.map(t => `<line x1="${L}" x2="${W - R}" y1="${py(t).toFixed(1)}"
-           y2="${py(t).toFixed(1)}" stroke="var(--grid)" stroke-width="1"
-           vector-effect="non-scaling-stroke"/>`).join("")}
-        <line x1="${L}" x2="${L}" y1="${T}" y2="${H - B}" stroke="var(--line)"
-              stroke-width="1" vector-effect="non-scaling-stroke"/>
-        <line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="var(--line)"
-              stroke-width="1" vector-effect="non-scaling-stroke"/>
-        ${ticksY.map(t => `<text x="${L - 6}" y="${(py(t) + 3.5).toFixed(1)}" text-anchor="end"
-           font-size="9" fill="var(--muted)" class="tnum">${fmt(t)}</text>`).join("")}
-        ${ticksX.map((t, i) => `<text x="${px(t).toFixed(1)}" y="${H - B + 13}"
-           text-anchor="${i === 0 ? "start" : i === 2 ? "end" : "middle"}"
-           font-size="9" fill="var(--muted)" class="tnum">${Math.round(t)}</text>`).join("")}
-        <path d="${d}" fill="none" stroke="${colour}" stroke-width="2"
-              stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
-        <circle cx="${endX.toFixed(1)}" cy="${endY.toFixed(1)}" r="3.2" fill="${colour}"
-                stroke="var(--surface)" stroke-width="2"/>
-        <g class="cross" opacity="0">
-          <line y1="${T}" y2="${H - B}" stroke="var(--muted)" stroke-width="1"
-                vector-effect="non-scaling-stroke"/>
-          <circle r="4" fill="${colour}" stroke="var(--surface)" stroke-width="2"/>
-        </g>
-        <rect x="${L}" y="0" width="${W - L - R}" height="${H}" fill="transparent" class="hit"/>
-      </svg>
-      <div class="tip"></div>
+function runHeader(run){
+  const pct = Math.round(100 * (run.progress || 0));
+  return `
+    <div class="top" style="margin-bottom:4px">
+      <h1 style="font-size:19px">${esc(run.name)}</h1>
+      <span class="pill tnum">${esc(run.variant || run.id)}</span>
+      <span class="badge ${cls(run.status)}">${esc(run.status)}</span>
+      ${run.verdict ? `<span class="badge ${cls(run.verdict)}">${esc(run.verdict)}</span>` : ""}
+      ${run.duration ? `<span class="pill">${esc(run.duration)}</span>` : ""}
     </div>
-  </div>`;
+    ${run.purpose ? `<div class="purpose">${esc(run.purpose)}</div>` : ""}
+    ${run.bar ? `<div class="purpose" style="color:var(--muted)"><b>Passes when:</b>
+      ${esc(run.bar)}</div>` : ""}
+    ${run.verdict_detail ? `<div class="purpose" style="color:var(--muted)">
+      <b>Verified:</b> ${esc(run.verdict_detail)}</div>` : ""}
+    ${run.notes ? `<div class="purpose" style="color:var(--muted)">${esc(run.notes)}</div>` : ""}
+    <div class="prog"><i style="width:${pct}%"></i></div>
+    <div class="proglab">
+      <span class="tnum">${(run.iterations_done || 0).toLocaleString()} /
+        ${(run.iterations_target || 0).toLocaleString()} iterations</span>
+      <span class="tnum">${pct}% &middot; started ${esc(run.started_age || "")}</span>
+    </div>`;
 }
-
-function wireHover(run){
-  const rows = run.metrics;
-  document.querySelectorAll(".card[data-key]").forEach(card => {
-    const key = card.dataset.key, svg = card.querySelector("svg");
-    const hit = card.querySelector(".hit"), g = card.querySelector(".cross");
-    const line = g.querySelector("line"), dotEl = g.querySelector("circle");
-    const tip = card.querySelector(".tip");
-    const W = 480, H = 132, L = 44, R = 10, T = 8, B = 22;
-    const xs = rows.map(r => r.iteration ?? 0), ys = rows.map(r => +r[key]);
-    const x0 = Math.min(...xs), x1 = Math.max(...xs) || 1;
-    let lo = Math.min(...ys), hi = Math.max(...ys);
-    if(hi === lo){ hi = lo + 1; lo -= 1; }
-    const pad = (hi - lo) * 0.12; lo -= pad; hi += pad;
-    const px = v => L + (W - L - R) * ((v - x0) / ((x1 - x0) || 1));
-    const py = v => T + (H - T - B) * (1 - (v - lo) / ((hi - lo) || 1));
-
-    const move = ev => {
-      const b = svg.getBoundingClientRect();
-      const vx = ((ev.clientX - b.left) / b.width) * W;
-      let best = 0, bd = Infinity;
-      xs.forEach((x, i) => { const dd = Math.abs(px(x) - vx); if(dd < bd){ bd = dd; best = i; } });
-      const cx = px(xs[best]), cy = py(ys[best]);
-      g.setAttribute("opacity", "1");
-      line.setAttribute("x1", cx); line.setAttribute("x2", cx);
-      dotEl.setAttribute("cx", cx); dotEl.setAttribute("cy", cy);
-      tip.style.opacity = "1";
-      tip.style.left = (cx / W * 100) + "%";
-      tip.style.top = (cy / H * b.height) + "px";
-      tip.innerHTML = `<b>${fmt(ys[best])}</b> &middot; iteration
-        <span class="tnum">${xs[best]}</span>`;
-    };
-    hit.addEventListener("mousemove", move);
-    hit.addEventListener("mouseleave", () => {
-      g.setAttribute("opacity", "0"); tip.style.opacity = "0";
-    });
-  });
-}
-
-function charts(run){
-  const keys = (run.metric_columns || []).filter(k => k !== "iteration");
-  if(!keys.length || (run.metrics || []).length < 2) return "";
-  return `<section>
-    <div class="sech"><h2>Metrics</h2><div class="grow"></div>
-      <button class="btn ${TABLE ? "on" : ""}" id="tbtn">${TABLE ? "Charts" : "Table"}</button>
-    </div>
-    <div class="charts ${TABLE ? "hide" : ""}">${
-      keys.map((k, i) => chartCard(run, k, hueOf(k, i))).join("")}</div>
-    ${TABLE ? metricTable(run, keys) : ""}
-  </section>`;
-}
-
-/* Every chart has a table twin - a value is never reachable only by hovering. */
-function metricTable(run, keys){
-  const rows = run.metrics.slice().reverse();
-  return `<div class="card wrapx"><table>
-    <tr><th>iteration</th>${keys.map(k => `<th>${esc(label(k))}</th>`).join("")}</tr>
-    ${rows.map(r => `<tr><td class="tnum">${r.iteration}</td>${
-      keys.map(k => `<td class="tnum">${fmt(r[k])}</td>`).join("")}</tr>`).join("")}
-  </table></div>`;
-}
-
-/* ---------------- videos ---------------- */
 
 function films(run){
   const v = run.videos || [];
@@ -436,14 +779,11 @@ function films(run){
   </section>`;
 }
 
-/* ---------------- what this run is scored on ---------------- */
-
 function scoring(run){
   const terms = run.scoring || [];
   if(!terms.length) return "";
   const earns = terms.filter(t => t.weight > 0);
   const loses = terms.filter(t => t.weight < 0);
-
   const table = (rows, positive) => `
     <div class="card wrapx">
       <table>
@@ -459,33 +799,88 @@ function scoring(run){
             Math.abs(t.weight)}</td></tr>`).join("")}
       </table>
     </div>`;
-
-  // The ceiling is worth showing beside the terms: it is what makes the reward
-  // number mean something rather than being an arbitrary score. See RULES.md.
   const perSec = earns.reduce((a, t) => a + t.weight, 0);
   return `<section>
     <div class="sech"><h2>Reward function</h2>
-      <span style="font-size:11.5px;color:var(--muted)">what earns and loses points,
-        every 1/50 s</span>
+      <span style="font-size:11.5px;color:var(--muted)">what this run was scored on,
+        recorded when it launched</span>
       <div class="grow"></div>
       <a class="btn" href="/summary#scoring">Why each term exists &rarr;</a></div>
-    <div class="twocol">
-      ${table(earns, true)}
-      ${table(loses, false)}
-    </div>
+    <div class="twocol">${table(earns, true)}${table(loses, false)}</div>
     <div class="sub" style="margin-top:8px">
       The rewards are capped at 1.0 each, so the most an episode can score is
-      <b>${perSec.toFixed(1)} per second</b>. Training stops at 98% of that
+      <b>${perSec.toFixed(1)} per second</b>. Training stops at 96.5% of that
       &mdash; past there only the penalties have any room left to move.
     </div>
   </section>`;
 }
 
-/* ---------------- plan, compact ---------------- */
+function livePanel(){
+  const run = DETAIL;
+  if(!SELECTED && !STATE.active)
+    return `<div class="empty">Nothing has trained yet. Queue a job and the runner
+      picks it up within a few seconds.</div>`;
+  if(!run) return `<div class="empty">Loading run…</div>`;
+  return runHeader(run) + tiles(run) + charts(run) + films(run) + scoring(run);
+}
 
-function pipeline(s, currentStage){
-  const lab = {done:"done", next:"next", later:"later", blocked:"needs robot"};
-  return `<section>
+/* ---------------- history ---------------- */
+
+function historyPanel(){
+  const runs = STATE.runs;
+  if(!runs.length) return `<div class="empty">No runs yet.</div>`;
+  return `<section style="margin-top:0">
+    <div class="sech"><h2>Every run</h2><div class="grow"></div>
+      <span class="pill">${runs.length}</span></div>
+    <div class="card wrapx"><table>
+      <tr><th>Run</th><th>Task</th><th>Status</th><th>Verdict</th>
+          <th class="tnum">iterations</th><th class="tnum">reward</th>
+          <th>Took</th><th class="tnum">films</th><th>Started</th></tr>
+      ${runs.map(r => `<tr class="click ${r.id === SELECTED ? "now" : ""}"
+          data-open="${esc(r.id)}">
+        <td><b>${esc(r.variant)}</b><div class="sub">${esc(r.name)}</div></td>
+        <td class="sub">${esc(r.task)}</td>
+        <td><span class="badge ${cls(r.status)}">${esc(r.status)}</span></td>
+        <td>${r.verdict ? `<span class="badge ${cls(r.verdict)}">${esc(r.verdict)}</span>`
+             : `<span class="sub">—</span>`}</td>
+        <td class="tnum">${r.iterations_done.toLocaleString()}${
+          r.iterations_target ? ` / ${r.iterations_target.toLocaleString()}` : ""}</td>
+        <td class="tnum">${fmt(r.latest && r.latest.reward)}</td>
+        <td class="sub tnum">${esc(r.duration)}</td>
+        <td class="tnum">${r.videos}</td>
+        <td class="sub tnum">${esc(r.started_age)}</td>
+      </tr>`).join("")}
+    </table></div>
+  </section>`;
+}
+
+/* ---------------- job log ---------------- */
+
+function jobsPanel(){
+  const q = STATE.queue;
+  if(!q.jobs.length) return `<div class="empty">No jobs yet.</div>`;
+  return `<section style="margin-top:0">
+    <div class="sech"><h2>Runner output</h2>
+      <span style="font-size:11.5px;color:var(--muted)">where "why did that fail"
+        actually lives</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      ${q.jobs.slice().reverse().map(j => `<button class="btn tiny ${
+        JOBLOG === j.id ? "on" : ""}" data-log="${esc(j.id)}">
+        ${esc(j.id)} ${esc(j.name || j.task)}</button>`).join("")}
+    </div>
+    ${JOBLOG ? `<pre class="log">${esc(JOBLOG_TEXT || "…")}</pre>`
+             : `<div class="empty">Pick a job to read its output.</div>`}
+  </section>`;
+}
+
+/* ---------------- plan ---------------- */
+
+function planPanel(){
+  const s = STATE;
+  const lab = {done:"done", next:"next", later:"later", blocked:"needs robot",
+               provisional:"provisional", "start now":"start now"};
+  const live = st => /^(in progress|partly|ongoing)/.test(st.state || "");
+  return `<section style="margin-top:0">
     <div class="sech"><h2>Pipeline</h2><div class="grow"></div>
       <a class="btn" href="/summary">Full plan &amp; every scoring term &rarr;</a></div>
     <div class="card wrapx"><table>
@@ -497,80 +892,139 @@ function pipeline(s, currentStage){
           esc(lab[p.state] || p.state)}</td></tr>`).join("")}
     </table></div>
     <div class="card wrapx" style="margin-top:10px"><table>
-      <tr><th class="n"></th><th>Stage</th><th>Passes when</th><th></th></tr>
-      ${s.stages.map(st => {
-        const cls = currentStage == null ? "" :
-          st.n < currentStage ? "done" : st.n === currentStage ? "now" : "";
-        return `<tr class="${cls === "now" ? "now" : ""}">
-          <td class="n tnum">${st.n}</td>
-          <td><b>${esc(st.name)}</b></td>
-          <td class="sub">${esc(st.bar)}</td>
-          <td class="st ${cls}">${cls === "done" ? "done" : cls === "now" ? "training" : ""}</td>
-        </tr>`;
-      }).join("")}
+      <tr><th></th><th>Kind</th><th>Passes when</th><th>State</th></tr>
+      ${s.stages.map(st => `<tr class="${live(st) ? "now" : ""}">
+        <td><b>${esc(st.name)}</b></td>
+        <td class="sub">${esc(st.kind)}</td>
+        <td class="sub">${esc(st.bar)}</td>
+        <td class="st ${live(st) ? "now" : ""}">${esc(st.state)}</td>
+      </tr>`).join("")}
     </table></div>
-  </section>`;
-}
+    <div class="sub" style="margin-top:8px">Three of these are training runs. The
+      rest are dials turned inside one, properties checked across all of them, or
+      measurements taken afterwards.</div>
 
-function blockers(nx){
-  return `<section><div class="sech"><h2>Blocking &mdash; ${esc(nx.title)}</h2></div>
+    <div class="sech" style="margin-top:28px"><h2>Blocking &mdash; ${
+      esc(s.next_up.title)}</h2></div>
     <div class="card wrapx"><table>
       <tr><th>Needed first</th><th></th></tr>
-      ${nx.before.map(b => `<tr><td style="white-space:nowrap"><b>${esc(b.task)}</b></td>
+      ${s.next_up.before.map(b => `<tr><td style="white-space:nowrap"><b>${esc(b.task)}</b>
+        <div class="sub">${esc(b.who)}</div></td>
         <td class="sub">${esc(b.note)}</td></tr>`).join("")}
-      ${nx.open.map(o => `<tr><td style="white-space:nowrap;color:var(--warn)">open</td>
-        <td class="sub">${esc(o.q)} ${esc(o.note)}</td></tr>`).join("")}
-    </table></div></section>`;
-}
+      ${s.next_up.open.map(o => `<tr><td style="white-space:nowrap;color:var(--warn)">open</td>
+        <td class="sub"><b>${esc(o.q)}</b> ${esc(o.note)}</td></tr>`).join("")}
+    </table></div>
 
-function modelRow(m){
-  const bad = (m.checks || []).filter(c => !c.passed);
-  return `<section><div class="sech"><h2>Model</h2></div>
-    <div class="tiles">
+    <div class="sech" style="margin-top:28px"><h2>Model</h2></div>
+    <div class="tiles" style="margin-top:0">
       <div class="tile"><div class="k">checks</div>
-        <div class="v" style="color:${bad.length ? "var(--crit)" : "var(--good)"}">${
-          m.passed}/${m.total}</div><div class="d">${esc(m.urdf)}</div></div>
-      ${bad.slice(0, 3).map(c => `<div class="tile"><div class="k">failing</div>
+        <div class="v" style="color:${s.model.passed === s.model.total
+          ? "var(--good)" : "var(--crit)"}">${s.model.passed}/${s.model.total}</div>
+        <div class="d">${esc(s.model.urdf)}</div></div>
+      ${(s.model.checks || []).filter(c => !c.passed).slice(0, 3).map(c =>
+        `<div class="tile"><div class="k">failing</div>
         <div class="v" style="font-size:15px;line-height:1.3">${esc(c.title)}</div>
         <div class="d">${esc(c.detail)}</div></div>`).join("")}
-    </div></section>`;
+    </div>
+  </section>`;
 }
 
 /* ---------------- draw ---------------- */
 
 function draw(){
-  const s = STATE, runs = s.runs || [];
+  if(!STATE) return;
+  const s = STATE;
   if(SELECTED === null) SELECTED = (s.active && s.active.id) || null;
-  const run = runs.find(r => r.id === SELECTED) || s.active || null;
 
-  renderRuns(runs);
-  renderHead(run, s.model);
-  $("#body").innerHTML = [
-    run ? tiles(run) : "",
-    run ? charts(run) : "",
-    run ? films(run) : "",
-    run ? scoring(run) : "",
-    pipeline(s, run ? run.stage : null),
-    blockers(s.next_up),
-    modelRow(s.model),
-  ].join("");
+  renderRuns(s.runs);
+  renderHead();
+  renderTabs();
 
-  if(run && !TABLE) wireHover(run);
+  const panels = {
+    live: livePanel, queue: queuePanel, history: historyPanel,
+    compare: comparePanel, jobs: jobsPanel, plan: planPanel,
+  };
+  $("#body").innerHTML = (panels[TAB] || livePanel)();
+
+  if(TAB === "live" && DETAIL && !TABLE) wireHover(DETAIL.metrics || []);
   const tb = $("#tbtn");
   if(tb) tb.onclick = () => { TABLE = !TABLE; draw(); };
   document.querySelectorAll(".thumb").forEach(el =>
     el.onclick = () => { VIDEO = +el.dataset.i; draw(); });
+
+  if(TAB === "queue") wireQueue();
+  if(TAB === "history") document.querySelectorAll("[data-open]").forEach(el =>
+    el.onclick = () => { SELECTED = el.dataset.open; DETAIL = null; VIDEO = null;
+                         TAB = "live"; draw(); fetchDetail(); });
+  if(TAB === "compare"){
+    document.querySelectorAll("[data-cmp]").forEach(el => el.onclick = () => {
+      const id = el.dataset.cmp, at = COMPARE.indexOf(id);
+      if(at >= 0) COMPARE.splice(at, 1);
+      else if(COMPARE.length < MAX_COMPARE) COMPARE.push(id);
+      COMPARE_DATA = null; draw(); fetchCompare();
+    });
+    const sel = $("#metricsel");
+    if(sel) sel.onchange = () => { METRIC = sel.value; COMPARE_DATA = null;
+                                   draw(); fetchCompare(); };
+    const cc = $("#clearcmp");
+    if(cc) cc.onclick = () => { COMPARE = []; COMPARE_DATA = null; draw(); };
+  }
+  if(TAB === "jobs") document.querySelectorAll("[data-log]").forEach(el =>
+    el.onclick = () => { JOBLOG = el.dataset.log; JOBLOG_TEXT = ""; draw(); fetchLog(); });
 }
 
-function load(){
-  fetch("/api/monitor").then(r => r.json()).then(s => {
-    // Hold the previous render while refetching - no skeleton flash, no jump.
-    STATE = s; draw();
-  }).catch(e => { $("#head").innerHTML = `<h1>Could not load</h1>
-    <div class="purpose">${esc(e)}</div>`; });
+/* ---------------- fetch ---------------- */
+
+async function fetchDetail(){
+  if(!SELECTED) return;
+  try{
+    const r = await fetch(`/api/run/${encodeURIComponent(SELECTED)}`);
+    if(!r.ok){ DETAIL = null; return; }
+    DETAIL = await r.json();
+    DETAIL_FOR = SELECTED;
+    if(TAB === "live") draw();
+  }catch(e){ /* the poll will try again */ }
+}
+
+async function fetchCompare(){
+  if(!COMPARE.length) return;
+  try{
+    const r = await fetch(`/api/compare?runs=${encodeURIComponent(COMPARE.join(","))}` +
+                          `&metric=${encodeURIComponent(METRIC)}`);
+    COMPARE_DATA = await r.json();
+    if(TAB === "compare") draw();
+  }catch(e){ /* leave the placeholder up */ }
+}
+
+async function fetchLog(){
+  if(!JOBLOG) return;
+  try{
+    const r = await fetch(`/api/job-log?id=${encodeURIComponent(JOBLOG)}`);
+    JOBLOG_TEXT = (await r.json()).text || "(nothing written yet)";
+    if(TAB === "jobs") draw();
+  }catch(e){ /* leave it */ }
+}
+
+async function load(){
+  try{
+    const r = await fetch("/api/monitor");
+    STATE = await r.json();
+    if(!STATE.metrics_available.includes(METRIC))
+      METRIC = STATE.metrics_available[0] || "reward";
+    draw();
+    // Refresh the open run's curves too - but only when it is actually moving,
+    // so a page left on a finished run is not refetching it every five seconds.
+    const run = STATE.runs.find(x => x.id === SELECTED);
+    if(SELECTED && (DETAIL_FOR !== SELECTED || (run && run.status === "running")))
+      fetchDetail();
+    if(TAB === "jobs" && JOBLOG) fetchLog();
+  }catch(e){
+    $("#head").innerHTML = `<h1>Could not load</h1>
+      <div class="purpose">${esc(e)}</div>`;
+  }
 }
 load();
-setInterval(load, 10000);
+setInterval(load, 5000);
 </script>
 </body>
 </html>

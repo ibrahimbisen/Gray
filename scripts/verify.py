@@ -37,6 +37,25 @@ TASKS = {
     # be knocked off its height as long as it comes back.
     "Gray-Push": {"experiment": "gray_push", "stage": 2, "seconds": 20.0,
                   "bar_survive": 0.90, "bar_err_mm": 20.0, "bar_upright": 0.95},
+    # Walking is measured differently from the two above. Standing still and
+    # taking a shove are judged on holding a pose; walking is judged on GOING
+    # SOMEWHERE, so height alone says nothing - a robot that sits down and never
+    # moves holds its height perfectly.
+    #
+    # The bar, from the plan: walks 5 m without falling, holds the commanded
+    # speed within 0.05 m/s, and drifts under 100 mm sideways over 20 s.
+    #
+    # 0.25 m/s x 20 s = 5.0 m, which is where the distance number comes from.
+    # The command is pinned to that speed for the test rather than left to
+    # resample: a bar that says "5 m in a straight line" cannot be measured while
+    # the robot is being told to turn every few seconds.
+    "Gray-Walk": {"experiment": "gray_walk", "stage": 5, "seconds": 20.0,
+                  "bar_survive": 0.90, "bar_err_mm": 40.0, "bar_upright": 0.90,
+                  "walk": True,
+                  "test_speed": 0.25,        # m/s forward, held for the whole test
+                  "bar_distance_m": 5.0,
+                  "bar_speed_err": 0.05,     # m/s, mean absolute
+                  "bar_drift_mm": 100.0},
 }
 
 
@@ -155,6 +174,23 @@ def main() -> int:
     env_cfg = load_env_cfg(args.task, play=True)
     env_cfg.scene.num_envs = args.robots
     env_cfg.episode_length_s = seconds + 5.0
+
+    # Walking is tested against ONE held command, not the random stream it trained
+    # on. "5 m in a straight line" is not measurable while the robot is being told
+    # to turn every few seconds, and a resample mid-test would show up as a speed
+    # error the policy never made.
+    if spec.get("walk"):
+        cmd = env_cfg.commands.get("walk")
+        if cmd is None:
+            raise SystemExit("Gray-Walk has no 'walk' command to pin for the test")
+        v = spec["test_speed"]
+        cmd.ranges.lin_vel_x = (v, v)
+        cmd.ranges.lin_vel_y = (0.0, 0.0)
+        cmd.ranges.ang_vel_z = (0.0, 0.0)
+        cmd.rel_standing_envs = 0.0      # nobody is told to stand still
+        cmd.rel_forward_envs = 1.0       # everybody goes straight
+        # Longer than the test, so it is drawn once and never changes under us.
+        cmd.resampling_time_range = (1e6, 1e6)
     agent_cfg = load_rl_cfg(args.task)
     env = RslRlVecEnvWrapper(ManagerBasedRlEnv(env_cfg, device="cuda:0"),
                              clip_actions=agent_cfg.clip_actions)
@@ -166,8 +202,9 @@ def main() -> int:
     origins = env.unwrapped.scene.env_origins
 
     obs, _ = env.reset()
-    heights, uprights = [], []
+    heights, uprights, speeds = [], [], []
     fell = torch.zeros(args.robots, dtype=torch.bool, device="cuda:0")
+    start_xy = (robot.data.root_link_pos_w[:, :2] - origins[:, :2]).clone()
     with torch.inference_mode():
         for _ in range(int(seconds * 50)):
             obs = env.step(policy(obs))[0]
@@ -175,7 +212,10 @@ def main() -> int:
             up = -robot.data.projected_gravity_b[:, 2]   # 1.0 is dead level
             heights.append(h.clone())
             uprights.append(up.clone())
+            if spec.get("walk"):
+                speeds.append(robot.data.root_link_lin_vel_b[:, 0].clone())
             fell |= (up < 0.7) | (h < target * 0.55)
+    end_xy = (robot.data.root_link_pos_w[:, :2] - origins[:, :2]).clone()
 
     h = torch.stack(heights)
     up = torch.stack(uprights)
@@ -203,6 +243,29 @@ def main() -> int:
          float(up_alive.mean()), spec["bar_upright"], "ge",
          f"worst {float(up_alive.min()):.4f}", "{:.4f}"),
     ]
+
+    # Walking has three more, and they are the ones that actually say it walked.
+    # Measured only on the robots still standing: a robot that fell at second two
+    # travelled no further, and averaging it in would report the FALL as a speed
+    # error rather than as the fall it already is.
+    if spec.get("walk"):
+        moved = end_xy - start_xy
+        fwd = moved[:, 0][alive] if bool(alive.any()) else moved[:, 0]
+        side = moved[:, 1][alive] if bool(alive.any()) else moved[:, 1]
+        v = torch.stack(speeds)
+        v_alive = v[:, alive] if bool(alive.any()) else v
+        speed_err = (v_alive - spec["test_speed"]).abs()
+        checks += [
+            (f"covered {spec['bar_distance_m']:.0f} m",
+             float(fwd.mean()), spec["bar_distance_m"], "ge",
+             f"worst {float(fwd.min()):.2f} m", "{:.2f} m"),
+            (f"speed within {spec['bar_speed_err']:.2f} m/s of {spec['test_speed']}",
+             float(speed_err.mean()), spec["bar_speed_err"], "le",
+             f"worst {float(speed_err.max()):.3f} m/s", "{:.3f} m/s"),
+            (f"sideways drift under {spec['bar_drift_mm']:.0f} mm",
+             float(side.abs().mean() * 1000), spec["bar_drift_mm"], "le",
+             f"worst {float(side.abs().max() * 1000):.0f} mm", "{:.1f} mm"),
+        ]
 
     passed = True
     print(f"{'check':<32} {'measured':>12}  {'bar':>7}")

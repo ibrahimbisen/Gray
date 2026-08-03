@@ -1,19 +1,19 @@
 {
-  "name": "Take a push",
-  "purpose": "The first task that cannot be solved by memorising a pose - the robot has to notice it was shoved and do something. That makes it the first real use of the potentiometers, and it builds the reflex walking needs, where every step is a disturbance the robot creates for itself.",
-  "stage": 2,
-  "stage_name": "Take a push",
-  "task": "Gray-Push",
-  "status": "stopped",
-  "bar": "Survives repeated shoves from any direction over 20 s, on ground anywhere from slippery to grippy, with mass and servo gains varied.",
-  "started": "2026-08-03T01:26:40",
-  "finished": "2026-08-03T02:22:44",
-  "iterations_target": 1500,
-  "notes": "6400 robots at once, 50 Hz control. Shoves 0.4-1.2 m/s from any angle, spin 1.5 rad/s. Stopped at ~1000/1500 by RULES.md rule 1: flat at 97.6 of a 100.0 ceiling for 300 iterations, above the 96.5% bar. Superseded anyway - trained on the old reward function (no skidding/foot_lift/jitter) and the old 2378.70 g masses. Checkpoints kept; scoring it would trip verify.py's drift warning.",
+  "name": "Stand still",
+  "purpose": "Can a policy hold the ride-height stance? The static check says twelve servos at 1.96 N-m have 3.57x the torque they need, so a failure here is the reward or the setup, not the robot.",
+  "stage": 1,
+  "stage_name": "Stand still",
+  "task": "Gray-Stand",
+  "status": "failed",
+  "bar": "30 s without falling. Trunk within 5 mm of 190 mm. Uprightness above 0.99.",
+  "started": "2026-08-03T05:56:57",
+  "finished": "2026-08-03T05:57:01",
+  "iterations_target": 600,
+  "notes": "4096 robots at once, 50 Hz control.",
   "scoring": [
     {
       "name": "fell_over",
-      "weight": -40.0,
+      "weight": -20.0,
       "what": "Fell. By far the largest single number here, and the one thing that ends an attempt."
     },
     {
@@ -29,7 +29,7 @@
     {
       "name": "posture",
       "weight": 1.5,
-      "what": "Joints near the stance they started in, rather than any pose that happens to stay up."
+      "what": "Joints near their default pose, but with the tolerance widened once the robot is asked to move. A fixed tolerance is the thing that stops a gait developing at all - it pays the robot to keep its legs where they started, which is the opposite of walking."
     },
     {
       "name": "still",
@@ -48,13 +48,8 @@
     },
     {
       "name": "twitching",
-      "weight": -0.1,
+      "weight": -0.01,
       "what": "How much the commanded angles jump between one moment and the next. Smooth commands are the single biggest factor in whether this survives contact with a real servo."
-    },
-    {
-      "name": "spinning",
-      "weight": -0.05,
-      "what": "Trunk rotating. A shove usually sets the robot turning as well as sliding, and killing that rotation is most of recovering from it. The stand task had no term for this because nothing ever span it."
     },
     {
       "name": "joint_speed",

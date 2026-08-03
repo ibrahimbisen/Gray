@@ -41,3 +41,14 @@ MUJOCO_LOG.TXT
 /progress/**/checkpoints/
 /progress/runs/0000-00-00_demo/
 /reference/**/*.mp4
+
+# The training queue's live state. progress/queue.json IS committed - it is the
+# record of what was planned and in what order, which is worth reading back.
+# These three are not:
+#   runner.json  a heartbeat, rewritten every couple of seconds
+#   queue.lock   exists only while a write is in flight
+#   jobs/        the runner's captured stdout, hundreds of MB over a long night
+/progress/runner.json
+/progress/queue.lock
+/progress/queue.json.tmp
+/progress/jobs/

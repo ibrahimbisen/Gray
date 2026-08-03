@@ -162,12 +162,190 @@ def read_run(folder: Path) -> dict:
 
 
 def all_runs() -> list[dict]:
-    """Newest first. An empty progress/runs/ is normal, not an error."""
+    """Newest first, WITH every metric row. An empty progress/runs/ is normal.
+
+    Heavy - one call is megabytes once there are a few runs. The pages use
+    `all_summaries()` for the list and `detail()` for the one being looked at.
+    Kept because it is the honest "give me everything" call.
+    """
     if not RUNS.is_dir():
         return []
     runs = [read_run(p) for p in RUNS.iterdir() if p.is_dir()]
     runs.sort(key=lambda r: (r["started"] or "", r["id"]), reverse=True)
     return runs
+
+
+# ---------------------------------------------------------------------------
+# Light reads.
+#
+# The training centre polls every few seconds and can hold a hundred runs. Every
+# metric row of every run in that payload was 1.6 MB at sixteen runs and grows
+# forever - so the list carries only what a list shows, and the full curves are
+# fetched for the one run being looked at.
+# ---------------------------------------------------------------------------
+
+# Parsed metrics, keyed by file mtime. Re-reading sixteen CSVs on every poll is
+# wasted work when none of them have changed - and the one that HAS changed is
+# the running one, whose mtime moves, so it is never served stale.
+_METRIC_CACHE: dict[str, tuple[float, list[str], list[dict]]] = {}
+
+
+def _metrics_cached(path: Path) -> tuple[list[str], list[dict]]:
+    try:
+        stamp = path.stat().st_mtime
+    except OSError:
+        return [], []
+    hit = _METRIC_CACHE.get(str(path))
+    if hit and hit[0] == stamp:
+        return hit[1], hit[2]
+    cols, rows = _read_metrics(path)
+    _METRIC_CACHE[str(path)] = (stamp, cols, rows)
+    return cols, rows
+
+
+def _duration(started: str | None, finished: str | None) -> str:
+    if not started:
+        return ""
+    try:
+        a = datetime.fromisoformat(started)
+        b = datetime.fromisoformat(finished) if finished else datetime.now()
+    except ValueError:
+        return ""
+    secs = max(0, int((b - a).total_seconds()))
+    h, rem = divmod(secs, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h}h {m:02d}m" if h else (f"{m}m {s:02d}s" if m else f"{s}s")
+
+
+def summary(folder: Path) -> dict:
+    """One run, without its metric history. Everything a list or card needs."""
+    full = read_run(folder)
+    rows = full.pop("metrics", [])
+    full["samples"] = len(rows)
+    full["videos"] = len(full["videos"])
+    full["checkpoints"] = len(full["checkpoints"])
+    full["scoring"] = len(full["scoring"])
+    full["duration"] = _duration(full["started"], full["finished"])
+    return full
+
+
+def all_summaries() -> list[dict]:
+    """Newest first, no metric rows. This is what the run list polls."""
+    if not RUNS.is_dir():
+        return []
+    out = []
+    for p in sorted(RUNS.iterdir()):
+        if not p.is_dir():
+            continue
+        meta = _read_json(p / "run.json")
+        cols, rows = _metrics_cached(p / "metrics.csv")
+        latest = rows[-1] if rows else {}
+        target = meta.get("iterations_target") or 0
+        done = int(latest.get("iteration", len(rows)))
+        status = {"done": "finished", "stopped": "cancelled"}.get(
+            meta.get("status", "unknown"), meta.get("status", "unknown"))
+        if status == "running":
+            newest = max((f.stat().st_mtime for f in p.rglob("*") if f.is_file()),
+                         default=0.0)
+            if newest and (datetime.now().timestamp() - newest) > STALE_AFTER_S:
+                status = "interrupted"
+        out.append({
+            "id": p.name,
+            "name": meta.get("name") or p.name,
+            "variant": p.name.split("_", 2)[-1] if p.name.count("_") >= 2 else p.name,
+            "task": meta.get("task", ""),
+            "stage": meta.get("stage"),
+            "stage_name": meta.get("stage_name", ""),
+            "purpose": meta.get("purpose", ""),
+            "notes": meta.get("notes", ""),
+            "bar": meta.get("bar", ""),
+            "status": status,
+            "verdict": meta.get("verdict", ""),
+            "verdict_detail": meta.get("verdict_detail", ""),
+            "started": meta.get("started"),
+            "started_age": _age(meta.get("started")),
+            "finished": meta.get("finished"),
+            "duration": _duration(meta.get("started"), meta.get("finished")),
+            "iterations_done": done,
+            "iterations_target": target,
+            "progress": (done / target) if target else 0.0,
+            "metric_columns": cols,
+            "samples": len(rows),
+            "latest": latest,
+            "videos": sum(1 for f in (p / "videos").glob("*.mp4")
+                          if not f.name.endswith(".writing.mp4")),
+            "checkpoints": sum(1 for _ in (p / "checkpoints").glob("*.npz")),
+            "scoring": len(meta.get("scoring", [])),
+        })
+    out.sort(key=lambda r: (r["started"] or "", r["id"]), reverse=True)
+    return out
+
+
+def detail(run_id: str, points: int = 0) -> dict | None:
+    """One run in full, for the panel actually being looked at."""
+    folder = RUNS / run_id
+    if not folder.is_dir() or ".." in run_id or "/" in run_id or "\\" in run_id:
+        return None
+    run = read_run(folder)
+    run["duration"] = _duration(run["started"], run["finished"])
+    if points and len(run["metrics"]) > points:
+        run["metrics"] = _thin(run["metrics"], points)
+    return run
+
+
+def _thin(rows: list[dict], keep: int) -> list[dict]:
+    """Even sample, always keeping the last row.
+
+    The last row is the current value the page prints beside the chart. Dropping
+    it to make the arithmetic neat would make the headline number disagree with
+    the end of its own line.
+    """
+    if keep < 2 or len(rows) <= keep:
+        return rows
+    step = (len(rows) - 1) / (keep - 1)
+    picked = [rows[int(i * step)] for i in range(keep - 1)]
+    picked.append(rows[-1])
+    return picked
+
+
+def series(run_ids: list[str], metric: str, points: int = 400) -> list[dict]:
+    """The same metric from several runs, for laying them over each other.
+
+    This is the view that answers "is it getting better?", which no single run
+    page can. Runs that never recorded the metric come back with an empty list
+    rather than being dropped - "this run has no reward curve" is information.
+    """
+    out = []
+    for rid in run_ids:
+        folder = RUNS / rid
+        if not folder.is_dir():
+            continue
+        meta = _read_json(folder / "run.json")
+        _, rows = _metrics_cached(folder / "metrics.csv")
+        pairs = [{"x": r.get("iteration"), "y": r.get(metric)}
+                 for r in rows
+                 if isinstance(r.get(metric), float) and r.get("iteration") is not None]
+        out.append({
+            "id": rid,
+            "label": rid.split("_", 2)[-1] if rid.count("_") >= 2 else rid,
+            "task": meta.get("task", ""),
+            "status": meta.get("status", ""),
+            "verdict": meta.get("verdict", ""),
+            "points": _thin(pairs, points) if points else pairs,
+            "n": len(pairs),
+        })
+    return out
+
+
+def metrics_available() -> list[str]:
+    """Every metric name any run has recorded, so the compare view can offer them."""
+    names: set[str] = set()
+    if RUNS.is_dir():
+        for p in RUNS.iterdir():
+            if p.is_dir():
+                cols, _ = _metrics_cached(p / "metrics.csv")
+                names.update(c for c in cols if c != "iteration")
+    return sorted(names)
 
 
 def active(runs: list[dict]) -> dict | None:

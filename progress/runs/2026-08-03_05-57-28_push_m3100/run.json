@@ -1,0 +1,85 @@
+{
+  "name": "Take a push",
+  "purpose": "The first task that cannot be solved by memorising a pose - the robot has to notice it was shoved and do something. That makes it the first real use of the potentiometers, and it builds the reflex walking needs, where every step is a disturbance the robot creates for itself.",
+  "stage": 2,
+  "stage_name": "Take a push",
+  "task": "Gray-Push",
+  "status": "running",
+  "bar": "Survives repeated shoves from any direction over 20 s, on ground anywhere from slippery to grippy, with mass and servo gains varied.",
+  "started": "2026-08-03T05:57:28",
+  "finished": null,
+  "iterations_target": 1500,
+  "notes": "3072 robots at once, 50 Hz control. Shoves 0.4-1.2 m/s from any angle, spin 1.5 rad/s.",
+  "scoring": [
+    {
+      "name": "fell_over",
+      "weight": -40.0,
+      "what": "Fell. By far the largest single number here, and the one thing that ends an attempt."
+    },
+    {
+      "name": "end_stops",
+      "weight": -5.0,
+      "what": "Driving a joint into the last few degrees of its travel. On the real robot that is a servo straining against a hard stop."
+    },
+    {
+      "name": "height",
+      "weight": 2.0,
+      "what": "Trunk at the ride height. 1.0 dead on, falling away over 30 mm."
+    },
+    {
+      "name": "tilt",
+      "weight": -2.0,
+      "what": "Trunk off level. Measured off gravity, so it needs no outside reference."
+    },
+    {
+      "name": "skidding",
+      "weight": -2.0,
+      "what": "A foot sliding along the floor while it is carrying weight. Nothing stopped the robot recovering by scuffing its feet across the ground, and that does not survive contact with a real floor: the simulator's friction is a guess, and a policy that leans on sliding is leaning on the guess."
+    },
+    {
+      "name": "posture",
+      "weight": 0.6,
+      "what": "Joints near their default pose, but with the tolerance widened once the robot is asked to move. A fixed tolerance is the thing that stops a gait developing at all - it pays the robot to keep its legs where they started, which is the opposite of walking."
+    },
+    {
+      "name": "still",
+      "weight": 0.5,
+      "what": "Trunk not moving. Standing still means still, not slowly drifting."
+    },
+    {
+      "name": "alive",
+      "weight": 0.5,
+      "what": "A small amount for every moment it has not fallen. Stops it ending an attempt early to escape a bad score."
+    },
+    {
+      "name": "foot_lift",
+      "weight": 0.3,
+      "what": "Picking a foot up and putting it down. Once sliding is expensive, the only way left to move a foot is to lift it - this pays for doing that properly rather than dragging."
+    },
+    {
+      "name": "spinning",
+      "weight": -0.05,
+      "what": "Trunk rotating. A shove usually sets the robot turning as well as sliding, and killing that rotation is most of recovering from it. The stand task had no term for this because nothing ever span it."
+    },
+    {
+      "name": "twitching",
+      "weight": -0.01,
+      "what": "How much the commanded angles jump between one moment and the next. Smooth commands are the single biggest factor in whether this survives contact with a real servo."
+    },
+    {
+      "name": "jitter",
+      "weight": -0.01,
+      "what": "Buzzing - the commanded angle reversing direction from one moment to the next. This looks at the change in the change, so a large smooth movement costs nothing while a small fast shudder is expensive. It is the right way to buy smoothness: push_v3 tried to get it by making 'twitching' 150 times harsher, and that taxed the big fast corrections needed to catch a fall, so the robot stopped catching them."
+    },
+    {
+      "name": "effort",
+      "weight": -0.0002,
+      "what": "Total torque across the twelve joints. Keeps the pose inside what a 20 kg-cm servo can hold, and saves battery."
+    },
+    {
+      "name": "joint_speed",
+      "weight": -0.0002,
+      "what": "Joints moving at all. A robot standing still should be still."
+    }
+  ]
+}

@@ -1,7 +1,13 @@
 #!/usr/bin/env python
-"""Open the dashboard.
+"""Open the dashboard, or start the training runner.
 
-    python run.py
+    python run.py                 the dashboard at http://127.0.0.1:8000
+    python run.py --runner        work through the training queue, unattended
+    python run.py --check         print what the dashboard can see, and exit
+
+Run BOTH, in two terminals. The dashboard is where you queue work; the runner is
+what actually runs it. They are separate processes on purpose - closing the
+dashboard must not kill a six-hour training run.
 
 Finds a Python that can actually import this project's packages and re-runs
 itself under it. There are two of them, in order of preference:
@@ -85,6 +91,18 @@ def main() -> int:
         return code
 
     sys.path.insert(0, str(ROOT))
+
+    # The runner goes through this launcher too, so it inherits the interpreter
+    # fix above. Started with a broken interpreter it would fail on the first
+    # job rather than at startup, hours later and in a log nobody is reading.
+    if "--runner" in sys.argv[1:]:
+        import runpy  # noqa: PLC0415
+
+        rest = [a for a in sys.argv[1:] if a != "--runner"]
+        sys.argv = [str(ROOT / "scripts" / "runner.py"), *rest]
+        runpy.run_path(sys.argv[0], run_name="__main__")
+        return 0
+
     try:
         from dashboard.server import monitor_state, serve
     except ImportError as exc:
@@ -96,8 +114,13 @@ def main() -> int:
     args = [a for a in sys.argv[1:] if a != "--check"]
     if "--check" in sys.argv[1:]:
         s = monitor_state()
+        q = s["queue"]
         print(f"interpreter : {sys.executable}")
         print(f"runs        : {len(s['runs'])}")
+        print(f"queue       : {len(q['queued'])} queued, "
+              f"{'PAUSED' if q['paused'] else 'active'}")
+        print(f"runner      : {'up' if q['runner']['alive'] else 'NOT RUNNING'}"
+              + (f" - {q['runner']['hint']}" if q["runner"]["hint"] else ""))
         print(f"phases      : {len(s['phases'])}")
         print(f"stages      : {len(s['stages'])}")
         print(f"model       : {s['model']['passed']}/{s['model']['total']} checks pass")

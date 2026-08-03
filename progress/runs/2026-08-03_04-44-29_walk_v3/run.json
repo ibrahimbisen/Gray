@@ -1,0 +1,130 @@
+{
+  "name": "Walk",
+  "purpose": "Go where it is told at 0.15-0.35 m/s and stop when told to stop. Stages 3 and 4 are skipped on purpose - this is a straight test of how much a policy picks up in a fixed amount of training. The one number that decides it is the tracking band: mjlab's default 0.5 m/s would pay this robot 78% of full marks for standing perfectly still, so it is set to 0.15 here.",
+  "stage": 5,
+  "stage_name": "Walk",
+  "task": "Gray-Walk",
+  "status": "running",
+  "bar": "Walks 5 m without falling, holds commanded speed within 0.05 m/s, and drifts less than 100 mm sideways over 20 s.",
+  "started": "2026-08-03T04:44:29",
+  "finished": null,
+  "iterations_target": 3000,
+  "notes": "6400 robots at once, 50 Hz control.",
+  "scoring": [
+    {
+      "name": "fell_over",
+      "weight": -40.0,
+      "what": "Fell. By far the largest single number here, and the one thing that ends an attempt."
+    },
+    {
+      "name": "end_stops",
+      "weight": -5.0,
+      "what": "Driving a joint into the last few degrees of its travel. On the real robot that is a servo straining against a hard stop."
+    },
+    {
+      "name": "track_speed",
+      "weight": 2.0,
+      "what": "Moving at the speed it was told to, measured on a trunk speed averaged over about half a stride rather than the raw one. This is the term that pays for walking at all."
+    },
+    {
+      "name": "dragging",
+      "weight": -2.0,
+      "what": "A foot at the wrong height while it is travelling. This is what stops the dragging leg that shows up in every walking run without it, and it is scored continuously rather than only at touchdown."
+    },
+    {
+      "name": "track_turn",
+      "weight": 1.0,
+      "what": "Turning at the rate it was told to, and not turning when it was not asked to."
+    },
+    {
+      "name": "ground_covered",
+      "weight": 1.0,
+      "what": "Ground actually put behind it. Speed tracking alone can be satisfied by rocking forwards and backwards, which averages out to the right speed and gets nowhere. This only pays for net progress, so that trick earns nothing."
+    },
+    {
+      "name": "wandering",
+      "weight": -1.0,
+      "what": "Drifting sideways off the line it was sent along. Only charged when it was told to go straight, and measured on where the robot has actually ended up rather than which way it is pointing."
+    },
+    {
+      "name": "upright",
+      "weight": 1.0,
+      "what": "Trunk level, measured off gravity. Replaces the stand task's 'tilt' penalty with the same measurement scored as a reward, which is what the walking references use."
+    },
+    {
+      "name": "ride_height",
+      "weight": 1.0,
+      "what": "Trunk still at walking height. Without this the cheapest way to move is to sink onto its belly and crawl."
+    },
+    {
+      "name": "posture",
+      "weight": 1.0,
+      "what": "Joints near their default pose, but with the tolerance widened once the robot is asked to move. A fixed tolerance is the thing that stops a gait developing at all - it pays the robot to keep its legs where they started, which is the opposite of walking."
+    },
+    {
+      "name": "stepping",
+      "weight": 1.0,
+      "what": "Feet spending a sensible time in the air - long enough to be a step, short enough not to be a hop. This is what turns 'move forwards' into 'walk' rather than 'shuffle'."
+    },
+    {
+      "name": "leg_swing",
+      "weight": 1.0,
+      "what": "How far the thighs and calves swing either side of their own average. This is what makes the walk look like a dog rather than a table sliding along - without it the cheapest gait is stiff legs and tiny steps. Capped, so it buys a stride and not a flail."
+    },
+    {
+      "name": "alive",
+      "weight": 0.5,
+      "what": "A small amount for every moment it has not fallen. Stops it ending an attempt early to escape a bad score."
+    },
+    {
+      "name": "skidding",
+      "weight": -0.5,
+      "what": "A foot sliding along the floor while it is carrying weight. Nothing stopped the robot recovering by scuffing its feet across the ground, and that does not survive contact with a real floor: the simulator's friction is a guess, and a policy that leans on sliding is leaning on the guess."
+    },
+    {
+      "name": "swing_height",
+      "weight": -0.25,
+      "what": "How wrong the top of a swing was, scored when the foot lands. Catches a foot that skims the floor and one that is thrown needlessly high, neither of which survives a real floor."
+    },
+    {
+      "name": "veering",
+      "weight": -0.2,
+      "what": "Turning off the heading it was sent along. Different from 'wandering': a robot can hold a perfectly straight line while slowly rotating to face sideways, and this is the term that catches that. Yaw RATE is already scored - this catches the drift that a near-zero rate hides, because a tenth of a degree per step is invisible in the rate and 20 degrees off after twenty seconds."
+    },
+    {
+      "name": "rocking",
+      "weight": -0.02,
+      "what": "Trunk rolling and pitching. Priced on its own rather than lumped in with turning, so rocking costs whether or not the robot is also holding its heading."
+    },
+    {
+      "name": "twitching",
+      "weight": -0.01,
+      "what": "How much the commanded angles jump between one moment and the next. Smooth commands are the single biggest factor in whether this survives contact with a real servo."
+    },
+    {
+      "name": "jitter",
+      "weight": -0.01,
+      "what": "Buzzing - the commanded angle reversing direction from one moment to the next. This looks at the change in the change, so a large smooth movement costs nothing while a small fast shudder is expensive. It is the right way to buy smoothness: push_v3 tried to get it by making 'twitching' 150 times harsher, and that taxed the big fast corrections needed to catch a fall, so the robot stopped catching them."
+    },
+    {
+      "name": "shaking",
+      "weight": -0.001,
+      "what": "How hard the trunk is being jolted about, measured as its own acceleration. Smooth joints can still add up to a trunk that hammers, and the trunk is where the IMU and the electronics live."
+    },
+    {
+      "name": "effort",
+      "weight": -0.0002,
+      "what": "Total torque across the twelve joints. Keeps the pose inside what a 20 kg-cm servo can hold, and saves battery."
+    },
+    {
+      "name": "hard_landing",
+      "weight": -0.0001,
+      "what": "Slamming a foot down. Printed PLA with no suspension, so this is set harder than the reference value."
+    },
+    {
+      "name": "joint_shock",
+      "weight": -2.5e-07,
+      "what": "Joint acceleration. Footfalls spike it, and a servo gearbox is what absorbs that spike on the real robot."
+    }
+  ]
+}
