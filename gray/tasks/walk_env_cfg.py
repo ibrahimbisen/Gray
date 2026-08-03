@@ -77,7 +77,30 @@ WALK_TURN = (-0.50, 0.50)     # rad/s about the vertical
 # the single most important number in the file. docs/REWARDS.md puts it at
 # 0.3-0.5x the target speed, against mjlab's borrowed 0.5.
 TRACK_STD = 0.15
-TURN_STD = 0.30
+
+# The turning band. This is the same trap as the tracking band above, in the
+# other direction, and it cost three runs to find.
+#
+# track_angular_velocity pays exp(-(yaw error squared + xy rotation) / std^2).
+# At std = 0.30, the yaw error the robot ACTUALLY makes - measured at 1.5 rad/s,
+# flat across all 3000 iterations of walk_m3100_a and _b - pays:
+#
+#     exp(-1.5^2 / 0.30^2) = 1.4e-11
+#
+# That is not a small reward, it is a dead one. The term is saturated at zero
+# across the whole region the policy operates in, so it has no gradient and the
+# policy was never told to stop spinning. Both runs walked over 5 m without
+# falling and then drifted 3.5-4 m sideways, and this is why. Raising the WEIGHT
+# does nothing either: twice zero is zero.
+#
+# At std = 0.80 the same error pays 0.030, rising to 0.68 at 0.5 rad/s and 0.94
+# at 0.2 - a real slope the whole way down. The reward stays capped at 1.0 so the
+# ceiling, and RULES.md rule 1's stop threshold, are unchanged.
+#
+# The lesson generalises: a tracking band has to be set against the error the
+# robot MAKES, not only against the command it is given. Both numbers here have
+# now been wrong in opposite directions for the same reason.
+TURN_STD = 0.80
 
 # The lowest command that still counts as "being asked to move". Every gated term
 # uses this instead of mjlab's 0.5, which Gray never reaches.

@@ -4,10 +4,10 @@
   "stage": 5,
   "stage_name": "Walk",
   "task": "Gray-Walk",
-  "status": "finished",
+  "status": "cancelled",
   "bar": "Walks 5 m without falling, holds commanded speed within 0.05 m/s, and drifts less than 100 mm sideways over 20 s.",
-  "started": "2026-08-03T07:55:22",
-  "finished": "2026-08-03T09:24:07",
+  "started": "2026-08-03T09:25:03",
+  "finished": "2026-08-03T09:28:18",
   "iterations_target": 3000,
   "notes": "3072 robots at once, 50 Hz control.",
   "scoring": [
@@ -22,9 +22,19 @@
       "what": "Driving a joint into the last few degrees of its travel. On the real robot that is a servo straining against a hard stop."
     },
     {
+      "name": "wandering",
+      "weight": -4.0,
+      "what": "Drifting sideways off the line it was sent along. Only charged when it was told to go straight, and measured on where the robot has actually ended up rather than which way it is pointing."
+    },
+    {
       "name": "track_speed",
       "weight": 2.0,
       "what": "Moving at the speed it was told to, measured on a trunk speed averaged over about half a stride rather than the raw one. This is the term that pays for walking at all."
+    },
+    {
+      "name": "track_turn",
+      "weight": 2.0,
+      "what": "Turning at the rate it was told to, and not turning when it was not asked to."
     },
     {
       "name": "dragging",
@@ -32,24 +42,9 @@
       "what": "A foot at the wrong height while it is travelling. This is what stops the dragging leg that shows up in every walking run without it, and it is scored continuously rather than only at touchdown."
     },
     {
-      "name": "leg_swing",
-      "weight": 1.8,
-      "what": "How far the thighs and calves swing either side of their own average. This is what makes the walk look like a dog rather than a table sliding along - without it the cheapest gait is stiff legs and tiny steps. Capped, so it buys a stride and not a flail."
-    },
-    {
-      "name": "track_turn",
-      "weight": 1.0,
-      "what": "Turning at the rate it was told to, and not turning when it was not asked to."
-    },
-    {
       "name": "ground_covered",
       "weight": 1.0,
       "what": "Ground actually put behind it. Speed tracking alone can be satisfied by rocking forwards and backwards, which averages out to the right speed and gets nowhere. This only pays for net progress, so that trick earns nothing."
-    },
-    {
-      "name": "wandering",
-      "weight": -1.0,
-      "what": "Drifting sideways off the line it was sent along. Only charged when it was told to go straight, and measured on where the robot has actually ended up rather than which way it is pointing."
     },
     {
       "name": "upright",
@@ -70,6 +65,11 @@
       "name": "stepping",
       "weight": 1.0,
       "what": "Feet spending a sensible time in the air - long enough to be a step, short enough not to be a hop. This is what turns 'move forwards' into 'walk' rather than 'shuffle'."
+    },
+    {
+      "name": "leg_swing",
+      "weight": 1.0,
+      "what": "How far the thighs and calves swing either side of their own average. This is what makes the walk look like a dog rather than a table sliding along - without it the cheapest gait is stiff legs and tiny steps. Capped, so it buys a stride and not a flail."
     },
     {
       "name": "alive",
@@ -126,7 +126,5 @@
       "weight": -2.5e-07,
       "what": "Joint acceleration. Footfalls spike it, and a servo gearbox is what absorbs that spike on the real robot."
     }
-  ],
-  "verdict": "not passed",
-  "verdict_detail": "64 robots x 25 s - stayed up for 25 s: 100% \u00b7 trunk within 40 mm of target: 3.63 mm \u00b7 uprightness above 0.9: 0.9987 \u00b7 covered 5 m: 5.05 m \u00b7 speed within 0.05 m/s of 0.25: 0.069 m/s \u00b7 sideways drift under 100 mm: 4027.8 mm"
+  ]
 }

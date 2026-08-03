@@ -1,6 +1,6 @@
 {
   "paused": false,
-  "next_id": 21,
+  "next_id": 23,
   "jobs": [
     {
       "task": "Gray-Push",
@@ -134,16 +134,91 @@
       "verify": true,
       "clamped": "",
       "id": "j0009",
-      "state": "running",
+      "state": "done",
       "created": "2026-08-03T06:00:40",
       "started": "2026-08-03T07:55:18",
-      "finished": null,
+      "finished": "2026-08-03T09:24:59",
       "run_id": "2026-08-03_07-55-22_walk_m3100_b",
+      "exit_code": 0,
+      "error": "",
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 5330.6,
+          "exit_code": 0,
+          "at": "2026-08-03T09:24:09"
+        },
+        {
+          "name": "verify",
+          "seconds": 26.0,
+          "exit_code": 1,
+          "at": "2026-08-03T09:24:59"
+        }
+      ],
+      "owner": "31132@061706",
+      "log": "progress/jobs/j0009.log"
+    },
+    {
+      "task": "Gray-Walk",
+      "name": "walk_m3100_f",
+      "note": "Targets what walk_a actually failed on. It covered 6.03 m with 0 of 64 falling, then drifted 3487 mm sideways against a 100 mm bar. wandering -1 to -4 makes leaving the line four times more expensive; track_turn 1 to 2 pays harder for holding the commanded yaw of zero. veering cannot be set from the CLI - the curriculum overwrites it at step 0.",
+      "num_envs": 3072,
+      "iterations": 3000,
+      "stop_at": 0.965,
+      "no_video": false,
+      "rewards": {
+        "wandering": -4.0,
+        "track_turn": 2.0
+      },
+      "push_speed": null,
+      "push_spin": null,
+      "film": true,
+      "verify": true,
+      "clamped": "",
+      "id": "j0021",
+      "state": "cancelled",
+      "created": "2026-08-03T07:57:51",
+      "started": "2026-08-03T09:24:59",
+      "finished": "2026-08-03T09:28:16",
+      "run_id": "2026-08-03_09-25-03_walk_m3100_f",
+      "exit_code": null,
+      "error": "cancelled from the dashboard",
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 201.2,
+          "exit_code": 0,
+          "at": "2026-08-03T09:28:20"
+        }
+      ],
+      "owner": "31132@061706",
+      "log": "progress/jobs/j0021.log"
+    },
+    {
+      "task": "Gray-Walk",
+      "name": "walk_m3100_g",
+      "note": "Tests the TURN_STD fix, 0.30 -> 0.80. walk_a and walk_b both walked over 5 m without falling and then drifted 3.5-4 m sideways, because track_turn paid 1.4e-11 at the yaw error they actually made - a dead term with no gradient. This is the first run where the policy is actually told to stop spinning. No weight overrides: the point is to see the fix alone.",
+      "num_envs": 3072,
+      "iterations": 3000,
+      "stop_at": 0.965,
+      "no_video": false,
+      "rewards": {},
+      "push_speed": null,
+      "push_spin": null,
+      "film": true,
+      "verify": true,
+      "clamped": "",
+      "id": "j0022",
+      "state": "running",
+      "created": "2026-08-03T09:28:04",
+      "started": "2026-08-03T09:28:56",
+      "finished": null,
+      "run_id": "2026-08-03_09-29-00_walk_m3100_g",
       "exit_code": null,
       "error": "",
       "steps": [],
       "owner": "31132@061706",
-      "log": "progress/jobs/j0009.log"
+      "log": "progress/jobs/j0022.log"
     },
     {
       "task": "Gray-Walk",
