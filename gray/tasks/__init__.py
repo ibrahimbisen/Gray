@@ -9,6 +9,7 @@ from mjlab.tasks.registry import register_mjlab_task
 
 from gray.tasks.push_env_cfg import push_env_cfg, push_ppo_cfg
 from gray.tasks.stand_env_cfg import stand_env_cfg, stand_ppo_cfg
+from gray.tasks.walk_env_cfg import walk_env_cfg, walk_ppo_cfg
 
 register_mjlab_task(
     task_id="Gray-Stand",
@@ -22,4 +23,11 @@ register_mjlab_task(
     env_cfg=push_env_cfg(),
     play_env_cfg=push_env_cfg(play=True),
     rl_cfg=push_ppo_cfg(),
+)
+
+register_mjlab_task(
+    task_id="Gray-Walk",
+    env_cfg=walk_env_cfg(),
+    play_env_cfg=walk_env_cfg(play=True),
+    rl_cfg=walk_ppo_cfg(),
 )

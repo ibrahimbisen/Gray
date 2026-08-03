@@ -5,7 +5,7 @@
 
 The one thing this exists for: **MuJoCo welds a URDF's root link to the world.**
 It does it silently. The robot cannot move, and the trunk's mass vanishes from the
-model - 1198.66 g of 2378.70 g, more than half the robot. The last attempt at this
+model - 914 g of 2030 g, nearly half the robot. The last attempt at this
 project shipped a model reporting 901 g instead of 1625 g for exactly this reason.
 
 Giving base_link a free joint fixes it, and the mass check below proves it.

@@ -6,9 +6,9 @@ each time it comes up.
 
 ---
 
-## 1. Stop a run when the reward reaches 98% of its ceiling
+## 1. Stop a run when the reward reaches 96.5% of its ceiling
 
-**The rule.** Training stops as soon as the mean reward reaches 98% of the most
+**The rule.** Training stops as soon as the mean reward reaches 96.5% of the most
 it could possibly score. It does not run out its remaining iterations.
 
 **Why there is a ceiling at all.** Every positive scoring term is capped at 1.0
@@ -28,12 +28,19 @@ fallen. The only headroom left is in the penalties, which are worth a fraction
 of a point between them. Training on is polishing something already measured as
 done.
 
-**Why 98 and not 99.** The last percent is the slowest to earn and buys the
-least: the curve flattens hard near the ceiling, so the difference between 98%
-and 99% can be hundreds of iterations. 98% is a judgement, not a law — it is a
-dial (`--stop-at`) precisely because the right number may turn out to differ per
-stage, and a stage that fails its bar after stopping at 98% is telling us to
-raise it rather than to distrust the rule.
+**Why 96.5 and not 99.** The last few percent are the slowest to earn and buy
+the least: the curve flattens hard near the ceiling, so the difference between
+96.5% and 99% can be hundreds of iterations. It is a judgement, not a law — it is
+a dial (`--stop-at`) precisely because the right number may turn out to differ per
+stage, and a stage that fails its bar after stopping early is telling us to raise
+the number rather than to distrust the rule.
+
+**Why it moved from 98 to 96.5** (owner's call, 3 Aug 2026). push_v4 shows what
+98% was costing. It reached 97.6 of a 100.0 ceiling at iteration ~700 and was
+still at 97.64 at iteration 938 — flat for 234 iterations, with zero falls and
+full-length episodes the whole way. It never reached 98, so it would have run all
+1500 iterations to buy nothing. At 96.5 it stops around iteration 700 and the
+remaining 800 go to the next run in the queue instead.
 
 **What the evidence looked like.** The stand run finished at 49.93 of a 50.0
 ceiling — 99.86% — and had been flat there for hundreds of iterations. It
@@ -68,3 +75,27 @@ How many robots fit on the card, how much torque a joint needs, how wide the
 body is: all of these are measurable in minutes, and all of them have been wrong
 when assumed. `scripts/probe_envs.py` answers the first, `scripts/find_stance.py`
 the second, and both write down what they found.
+
+---
+
+## 4. One training process on the card at a time
+
+**The rule.** Never start a second run — not even a three-iteration smoke test —
+while another is training. Wait, or stop the first one.
+
+**Why.** Runs are sized by `probe_envs.py` to fill the card on purpose: the push
+task at 6400 robots holds 10.2 GB of 12.3 GB. There is no room for a second
+process, and the failure is not a clean error. Both processes sit at 100% GPU
+utilisation, allocating and stalling, and neither makes progress.
+
+**What it looks like.** Exactly like a hung dashboard. The GPU is pinned, the fans
+are loud, and nothing is being written — because nothing is happening. The monitor
+is telling the truth; there is genuinely no new data.
+
+**What the evidence looked like.** A 256-robot smoke test started at 01:47:22 on
+top of push_v4. push_v4's last checkpoint was 01:47:13. Neither process advanced
+for the next eighteen minutes. Killing the smoke test alone brought push_v4 back
+within one checkpoint interval, unharmed — the deadlock costs time, not the run.
+
+**In practice.** `nvidia-smi` before starting anything. If a python process is
+already holding GPU memory, do not start a second one.

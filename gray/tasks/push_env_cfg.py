@@ -32,8 +32,8 @@ from mjlab.managers import EventTermCfg, RewardTermCfg, SceneEntityCfg
 
 from gray.tasks.stand_env_cfg import ALL_JOINTS, ROBOT, stand_env_cfg, stand_ppo_cfg
 
-# How hard the shoves are, as an instant change in trunk speed. On 2.379 kg,
-# 1.2 m/s is about 2.9 N-s - a proper shove rather than a nudge.
+# How hard the shoves are, as an instant change in trunk speed. On 2.030 kg,
+# 1.2 m/s is about 2.4 N-s - a proper shove rather than a nudge.
 PUSH_MS = (0.4, 1.2)
 PUSH_SPIN = (-1.5, 1.5)      # rad/s about the vertical, either way
 PUSH_EVERY_S = (2.0, 4.0)
@@ -53,6 +53,12 @@ PUSH_NOTES = {
     "foot_lift": "Picking a foot up and putting it down. Once sliding is expensive, "
                  "the only way left to move a foot is to lift it - this pays for "
                  "doing that properly rather than dragging.",
+    "jitter": "Buzzing - the commanded angle reversing direction from one moment to "
+              "the next. This looks at the change in the change, so a large smooth "
+              "movement costs nothing while a small fast shudder is expensive. It is "
+              "the right way to buy smoothness: push_v3 tried to get it by making "
+              "'twitching' 150 times harsher, and that taxed the big fast corrections "
+              "needed to catch a fall, so the robot stopped catching them.",
 }
 
 
@@ -177,6 +183,21 @@ def push_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     cfg.rewards["posture"].weight = 0.6
     cfg.rewards["still"].weight = 0.5
     cfg.rewards["joint_speed"].weight = -0.0002
+
+    # Smoothness, bought the way that does not break fall-catching. push_v3 tried
+    # to get it by scaling 'twitching' from -0.01 to -1.5, and the robot stopped
+    # catching itself: action-rate taxes speed, and catching a fall IS a large fast
+    # movement. This is the second difference instead - the change in the change -
+    # so a big smooth correction is free and only a shudder costs anything.
+    cfg.rewards["jitter"] = RewardTermCfg(func=mdp.action_acc_l2, weight=-0.01)
+
+    # Driving a joint into its hard stop. mjlab ships -1.0; the A1 and Go2 configs
+    # both use -10.0. Gray needs the harsher end of that range more than they do,
+    # not less: the knee has 86 degrees of travel in total and the stance already
+    # sits about 3 degrees past the stop, so there is no slack to spend. -5.0 is a
+    # step toward the reference value rather than a jump to it, because it is the
+    # first time this term has carried real weight here.
+    cfg.rewards["end_stops"].weight = -5.0
 
     # Falling costs more here. The whole point is that being disturbed and
     # recovering beats being disturbed and going over.

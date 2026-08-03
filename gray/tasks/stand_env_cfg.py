@@ -1,11 +1,18 @@
-"""Stage 1 - stand still.
+"""Smoke test - stand still.
 
 The robot starts in the ride-height stance and has to stay there: trunk level,
-trunk at 164 mm, feet where they were put, not falling over.
+trunk at the solved stance height (190.4 mm, read from progress/stance/stance.yaml
+rather than written here, so the two cannot disagree), feet where they were put,
+not falling over.
+
+This is NOT a shipped policy and it is not a subsection of the plan. Standing is
+the zero-velocity corner of R1 locomotion - same reward, same observation, so the
+same policy file. What this task is, and all it is, is a check that the model is
+right before six hours are spent finding out otherwise.
 
 Why this is the first thing trained, before anything that moves: it is the
 cheapest possible test of whether the model is right. A static torque check says
-twelve servos at 1.96 N-m hold 2378.70 g with 3.58x to spare, and the drop test
+twelve servos at 1.96 N-m hold 2030 g with 4.18x to spare, and the drop test
 says the robot holds itself up for four seconds without a controller at all - so
 if a policy cannot learn to stand, the fault is in the reward or the training
 setup, not in the robot. Minutes to find that out here; six hours to find it out

@@ -73,6 +73,18 @@ TASKS = {
         "bar": "Survives repeated shoves from any direction over 20 s, on ground "
                "anywhere from slippery to grippy, with mass and servo gains varied.",
     },
+    "Gray-Walk": {
+        "name": "Walk",
+        "stage": 5,
+        "purpose": "Go where it is told at 0.15-0.35 m/s and stop when told to stop. "
+                   "Stages 3 and 4 are skipped on purpose - this is a straight test "
+                   "of how much a policy picks up in a fixed amount of training. The "
+                   "one number that decides it is the tracking band: mjlab's default "
+                   "0.5 m/s would pay this robot 78% of full marks for standing "
+                   "perfectly still, so it is set to 0.15 here.",
+        "bar": "Walks 5 m without falling, holds commanded speed within 0.05 m/s, "
+               "and drifts less than 100 mm sideways over 20 s.",
+    },
 }
 
 
@@ -80,8 +92,9 @@ def reward_notes() -> dict[str, str]:
     """Plain-English descriptions for every scoring term across the tasks."""
     from gray.tasks.push_env_cfg import PUSH_NOTES  # noqa: PLC0415
     from gray.tasks.stand_env_cfg import REWARD_NOTES  # noqa: PLC0415
+    from gray.tasks.walk_env_cfg import WALK_NOTES  # noqa: PLC0415
 
-    return {**REWARD_NOTES, **PUSH_NOTES}
+    return {**REWARD_NOTES, **PUSH_NOTES, **WALK_NOTES}
 
 # rsl_rl's tensorboard tags, and what to call them on the dashboard. Only the
 # handful worth watching - the run page is a monitor, not an archive.
@@ -89,12 +102,26 @@ WATCH = {
     "Train/mean_reward": "reward",
     "Train/mean_episode_length": "episode_length",
     "Episode_Reward/height": "height_reward",
+    # The walk task calls the same term ride_height. Without this line every
+    # walking run shows an empty height chart, which reads as "the robot has no
+    # height" rather than "nobody told the bridge the term was renamed".
+    "Episode_Reward/ride_height": "height_reward",
     "Episode_Reward/tilt": "tilt_penalty",
-    "Episode_Reward/upright": "tilt_penalty",   # what the term was called before
+    # Its own column, NOT tilt_penalty. Stage 1 used the name 'upright' for the
+    # tilt PENALTY; the walking tasks use it for a levelness REWARD, so the same
+    # tag means opposite things in old and new runs. Sharing a column would put a
+    # positive number under a heading that says penalty.
+    "Episode_Reward/upright": "upright_reward",
     "Episode_Termination/tipped_over": "tipped_over",
     "Episode_Termination/collapsed": "collapsed",
     "Policy/mean_std": "exploration",
     "Perf/total_fps": "steps_per_second",
+    # Walking only. These are what say whether it is actually walking, as opposed
+    # to scoring well: how far off the commanded speed it is, whether feet leave
+    # the ground at all, and how high they get.
+    "Metrics/walk/error_vel_xy": "speed_error",
+    "Metrics/air_time_mean": "air_time",
+    "Metrics/peak_height_mean": "swing_height",
 }
 
 
@@ -206,12 +233,12 @@ def main() -> int:
                     help="0 uses the task's own default")
     ap.add_argument("--name", default="")
     ap.add_argument("--no-video", action="store_true")
-    ap.add_argument("--stop-at", type=float, default=0.98, metavar="FRACTION",
+    ap.add_argument("--stop-at", type=float, default=0.965, metavar="FRACTION",
                     help="stop once the reward reaches this fraction of the most it "
                          "could score. 0 runs the full schedule. See RULES.md rule 1.")
     ap.add_argument("--push-speed", type=float, nargs=2, metavar=("MIN", "MAX"),
                     help="how hard the shoves are, m/s of instant trunk speed. "
-                         "On 2.379 kg, 1 m/s is about 2.4 N-s.")
+                         "On 1.99 kg, 1 m/s is about 2.0 N-s.")
     ap.add_argument("--push-spin", type=float, nargs=2, metavar=("MIN", "MAX"),
                     help="how much spin each shove adds, rad/s about the vertical")
     ap.add_argument("--reward", action="append", default=[], metavar="NAME=WEIGHT",

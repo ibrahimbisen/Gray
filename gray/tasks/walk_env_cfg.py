@@ -1,0 +1,541 @@
+"""Stage 5 - walk.
+
+Stages 3 and 4 (lift one foot, step in place) are skipped on purpose: the owner
+wants to see how much a policy picks up in a fixed amount of training, and going
+straight from "recovers from a shove" to "walks" is the shortest way to find out.
+Built on the push task, so it keeps that task's domain randomisation, its contact
+sensors and its anti-skid term - but the shoves are switched off, because a first
+walk has enough to deal with.
+
+The scoring here follows the stage 5 table in docs/REWARDS.md. Three things in it
+are mjlab defaults that are wrong for THIS robot rather than wrong in general, and
+all three fail silently - the run trains, the curves look plausible, and a term
+that was supposed to be doing the work is quietly worth nothing.
+
+**1. The tracking band, sigma.** Tracking pays `exp(-error^2 / sigma^2)`. mjlab
+ships sigma = 0.5 m/s, tuned for ANYmal and Go1, which walk at 0.6-1.5 m/s. Gray
+walks at 0.25. Put those together and a robot that never moves at all collects
+
+    exp(-0.25^2 / 0.5^2) = 0.78
+
+- 78% of full marks for standing still. There is then almost nothing to gain by
+walking and a great deal to lose by falling over, so the policy learns to stand.
+That is what the archived attempt at this project did, and IsaacLab issue #458
+reports the same thing independently. At sigma = 0.15 the same robot collects
+0.06, and walking becomes the only way to score.
+
+**2. Speed gates set for a faster robot.** Four separate terms multiply themselves
+by zero unless the commanded speed clears a threshold, and the defaults are set
+where a Go1 lives, not where Gray does:
+
+    feet_air_time      command_threshold  0.5    Gray never exceeds 0.35
+    feet_swing_height  command_threshold  0.5
+    variable_posture   walking_threshold  0.5    -> Gray is always "standing"
+    variable_posture   running_threshold  1.5
+
+On defaults, the term that pays for picking a foot up is dead for the whole run,
+and the posture term holds Gray to its tight standing tolerance while asking it to
+walk. Every threshold is retuned below.
+
+**3. Terms that need a sensor we do not have.** mjlab's `feet_clearance` and
+`feet_swing_height` both require a `TerrainHeightSensor`. On a flat floor, height
+above the environment origin is the same number, so both are rewritten here
+against the foot sites already in the model. On rough terrain (stage 8) they must
+go back to the real sensor.
+
+**Smoothness is ramped, not switched on.** `twitching` rises from -0.01 to -0.05
+over the first 250 iterations. docs/REWARDS.md is emphatic about this and so is
+our own history: push_v3 set a large smoothness penalty from step 0 and the robot
+stopped being able to catch itself. RMA reports the same failure and the same fix.
+"""
+
+from __future__ import annotations
+
+import torch
+
+from mjlab.envs import ManagerBasedRlEnvCfg, mdp
+from mjlab.managers import CurriculumTermCfg, ObservationTermCfg, RewardTermCfg
+from mjlab.tasks.velocity import mdp as vmdp
+
+from mjlab.managers import SceneEntityCfg
+
+from gray.tasks.push_env_cfg import FOOT_SITES, push_env_cfg, push_ppo_cfg
+from gray.tasks.stand_env_cfg import ALL_JOINTS
+
+# The two joints that make a stride look like a stride. The hip only swings the
+# leg sideways, so animating it does nothing for how the walk reads.
+SWING_JOINTS = SceneEntityCfg("robot", joint_names=(".*thigh", ".*calf"))
+
+# How fast it is asked to walk. Slow, because 1.96 N-m servos at 50 Hz are not
+# going to run, and because a speed the robot cannot reach is a reward it can
+# never earn.
+WALK_SPEED = (0.15, 0.35)     # m/s forwards
+WALK_SIDE = (-0.10, 0.10)     # m/s sideways
+WALK_TURN = (-0.50, 0.50)     # rad/s about the vertical
+
+# The band the tracking reward falls off over. See the module docstring - this is
+# the single most important number in the file. docs/REWARDS.md puts it at
+# 0.3-0.5x the target speed, against mjlab's borrowed 0.5.
+TRACK_STD = 0.15
+TURN_STD = 0.30
+
+# The lowest command that still counts as "being asked to move". Every gated term
+# uses this instead of mjlab's 0.5, which Gray never reaches.
+MOVING = 0.05
+
+# How high a foot should be at the top of its swing. mjlab's default target is
+# 0.1 m, set for a Go1; Gray rides at 0.19 m, so a tenth of a metre is most of
+# its ride height. 35 mm matches the lift the stage 3 bar asks for.
+SWING_TARGET = 0.035
+
+# How many control steps the trunk speed is averaged over before it is scored.
+# At 50 Hz, 12 steps is 0.24 s, about half a stride. Every footfall makes the
+# trunk surge, and that ripple was measured at four times the mean speed - scored
+# raw it collapses the tracking reward at every step, no matter how well the
+# robot is actually walking. Nothing in mjlab does this; it has to be written.
+FILTER_STEPS = 12
+
+# How far a thigh or calf should swing either side of its own average, in radians.
+# 0.15 rad is 8.6 degrees of typical deviation, so a stride spanning roughly 17
+# degrees at each of those joints. Below that the robot creeps along on stiff legs
+# and technically walks; the owner's word for what is wanted instead is
+# "animated". Capped, because uncapped this buys flailing.
+SWING_SPREAD = 0.15
+
+# How far sideways the robot may wander before it costs, in metres, when it has
+# been told to go straight. The previous attempt's hand-written gait walked but
+# drifted about 140 mm, which is the failure this exists to price.
+DRIFT_FREE_M = 0.05
+
+WALK_NOTES = {
+    "track_speed": "Moving at the speed it was told to, measured on a trunk speed "
+                   "averaged over about half a stride rather than the raw one. This "
+                   "is the term that pays for walking at all.",
+    "track_turn": "Turning at the rate it was told to, and not turning when it was "
+                  "not asked to.",
+    "stepping": "Feet spending a sensible time in the air - long enough to be a "
+                "step, short enough not to be a hop. This is what turns 'move "
+                "forwards' into 'walk' rather than 'shuffle'.",
+    "ride_height": "Trunk still at walking height. Without this the cheapest way "
+                   "to move is to sink onto its belly and crawl.",
+    "upright": "Trunk level, measured off gravity. Replaces the stand task's 'tilt' "
+               "penalty with the same measurement scored as a reward, which is what "
+               "the walking references use.",
+    "posture": "Joints near their default pose, but with the tolerance widened once "
+               "the robot is asked to move. A fixed tolerance is the thing that "
+               "stops a gait developing at all - it pays the robot to keep its legs "
+               "where they started, which is the opposite of walking.",
+    "dragging": "A foot at the wrong height while it is travelling. This is what "
+                "stops the dragging leg that shows up in every walking run without "
+                "it, and it is scored continuously rather than only at touchdown.",
+    "swing_height": "How wrong the top of a swing was, scored when the foot lands. "
+                    "Catches a foot that skims the floor and one that is thrown "
+                    "needlessly high, neither of which survives a real floor.",
+    "hard_landing": "Slamming a foot down. Printed PLA with no suspension, so this "
+                    "is set harder than the reference value.",
+    "joint_shock": "Joint acceleration. Footfalls spike it, and a servo gearbox is "
+                   "what absorbs that spike on the real robot.",
+    "ground_covered": "Ground actually put behind it. Speed tracking alone can be "
+                      "satisfied by rocking forwards and backwards, which averages "
+                      "out to the right speed and gets nowhere. This only pays for "
+                      "net progress, so that trick earns nothing.",
+    "leg_swing": "How far the thighs and calves swing either side of their own "
+                 "average. This is what makes the walk look like a dog rather than "
+                 "a table sliding along - without it the cheapest gait is stiff "
+                 "legs and tiny steps. Capped, so it buys a stride and not a flail.",
+    "wandering": "Drifting sideways off the line it was sent along. Only charged "
+                 "when it was told to go straight, and measured on where the robot "
+                 "has actually ended up rather than which way it is pointing.",
+    "shaking": "How hard the trunk is being jolted about, measured as its own "
+               "acceleration. Smooth joints can still add up to a trunk that "
+               "hammers, and the trunk is where the IMU and the electronics live.",
+    "rocking": "Trunk rolling and pitching. Priced on its own rather than lumped "
+               "in with turning, so rocking costs whether or not the robot is "
+               "also holding its heading.",
+    "veering": "Turning off the heading it was sent along. Different from "
+               "'wandering': a robot can hold a perfectly straight line while "
+               "slowly rotating to face sideways, and this is the term that "
+               "catches that. Yaw RATE is already scored - this catches the drift "
+               "that a near-zero rate hides, because a tenth of a degree per step "
+               "is invisible in the rate and 20 degrees off after twenty seconds.",
+}
+
+
+# ---------------------------------------------------------------------------
+# rewards that mjlab does not have, or has only in a form that needs a sensor
+# this scene does not carry
+# ---------------------------------------------------------------------------
+
+
+def _filtered_speed(env) -> torch.Tensor:
+    """Trunk velocity, smoothed over about half a stride.
+
+    Called from exactly ONE reward term, so the average advances once per step.
+    If a second term ever needs this, cache it against a step counter first -
+    otherwise the average runs at a multiple of the real rate and the effective
+    filter gets shorter without anything looking wrong.
+    """
+    v = env.scene["robot"].data.root_link_lin_vel_b[:, :2]
+    buf = getattr(env, "_gray_vel_avg", None)
+    if buf is None or buf.shape != v.shape:
+        buf = v.clone()
+    # A reset means a new episode: start the average again rather than carrying
+    # the last one's speed across, which would score the first tenth of a second
+    # of every episode against the previous episode's motion.
+    fresh = (env.episode_length_buf <= 1).unsqueeze(1)
+    buf = torch.where(fresh, v, buf + (v - buf) / FILTER_STEPS)
+    env._gray_vel_avg = buf.detach()
+    return buf
+
+
+def track_speed(env, std: float, command_name: str = "walk"):
+    """How close the smoothed trunk speed is to the commanded one."""
+    command = env.command_manager.get_command(command_name)
+    err = torch.sum(torch.square(command[:, :2] - _filtered_speed(env)), dim=1)
+    return torch.exp(-err / (std * std))
+
+
+def stepping(env, sensor_name: str = "feet", lo: float = 0.10, hi: float = 0.45):
+    """Fraction of the four feet that are mid-step, rather than planted or hopping.
+
+    Divided by four so the term tops out at 1.0 like every other reward here. The
+    mjlab original returns 0-4, which would quietly make this worth four times its
+    stated weight and break the reward ceiling RULES.md rule 1 depends on.
+    """
+    air = env.scene[sensor_name].data.current_air_time
+    return torch.sum(((air > lo) & (air < hi)).float(), dim=1) / 4.0
+
+
+def _foot_height(env, asset_cfg) -> torch.Tensor:
+    asset = env.scene[asset_cfg.name]
+    return (asset.data.site_pos_w[:, asset_cfg.site_ids, 2]
+            - env.scene.env_origins[:, 2].unsqueeze(1))
+
+
+def foot_clearance(env, target: float, command_name: str = "walk",
+                   asset_cfg=FOOT_SITES):
+    """Penalise a foot at the wrong height while it is travelling.
+
+    Weighted by how fast the foot is moving, so a planted foot costs nothing and a
+    foot skimming the floor on its way forward costs a lot. mjlab's version reads
+    a TerrainHeightSensor; on flat ground the height above the environment origin
+    is the same number and needs no extra sensor.
+    """
+    command = env.command_manager.get_command(command_name)
+    moving = (torch.norm(command[:, :2], dim=1) + torch.abs(command[:, 2]) > MOVING)
+    asset = env.scene[asset_cfg.name]
+    speed = torch.norm(asset.data.site_lin_vel_w[:, asset_cfg.site_ids, :2], dim=-1)
+    wrong = torch.abs(_foot_height(env, asset_cfg) - target)
+    return torch.sum(wrong * speed, dim=1) * moving.float()
+
+
+def swing_height(env, target: float, sensor_name: str = "feet",
+                 command_name: str = "walk", asset_cfg=FOOT_SITES):
+    """How wrong the top of each swing was, charged at the moment the foot lands.
+
+    Clearance above scores every step of the swing; this scores the peak once. The
+    two catch different faults - a foot can average the right height and still
+    never actually clear the ground.
+    """
+    contact = env.scene[sensor_name]
+    height = _foot_height(env, asset_cfg)
+    peak = getattr(env, "_gray_swing_peak", None)
+    if peak is None or peak.shape != height.shape:
+        peak = torch.zeros_like(height)
+
+    in_air = contact.data.found == 0
+    peak = torch.where(in_air, torch.maximum(peak, height), peak)
+
+    landed = contact.compute_first_contact(dt=env.step_dt)
+    command = env.command_manager.get_command(command_name)
+    moving = (torch.norm(command[:, :2], dim=1) + torch.abs(command[:, 2]) > MOVING)
+    cost = torch.sum(torch.square(peak / target - 1.0) * landed.float(), dim=1)
+
+    # Reset a foot's peak once it has been charged for, and whenever the episode
+    # restarts - otherwise a peak carries across a reset and is billed twice.
+    fresh = (env.episode_length_buf <= 1).unsqueeze(1)
+    env._gray_swing_peak = torch.where(landed | fresh,
+                                       torch.zeros_like(peak), peak).detach()
+    return cost * moving.float()
+
+
+def _going_straight(env, command_name: str = "walk") -> torch.Tensor:
+    """True where the robot has been told to go forward and not to turn."""
+    command = env.command_manager.get_command(command_name)
+    return ((command[:, 0] > MOVING)
+            & (torch.abs(command[:, 2]) < 0.05)
+            & (torch.abs(command[:, 1]) < 0.05))
+
+
+def ground_covered(env, command_name: str = "walk"):
+    """Net forward progress, as a fraction of the distance it was asked to cover.
+
+    Speed tracking is scored on velocity, and velocity can be faked: a robot
+    rocking forward and back at the right amplitude averages to the commanded
+    speed and travels nowhere. This measures where the robot actually is compared
+    to where it was, so only real progress counts.
+
+    Clamped to [0, 1] per step. Unclamped it would be an unbounded linear reward
+    and the ceiling that RULES.md rule 1 depends on would stop meaning anything.
+    """
+    here = (env.scene["robot"].data.root_link_pos_w[:, 0]
+            - env.scene.env_origins[:, 0])
+    was = getattr(env, "_gray_fwd", None)
+    if was is None or was.shape != here.shape:
+        was = here.clone()
+    fresh = env.episode_length_buf <= 1
+    progress = torch.where(fresh, torch.zeros_like(here), here - was)
+    env._gray_fwd = here.detach()
+
+    command = env.command_manager.get_command(command_name)
+    asked = torch.norm(command[:, :2], dim=1) * env.step_dt
+    return torch.clamp(progress / torch.clamp(asked, min=1e-6), 0.0, 1.0)
+
+
+def leg_swing(env, target: float, command_name: str = "walk",
+              asset_cfg=SWING_JOINTS):
+    """How far the thighs and calves swing either side of their own average.
+
+    Measured against a running average of each joint rather than its default
+    pose, so this pays for movement and not for sitting at an offset. Capped at
+    `target`: past that there is nothing more to earn, which is what stops it
+    turning into a flail. The smoothness terms handle the other failure - a joint
+    could score here by buzzing, and `twitching`, `jitter` and `joint_shock` all
+    charge for that.
+    """
+    q = env.scene[asset_cfg.name].data.joint_pos[:, asset_cfg.joint_ids]
+    avg = getattr(env, "_gray_joint_avg", None)
+    if avg is None or avg.shape != q.shape:
+        avg = q.clone()
+    fresh = (env.episode_length_buf <= 1).unsqueeze(1)
+    avg = torch.where(fresh, q, avg + (q - avg) / FILTER_STEPS)
+    env._gray_joint_avg = avg.detach()
+
+    spread = torch.mean(torch.abs(q - avg), dim=1)
+    moving = torch.norm(env.command_manager.get_command(command_name)[:, :2], dim=1)
+    return torch.clamp(spread / target, max=1.0) * (moving > MOVING).float()
+
+
+def shaking(env):
+    """How hard the trunk is being jolted, as its own acceleration in m/s^2.
+
+    Nothing else here measures this. The smoothness terms all watch the COMMANDS
+    or the joints; a policy can issue perfectly smooth joint targets and still
+    produce a trunk that hammers, because the jolt comes from the feet hitting
+    the floor rather than from the servos. This is the thing three trunk-mounted
+    IMUs would actually read.
+    """
+    v = env.scene["robot"].data.root_link_lin_vel_b
+    was = getattr(env, "_gray_prev_vel", None)
+    if was is None or was.shape != v.shape:
+        was = v.clone()
+    fresh = (env.episode_length_buf <= 1).unsqueeze(1)
+    accel = torch.where(fresh, torch.zeros_like(v), (v - was) / env.step_dt)
+    env._gray_prev_vel = v.detach()
+    return torch.sum(torch.square(accel), dim=1)
+
+
+def veering(env, command_name: str = "walk"):
+    """How far the trunk has turned off the heading it was sent along.
+
+    `track_turn` scores yaw RATE against the commanded rate, and a rate near zero
+    looks perfect while the heading quietly walks away: a tenth of a degree per
+    step is invisible in the rate and puts the robot 20 degrees off after twenty
+    seconds. This scores the accumulated angle instead.
+
+    The reference heading follows the robot while it is being told to turn, and
+    locks the moment a straight command starts - so a legitimate turn is never
+    charged as drift.
+    """
+    h = env.scene["robot"].data.heading_w
+    straight = _going_straight(env, command_name)
+    ref = getattr(env, "_gray_heading_ref", None)
+    if ref is None or ref.shape != h.shape:
+        ref = h.clone()
+    hold = straight & (env.episode_length_buf > 1)
+    ref = torch.where(hold, ref, h)
+    env._gray_heading_ref = ref.detach()
+    return torch.square(vmdp.wrap_to_pi(h - ref)) * straight.float()
+
+
+def wandering(env, free: float, command_name: str = "walk"):
+    """Sideways drift off the line, when it was told to walk a straight one.
+
+    Scored on displacement, not on sideways velocity. A robot can have zero
+    lateral velocity at every instant this reward is sampled and still be a foot
+    off course, which is exactly what the previous attempt did - it walked, and
+    wandered about 140 mm doing it.
+    """
+    off = torch.abs(env.scene["robot"].data.root_link_pos_w[:, 1]
+                    - env.scene.env_origins[:, 1])
+    return torch.clamp(off - free, min=0.0) * _going_straight(env, command_name).float()
+
+
+# ---------------------------------------------------------------------------
+
+
+def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
+    cfg = push_env_cfg(play=play)
+
+    # A first walk has enough to deal with. The randomised ground, mass and servo
+    # gains stay; only the shoving stops.
+    cfg.events.pop("shove", None)
+
+    cfg.commands = {
+        "walk": vmdp.UniformVelocityCommandCfg(
+            entity_name="robot",
+            resampling_time_range=(5.0, 10.0),
+            # About one attempt in seven commands a full stop. Without them the
+            # policy never learns that zero means stand, and a robot that cannot
+            # stop is not much use.
+            rel_standing_envs=0.15,
+            # Four in five get a straight line and nothing else. This stage is
+            # "walk forward"; turning is stage 6, and the small share that still
+            # gets a turn command is there so the policy does not become unable
+            # to do anything but go straight.
+            rel_forward_envs=0.8,
+            ranges=vmdp.UniformVelocityCommandCfg.Ranges(
+                lin_vel_x=WALK_SPEED, lin_vel_y=WALK_SIDE, ang_vel_z=WALK_TURN),
+        ),
+    }
+    # The policy has to be told where it is being sent, or the command is noise.
+    for group in ("actor", "critic"):
+        cfg.observations[group].terms["command"] = ObservationTermCfg(
+            func=vmdp.generated_commands, params={"command_name": "walk"})
+
+    # Terms that were the whole point of standing still and are now in the way.
+    #   still        - it is being asked to move
+    #   joint_speed  - same; legged_gym disables this one for walking too
+    #   foot_lift    - 'stepping' and 'swing_height' are the gait versions of this
+    #   spinning     - it fines ALL trunk rotation, including the yaw the robot has
+    #                  just been ordered to produce. track_turn already pays for the
+    #                  commanded yaw and fines roll and pitch, so keeping both means
+    #                  paying and fining the same motion at once.
+    #   tilt         - replaced by 'upright', the same measurement scored the way
+    #                  the walking references score it
+    #   posture      - replaced below by the speed-dependent version
+    for gone in ("still", "joint_speed", "foot_lift", "spinning", "tilt", "posture"):
+        cfg.rewards.pop(gone, None)
+
+    # --- the task itself ---
+    cfg.rewards["track_speed"] = RewardTermCfg(
+        func=track_speed, weight=2.0, params={"std": TRACK_STD})
+    cfg.rewards["track_turn"] = RewardTermCfg(
+        func=vmdp.track_angular_velocity, weight=1.0,
+        params={"std": TURN_STD, "command_name": "walk"})
+    # Ground actually covered, which velocity tracking alone does not guarantee.
+    cfg.rewards["ground_covered"] = RewardTermCfg(func=ground_covered, weight=1.0)
+    # And covered in a straight line. Two different failures: 'wandering' is
+    # ending up off the line, 'veering' is turning off it. A robot can do either
+    # without the other - slide sideways while pointing straight ahead, or hold a
+    # perfect line while slowly rotating to face the wrong way.
+    cfg.rewards["wandering"] = RewardTermCfg(
+        func=wandering, weight=-1.0, params={"free": DRIFT_FREE_M})
+    cfg.rewards["veering"] = RewardTermCfg(func=veering, weight=-0.2)
+
+    # --- staying up while doing it ---
+    # asset_cfg must name the trunk explicitly. mjlab's default resolves to every
+    # body in the robot, and `upright` then hands 13 quaternions per robot to a
+    # function expecting one - it fails with a shape mismatch that names neither
+    # this term nor the reason.
+    cfg.rewards["upright"] = RewardTermCfg(
+        func=vmdp.upright, weight=1.0,
+        params={"std": 0.45,
+                "asset_cfg": SceneEntityCfg("robot", body_names=("base_link",))})
+    cfg.rewards["ride_height"] = cfg.rewards.pop("height")
+    cfg.rewards["ride_height"].weight = 1.0
+
+    # Tolerance that widens once the robot is asked to move. The thresholds are
+    # the whole point: mjlab's 0.5 / 1.5 are Go1 speeds, and Gray's total command
+    # tops out near 0.85, so on the defaults it would sit in the tight standing
+    # band for the entire run while being asked to walk.
+    cfg.rewards["posture"] = RewardTermCfg(
+        func=vmdp.variable_posture, weight=1.0,
+        params={
+            "asset_cfg": ALL_JOINTS,
+            "command_name": "walk",
+            "walking_threshold": MOVING,
+            "running_threshold": 0.60,
+            "std_standing": {".*hip": 0.10, ".*thigh": 0.10, ".*calf": 0.15},
+            "std_walking": {".*hip": 0.25, ".*thigh": 0.35, ".*calf": 0.45},
+            "std_running": {".*hip": 0.25, ".*thigh": 0.35, ".*calf": 0.45},
+        })
+
+    # --- what makes it a gait rather than a shuffle ---
+    cfg.rewards["stepping"] = RewardTermCfg(func=stepping, weight=1.0)
+    # The one that decides whether this looks like a dog. Everything else in this
+    # file is happy with a robot creeping along on stiff legs; this is the only
+    # term that pays for the thighs and calves actually swinging through a stride.
+    cfg.rewards["leg_swing"] = RewardTermCfg(
+        func=leg_swing, weight=1.0, params={"target": SWING_SPREAD})
+    cfg.rewards["dragging"] = RewardTermCfg(
+        func=foot_clearance, weight=-2.0, params={"target": SWING_TARGET})
+    cfg.rewards["swing_height"] = RewardTermCfg(
+        func=swing_height, weight=-0.25, params={"target": SWING_TARGET})
+    cfg.rewards["hard_landing"] = RewardTermCfg(
+        func=vmdp.soft_landing, weight=-1e-4,
+        params={"sensor_name": "feet", "command_name": "walk",
+                "command_threshold": MOVING})
+
+    # Sliding still costs. docs/REWARDS.md puts the reference at -0.1, but the
+    # owner's complaint about the push runs was specifically skidding, and the
+    # simulator's friction is a guess a policy should not be allowed to lean on.
+    # -0.5 is five times the reference and half what the push task used, now that
+    # clearance and swing height are also pushing toward picking feet up.
+    cfg.rewards["skidding"].weight = -0.5
+
+    # --- how steady the trunk is ---
+    # `upright` above scores the trunk's ANGLE off level. These two score how
+    # violently it is getting there. A robot can average perfectly level while
+    # rocking and hammering the whole way, and nothing else in this file notices.
+    # Both start near zero and ramp - see the curriculum below. A robot that has
+    # not yet learned to stand rocks hard, and charged at full weight from step 0
+    # these two are worth more per step than staying alive is. legged_gym clips
+    # the summed reward at zero for exactly this reason: under a net-negative
+    # score, ending the episode early beats carrying on.
+    cfg.rewards["rocking"] = RewardTermCfg(
+        func=vmdp.body_angular_velocity_penalty, weight=-0.02,
+        params={"asset_cfg": SceneEntityCfg("robot", body_names=("base_link",))})
+    cfg.rewards["shaking"] = RewardTermCfg(func=shaking, weight=-0.001)
+
+    # --- protecting the hardware ---
+    cfg.rewards["joint_shock"] = RewardTermCfg(func=mdp.joint_acc_l2, weight=-2.5e-7)
+
+    # Everything that asks the robot to be TIDY is ramped in, rather than set at
+    # full weight from step 0. docs/REWARDS.md is emphatic about this and so is
+    # our own history: push_v3 set one large smoothness penalty from the start and
+    # the robot lost the ability to catch itself. RMA reports the same failure and
+    # the same fix. First learn to walk, then learn to walk neatly.
+    #
+    # common_step_counter counts env steps, and at 24 per iteration these land at
+    # roughly iteration 100, 250 and 500.
+    def _ramp(name, weights):
+        return CurriculumTermCfg(
+            func=vmdp.reward_curriculum,
+            params={"reward_name": name,
+                    "stages": [{"step": s, "weight": w} for s, w in
+                               zip((0, 2400, 6000, 12000), weights)]})
+
+    cfg.curriculum = {
+        # commanded angles jumping about
+        "ease_in_smoothness": _ramp("twitching", (-0.01, -0.025, -0.05, -0.05)),
+        # trunk rolling and pitching
+        "ease_in_steadiness": _ramp("rocking", (-0.02, -0.05, -0.12, -0.2)),
+        # trunk being hammered by its own footfalls
+        "ease_in_shake": _ramp("shaking", (-0.001, -0.003, -0.006, -0.01)),
+        # heading drifting off the line. Last and slowest: it is meaningless until
+        # the robot can actually hold a direction, and charging for it early just
+        # fines a robot for falling over in a way that happens to rotate it.
+        "ease_in_straightness": _ramp("veering", (-0.2, -0.5, -1.2, -2.0)),
+    }
+
+    if not play:
+        cfg.episode_length_s = 20.0
+    return cfg
+
+
+def walk_ppo_cfg():
+    cfg = push_ppo_cfg()
+    cfg.experiment_name = "gray_walk"
+    cfg.max_iterations = 3000
+    return cfg

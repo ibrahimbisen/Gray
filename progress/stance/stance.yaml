@@ -1,7 +1,7 @@
 trunk_height_m: 0.1904
 trunk_height_pct_of_max: 70.0
 max_standing_height_m: 0.272
-worst_margin_x: 3.569
+worst_margin_x: 4.183
 angles_deg:
   fr_hip: 4.19
   fr_thigh: -4.876
@@ -16,17 +16,17 @@ angles_deg:
   bl_thigh: -3.398
   bl_calf: 43.883
 holding_torque_nm:
-  fr_hip: 0.1983
-  fr_thigh: 0.2496
-  fr_calf: 0.5491
-  fl_hip: 0.1983
-  fl_thigh: 0.2524
-  fl_calf: 0.546
-  br_hip: 0.1983
-  br_thigh: 0.2579
-  br_calf: 0.5412
-  bl_hip: 0.1983
-  bl_thigh: 0.252
-  bl_calf: 0.5465
+  fr_hip: 0.1693
+  fr_thigh: 0.213
+  fr_calf: 0.4686
+  fl_hip: 0.1693
+  fl_thigh: 0.2154
+  fl_calf: 0.466
+  br_hip: 0.1693
+  br_thigh: 0.2201
+  br_calf: 0.4619
+  bl_hip: 0.1693
+  bl_thigh: 0.215
+  bl_calf: 0.4664
 servo_stall_nm: 1.96
 zero: the sitting pose, as exported from SolidWorks
