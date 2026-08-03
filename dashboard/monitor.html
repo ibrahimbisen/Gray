@@ -238,7 +238,7 @@ let SELECTED = null, VIDEO = null, TABLE = false;
 let TAB = location.hash.slice(1) || "live";
 let COMPARE = [], METRIC = "reward", COMPARE_DATA = null;
 let JOBLOG = null, JOBLOG_TEXT = "";
-let BUSY = false;
+let BUSY = false, LAST_SIG = null;
 
 const STATE_CLASS = {
   "running": "live", "reached target": "ok", "finished": "ok",
@@ -248,16 +248,20 @@ const STATE_CLASS = {
 };
 const cls = s => STATE_CLASS[s] || "muted";
 
-/* A metric keeps its hue wherever it appears - tile, chart, table. Assigned by
-   fixed order of first appearance, never by rank, so a chart never repaints. */
-const HUE = {};
-function hueOf(key, order){
-  if(!(key in HUE)) HUE[key] = SLOTS[order % SLOTS.length];
-  return HUE[key];
-}
+/* The per-metric charts are SMALL MULTIPLES: one chart per metric, one series in
+   each, every one titled and labelled. So they share a single accent rather than
+   each taking a categorical hue. There are eleven metrics and five validated
+   colours, and cycling would have said `reward` and `exploration` are the same
+   thing. The five categorical slots are kept for the compare chart, where they
+   carry real identity - which run is which - and are capped at five. */
+const METRIC_INK = "var(--s1)";
 
 function fmt(v){
   if(v === null || v === undefined || v === "") return "—";
+  // metrics.csv can hold a non-numeric cell (a header repeated by a crashed
+  // writer, say), and runs.py keeps it as a string on purpose. v.toFixed would
+  // throw and take the whole panel down, so show it as-is instead.
+  if(typeof v !== "number" || !isFinite(v)) return esc(String(v));
   const a = Math.abs(v);
   if(a >= 1000) return Math.round(v).toLocaleString();
   if(a >= 100) return v.toFixed(0);
@@ -466,7 +470,7 @@ function charts(run){
       <button class="btn ${TABLE ? "on" : ""}" id="tbtn">${TABLE ? "Charts" : "Table"}</button>
     </div>
     <div class="charts ${TABLE ? "hide" : ""}">${
-      keys.map((k, i) => chartCard(rows, k, hueOf(k, i))).join("")}</div>
+      keys.map(k => chartCard(rows, k, METRIC_INK)).join("")}</div>
     ${TABLE ? metricTable(run, keys) : ""}
   </section>`;
 }
@@ -493,8 +497,13 @@ function compareChart(data){
   const ys = live.flatMap(s => s.points.map(p => p.y));
   const sc = scales(xs, ys, geo);
 
-  const paths = live.map((s, i) => {
-    const c = SLOTS[i];
+  // Colour by position in the SELECTION, not in the filtered list. A selected
+  // run with no data for this metric is dropped from `live`, which used to shift
+  // every colour after it - the button green and its own line orange.
+  const hue = s => SLOTS[Math.max(0, COMPARE.indexOf(s.id)) % SLOTS.length];
+
+  const paths = live.map(s => {
+    const c = hue(s);
     const d = s.points.map((p, n) =>
       `${n ? "L" : "M"}${sc.px(p.x).toFixed(1)},${sc.py(p.y).toFixed(1)}`).join("");
     const last = s.points[s.points.length - 1];
@@ -515,10 +524,13 @@ function compareChart(data){
           ${axes(sc, geo)}${paths}
         </svg>
       </div>
-      <div class="legend">${live.map((s, i) => `<span>
-        <i style="background:${SLOTS[i]}"></i>${esc(s.label)}
+      <div class="legend">${live.map(s => `<span>
+        <i style="background:${hue(s)}"></i>${esc(s.label)}
         <span class="tnum" style="color:var(--muted)">${fmt(
           s.points[s.points.length - 1].y)}</span></span>`).join("")}</div>
+      ${(data.series || []).length > live.length ? `<div class="sub"
+        style="margin-top:6px">${(data.series || []).length - live.length} selected
+        run(s) recorded no <b>${esc(data.metric)}</b> and are not drawn.</div>` : ""}
     </div>
     <div class="card wrapx" style="margin-top:12px"><table>
       <tr><th>Run</th><th>Task</th><th class="tnum">samples</th>
@@ -716,7 +728,7 @@ function tiles(run){
   if(!keys.length) return "";
   const rows = run.metrics || [], last = rows[rows.length - 1] || {}, first = rows[0] || {};
   return `<div class="tiles">${keys.map((k, i) => {
-    const c = hueOf(k, i), now = last[k], was = first[k];
+    const c = METRIC_INK, now = last[k], was = first[k];
     const d = (typeof now === "number" && typeof was === "number") ? now - was : null;
     return `<div class="tile">
       <div class="k"><span class="swatch" style="background:${c}"></span>${esc(label(k))}</div>
@@ -931,6 +943,60 @@ function planPanel(){
 
 /* ---------------- draw ---------------- */
 
+/* What the current panel actually depends on. The page polls every five seconds
+   and used to rewrite #body unconditionally, which made the queue form
+   impossible to type into - every keystroke was erased within five seconds - and
+   restarted any checkpoint video from zero before it could be watched. Nothing
+   is redrawn unless something it shows has changed. */
+function bodySignature(){
+  const s = STATE, q = s.queue;
+  const base = `${TAB}|${s.runs.length}`;
+  if(TAB === "queue")
+    return base + "|" + q.paused + "|" + q.jobs.map(j =>
+      [j.id, j.state, j.run_id, j.error, (j.steps || []).length].join(":")).join(",");
+  if(TAB === "live")
+    return base + `|${SELECTED}|${TABLE}|${VIDEO}|` + (DETAIL
+      ? [DETAIL.id, DETAIL.status, (DETAIL.metrics || []).length,
+         (DETAIL.videos || []).length, DETAIL.verdict].join(":")
+      : "none");
+  if(TAB === "history")
+    return base + `|${SELECTED}|` + s.runs.map(r =>
+      [r.id, r.status, r.iterations_done, r.verdict].join(":")).join(",");
+  if(TAB === "compare")
+    return base + `|${COMPARE.join(",")}|${METRIC}|` + (COMPARE_DATA
+      ? COMPARE_DATA.series.map(x => `${x.id}:${x.n}`).join(",") : "none");
+  if(TAB === "jobs")
+    return base + `|${JOBLOG}|${JOBLOG_TEXT.length}|${q.jobs.length}`;
+  return base;
+}
+
+/* Even when a redraw IS needed, whatever is half-typed survives it. */
+function saveInputs(){
+  const out = {focus: null, start: null, end: null, values: {}};
+  document.querySelectorAll("#body input,#body select,#body textarea").forEach(el => {
+    if(el.id) out.values[el.id] = el.type === "checkbox" ? el.checked : el.value;
+  });
+  const a = document.activeElement;
+  if(a && a.id && out.values.hasOwnProperty(a.id)){
+    out.focus = a.id;
+    try{ out.start = a.selectionStart; out.end = a.selectionEnd; }catch(e){}
+  }
+  return out;
+}
+
+function restoreInputs(saved){
+  document.querySelectorAll("#body input,#body select,#body textarea").forEach(el => {
+    if(!el.id || !saved.values.hasOwnProperty(el.id)) return;
+    if(el.type === "checkbox") el.checked = saved.values[el.id];
+    else el.value = saved.values[el.id];
+  });
+  if(!saved.focus) return;
+  const el = document.getElementById(saved.focus);
+  if(!el) return;
+  el.focus();
+  try{ if(saved.start !== null) el.setSelectionRange(saved.start, saved.end); }catch(e){}
+}
+
 function draw(){
   if(!STATE) return;
   const s = STATE;
@@ -940,11 +1006,17 @@ function draw(){
   renderHead();
   renderTabs();
 
+  const sig = bodySignature();
+  if(sig === LAST_SIG) return;      // nothing this panel shows has moved
+  LAST_SIG = sig;
+
   const panels = {
     live: livePanel, queue: queuePanel, history: historyPanel,
     compare: comparePanel, jobs: jobsPanel, plan: planPanel,
   };
+  const saved = saveInputs();
   $("#body").innerHTML = (panels[TAB] || livePanel)();
+  restoreInputs(saved);
 
   if(TAB === "live" && DETAIL && !TABLE) wireHover(DETAIL.metrics || []);
   const tb = $("#tbtn");
@@ -976,14 +1048,30 @@ function draw(){
 /* ---------------- fetch ---------------- */
 
 async function fetchDetail(){
-  if(!SELECTED) return;
+  // Capture which run we are asking about BEFORE awaiting. Reading the global
+  // afterwards means that clicking A then B, with A's reply landing second,
+  // leaves DETAIL holding A while DETAIL_FOR and SELECTED both say B - so the
+  // poll guard sees them agree and never corrects it. You read A's curves under
+  // B's name, with nothing to say so.
+  const id = SELECTED;
+  if(!id) return;
   try{
-    const r = await fetch(`/api/run/${encodeURIComponent(SELECTED)}`);
-    if(!r.ok){ DETAIL = null; return; }
-    DETAIL = await r.json();
-    DETAIL_FOR = SELECTED;
+    const r = await fetch(`/api/run/${encodeURIComponent(id)}`);
+    if(!r.ok){
+      // Clear DETAIL_FOR too. Leaving it equal to SELECTED makes the poll guard
+      // think this run is already loaded, so it never retries and the panel
+      // says "Loading run…" for ever.
+      if(SELECTED === id){ DETAIL = null; DETAIL_FOR = null; draw(); }
+      return;
+    }
+    const got = await r.json();
+    if(SELECTED !== id) return;          // the user moved on; this reply is stale
+    DETAIL = got;
+    DETAIL_FOR = id;
     if(TAB === "live") draw();
-  }catch(e){ /* the poll will try again */ }
+  }catch(e){
+    if(SELECTED === id) DETAIL_FOR = null;   // let the poll try again
+  }
 }
 
 async function fetchCompare(){

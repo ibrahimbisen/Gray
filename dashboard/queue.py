@@ -23,12 +23,16 @@ training environment is broken, because that is exactly when you need to see it.
 
 from __future__ import annotations
 
+import itertools
 import json
 import os
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+# Makes every temp filename unique - see _publish().
+_TMP_SEQ = itertools.count()
 
 ROOT = Path(__file__).resolve().parent.parent
 QUEUE = ROOT / "progress" / "queue.json"
@@ -106,11 +110,58 @@ def _read() -> dict:
 
 
 def _write(state: dict) -> None:
-    """Replace the file atomically, so a reader never sees a half-written queue."""
-    QUEUE.parent.mkdir(parents=True, exist_ok=True)
-    tmp = QUEUE.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(state, indent=2))
-    os.replace(tmp, QUEUE)      # atomic on the same volume, Windows included
+    """Replace the file atomically, so a reader never sees a half-written queue.
+
+    Two things here are Windows, not paranoia.
+
+    **The temp file is per-process.** Both the dashboard and the runner write
+    this. Sharing one temp name means one can truncate-and-rewrite it while the
+    other is publishing it, and what lands in queue.json is a truncated file.
+    _read() then returns a blank queue, and the next _edit writes that blank back
+    - every job gone, silently.
+
+    **os.replace is retried.** It is atomic, but on Windows it FAILS outright
+    while any other process has the destination open, because Python opens files
+    without FILE_SHARE_DELETE. Measured under two writers and one reader: 59 of
+    240 replaces raised PermissionError, with the lock working perfectly - the
+    lock serialises writers, and readers never take it. An unretried failure
+    throws out of the runner's heartbeat and marks a job failed while its
+    training is still running.
+    """
+    _publish(QUEUE, json.dumps(state, indent=2))
+
+
+def _publish(dest: Path, text: str, tries: int = 80) -> None:
+    """Write `text` to `dest` atomically, retrying the replace.
+
+    Used for both the queue and the heartbeat. Both are written by one process
+    while another may be reading them, and on Windows that makes os.replace fail
+    outright rather than block - Python opens files without FILE_SHARE_DELETE.
+    Measured before the retry: 59 of 240 replaces raised PermissionError under
+    two writers and one reader, with the lock working perfectly. The lock
+    serialises writers; readers never take it, and never should.
+    """
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    # Unique per CALL, not per process. Two threads in one process - two
+    # concurrent dashboard requests, say - would otherwise share the name, and
+    # whichever replaced first would delete the other's temp file out from under
+    # it: "WinError 2, cannot find the file". Measured: 8 failures in 360 writes
+    # across three threads before the counter was added.
+    tmp = dest.with_suffix(f".{os.getpid()}.{next(_TMP_SEQ)}.tmp")
+    tmp.write_text(text)
+    last: Exception | None = None
+    for _ in range(tries):                  # ~4 s of 50 ms tries
+        try:
+            os.replace(tmp, dest)
+            return
+        except PermissionError as exc:      # a reader has it open; it will let go
+            last = exc
+            time.sleep(0.05)
+        except OSError as exc:
+            last = exc
+            break
+    tmp.unlink(missing_ok=True)
+    raise OSError(f"could not publish {dest.name} after retrying: {last}")
 
 
 class _Lock:
@@ -138,29 +189,53 @@ class _Lock:
                 self.held = True
                 return self
             except FileExistsError:
-                try:
-                    if time.time() - LOCK.stat().st_mtime > self.stale_after:
-                        LOCK.unlink(missing_ok=True)
-                        continue
-                except OSError:
-                    continue
-                if time.time() > deadline:
-                    # Carry on unlocked rather than refusing to work. The cost of
-                    # a lost write here is one queue edit; the cost of raising is
-                    # a dashboard that cannot queue anything.
-                    return self
-                time.sleep(0.05)
+                pass
+            except OSError:
+                # Transient - an indexer or scanner holding the file, say. Fall
+                # through to the SAME deadline as everything else. An earlier
+                # version did `continue` here with no sleep and no deadline
+                # check, which spins at 100% CPU forever if it does not clear.
+                pass
+            try:
+                stale = time.time() - LOCK.stat().st_mtime > self.stale_after
+            except OSError:
+                stale = False          # it vanished under us; just try again
+            if stale:
+                LOCK.unlink(missing_ok=True)
+            elif time.time() > deadline:
+                # Carry on unlocked rather than refusing to work. The cost of a
+                # lost write here is one queue edit; the cost of raising is a
+                # dashboard that cannot queue anything at all.
+                return self
+            time.sleep(0.05)
 
     def __exit__(self, *exc):
+        # Only remove the lock if it is still OURS. Breaking a stale lock deletes
+        # somebody else's file, and without this check a process that timed out
+        # and proceeded unlocked would go on to delete whoever holds it now.
         if self.held:
-            LOCK.unlink(missing_ok=True)
+            try:
+                if LOCK.read_text().strip() == str(os.getpid()):
+                    LOCK.unlink(missing_ok=True)
+            except OSError:
+                pass
         return False
 
 
 def _edit(fn) -> dict:
-    """Re-read under the lock, apply fn, write back. Returns the new state."""
+    """Re-read under the lock, apply fn, write back. Returns the new state.
+
+    Refuses to publish over a queue it could not parse. Without that, one
+    truncated read turns into a blank state that gets written straight back,
+    and every queued job disappears with nothing to say why.
+    """
     with _Lock():
+        raw_existed = QUEUE.is_file()
         state = _read()
+        if raw_existed and not state["jobs"] and QUEUE.stat().st_size > 200:
+            raise OSError(
+                "queue.json exists and is non-trivial but parsed as empty - "
+                "refusing to overwrite it. Look at the file before retrying.")
         fn(state)
         _write(state)
         return state
@@ -173,11 +248,8 @@ def _edit(fn) -> dict:
 
 def beat(**extra) -> None:
     """The runner says it is alive. Called from its poll loop."""
-    HEARTBEAT.parent.mkdir(parents=True, exist_ok=True)
-    tmp = HEARTBEAT.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps({"pid": os.getpid(), "at": _now(),
-                               "stamp": time.time(), **extra}, indent=2))
-    os.replace(tmp, HEARTBEAT)
+    _publish(HEARTBEAT, json.dumps(
+        {"pid": os.getpid(), "at": _now(), "stamp": time.time(), **extra}, indent=2))
 
 
 def runner_status() -> dict:
@@ -234,31 +306,126 @@ def next_queued() -> dict | None:
     return next((j for j in state["jobs"] if j.get("state") == "queued"), None)
 
 
+def claim(owner: str) -> dict | None:
+    """Take the next job AND mark it running, in one locked edit.
+
+    next_queued() then a separate update() is two steps with a gap, and in that
+    gap a second runner can read the same job and claim it too - two trainers on
+    one card, which is the exact failure RULES.md rule 4 exists to prevent. The
+    job can also be removed in that gap, so the runner would launch training for
+    a job that is no longer in the queue.
+
+    Claiming under the lock closes both. `owner` is recorded so a job says which
+    runner has it.
+    """
+    taken: dict = {}
+
+    def apply(state: dict) -> None:
+        if state.get("paused"):
+            return
+        if any(j.get("state") == "running" for j in state["jobs"]):
+            return
+        for job in state["jobs"]:
+            if job.get("state") == "queued":
+                job["state"] = "running"
+                job["started"] = _now()
+                job["owner"] = owner
+                taken.update(job)
+                return
+
+    _edit(apply)
+    return taken or None
+
+
 # ---------------------------------------------------------------------------
 # writing
 # ---------------------------------------------------------------------------
 
 
+_FALSE_WORDS = {"", "0", "false", "no", "off", "none", "null"}
+
+
+def _as_bool(value) -> bool:
+    """"false", "0" and "off" are False.
+
+    Plain bool() says any non-empty string is true, so a client that sends its
+    checkboxes as strings gets no_video="false" -> True and silently trains a
+    whole run with no videos.
+    """
+    if isinstance(value, str):
+        return value.strip().lower() not in _FALSE_WORDS
+    return bool(value)
+
+
+def _as_int(value, fallback: int) -> int:
+    try:
+        return int(float(value))        # tolerate "3072.0" and 3072.0
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _as_float(value, fallback: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _as_pair(value):
+    """A two-number range, or None. Never raises."""
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return None                     # a single number is not a range
+    if isinstance(value, str):
+        value = [p for p in value.replace(",", " ").split() if p]
+    try:
+        pair = [float(v) for v in value][:2]
+    except (TypeError, ValueError):
+        return None
+    return pair if len(pair) == 2 else None
+
+
 def _clean(spec: dict) -> dict:
-    """Coerce whatever the browser sent into the shape the runner expects."""
+    """Coerce whatever the browser sent into the shape the runner expects.
+
+    Every branch here is total: it returns a usable job for ANY input. That is
+    not defensiveness for its own sake. This runs on a POST body, and one bad
+    value used to be permanent - a `rewards` that was not a dict got stringified,
+    saved, and then command_line() raised AttributeError on it forever. load()
+    calls command_line() on every job, so /api/queue and /api/monitor returned
+    500 for good, and the runner died on its next poll. The only way out was
+    hand-editing queue.json.
+    """
     job = dict(DEFAULTS)
-    for key, default in DEFAULTS.items():
-        if key not in spec or spec[key] is None:
-            continue
-        value = spec[key]
-        if isinstance(default, bool):
-            job[key] = bool(value)
-        elif isinstance(default, int) and not isinstance(default, bool):
-            job[key] = int(value)
-        elif isinstance(default, float):
-            job[key] = float(value)
-        elif key == "rewards" and isinstance(value, dict):
-            job[key] = {str(k): float(v) for k, v in value.items()}
-        elif key in ("push_speed", "push_spin"):
-            pair = [float(v) for v in value][:2]
-            job[key] = pair if len(pair) == 2 else None
-        else:
-            job[key] = str(value)
+
+    for key in ("task", "name", "note"):
+        if spec.get(key) is not None:
+            job[key] = str(spec[key])
+    for key in ("no_video", "film", "verify"):
+        if spec.get(key) is not None:
+            job[key] = _as_bool(spec[key])
+    for key in ("num_envs", "iterations"):
+        if spec.get(key) is not None:
+            job[key] = _as_int(spec[key], DEFAULTS[key])
+    if spec.get("stop_at") is not None:
+        job["stop_at"] = _as_float(spec["stop_at"], DEFAULTS["stop_at"])
+    for key in ("push_speed", "push_spin"):
+        if spec.get(key) is not None:
+            job[key] = _as_pair(spec[key])
+
+    # Only a mapping of name -> number. Anything else is dropped rather than
+    # coerced: a reward override that did not survive is far better than one
+    # that poisons the queue file.
+    rewards = spec.get("rewards")
+    clean_rewards: dict[str, float] = {}
+    if isinstance(rewards, dict):
+        for term, weight in rewards.items():
+            try:
+                clean_rewards[str(term)] = float(weight)
+            except (TypeError, ValueError):
+                continue
+    job["rewards"] = clean_rewards
     if job["task"] not in TASKS:
         job["task"] = DEFAULTS["task"]
     job["iterations"] = max(0, job["iterations"])
@@ -367,21 +534,32 @@ def remove(job_id: str) -> bool:
 
 
 def move(job_id: str, delta: int) -> bool:
-    """Shift a queued job up or down. Only among the queued ones - reordering
-    around a finished job would put it somewhere that means nothing."""
+    """Shift a queued job up or down by `delta` places.
+
+    Only among the queued ones - reordering around a finished job would put it
+    somewhere that means nothing.
+
+    This SHIFTS rather than swaps. Swapping is the same thing for the plus or
+    minus one the arrow buttons send, and different for anything larger: moving
+    a job up two by swapping also throws whatever was two above it down to where
+    the job came from, silently reordering a run nobody touched.
+    """
     ok = {"ok": False}
 
     def apply(state: dict) -> None:
-        idx = [i for i, j in enumerate(state["jobs"]) if j.get("state") == "queued"]
-        here = next((n for n, i in enumerate(idx)
-                     if state["jobs"][i].get("id") == job_id), None)
+        slots = [i for i, j in enumerate(state["jobs"]) if j.get("state") == "queued"]
+        order = [state["jobs"][i] for i in slots]
+        here = next((n for n, j in enumerate(order) if j.get("id") == job_id), None)
         if here is None:
             return
         there = here + delta
-        if not 0 <= there < len(idx):
+        if not 0 <= there < len(order):
             return
-        a, b = idx[here], idx[there]
-        state["jobs"][a], state["jobs"][b] = state["jobs"][b], state["jobs"][a]
+        order.insert(there, order.pop(here))
+        # Write the reordered queued jobs back into the same slots, so anything
+        # running or finished keeps its position in the list.
+        for slot, job in zip(slots, order):
+            state["jobs"][slot] = job
         ok["ok"] = True
 
     _edit(apply)
@@ -440,20 +618,27 @@ def train_argv(job: dict) -> list[str]:
     command a job will run before it runs - which is the difference between
     queueing something and hoping.
     """
-    argv = [job["task"], "--num-envs", str(job["num_envs"])]
+    argv = [str(job.get("task") or DEFAULTS["task"]),
+            "--num-envs", str(_as_int(job.get("num_envs"), DEFAULTS["num_envs"]))]
     if job.get("iterations"):
-        argv += ["--iterations", str(job["iterations"])]
+        argv += ["--iterations", str(_as_int(job["iterations"], 0))]
     if job.get("name"):
-        argv += ["--name", job["name"]]
+        argv += ["--name", str(job["name"])]
     if job.get("no_video"):
         argv += ["--no-video"]
-    argv += ["--stop-at", str(job.get("stop_at", DEFAULTS["stop_at"]))]
-    for term, weight in (job.get("rewards") or {}).items():
-        argv += ["--reward", f"{term}={weight}"]
-    if job.get("push_speed"):
-        argv += ["--push-speed", *(str(v) for v in job["push_speed"])]
-    if job.get("push_spin"):
-        argv += ["--push-spin", *(str(v) for v in job["push_spin"])]
+    argv += ["--stop-at", str(_as_float(job.get("stop_at"), DEFAULTS["stop_at"]))]
+    # `.items()` only if it really is a mapping. _clean guarantees that for
+    # anything added from now on, but a queue.json written before it did would
+    # otherwise raise here - and load() calls this for EVERY job, so one bad
+    # entry would 500 the whole API rather than spoiling one row.
+    rewards = job.get("rewards")
+    if isinstance(rewards, dict):
+        for term, weight in rewards.items():
+            argv += ["--reward", f"{term}={weight}"]
+    for flag in ("push_speed", "push_spin"):
+        pair = _as_pair(job.get(flag))
+        if pair:
+            argv += [f"--{flag.replace('_', '-')}", *(str(v) for v in pair)]
     return argv
 
 

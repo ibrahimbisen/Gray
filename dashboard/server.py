@@ -142,6 +142,36 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(HERE), **kw)
 
+    def handle_one_request(self):
+        """Never let a handler die without answering.
+
+        socketserver closes the connection on an unhandled exception, and the
+        browser sees a network error with nothing in it. Every page then reads
+        "Could not load" with no clue which request failed or why. Answering with
+        the traceback turns a silent dead page into a message that names the bug.
+        """
+        try:
+            super().handle_one_request()
+        except (ConnectionResetError, BrokenPipeError):
+            self.close_connection = True        # the browser went away; normal
+        except Exception as exc:  # noqa: BLE001
+            import traceback  # noqa: PLC0415
+
+            detail = traceback.format_exc()
+            print(f"[server] {self.path}\n{detail}", flush=True)
+            try:
+                body = json.dumps({"error": f"{type(exc).__name__}: {exc}",
+                                   "where": self.path,
+                                   "traceback": detail}).encode()
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                pass
+            self.close_connection = True
+
     def _send(self, body: bytes, ctype: str, cache: bool = False) -> None:
         self.send_response(200)
         self.send_header("Content-Type", ctype)
@@ -308,10 +338,26 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             with target.open("rb") as fh:
                 return self._send(fh.read(), ctype, cache=True)
 
-        start_s, _, end_s = rng[len("bytes="):].partition("-")
-        start = int(start_s or 0)
-        end = int(end_s) if end_s else size - 1
+        # A malformed or multi-range header used to raise straight out of the
+        # handler, killing the request with no response. Anything we cannot read
+        # falls back to serving the whole file, which is always a valid answer.
+        try:
+            first = rng[len("bytes="):].split(",")[0]
+            start_s, _, end_s = first.partition("-")
+            start = int(start_s) if start_s else 0
+            end = int(end_s) if end_s else size - 1
+        except ValueError:
+            with target.open("rb") as fh:
+                return self._send(fh.read(), ctype, cache=True)
         end = min(end, size - 1)
+        if start < 0 or start > end:
+            # Out of range. 416 is the honest answer; serving the whole file with
+            # a nonsense Content-Range makes a video player seek to garbage.
+            self.send_response(416)
+            self.send_header("Content-Range", f"bytes */{size}")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return None
         with target.open("rb") as fh:
             fh.seek(start)
             chunk = fh.read(end - start + 1)

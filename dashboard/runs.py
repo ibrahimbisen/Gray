@@ -18,6 +18,7 @@ from __future__ import annotations
 import csv
 import json
 from datetime import datetime
+from math import isfinite
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -62,12 +63,53 @@ def _read_metrics(path: Path) -> tuple[list[str], list[dict]]:
         out = {}
         for k, v in r.items():
             try:
-                out[k] = float(v)
+                f = float(v)
             except (TypeError, ValueError):
                 out[k] = v
+                continue
+            # NaN and inf are valid floats and invalid JSON. json.dumps writes
+            # them as bare NaN / Infinity, which JSON.parse rejects outright - so
+            # ONE diverged reward turns the whole dashboard into "Could not
+            # load". A diverged RL run logs NaN as a matter of course, so this is
+            # the normal case for exactly the run you most want to look at.
+            # Dropped to None here, at the only place metrics enter the system.
+            out[k] = f if isfinite(f) else None
         clean.append(out)
-    cols = [k for k in clean[0] if isinstance(clean[0][k], float)] if clean else []
+    # Scan EVERY row for the numeric columns, not just the first. train.py writes
+    # "" for a metric missing from a row, and a metric absent from row 0 would
+    # otherwise never appear in metric_columns - so it would get no chart for the
+    # whole run, silently.
+    cols: list[str] = []
+    for row in clean:
+        for k, v in row.items():
+            if isinstance(v, float) and k not in cols:
+                cols.append(k)
     return cols, clean
+
+
+def _newest_mtime(folder: Path) -> float:
+    """When anything in this run was last written, 0.0 if nothing could be read.
+
+    Every stat is guarded individually. rglob lists names, and a file can be
+    renamed or removed between being listed and being stat'd - which is exactly
+    what filming does every time it finishes one (`.writing.mp4` -> `.mp4`), and
+    what the checkpoint marker writer does. An unguarded FileNotFoundError here
+    escapes the request handler, and socketserver closes the connection with no
+    response at all: the whole dashboard goes to "Could not load", and only ever
+    while a run is training.
+    """
+    newest = 0.0
+    try:
+        entries = list(folder.rglob("*"))
+    except OSError:
+        return 0.0
+    for f in entries:
+        try:
+            if f.is_file():
+                newest = max(newest, f.stat().st_mtime)
+        except OSError:
+            continue        # it went away mid-scan; it cannot be the newest
+    return newest
 
 
 def _iteration_of(name: str) -> int | None:
@@ -118,8 +160,7 @@ def read_run(folder: Path) -> dict:
     status = {"done": "finished", "stopped": "cancelled"}.get(
         meta.get("status", "unknown"), meta.get("status", "unknown"))
     if status == "running":
-        newest = max((p.stat().st_mtime for p in folder.rglob("*") if p.is_file()),
-                     default=0.0)
+        newest = _newest_mtime(folder)
         if newest and (datetime.now().timestamp() - newest) > STALE_AFTER_S:
             status = "interrupted"
 
@@ -245,8 +286,7 @@ def all_summaries() -> list[dict]:
         status = {"done": "finished", "stopped": "cancelled"}.get(
             meta.get("status", "unknown"), meta.get("status", "unknown"))
         if status == "running":
-            newest = max((f.stat().st_mtime for f in p.rglob("*") if f.is_file()),
-                         default=0.0)
+            newest = _newest_mtime(p)
             if newest and (datetime.now().timestamp() - newest) > STALE_AFTER_S:
                 status = "interrupted"
         out.append({
@@ -283,8 +323,13 @@ def all_summaries() -> list[dict]:
 
 def detail(run_id: str, points: int = 0) -> dict | None:
     """One run in full, for the panel actually being looked at."""
+    # An empty id makes `RUNS / ""` resolve to RUNS itself, which is a directory,
+    # contains no ".." or slash, and so passed every check - returning a
+    # fabricated 200 for a run called "runs" instead of a 404.
+    if not run_id or ".." in run_id or "/" in run_id or "\\" in run_id:
+        return None
     folder = RUNS / run_id
-    if not folder.is_dir() or ".." in run_id or "/" in run_id or "\\" in run_id:
+    if not folder.is_dir():
         return None
     run = read_run(folder)
     run["duration"] = _duration(run["started"], run["finished"])

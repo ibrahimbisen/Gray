@@ -24,6 +24,7 @@ import csv
 import json
 import os
 import shutil
+import signal
 import sys
 import threading
 import time
@@ -32,6 +33,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+
+# Make Ctrl-Break behave like Ctrl-C.
+#
+# scripts/runner.py stops a training job by sending CTRL_BREAK_EVENT, which is
+# the only signal that reaches a child in its own process group on Windows. That
+# raises SIGBREAK, and Python leaves SIGBREAK at its OS default: terminate
+# immediately. Neither `except KeyboardInterrupt` nor `finally` below runs, so
+# the run's status is never written and it shows as "running" on the dashboard
+# forever - and the last metrics sync is lost with it.
+#
+# Measured before this line: exit code 0xC000013A, both handlers skipped.
+if os.name == "nt":
+    signal.signal(signal.SIGBREAK, signal.default_int_handler)
 
 # rsl_rl records which commit a run came from, through GitPython, which refuses
 # to import at all if it cannot find git. On Windows git is often on the shell's

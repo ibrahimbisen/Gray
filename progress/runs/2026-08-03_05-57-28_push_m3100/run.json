@@ -4,10 +4,10 @@
   "stage": 2,
   "stage_name": "Take a push",
   "task": "Gray-Push",
-  "status": "running",
+  "status": "reached target",
   "bar": "Survives repeated shoves from any direction over 20 s, on ground anywhere from slippery to grippy, with mass and servo gains varied.",
   "started": "2026-08-03T05:57:28",
-  "finished": null,
+  "finished": "2026-08-03T06:08:24",
   "iterations_target": 1500,
   "notes": "3072 robots at once, 50 Hz control. Shoves 0.4-1.2 m/s from any angle, spin 1.5 rad/s.",
   "scoring": [
@@ -81,5 +81,7 @@
       "weight": -0.0002,
       "what": "Joints moving at all. A robot standing still should be still."
     }
-  ]
+  ],
+  "verdict": "passed",
+  "verdict_detail": "64 robots x 20 s - stayed up for 20 s: 100% \u00b7 trunk within 20 mm of target: 2.18 mm \u00b7 uprightness above 0.95: 0.9941"
 }

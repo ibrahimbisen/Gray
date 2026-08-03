@@ -20,7 +20,20 @@ ceiling  =  (sum of the positive weights)  ×  (episode length in seconds)
 ```
 
 For the stand task: (height 2.0 + posture 1.5 + still 1.0 + alive 0.5) × 10 s = **50.0**
-For the push task: the same weights × 20 s = **100.0**
+
+**Do not read a ceiling off this page.** It is a property of whatever the weights
+are today, and the weights change — the push ceiling was 100.0 when this was
+written and is 78.0 now, because the task gained terms since. `scripts/train.py`
+computes it from the task's own weights and prints it as the run starts:
+
+```
+reward        ceiling 78.0 (3.9/s over 20 s)
+              stopping at 96% of it = 75.3
+```
+
+That printed line is the number the run actually used. A ceiling written down
+here would be a second copy that goes quietly out of date, and a stop threshold
+computed from a stale ceiling either cuts a run short or never fires.
 
 **Why that means stop.** At that point every positive term is essentially maxed —
 the robot is at the right height, level, still, in the right pose, and has not

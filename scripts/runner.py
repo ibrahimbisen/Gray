@@ -16,14 +16,14 @@ or close it entirely, and the queue keeps going.
 
 **Why one at a time, structurally.** RULES.md rule 4. Two runs on one card do not
 fail cleanly: both sit at 100% GPU and neither advances, which looks exactly like
-a hung dashboard. dashboard/queue.py refuses to hand out a second job while one
-is running, so the rule is enforced by the thing handing out work rather than by
-remembering it at 2 a.m.
+a hung dashboard. The job is CLAIMED under the queue's lock - found and marked
+running in a single edit - so two runners racing cannot both take it.
 
-**What happens when it is killed.** A job left marked `running` by a runner that
-died would block the queue forever, so on startup this reconciles: any job that
-says it is running, when no runner is alive to be running it, is marked
-interrupted and the queue moves on.
+**What happens when it is killed.** Two protections. Every child is tracked and
+killed in a `finally`, so Ctrl-C does not leave training burning the GPU with the
+queue saying "cancelled". And on startup a job left marked `running` is cleared -
+but ONLY after checking no other runner is alive, because a second runner
+clearing the first one's job is how you end up with two trainers on one card.
 """
 
 from __future__ import annotations
@@ -55,6 +55,15 @@ POLL_BUSY_S = 2.0
 # linking the job to it. The job still runs; it just will not have a link.
 RUN_DIR_TIMEOUT_S = 300.0
 
+# This runner's identity, recorded on a job it claims.
+ME = f"{os.getpid()}@{datetime.now():%H%M%S}"
+
+# Every child we have started and not yet reaped, so a `finally` can kill them
+# all. Without this, Ctrl-C on the runner leaves training running - the children
+# are in their own process groups precisely so the console signal does NOT reach
+# them - and the queue says the job was cancelled while the GPU is still busy.
+_CHILDREN: list[tuple[subprocess.Popen, object]] = []
+
 
 def _now() -> str:
     return datetime.now().isoformat(timespec="seconds")
@@ -62,6 +71,19 @@ def _now() -> str:
 
 def _say(msg: str) -> None:
     print(f"[{datetime.now():%H:%M:%S}] {msg}", flush=True)
+
+
+def _beat(**extra) -> None:
+    """Never let a heartbeat failure escape.
+
+    queue.beat() writes a file, and on Windows that write can lose a race with a
+    dashboard poll. An exception here used to propagate out of the wait loop and
+    mark a job failed while its training was still running.
+    """
+    try:
+        queue.beat(**extra)
+    except OSError:
+        pass
 
 
 def _run_dirs() -> set[str]:
@@ -72,16 +94,15 @@ def _popen(argv: list[str], log: Path) -> subprocess.Popen:
     """Start a child with its own process group, so it can be interrupted cleanly.
 
     CREATE_NEW_PROCESS_GROUP matters: it is what lets us send CTRL_BREAK later.
-    train.py catches KeyboardInterrupt and uses it to write its final status and
-    flush the metrics one last time - a hard kill loses both, and the run then
-    shows on the dashboard as permanently "running".
+    train.py installs a SIGBREAK handler so that arrives as KeyboardInterrupt and
+    its `finally` gets to write the run's final status.
     """
     log.parent.mkdir(parents=True, exist_ok=True)
     handle = log.open("a", encoding="utf-8", errors="replace")
     handle.write(f"\n=== {_now()}  {' '.join(argv)}\n")
     handle.flush()
     flags = subprocess.CREATE_NEW_PROCESS_GROUP if WIN else 0
-    return subprocess.Popen(
+    proc = subprocess.Popen(
         [sys.executable, *argv],
         cwd=str(ROOT),
         stdout=handle,
@@ -89,9 +110,28 @@ def _popen(argv: list[str], log: Path) -> subprocess.Popen:
         creationflags=flags,
         start_new_session=not WIN,
     )
+    _CHILDREN.append((proc, handle))
+    return proc
 
 
-def _interrupt(proc: subprocess.Popen, grace: float = 30.0) -> None:
+def _reap(proc: subprocess.Popen) -> None:
+    """Drop a finished child and close its log handle.
+
+    The handle has to be closed explicitly - it is not bound to the Popen, so it
+    would leak one file descriptor per child, three per job, for as long as the
+    runner lives.
+    """
+    for i, (p, handle) in enumerate(_CHILDREN):
+        if p is proc:
+            try:
+                handle.close()
+            except OSError:
+                pass
+            _CHILDREN.pop(i)
+            return
+
+
+def _interrupt(proc: subprocess.Popen, grace: float = 30.0, job_id: str = "") -> None:
     """Ask a child to stop, then insist. Politeness first so train.py can tidy up."""
     if proc.poll() is not None:
         return
@@ -102,11 +142,17 @@ def _interrupt(proc: subprocess.Popen, grace: float = 30.0) -> None:
             os.killpg(os.getpgid(proc.pid), signal.SIGINT)
     except (OSError, ValueError):
         pass
-    try:
-        proc.wait(timeout=grace)
-        return
-    except subprocess.TimeoutExpired:
-        pass
+
+    # Beat while waiting: a 30 s grace period is longer than HEARTBEAT_STALE_S,
+    # so without this the dashboard declares the runner dead mid-shutdown.
+    deadline = time.time() + grace
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            _reap(proc)
+            return
+        _beat(state="stopping", job=job_id)
+        time.sleep(1.0)
+
     _say("child did not stop when asked - killing it")
     try:
         if WIN:
@@ -116,11 +162,35 @@ def _interrupt(proc: subprocess.Popen, grace: float = 30.0) -> None:
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
     except OSError:
         proc.kill()
+    # Confirm it actually died. taskkill returns before the process is gone, so
+    # without this wait the caller reads poll() as None and reports the child as
+    # still alive when it is not - or worse, moves on while it really is.
+    try:
+        proc.wait(timeout=15)
+    except subprocess.TimeoutExpired:
+        _say(f"WARNING pid {proc.pid} survived taskkill - the GPU may still be busy")
+    _reap(proc)
+
+
+def _kill_all(why: str) -> None:
+    for proc, _ in list(_CHILDREN):
+        if proc.poll() is None:
+            _say(f"{why}: stopping pid {proc.pid}")
+            _interrupt(proc, grace=20.0)
+    for proc, handle in list(_CHILDREN):
+        try:
+            handle.close()
+        except OSError:
+            pass
+        _CHILDREN.clear()
 
 
 def _cancelled(job_id: str) -> bool:
     """Has the dashboard taken this job away from us?"""
-    state = queue.load()
+    try:
+        state = queue.load()
+    except OSError:
+        return False        # could not read; assume not, and check again shortly
     job = next((j for j in state["jobs"] if j.get("id") == job_id), None)
     return job is None or job.get("state") != "running"
 
@@ -130,139 +200,182 @@ def _wait(proc: subprocess.Popen, job_id: str, label: str) -> int:
     while True:
         # Heartbeat from in here too, not only from the idle loop - otherwise a
         # six-hour training job looks exactly like a runner that died.
-        queue.beat(state=label, job=job_id)
+        _beat(state=label, job=job_id)
         code = proc.poll()
         if code is not None:
+            _reap(proc)
             return code
         if _cancelled(job_id):
             _say(f"{label}: cancelled from the dashboard")
-            _interrupt(proc)
+            _interrupt(proc, job_id=job_id)
             return proc.poll() if proc.poll() is not None else -1
         time.sleep(POLL_BUSY_S)
 
 
-def _find_run_dir(before: set[str], deadline: float) -> str | None:
+def _find_run_dir(before: set[str], deadline: float, job_id: str) -> str | None:
     """The run directory train.py just created. It names it by the clock, so it
-    has to be found rather than predicted."""
+    has to be found rather than predicted.
+
+    Beats while it waits and honours cancellation: torch and mjlab take 30-120 s
+    to start, which is far longer than HEARTBEAT_STALE_S, so a silent wait here
+    made the dashboard report "the runner stopped" at the start of every job.
+    """
     while time.time() < deadline:
         new = _run_dirs() - before
         if new:
             return sorted(new)[-1]
+        _beat(state="starting", job=job_id)
+        if _cancelled(job_id):
+            return None
         time.sleep(1.0)
     return None
 
 
 def _step(job_id: str, name: str, started: float, code: int | None) -> None:
     """Record one pipeline step on the job, so the page can show what happened."""
-    state = queue.load()
-    job = next((j for j in state["jobs"] if j.get("id") == job_id), None)
-    steps = list(job.get("steps") or []) if job else []
-    steps.append({
-        "name": name,
-        "seconds": round(time.time() - started, 1),
-        "exit_code": code,
-        "at": _now(),
-    })
-    queue.update(job_id, steps=steps)
+    try:
+        state = queue.load()
+        job = next((j for j in state["jobs"] if j.get("id") == job_id), None)
+        steps = list(job.get("steps") or []) if job else []
+        steps.append({
+            "name": name,
+            "seconds": round(time.time() - started, 1),
+            "exit_code": code,
+            "at": _now(),
+        })
+        queue.update(job_id, steps=steps)
+    except OSError as exc:
+        _say(f"could not record the {name} step: {exc}")
 
 
 def run_job(job: dict) -> None:
-    """train -> film -> verify, for one job."""
+    """train -> film -> verify, for one job. Already claimed and marked running."""
     job_id = job["id"]
     log = LOGS / f"{job_id}.log"
-    queue.update(job_id, state="running", started=_now(), log=str(
-        log.relative_to(ROOT)).replace("\\", "/"))
+    queue.update(job_id, log=str(log.relative_to(ROOT)).replace("\\", "/"))
     _say(f"{job_id}  {job['task']}  {queue.command_line(job)}")
 
     before = _run_dirs()
     started = time.time()
-    train = _popen(["scripts/train.py", *queue.train_argv(job)], log)
+    try:
+        train = _popen(["scripts/train.py", *queue.train_argv(job)], log)
 
-    # Link the job to its run as soon as the directory appears, rather than at
-    # the end - the dashboard wants to show live curves while it is training.
-    run_id = _find_run_dir(before, started + RUN_DIR_TIMEOUT_S)
-    if run_id:
-        queue.update(job_id, run_id=run_id)
-        _say(f"{job_id}  -> progress/runs/{run_id}")
-    else:
-        _say(f"{job_id}  no run directory appeared - the job runs, but unlinked")
-
-    # Filming reads the checkpoints training writes, so it runs alongside rather
-    # than after. It is a separate process and its own failure: a broken renderer
-    # should cost the videos, not the run.
-    film = None
-    if job.get("film") and not job.get("no_video"):
-        film = _popen(["scripts/film_checkpoints.py", "--watch"],
-                      LOGS / f"{job_id}.film.log")
-
-    code = _wait(train, job_id, "train")
-    _step(job_id, "train", started, code)
-
-    if film is not None:
-        # Give it a moment to catch the final checkpoint, then stop it.
-        time.sleep(20.0)
-        _interrupt(film, grace=60.0)
-
-    if _cancelled(job_id):
-        _say(f"{job_id}  cancelled")
-        return
-    if code != 0:
-        queue.update(job_id, state="failed", finished=_now(), exit_code=code,
-                     error=f"training exited {code} - see {log.name}")
-        _say(f"{job_id}  FAILED (exit {code})")
-        return
-
-    # RULES.md rule 2: a stage is passed by its bar, not by its curve. Training
-    # finishing is not the same as the stage being passed, so this always runs
-    # separately and writes its own verdict onto the run.
-    if job.get("verify"):
-        at = time.time()
-        argv = ["scripts/verify.py", job["task"]]
-        # verify.py's --run names an MJLAB log directory under logs/rsl_rl/<exp>/,
-        # NOT the progress/runs/ folder. The two happen to share a naming scheme
-        # and usually match - but they are stamped a moment apart, so a run that
-        # straddles a second boundary would get two different names and --run
-        # would point at nothing. Pass it only when it actually resolves;
-        # otherwise verify.py's own default - the newest log directory - is right,
-        # because the runner is serial and the newest IS the one just trained.
-        exp = ROOT / "logs" / "rsl_rl" / f"gray_{job['task'].split('-')[-1].lower()}"
-        if run_id and (exp / run_id).is_dir():
-            argv += ["--run", run_id]
+        # Link the job to its run as soon as the directory appears, rather than
+        # at the end - the dashboard wants live curves while it is training.
+        run_id = _find_run_dir(before, started + RUN_DIR_TIMEOUT_S, job_id)
+        if run_id:
+            queue.update(job_id, run_id=run_id)
+            _say(f"{job_id}  -> progress/runs/{run_id}")
         else:
-            _say(f"{job_id}  verifying the newest {exp.name} run "
-                 f"(no log dir named {run_id})")
-        vcode = _wait(_popen(argv, log), job_id, "verify")
-        _step(job_id, "verify", at, vcode)
-        if vcode != 0:
-            _say(f"{job_id}  verify exited {vcode} - training kept, verdict missing")
+            _say(f"{job_id}  no run directory appeared - the job runs, but unlinked")
 
-    queue.update(job_id, state="done", finished=_now(), exit_code=0)
-    _say(f"{job_id}  done")
+        # Filming reads the checkpoints training writes, so it runs alongside
+        # rather than after. Its own process and its own failure: a broken
+        # renderer should cost the videos, not the run.
+        film = None
+        if job.get("film") and not job.get("no_video"):
+            film = _popen(["scripts/film_checkpoints.py", "--watch"],
+                          LOGS / f"{job_id}.film.log")
+
+        code = _wait(train, job_id, "train")
+        _step(job_id, "train", started, code)
+
+        if film is not None:
+            time.sleep(20.0)        # let it catch the final checkpoint
+            _interrupt(film, grace=60.0, job_id=job_id)
+
+        if _cancelled(job_id):
+            _say(f"{job_id}  cancelled")
+            return
+        if code != 0:
+            queue.update(job_id, state="failed", finished=_now(), exit_code=code,
+                         error=f"training exited {code} - see {log.name}")
+            _say(f"{job_id}  FAILED (exit {code})")
+            return
+
+        # RULES.md rule 2: a stage is passed by its bar, not by its curve.
+        if job.get("verify"):
+            at = time.time()
+            argv = ["scripts/verify.py", job["task"]]
+            # verify.py's --run names an MJLAB log directory under
+            # logs/rsl_rl/<exp>/, NOT the progress/runs/ folder. The two share a
+            # naming scheme and usually match - but they are stamped a moment
+            # apart, so a run straddling a second boundary gets two different
+            # names. Pass it only when it resolves; otherwise verify.py's own
+            # default (the newest log directory) is right, because this runner is
+            # serial and the newest IS the one just trained.
+            exp = ROOT / "logs" / "rsl_rl" / f"gray_{job['task'].split('-')[-1].lower()}"
+            if run_id and (exp / run_id).is_dir():
+                argv += ["--run", run_id]
+            else:
+                _say(f"{job_id}  verifying the newest {exp.name} run "
+                     f"(no log dir named {run_id})")
+            vcode = _wait(_popen(argv, log), job_id, "verify")
+            _step(job_id, "verify", at, vcode)
+            if vcode != 0:
+                _say(f"{job_id}  verify exited {vcode} - "
+                     f"training kept, the bar was not met or could not be read")
+
+        # Re-check AFTER verify. Verifying takes minutes, and a cancellation that
+        # arrived during it would otherwise be overwritten with a clean "done" -
+        # the job would read as a success and the reason would be erased.
+        if _cancelled(job_id):
+            _say(f"{job_id}  cancelled during verify")
+            return
+
+        queue.update(job_id, state="done", finished=_now(), exit_code=0)
+        _say(f"{job_id}  done")
+    finally:
+        # Whatever happened - a raise, a Ctrl-C, a clean finish - no child of
+        # this job outlives it. An orphaned trainer holds the GPU and the next
+        # job starts alongside it, which is the rule-4 deadlock.
+        _kill_all(f"{job_id} finishing")
 
 
 def reconcile() -> None:
     """Clear jobs left marked running by a runner that died.
 
-    Without this the queue is blocked forever: next_queued() refuses to hand out
-    work while anything says it is running, and nothing else will ever change
-    that flag.
+    Without this the queue is blocked forever: claim() refuses to hand out work
+    while anything says it is running, and nothing else will change that flag.
+
+    But it checks the heartbeat FIRST. A second runner started while the first is
+    three hours into a job would otherwise mark that job failed, see nothing
+    running, and launch the next one alongside it - two trainers on one card,
+    the exact failure rule 4 exists to prevent.
     """
-    for job in queue.load()["jobs"]:
-        if job.get("state") == "running":
-            queue.update(job["id"], state="failed", finished=_now(),
-                         error="the runner stopped while this was training - "
-                               "requeue it if the run did not finish")
-            _say(f"{job['id']}  was marked running with no runner alive - cleared")
+    state = queue.load()
+    stuck = [j for j in state["jobs"] if j.get("state") == "running"]
+    if not stuck:
+        return
+    runner = state["runner"]
+    if runner.get("alive"):
+        _say(f"another runner is alive (pid {runner.get('pid')}, last seen "
+             f"{runner.get('age_s')}s ago) and holds "
+             f"{', '.join(j['id'] for j in stuck)}.")
+        _say("refusing to start - two trainers on one card is RULES.md rule 4. "
+             "Stop the other runner first.")
+        raise SystemExit(1)
+    for job in stuck:
+        queue.update(job["id"], state="failed", finished=_now(),
+                     error="the runner stopped while this was training - "
+                           "requeue it if the run did not finish")
+        _say(f"{job['id']}  was marked running with no runner alive - cleared")
 
 
 def serve(once: bool = False) -> int:
-    _say(f"runner up. interpreter: {sys.executable}")
+    _say(f"runner {ME} up. interpreter: {sys.executable}")
     _say(f"queue: {queue.QUEUE.relative_to(ROOT)}")
     reconcile()
     idle_said = False
     while True:
-        queue.beat(state="looking")
-        job = queue.next_queued()
+        _beat(state="looking")
+        try:
+            job = queue.claim(ME)
+        except OSError as exc:
+            _say(f"could not read the queue: {exc}")
+            time.sleep(POLL_IDLE_S)
+            continue
+
         if job is None:
             state = queue.load()
             if not idle_said:
@@ -287,7 +400,7 @@ def serve(once: bool = False) -> int:
             run_job(job)
         except KeyboardInterrupt:
             queue.update(job["id"], state="cancelled", finished=_now(),
-                         error="runner interrupted")
+                         error="the runner was interrupted")
             _say("interrupted - stopping")
             return 130
         except Exception as exc:  # noqa: BLE001
@@ -308,6 +421,8 @@ def main() -> int:
     except KeyboardInterrupt:
         _say("stopped")
         return 130
+    finally:
+        _kill_all("runner exiting")
 
 
 if __name__ == "__main__":

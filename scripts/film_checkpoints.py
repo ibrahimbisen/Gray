@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import signal
 import sys
 import time
 from dataclasses import asdict
@@ -28,6 +29,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 os.environ.setdefault("GIT_PYTHON_REFRESH", "quiet")
+
+# Make Ctrl-Break behave like Ctrl-C - see the same note in scripts/train.py.
+# scripts/runner.py stops this with CTRL_BREAK_EVENT when training finishes, and
+# without this the process is terminated outright rather than being allowed to
+# finish writing the film it is part way through encoding.
+if os.name == "nt":
+    signal.signal(signal.SIGBREAK, signal.default_int_handler)
 
 LOG_ROOT = ROOT / "logs" / "rsl_rl"
 RUNS = ROOT / "progress" / "runs"
