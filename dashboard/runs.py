@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 from datetime import datetime
 from math import isfinite
 from pathlib import Path
@@ -113,9 +114,17 @@ def _newest_mtime(folder: Path) -> float:
 
 
 def _iteration_of(name: str) -> int | None:
-    stem = Path(name).stem
-    digits = "".join(ch for ch in stem if ch.isdigit())
-    return int(digits) if digits else None
+    """The iteration a checkpoint film was taken at, or None if it is not one.
+
+    Only `iter_NNNN` counts. This used to scrape every digit out of the stem,
+    which is fine while every file is called iter_0150 and wrong the moment one
+    is not: scripts/drive.py writes clips named for the command that made them,
+    and `drive_1_straight` was read as iteration 1, then sorted to the bottom of
+    a sixty-six clip strip and labelled "iteration 1". Present, and impossible
+    to find. A file that does not follow the convention has no iteration.
+    """
+    m = re.fullmatch(r"iter_(\d+)", Path(name).stem)
+    return int(m.group(1)) if m else None
 
 
 def _age(iso: str | None) -> str:

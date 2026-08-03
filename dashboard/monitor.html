@@ -163,6 +163,11 @@
          border-radius:8px;padding:7px 9px;cursor:pointer;font-size:12px}
   .thumb:hover{border-color:#333945}
   .thumb.sel{border-color:var(--s1);background:#182231}
+  /* Clips driven by hand rather than filmed at a checkpoint. They sit at the
+     top of the strip and need to look different, or they read as five broken
+     checkpoint films. */
+  .thumb.driven{border-left:2px solid #a78bfa}
+  .thumb.driven .n{color:#a78bfa}
   .thumb .n{color:var(--muted);width:34px;font-size:11px}
 
   /* ---- tables ---- */
@@ -855,6 +860,16 @@ function runHeader(run){
     </div>` : ""}`;
 }
 
+/* A clip is labelled by its iteration, EXCEPT that not every clip has one.
+   scripts/drive.py writes clips named for the command that produced them, and
+   those were rendering as five identical "iteration ?" thumbs among sixty-six
+   numbered ones - present, and impossible to find. A clip without an iteration
+   is labelled by its name instead. */
+const vTitle = (f) => f.iteration != null
+  ? `iteration ${f.iteration}`
+  : String(f.name || "").replace(/^drive_/, "").replace(/_/g, " ");
+const vBadge = (f) => f.iteration != null ? String(f.iteration) : "cmd";
+
 function films(run){
   const v = run.videos || [];
   if(!v.length){
@@ -864,20 +879,24 @@ function films(run){
   }
   if(VIDEO === null) VIDEO = v.length - 1;
   const cur = v[Math.min(VIDEO, v.length - 1)];
+  const driven = v.filter(f => f.iteration == null).length;
   return `<section>
     <div class="sech"><h2>Checkpoints</h2><div class="grow"></div>
+      ${driven ? `<span class="pill">${driven} driven by hand</span>` : ""}
       <span class="pill tnum">${v.length} filmed</span></div>
     <div class="vwrap">
       <div class="stage">
         <video src="${esc(cur.file)}" controls autoplay muted loop playsinline></video>
-        <div class="cap"><span class="tnum">iteration ${cur.iteration ?? "?"}</span>
-          <span>${VIDEO === v.length - 1 ? "latest" : ""}</span></div>
+        <div class="cap"><span class="tnum">${esc(vTitle(cur))}</span>
+          <span>${cur.iteration == null ? "driven with scripts/drive.py"
+                  : VIDEO === v.length - 1 ? "latest" : ""}</span></div>
       </div>
       <div class="strip">${v.slice().reverse().map(f => {
         const i = v.indexOf(f);
-        return `<div class="thumb ${i === VIDEO ? "sel" : ""}" data-i="${i}">
-          <span class="n tnum">${f.iteration ?? "?"}</span>
-          <span>iteration ${f.iteration ?? "?"}</span></div>`;
+        return `<div class="thumb ${i === VIDEO ? "sel" : ""}${
+            f.iteration == null ? " driven" : ""}" data-i="${i}">
+          <span class="n tnum">${esc(vBadge(f))}</span>
+          <span>${esc(vTitle(f))}</span></div>`;
       }).join("")}</div>
     </div>
   </section>`;
