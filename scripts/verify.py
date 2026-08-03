@@ -40,6 +40,83 @@ TASKS = {
 }
 
 
+def trained_under(log_dir: Path) -> dict:
+    """What the run was actually trained with, as mjlab recorded it at launch.
+
+    The dump carries python tags for functions, tuples and enums. Reconstructing
+    those objects is neither possible nor wanted - unsafe_load dies on the first
+    enum it cannot import, and all that is needed here is the numbers. So unknown
+    tags are read as the plain structure underneath them.
+    """
+    import yaml  # noqa: PLC0415
+
+    path = log_dir / "params" / "env.yaml"
+    if not path.exists():
+        return {}
+
+    class Tolerant(yaml.SafeLoader):
+        pass
+
+    def plain(loader, _suffix, node):
+        if isinstance(node, yaml.MappingNode):
+            return loader.construct_mapping(node, deep=True)
+        if isinstance(node, yaml.SequenceNode):
+            return loader.construct_sequence(node, deep=True)
+        return loader.construct_scalar(node)
+
+    Tolerant.add_multi_constructor("", plain)
+    try:
+        return yaml.load(path.read_text(), Loader=Tolerant) or {}
+    except Exception as exc:  # noqa: BLE001
+        print(f"[drift] could not read what this run trained with: {exc}")
+        return {}
+
+
+def report_drift(log_dir: Path, cfg) -> None:
+    """Say so when the task has changed since the run was trained.
+
+    Scoring a policy against a task that has moved under it is not a verdict on
+    the policy - it silently answers a different question. This caught exactly
+    that: a run trained on 0.6 m/s box-shaped shoves was scored against 1.2 m/s
+    ones from any angle, and 'failed' a bar it had never been trained for.
+    """
+    was = trained_under(log_dir)
+    if not was:
+        return
+    drift = []
+
+    def numbers(x):
+        """Strip a params tree down to comparable plain numbers."""
+        if isinstance(x, dict):
+            return {k: numbers(v) for k, v in sorted(x.items())}
+        if isinstance(x, (list, tuple)):
+            return [numbers(v) for v in x]
+        return round(x, 6) if isinstance(x, (int, float)) else str(x)
+
+    old_shove = (was.get("events") or {}).get("shove") or {}
+    new_shove = cfg.events.get("shove")
+    if old_shove and new_shove is not None:
+        old_p, new_p = numbers(old_shove.get("params", {})), numbers(new_shove.params)
+        if old_p != new_p:
+            drift.append(f"  shove    trained {old_p}")
+            drift.append(f"           testing {new_p}")
+
+    old_rew = was.get("rewards") or {}
+    for name, term in cfg.rewards.items():
+        before = (old_rew.get(name) or {}).get("weight")
+        if isinstance(before, (int, float)) and abs(before - term.weight) > 1e-9:
+            drift.append(f"  {name:<9}trained {before}   testing {term.weight}")
+    for name in old_rew:
+        if name not in cfg.rewards:
+            drift.append(f"  {name:<9}was a scoring term then, and is not now")
+
+    if drift:
+        print("WARNING - the task has changed since this run was trained:")
+        print("\n".join(drift))
+        print("  The result below answers how this policy copes with today's task,")
+        print("  not whether it passed the one it was trained for.\n")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("task", nargs="?", default="Gray-Stand", choices=sorted(TASKS))
@@ -114,6 +191,7 @@ def main() -> int:
     print(f"checkpoint  {ckpt.relative_to(ROOT)}")
     print(f"tested      {args.robots} robots, {seconds:.0f} s each, "
           f"target trunk height {target*1000:.1f} mm\n")
+    report_drift(log_dir, env_cfg)
 
     checks = [
         (f"stayed up for {seconds:.0f} s", survived, spec["bar_survive"], "ge",
