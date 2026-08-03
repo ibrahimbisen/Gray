@@ -69,7 +69,18 @@ TASKS = ("Gray-Stand", "Gray-Push", "Gray-Walk")
 # is enforced here rather than remembered, because the failure arrives minutes
 # later and looks like a broken model rather than a full card.
 CARD_ENV_CEILING = 4096
-FILMING_ENV_CEILING = 3072
+
+# Raised 3072 -> 3600 on the owner's call, 3 Aug 2026.
+#
+# What is actually known, rather than assumed:
+#   3072 + filming   works. Measured at 6.9 GB of 12.0 across several runs.
+#   4096 + filming   died 26 s in with CUDA error 600.
+#
+# 3600 is between them and has not been run yet. It is a 17% step up from
+# known-good, not a jump to the known-bad number. If a run dies with error 600
+# again, this is the line to put back to 3072 - the failure is fast and obvious,
+# so it costs a minute rather than a night.
+FILMING_ENV_CEILING = 3600
 
 # A job, with every field defaulted. Anything the UI does not send falls back to
 # the same value train.py would have used on its own.
