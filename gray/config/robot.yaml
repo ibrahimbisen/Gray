@@ -47,7 +47,7 @@ joint_limits:
     calf: + lifts the foot UP
   hip:
   - -55.0
-  - 43.0
+  - 40.0
   thigh:
   - -35.0
   - 65.0

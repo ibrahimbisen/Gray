@@ -109,14 +109,38 @@ def _build() -> dict:
     return s
 
 
+def _body_lows(s: dict) -> dict[int, float]:
+    """The lowest point of every link, in metres. Real vertices, not geom centres."""
+    rb = s["rb"]
+    return {b: float((mesh.vertices @ rb.d.xmat[b].reshape(3, 3).T
+                      + rb.d.xpos[b])[:, 2].min())
+            for b, mesh in s["meshes"].items()}
+
+
 def lowest_point(s: dict) -> float:
     """Height of the lowest point on the whole robot, in metres."""
-    rb = s["rb"]
-    low = None
-    for b, mesh in s["meshes"].items():
-        z = (mesh.vertices @ rb.d.xmat[b].reshape(3, 3).T + rb.d.xpos[b])[:, 2].min()
-        low = float(z) if low is None else min(low, float(z))
-    return low if low is not None else 0.0
+    lows = _body_lows(s)
+    return min(lows.values()) if lows else 0.0
+
+
+def touching(s: dict, tol: float = 0.004) -> tuple[list[str], list[str]]:
+    """Which legs reach the ground, and which links are the ones actually on it.
+
+    Not the same question as "is the toe down". Folded up, this robot rests on the
+    side of its calves with its toes in the air, and calling that zero feet down
+    is true but useless.
+    """
+    rb, mj = s["rb"], s["mujoco"]
+    legs, parts = [], []
+    for b, low in _body_lows(s).items():
+        if low > tol:
+            continue
+        name = mj.mj_id2name(rb.m, mj.mjtObj.mjOBJ_BODY, b) or str(b)
+        parts.append(name)
+        leg = next((l for l in LEGS if name.lower().startswith(l)), None)
+        if leg and leg not in legs:
+            legs.append(leg)
+    return legs, parts
 
 
 def _penetration(s: dict) -> dict[tuple[str, str], float]:
@@ -207,7 +231,8 @@ def pose_report(physical_deg: dict[str, float], azimuth: float = 125.0,
 
         feet = {leg: rb.foot_world(leg) for leg in LEGS}
         trunk = float(rb.d.xpos[rb.base][2])
-        grounded = [leg for leg, p in feet.items() if p[2] < 0.004]
+        legs_down, parts_down = touching(s)
+        toes_down = [leg for leg, p in feet.items() if p[2] < 0.004]
         span_x = float(max(f[0] for f in feet.values()) - min(f[0] for f in feet.values()))
         span_y = float(max(f[1] for f in feet.values()) - min(f[1] for f in feet.values()))
 
@@ -229,7 +254,10 @@ def pose_report(physical_deg: dict[str, float], azimuth: float = 125.0,
         "feet_mm": {leg: [round(float(v) * 1000, 1) for v in p] for leg, p in feet.items()},
         "clashes": [f"{a} into {b} by {d:.1f} mm" for a, b, d in clashes],
         "colliding": bool(clashes),
-        "feet_down": len(grounded),
+        "legs_down": len(legs_down),
+        "toes_down": len(toes_down),
+        "on_ground": sorted(parts_down),
+        "toe_height_mm": {leg: round(float(p[2]) * 1000, 1) for leg, p in feet.items()},
     }
 
 

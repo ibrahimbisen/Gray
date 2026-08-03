@@ -47,6 +47,8 @@
   .fact{background:var(--surface);padding:10px 12px}
   .fact .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
   .fact .v{font-size:20px;font-weight:600;margin-top:2px}
+  .fact .tiny{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;
+              line-height:1.5}
 
   .grp{margin-bottom:16px}
   .grph{font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);
@@ -232,12 +234,19 @@ function facts(f){
       <div class="v tnum">${f.stance_x_mm}</div></div>
     <div class="fact"><div class="k">stance, side-side</div>
       <div class="v tnum">${f.stance_y_mm}</div></div>
-    <div class="fact"><div class="k">feet on the floor</div>
-      <div class="v ${f.feet_down === 4 ? "ok" : "warnc"}">${f.feet_down}<span
-        style="font-size:13px;color:var(--muted)"> / 4</span></div></div>
+    <div class="fact"><div class="k">legs on the floor</div>
+      <div class="v ${f.legs_down === 4 ? "ok" : "warnc"}">${f.legs_down}<span
+        style="font-size:13px;color:var(--muted)"> / 4</span></div>
+      <div class="tiny">on toes: ${f.toes_down} / 4</div></div>
     <div class="fact"><div class="k">self-collision</div>
       <div class="v ${f.colliding ? "bad" : "ok"}" style="font-size:16px">
-        ${f.colliding ? "HITTING" : "clear"}</div></div>`;
+        ${f.colliding ? "HITTING" : "clear"}</div></div>
+    <div class="fact" style="grid-column:1/-1"><div class="k">touching the ground</div>
+      <div class="tiny" style="margin-top:4px">${
+        f.on_ground.length ? f.on_ground.map(esc).join(" &middot; ") : "nothing"}</div>
+      <div class="tiny">toe heights &mdash; ${
+        Object.entries(f.toe_height_mm).map(([k, v]) => `${esc(k)} ${v}`).join(" &middot; ")} mm</div>
+    </div>`;
   const bar = $("#clash");
   if(f.colliding){
     bar.style.display = "block";
