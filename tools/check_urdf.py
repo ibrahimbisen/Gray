@@ -45,9 +45,34 @@ def leg_seg(name: str) -> tuple[str, str] | None:
     leg = next((l for l in LEGS if l in rest), None)
     return (leg, seg) if leg else None
 
-# Mass bounds, kg. Printed structure plus 12 servos plus battery, Pi and wiring.
-# Anything outside this means the CAD is missing components or double-counting.
-MASS_MIN, MASS_MAX = 1.2, 2.6
+# Mass bounds, kg. Derived from gray/config/robot.yaml rather than typed here:
+# this check exists to catch a model that disagrees with what we believe the
+# robot weighs, and a hardcoded band answers a different question - "does it
+# match what someone typed months ago". When the owner added the Jetson, battery
+# and cameras the real total went to 2.87 kg and the literal 1.2-2.6 band failed
+# a model that was correct.
+#
+# +/-15% around total_expected. Wide enough that a rounding difference or one
+# unmodelled bracket does not fail the check; narrow enough to still catch the
+# faults this was written for - a missing component, or one counted twice.
+MASS_TOLERANCE = 0.15
+_FALLBACK_MIN, _FALLBACK_MAX = 1.2, 2.6
+
+
+def _mass_bounds() -> tuple[float, float]:
+    """Expected total mass in kg, from robot.yaml. Falls back if it cannot be read."""
+    cfg = Path(__file__).resolve().parent.parent / "gray" / "config" / "robot.yaml"
+    try:
+        import yaml  # noqa: PLC0415
+
+        expected = float(yaml.safe_load(cfg.read_text())["mass"]["total_expected"])
+    except Exception:  # noqa: BLE001
+        return _FALLBACK_MIN, _FALLBACK_MAX
+    kg = expected / 1000.0
+    return kg * (1.0 - MASS_TOLERANCE), kg * (1.0 + MASS_TOLERANCE)
+
+
+MASS_MIN, MASS_MAX = _mass_bounds()
 
 # A joint axis should be a coordinate axis. The old export had axes 0.86 deg off,
 # which is CAD misalignment leaking into the physics.

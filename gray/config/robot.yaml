@@ -8,18 +8,132 @@
 # tools/prepare_model.py reads this and corrects the export.
 
 mass:
-  # Source: SolidWorks mass properties, 2 Aug 2026, taken per component.
-  # These four add up to 2378.70 g, which is exactly what SolidWorks reports for
-  # the whole assembly - so nothing is missing and nothing is counted twice.
+  # Built up from known part weights, 3 Aug 2026. NOT scale readings - see
+  # `measured: false`. Replace each line with a real number during reassembly.
   #
-  # They are still CAD numbers, not scale readings. Weigh the real parts during
-  # reassembly and replace them.
+  # Why the CAD numbers were dropped. The exported meshes were measured against
+  # the CAD masses and two separate faults showed up, pulling opposite ways:
+  #
+  #   part       mesh volume   CAD mass   implied density   separate shells
+  #   thigh        73.91 cm3    75.51 g      1.022 g/cm3           1
+  #   calf         46.36 cm3    47.43 g      1.023 g/cm3           3
+  #   hip          96.47 cm3   172.07 g      1.784 g/cm3          85
+  #   base_link   799.94 cm3  1198.66 g      1.498 g/cm3         551
+  #
+  # 1. Thigh and calf come out at almost exactly 1.0 g/cm3 - water. That is the
+  #    SolidWorks exporter writing volume in cm3 into the mass field, so those
+  #    two numbers are not masses at all.
+  # 2. Hip and base_link are denser than water and split into 85 and 551 closed
+  #    bodies, so those DO contain servos and fasteners as real geometry. But
+  #    their printed plastic is still costed at solid density, and a part printed
+  #    at 20-25% infill weighs roughly 45% of solid.
+  #
+  # WHERE THE SERVOS ARE - stated by the owner, 3 Aug 2026. Not inferred.
+  #
+  #   4 embedded in the body      - one per leg, these swing the hip out and in
+  #   2 in each hip module (x4=8) - one drives the thigh, one drives the calf
+  #   0 in the thigh              - it carries only the threaded pushrod and its
+  #                                 ball joints, which run its full length
+  #   0 in the calf
+  #
+  # So the calf is driven from the hip module through a rod that spans the whole
+  # thigh. That is the pushrod linkage in CLAUDE.md, and it is why the calf can
+  # be light while the hip is heavy.
+  #
+  # This split matters more than the total does. Two earlier versions of this
+  # file got it wrong in opposite directions - one put a knee servo on each
+  # thigh (legs came out 67% of the robot), one read the photos as 8 servos in
+  # the body (42%). The truth is 55%. Leg mass is what a swing costs and what a
+  # shove has to arrest, so a wrong split is worse than a wrong total.
   units: g
-  trunk: 1198.66     # Main Body Assembly, includes electronics and battery
-  hip: 172.07        # "right hip" and "HIp Part", 4 off
-  thigh: 75.51       # Left_Thigh and Right_Thigh, 4 off
-  calf: 47.43        # "calves", 4 off
-  total_expected: 2378.70
+  measured: false
+  # 1984 = 914 original + 840 net payload + 230 margin. See `payload_g` below.
+  # Rounded UP to a 3100 g total on the owner's instruction: it is far easier to
+  # shave mass off a model later than to discover the real robot is heavier than
+  # everything was trained against. Being 200 g pessimistic costs a little
+  # performance; being 200 g optimistic costs a retrain.
+  trunk: 1984.0      # base_link, holds 4 of the 12 servos AND the whole payload
+  hip: 165.0         # 4 off, TWO servos each - thigh drive and calf drive
+  thigh: 65.0        # 4 off, no servo - printed arm plus a pushrod
+  calf: 49.0         # 4 off, no servo
+  total_expected: 3100.0
+
+  # Every line above, itemised. These are the numbers to argue with.
+  breakdown:
+    plastic:
+      material: PLA
+      density_g_cm3: 1.24
+      infill_pct: 22
+      # Fraction of solid weight an FDM part actually comes out at, once
+      # perimeters and solid top/bottom layers are counted. Infill alone would
+      # say 0.22; perimeters dominate on parts this size.
+      solid_fraction: 0.45
+    known_parts_g:
+      servo_ds3218mg: 60      # x12 = 720 g. Datasheet, and the single biggest item.
+      raspberry_pi_4: 46
+      pca9685: 10
+      imu_mpu6050: 3          # x3 = 9 g, front / middle / back
+      adc_ads1115: 5          # x3 = 15 g, 12 channels of pot
+      pot_rotary: 8           # x8 = 64 g
+      pot_linear: 15          # x4 = 60 g
+      wiring_and_connectors: 120
+      fasteners_bearings_pushrods: 140
+
+    # THE PAYLOAD. Owner's spec, 3 Aug 2026. None of it is in the CAD yet, so it
+    # is added to the trunk as a single lump - the owner's instruction was
+    # explicitly "just add the weight to the main body, I will distribute it when
+    # I design it". That is honest for now and wrong later: a battery under the
+    # trunk and a Jetson on top are not the same as 840 g at the trunk's centre,
+    # and the difference shows up in roll inertia. Redistribute when the mounts
+    # are modelled.
+    #
+    # Why the total is not simply +1040: the original 914 g trunk already carried
+    # a 200 g 3S LiPo, and the 18650 pack replaces it rather than joining it.
+    payload_g:
+      cell_18650_2000mah: 45       # x12 in 3S4P = 540 g. 89 Wh, about 1.5 h walking.
+      jetson_orin_nano_devkit: 250  # dev kit, so carrier board and cooling included
+      cameras: 50                   # 5 small modules plus ribbon
+      unallocated: 200              # the owner's "couple of other things"
+      gross_added: 1040
+      lipo_removed: -200            # battery_3s_lipo, superseded by the 18650 pack
+      margin: 230                   # owner's call: round the total up to 3100 g
+      net_added_to_trunk: 1070
+
+    # What the payload costs, so it is not a surprise later:
+    #   total          2030 g -> 3100 g, +53%
+    #   worst joint    0.47 -> 0.72 N-m of 1.96 available
+    #   torque margin  4.18x -> 2.73x. Still holds itself up comfortably.
+    #   leg fraction   55% -> 36%. This is the good news: every gram lands on the
+    #                  trunk, so legs get RELATIVELY lighter, and leg mass is what
+    #                  a swing costs and what a shove has to arrest.
+    # The cost lands on dynamics and servo speed under load, not on standing up.
+    #
+    # Training randomises mass around this, so the exact figure matters less than
+    # the band containing the truth. Pessimistic-and-wide is the safe direction.
+    per_link:
+      calf:  "26 printed + 15 linear pot + 8 rod end = 49"
+      thigh: "41 printed + 18 pushrod and ball joints + 6 fasteners = 65"
+      hip:   "17 printed (hex lattice, light) + 120 two servos + 16 two rotary pots + 12 fasteners = 165"
+      trunk: "234 printed + 240 four servos + 46 Pi + 10 PCA9685 + 9 IMUs + 15 ADCs + 120 wiring + 40 fasteners = 714 structural, + 1040 payload + 230 margin = 1984"
+
+    # Cross-check, against the PRE-PAYLOAD trunk of 914 g (714 structural plus the
+    # 200 g LiPo that was in the budget then). The payload is not in the CAD, so
+    # it cannot appear in a CAD cross-check.
+    # SolidWorks reported the trunk at
+    # 1198.66 g with its plastic costed at solid density. Our trunk frame is
+    # ~520 cm3 of solid PLA = 645 g solid, but 234 g printed at 22% infill - a
+    # difference of 286 g. 914 + 286 = 1200 g, against the CAD's 1198.66. The
+    # hip lands at 165 g against the CAD's 172.07. Two independent routes to the
+    # same numbers, so the remaining disagreement is the infill correction and
+    # nothing else.
+
+  # What would settle this, in order of how much it is worth:
+  #   1. Weigh one calf, one thigh, one hip. Checks the split, which is what leg
+  #      inertia depends on - and the split is the part that has already been
+  #      wrong once.
+  #   2. Weigh the whole assembled robot. One number, checks the total.
+  #   3. Weigh the trunk with electronics and battery in it.
+  # Anything measured replaces the estimate and `measured` goes true.
 
 servo:
   # 12x DS3218MG on a PCA9685 over I2C.
