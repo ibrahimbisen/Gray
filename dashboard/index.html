@@ -3,153 +3,574 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gray &mdash; project summary</title>
+<title>Gray &mdash; how the whole thing works</title>
 <link rel="stylesheet" href="/page.css">
+<style>
+/* ---------------------------------------------------------------------------
+   This page is a schematic sheet, not an article.
+
+   The subject is a control system explained to the engineer who built the
+   machine, and the native vernacular for that is the block diagram: boxes,
+   labelled wires, a controller, a plant. So the identity is drawn rather than
+   written - the diagrams carry the argument and the prose annotates them.
+
+   Two rules hold it together. Accent blue is reserved for a LIVE SIGNAL and
+   appears nowhere else, so a blue line always means numbers are moving along
+   it. And every label ON a diagram is monospaced while every sentence ABOUT one
+   is not, which is how a real drawing separates the thing from the note about
+   the thing.
+
+   Tokens come from page.css so this page belongs with the rest of the
+   dashboard; only the diagram layer is added here.
+   --------------------------------------------------------------------------- */
+:root{
+  --wire:#2b323d;                     /* drawn hairline, warmer than --line */
+  --plate:#13161c;                    /* the diagram field, under the cards */
+  --sig:var(--accent);                /* a live signal. Never used for anything else. */
+}
+@media (prefers-color-scheme: light){
+  :root{ --wire:#ccd2dd; --plate:#eef1f5; }
+}
+:root[data-theme="dark"]{ --wire:#2b323d; --plate:#13161c; }
+:root[data-theme="light"]{ --wire:#ccd2dd; --plate:#eef1f5; }
+
+body{ overflow:auto; display:block; }
+.sheet{ max-width:1120px; margin:0 auto; padding:0 28px 120px; }
+
+/* ---------- masthead ---------- */
+.mast{ padding:60px 0 44px; border-bottom:1px solid var(--wire); }
+.mast .kicker{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:11px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--sig); margin-bottom:16px; }
+.mast h1{ font-size:clamp(30px,5vw,50px); line-height:1.04; letter-spacing:-.035em;
+  font-weight:800; max-width:16ch; text-wrap:balance; margin:0 0 18px; }
+.mast p{ font-size:18px; line-height:1.6; color:var(--dim); max-width:62ch; margin:0; }
+.mast .meta{ display:flex; flex-wrap:wrap; gap:26px; margin-top:30px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; }
+.mast .meta b{ display:block; font-size:20px; font-weight:700; color:var(--ink);
+  font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+.mast .meta span{ color:var(--faint); text-transform:uppercase; letter-spacing:.1em;
+  font-size:10.5px; }
+
+/* ---------- plates ---------- */
+.plate{ padding:64px 0; border-bottom:1px solid var(--wire); }
+.plate:last-child{ border-bottom:0; }
+.plate > header{ display:grid; grid-template-columns:auto 1fr; gap:18px;
+  align-items:start; margin-bottom:26px; }
+.pnum{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px;
+  font-weight:700; color:var(--sig); border:1px solid var(--wire);
+  border-radius:6px; padding:5px 9px; letter-spacing:.06em; margin-top:5px; }
+.plate h2{ font-size:clamp(22px,3.2vw,32px); line-height:1.12; letter-spacing:-.028em;
+  font-weight:750; margin:0 0 8px; max-width:22ch; text-wrap:balance; }
+.plate header p{ font-size:16.5px; line-height:1.6; color:var(--dim);
+  max-width:62ch; margin:0; }
+.plate .prose{ max-width:62ch; }
+.plate .prose p{ font-size:15.5px; line-height:1.68; margin:0 0 14px; }
+.plate .prose p:last-child{ margin-bottom:0; }
+.plate .prose b{ color:var(--ink); }
+
+.split{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:36px; align-items:start; }
+@media (max-width:900px){ .split{ grid-template-columns:1fr; gap:28px; } }
+
+/* ---------- the drawing layer ---------- */
+.dwg{ background:var(--plate); border:1px solid var(--wire); border-radius:14px;
+  padding:26px 24px; overflow-x:auto; }
+.dwg .cap{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10.5px;
+  letter-spacing:.13em; text-transform:uppercase; color:var(--faint);
+  margin-bottom:18px; }
+.dwg .foot{ font-size:12.5px; color:var(--dim); margin-top:18px; line-height:1.55; }
+
+/* Every label on a drawing is monospaced. Every sentence about one is not. */
+.mono{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-variant-numeric:tabular-nums; }
+
+/* -- the signal chain: sensors -> policy -> joints -- */
+.chain{ display:grid; grid-template-columns:1fr auto 1fr auto 1fr; gap:0;
+  align-items:center; min-width:660px; }
+.blk{ border:1px solid var(--wire); border-radius:10px; background:var(--panel);
+  padding:14px 16px; }
+.blk.core{ border-color:var(--sig); border-width:2px; padding:20px 18px;
+  box-shadow:0 0 0 5px color-mix(in srgb,var(--sig) 9%,transparent); }
+.blk h4{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10.5px;
+  letter-spacing:.13em; text-transform:uppercase; color:var(--faint);
+  margin:0 0 10px; font-weight:600; }
+.blk .big{ font-size:30px; font-weight:750; letter-spacing:-.03em; line-height:1;
+  font-variant-numeric:tabular-nums; }
+.blk .big small{ font-size:12px; font-weight:500; color:var(--dim); letter-spacing:0;
+  margin-left:6px; }
+.io{ list-style:none; margin:0; padding:0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:12px; font-variant-numeric:tabular-nums; }
+.io li{ display:flex; gap:10px; padding:3px 0; color:var(--dim); }
+.io li b{ color:var(--ink); width:26px; text-align:right; flex:0 0 auto; }
+.io li.sum{ border-top:1px solid var(--wire); margin-top:7px; padding-top:7px;
+  color:var(--ink); font-weight:700; }
+
+/* A wire carries numbers. Blue, and only ever blue. */
+.wire{ position:relative; height:2px; background:var(--sig); min-width:56px; }
+.wire::after{ content:""; position:absolute; right:-1px; top:-4px;
+  border-left:9px solid var(--sig); border-top:5px solid transparent;
+  border-bottom:5px solid transparent; }
+.wire em{ position:absolute; top:-26px; left:50%; transform:translateX(-50%);
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10px;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--sig);
+  font-style:normal; white-space:nowrap; }
+
+/* -- the sampled box: one track per axis -- */
+.axis{ margin-bottom:22px; }
+.axis:last-child{ margin-bottom:0; }
+.axis .hd{ display:flex; align-items:baseline; gap:10px; margin-bottom:9px; }
+.axis .hd b{ font-size:14px; }
+.axis .hd span{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:11px; color:var(--faint); }
+.track{ position:relative; height:26px; border-radius:5px;
+  background:repeating-linear-gradient(90deg,var(--wire) 0 1px,transparent 1px 9px);
+  border:1px solid var(--wire); }
+.track .span{ position:absolute; top:-1px; bottom:-1px; border-radius:5px;
+  background:color-mix(in srgb,var(--sig) 26%,transparent);
+  border:1px solid var(--sig); }
+.track .zero{ position:absolute; top:-5px; bottom:-5px; width:1px;
+  background:var(--faint); }
+.track .pin{ position:absolute; top:50%; width:9px; height:9px; margin:-5px 0 0 -5px;
+  border-radius:50%; background:var(--bad); box-shadow:0 0 0 3px var(--plate); }
+.axis .ends{ display:flex; justify-content:space-between; margin-top:6px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10.5px;
+  color:var(--faint); font-variant-numeric:tabular-nums; }
+
+/* -- sim | real, one file spanning the divide -- */
+.mirror{ position:relative; display:grid; grid-template-columns:1fr 1fr; gap:0;
+  border:1px solid var(--wire); border-radius:12px; overflow:hidden;
+  min-width:600px; }
+.mirror > div{ padding:22px 20px 78px; }
+.mirror > div + div{ border-left:1px dashed var(--wire); }
+.mirror h4{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10.5px;
+  letter-spacing:.13em; text-transform:uppercase; margin:0 0 14px; font-weight:600; }
+.mirror .l{ color:var(--faint); }
+.mirror .bridge{ position:absolute; left:50%; bottom:16px; transform:translateX(-50%);
+  background:var(--panel); border:2px solid var(--sig); border-radius:10px;
+  padding:12px 22px; text-align:center; white-space:nowrap;
+  box-shadow:0 0 0 6px color-mix(in srgb,var(--sig) 10%,transparent); }
+.mirror .bridge b{ display:block; font-size:15px; letter-spacing:-.01em; }
+.mirror .bridge span{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:10.5px; color:var(--sig); letter-spacing:.1em; text-transform:uppercase; }
+
+/* -- bars against their bar -- */
+.bar{ margin-bottom:16px; }
+.bar:last-child{ margin-bottom:0; }
+.bar .hd{ display:flex; align-items:baseline; gap:8px; margin-bottom:7px; }
+.bar .hd b{ font-size:14px; flex:1; }
+.bar .hd .v{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px;
+  font-variant-numeric:tabular-nums; font-weight:700; }
+.bar .rail{ height:8px; border-radius:99px; background:var(--wire); overflow:hidden; }
+.bar .rail i{ display:block; height:100%; border-radius:99px; }
+.bar .note{ font-size:11.5px; color:var(--faint); margin-top:5px; }
+
+.pill{ display:inline-block; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; padding:3px 9px;
+  border-radius:99px; border:1px solid var(--wire); color:var(--dim); }
+.pill.go{ color:var(--ok); border-color:color-mix(in srgb,var(--ok) 45%,transparent); }
+.pill.no{ color:var(--bad); border-color:color-mix(in srgb,var(--bad) 45%,transparent); }
+.pill.now{ color:var(--sig); border-color:color-mix(in srgb,var(--sig) 45%,transparent); }
+
+.callout{ border-left:2px solid var(--sig); padding:4px 0 4px 16px; margin:20px 0 0;
+  max-width:62ch; }
+.callout b{ display:block; margin-bottom:4px; }
+.callout p{ font-size:14.5px; line-height:1.6; color:var(--dim); margin:0; }
+.callout.warn{ border-color:var(--bad); }
+
+.files{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; }
+.file{ border:1px solid var(--wire); border-radius:11px; padding:16px 17px;
+  background:var(--panel); }
+.file .id{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px;
+  font-weight:700; color:var(--sig); }
+.file h4{ margin:6px 0 4px; font-size:16px; letter-spacing:-.015em; }
+.file p{ font-size:12.5px; color:var(--dim); margin:0 0 10px; line-height:1.5; }
+
+.notfiles{ list-style:none; margin:14px 0 0; padding:0; }
+.notfiles li{ display:grid; grid-template-columns:46px 1fr; gap:12px;
+  padding:9px 0; border-top:1px solid var(--wire); font-size:13.5px; }
+.notfiles li .k{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:11px; color:var(--faint); padding-top:2px; }
+.notfiles li span{ color:var(--dim); }
+.notfiles li b{ color:var(--ink); }
+
+table.pts{ width:100%; border-collapse:collapse; font-size:13px; }
+table.pts td{ padding:6px 10px 6px 0; border-bottom:1px solid var(--wire);
+  vertical-align:top; }
+table.pts tr:last-child td{ border-bottom:0; }
+table.pts .s{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; width:16px;
+  font-weight:700; font-size:15px; }
+table.pts .w{ text-align:right; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-variant-numeric:tabular-nums; color:var(--faint); white-space:nowrap; }
+
+@media (prefers-reduced-motion:no-preference){
+  .plate{ animation:rise .5s cubic-bezier(.2,.7,.3,1) both; }
+  @keyframes rise{ from{ opacity:0; transform:translateY(10px);} to{ opacity:1; transform:none; } }
+}
+a.plain:focus-visible, .thumb:focus-visible{ outline:2px solid var(--sig);
+  outline-offset:2px; border-radius:4px; }
+</style>
 </head>
 <body>
 <div class="top" id="top"></div>
-<div class="shell">
-  <div class="side"></div>
-  <div class="main"></div>
-</div>
+<div class="sheet" id="sheet"><p class="muted" style="padding:60px 0">Loading&hellip;</p></div>
 
 <script src="/page.js"></script>
 <script>
-document.getElementById("top").innerHTML = topbar("/summary", "Project summary");
+document.getElementById("top").innerHTML = topbar("/summary", "How the whole thing works");
 
-/* Stage 1 is amber rather than green on purpose: eleven of eleven checks passing
-   says the model is self-consistent, not that it is the robot. */
-const CLS  = { "provisional": "later", "in progress": "now", "start now": "now" };
-const CHIP = { "provisional": "warn",  "in progress": "now", "start now": "now" };
+const n = (x, d = 0) => (x == null || !isFinite(x)) ? "&mdash;"
+  : Number(x).toLocaleString(undefined, {minimumFractionDigits: d, maximumFractionDigits: d});
 
-function rewardTable(t) {
-  if (t.error) {
-    return `<div class="card"><h3>${esc(t.title)}</h3>
-      <div class="risk small"><b>Could not build this config.</b> ${esc(t.error)}</div>
-    </div>`;
-  }
-  const earn = t.terms.filter(x => x.sign === "+");
-  const lose = t.terms.filter(x => x.sign === "-");
-  const rows = (list) => list.map(r => `<tr>
-      <td class="n" style="color:${r.sign === "+" ? "var(--ok)" : "var(--bad)"};
-          font-size:17px;font-weight:700">${r.sign}</td>
-      <td><b>${esc(r.label)}</b>
-        <div class="dim" style="margin-top:2px">${
-          r.described ? esc(r.note)
-            : `<i>No written explanation. It is in the code and not on this page
-               &mdash; that gap is shown rather than hidden.</i>`}</div></td>
-      <td class="n dim" style="text-align:right">${r.weight}</td>
-    </tr>`).join("");
-  return `<div class="card">
-    <h3>${esc(t.title)}
-      <span class="chip">${t.terms.length} terms</span>
-      ${t.undescribed ? `<span class="chip warn">${t.undescribed} unexplained</span>` : ""}</h3>
-    <p class="why small">${esc(t.note)}</p>
-    <div class="tw scroller"><table>
-      <tr><th class="n"></th><th>What it measures</th><th class="n">weight</th></tr>
-      ${rows(earn)}${rows(lose)}
-    </table></div>
-    <div class="note small" style="margin-top:12px"><b>Ceiling:</b> the rewards are
-      capped at 1.0 each, so the most this run can score is
-      <b>${t.ceiling}</b> per step before penalties.</div>
-  </div>`;
-}
+fetch("/api/state").then(r => r.json()).then(s => {
 
-fetch("/api/state").then(r => r.json()).then(s => shell([
+const obs   = s.observation || {};
+const axes  = (s.sampling || {}).axes || [];
+const cmds  = ((s.sampling || {}).headline || {}).commands || "—";
+const envs  = ((s.sampling || {}).headline || {}).envs || "—";
+const lib   = s.library || {};
+const rt    = lib.run_totals || {};
+const drive = s.driven || {};
+const walk  = ((s.rewards || {}).tasks || []).find(t => t.key === "walk") || {terms: []};
+const r1    = (s.status.tasks || []).find(t => t.id === "R1");
 
-  { id: "stages", label: "The project, in three stages", html: () => `
-    <div class="eyebrow">Gray</div>
-    <h1>${esc(s.goal.one_line)}</h1>
-    <p class="lede">Three stages, and they are a loop rather than a line. Stage 1
-      is provisional &mdash; three of its numbers have no datasheet. Stage 2 is
-      where the project lives for a long time. Stage 3 measures what stage 1 is
-      guessing, which is why it starts now instead of last.</p>
-    <div class="cols tight">
-      ${s.project.map(p => `
-        <div class="stagecard ${CLS[p.state] || ""}">
-          <div class="num">${p.n}</div>
-          <h3>${esc(p.name)}</h3>
-          <p class="small" style="margin-bottom:10px">${esc(p.one_line)}
-            <span class="chip ${CHIP[p.state] || "warn"}">${esc(p.state)}</span></p>
-          <p class="why small">${esc(p.summary)}</p>
-          <div class="grow"></div>
-          <div class="note small" style="margin:8px 0 12px"><b>Where it stands:</b>
-            ${esc(p.headline)}</div>
-          <a class="plain small" href="${esc(p.page)}">Open stage ${p.n} &rarr;</a>
-        </div>`).join("")}
-    </div>` },
-
-  { id: "loop", label: "Why it is a loop", count: s.loop.edges.length, html: () => `
-    <div class="eyebrow">Stage 3 &rarr; Stage 1</div>
-    <h1>Why it is a loop, not a line</h1>
-    <p class="lede">${esc(s.loop.one_line)}</p>
-    <div class="card">
-      <div class="tw"><table>
-        <tr><th class="n">From</th><th>What it measures</th><th>Why it cannot be
-          settled any other way</th></tr>
-        ${s.loop.edges.map(e => `<tr>
-          <td class="n"><span class="chip" style="font-family:ui-monospace">${
-            esc(e.from)}</span></td>
-          <td><b>${esc(e.what)}</b>
-            <div class="dim small">feeds ${esc(e.to)}</div></td>
-          <td class="dim">${esc(e.why)}</td></tr>`).join("")}
-      </table></div>
-      <div class="note key small" style="margin-top:14px"><b>What the loop costs:</b>
-        ${esc(s.loop.cost)}</div>
-    </div>` },
-
-  { id: "goal", label: "What we are training for", html: () => `
-    <div class="eyebrow">Gray</div>
-    <h1>What we are training for</h1>
-    <p class="lede">${esc(s.goal.one_line)}</p>
-    <div class="cols">
-      ${s.goal.paragraphs.map(p => `<div class="card">
-        <p class="small">${esc(p)}</p></div>`).join("")}
-    </div>
-    <div class="note key" style="margin-top:18px"><b>Done looks like:</b>
-      ${esc(s.goal.success)}</div>` },
-
-  { id: "model", label: "Model status",
-    count: s.model && s.model.total ? `${s.model.passed}/${s.model.total}` : null,
-    html: () => `
-    <div class="eyebrow">Stage 1 output</div>
-    <h1>Model status</h1>
-    <p class="lede">The simulator's robot, checked against the real one. Run
-      live on every page load. These checks say the model is self-consistent
-      &mdash; they cannot say it is the robot.</p>
-    <div class="card">${modelBlock(s.model)}</div>` },
-
-  { id: "scoring", label: "Reward function",
-    count: (s.rewards.tasks || []).length, html: () => `
-    <div class="eyebrow">How points are given</div>
-    <h1>Reward function</h1>
-    <p class="lede">${esc(s.scoring_intro[0])}</p>
-    ${s.rewards.error ? `<div class="card"><div class="risk small">
-      <b>Not shown.</b> ${esc(s.rewards.error)}</div></div>` : ""}
-    <div class="cols">
-      <div class="card">
-        <h3>How it works</h3>
-        ${s.scoring_intro.slice(1).map(p => `<p class="why small">${esc(p)}</p>`).join("")}
-        <div class="note key small" style="margin-top:12px"><b>Source:</b>
-          <code>${esc(s.rewards.source)}</code>. Nothing on this page is a copy
-          &mdash; an earlier hand-written list drifted and named four terms that
-          no longer existed while missing four that did.</div>
+/* ------------------------------------------------------------------ 1 ---- */
+const chain = () => `
+  <div class="dwg">
+    <div class="cap">the deliverable &mdash; one function, 50 times a second</div>
+    <div class="chain">
+      <div class="blk">
+        <h4>what it senses</h4>
+        <ul class="io">
+          ${(obs.terms || []).map(t =>
+            `<li><b>${t.n}</b> ${esc(t.note)}</li>`).join("")}
+          <li class="sum"><b>${obs.total || 0}</b> numbers in</li>
+        </ul>
       </div>
-      ${(s.rewards.tasks || []).map(rewardTable).join("")}
-    </div>` },
+      <div class="wire"><em>in</em></div>
+      <div class="blk core">
+        <h4>the policy</h4>
+        <div class="big">${obs.total || 0} &rarr; 12</div>
+        <p class="mono" style="font-size:11.5px;color:var(--dim);margin:10px 0 0">
+          ~300 KB of numbers.<br>No motion library.<br>No inverse kinematics.</p>
+      </div>
+      <div class="wire"><em>out</em></div>
+      <div class="blk">
+        <h4>what it moves</h4>
+        <div class="big">12<small>joint angles</small></div>
+        <p class="mono" style="font-size:11.5px;color:var(--dim);margin:10px 0 0">
+          every 20 ms, forever.<br>The PWM period is the<br>ceiling, not a choice.</p>
+      </div>
+    </div>
+    <div class="foot">It has never seen your exact situation. It answers anyway
+      &mdash; that is the whole trick, and plate 4 is why it works.</div>
+  </div>`;
 
-  { id: "feasibility", label: "Can this machine train it", html: () => `
-    <div class="eyebrow">Measured, not assumed</div>
-    <h1>Can this machine train it</h1>
-    <p class="lede">${esc(s.feasibility.verdict)}</p>
-    ${facts(s.feasibility.facts)}
-    <div class="cols tight">
-      ${s.feasibility.risks.map(r => `<div class="card">
-        <h3>${esc(r.risk)}<span class="lv ${esc(r.level)}">${esc(r.level)}</span></h3>
-        <p class="why small">${esc(r.detail)}</p></div>`).join("")}
-    </div>` },
+/* ------------------------------------------------------------------ 2 ---- */
+const earn = walk.terms.filter(t => t.sign === "+");
+const lose = walk.terms.filter(t => t.sign === "-");
+const ptrow = (t) => `<tr>
+  <td class="s" style="color:${t.sign === "+" ? "var(--ok)" : "var(--bad)"}">${t.sign}</td>
+  <td><b>${esc(t.label)}</b></td>
+  <td class="w">${t.weight}</td></tr>`;
 
-])).catch(fail);
+/* ------------------------------------------------------------------ 4 ---- */
+const track = (a) => {
+  // Domain is symmetric and wider than the sampled span, so an axis that never
+  // goes negative LOOKS like one. That asymmetry is the finding.
+  const dom = Math.max(Math.abs(a.lo), Math.abs(a.hi)) * 1.6;
+  const pc  = (v) => (50 + 50 * v / dom).toFixed(2) + "%";
+  const asked = drive.cases ? drive.cases
+    .filter(c => c.went_nowhere && a.axis === "forward")
+    .map(c => c.commanded.vx) : [];
+  return `<div class="axis">
+    <div class="hd"><b>${esc(a.axis)}</b>
+      <span>${esc(a.const)} = (${a.lo}, ${a.hi}) ${esc(a.unit)}</span></div>
+    <div class="track">
+      <div class="zero" style="left:50%"></div>
+      <div class="span" style="left:${pc(a.lo)};right:${(100 - parseFloat(pc(a.hi))).toFixed(2)}%"></div>
+      ${asked.map(v => `<div class="pin" style="left:${pc(v)}" title="asked for ${v}, stood still"></div>`).join("")}
+    </div>
+    <div class="ends"><span>${(-dom).toFixed(2)}</span>
+      <span style="color:var(--sig)">sampled ${a.lo} to ${a.hi}</span>
+      <span>+${dom.toFixed(2)}</span></div>
+  </div>`;
+};
+
+/* ------------------------------------------------------------------ 6 ---- */
+const barRow = (c) => {
+  const better = c.better === "lower";
+  const best = c.best;
+  if (best == null) return "";
+  // Fraction of the way to passing, capped. For a lower-is-better criterion
+  // that is bar/best, which goes to zero as the miss grows - which is honest:
+  // drift at 2125 against a 100 bar should look like almost nothing done, not
+  // like 95% of the way there.
+  const frac = better ? Math.min(1, c.bar / best) : Math.min(1, best / c.bar);
+  const met  = better ? best <= c.bar : best >= c.bar;
+  const col  = met ? "var(--ok)" : frac > 0.5 ? "var(--warn)" : "var(--bad)";
+  const dp   = c.bar < 1 ? 2 : 1;
+  return `<div class="bar">
+    <div class="hd"><b>${esc(c.name)}</b>
+      <span class="v" style="color:${col}">${n(best, dp)}</span>
+      <span class="mono" style="font-size:11px;color:var(--faint)">
+        ${better ? "≤" : "≥"} ${n(c.bar, dp)} ${esc(c.unit || "")}</span></div>
+    <div class="rail"><i style="width:${(frac * 100).toFixed(1)}%;background:${col}"></i></div>
+    ${!met ? `<div class="note">${better
+        ? `${(best / c.bar).toFixed(1)}&times; over the bar`
+        : `${(best / c.bar * 100).toFixed(0)}% of the bar`}</div>` : ""}
+  </div>`;
+};
+
+/* ------------------------------------------------------------------------ */
+document.getElementById("sheet").innerHTML = `
+
+<header class="mast">
+  <div class="kicker mono">Gray &middot; a 12-joint quadruped &middot; read top to bottom</div>
+  <h1>How this whole project actually works</h1>
+  <p>${esc(s.goal.one_line)} Six plates: what is being built, how it gets made,
+    why two hundred skills are three files, the one idea everything rests on,
+    what happens on the real robot, and where it stands today.</p>
+  <div class="meta">
+    <div><b>${obs.total || 0}</b><span>numbers in</span></div>
+    <div><b>12</b><span>joint angles out</span></div>
+    <div><b>50 Hz</b><span>forever</span></div>
+    <div><b>${lib.total || 0}</b><span>skills in the library</span></div>
+    <div><b>${(lib.runs || []).length}</b><span>files that ship</span></div>
+    <div><b>${cmds}</b><span>commands per run</span></div>
+  </div>
+</header>
+
+<section class="plate">
+  <header><div class="pnum">01</div><div>
+    <h2>You are not building a robot that walks. You are building a function.</h2>
+    <p>One file. Sensor readings and your command go in, twelve joint angles come
+      out, fifty times a second. That is the entire deliverable &mdash; everything
+      else in this project exists to produce it and to check it is any good.</p>
+  </div></header>
+  ${chain()}
+  <div class="callout"><b>What it is not.</b>
+    <p>It is not a recording of a good walk. There is no library of motions, no
+      keyframes, and no inverse kinematics solved at runtime. It is a lookup that
+      has never seen your exact situation and answers anyway.</p></div>
+</section>
+
+<section class="plate">
+  <header><div class="pnum">02</div><div>
+    <h2>You cannot write those twelve numbers. So you write down what good means.</h2>
+    <p>Nobody can hand-author joint angles for every situation. Instead you write
+      the <b>reward</b> &mdash; ${walk.terms.length} small opinions, added up every
+      step &mdash; and let a search find the function that scores well.</p>
+  </div></header>
+  <div class="split">
+    <div class="dwg">
+      <div class="cap">R1&rsquo;s reward &middot; read live from gray/tasks/</div>
+      <div class="split" style="gap:22px">
+        <table class="pts"><tbody>${earn.map(ptrow).join("")}</tbody></table>
+        <table class="pts"><tbody>${lose.map(ptrow).join("")}</tbody></table>
+      </div>
+      <div class="foot"><span class="mono">ceiling ${walk.ceiling}</span> per step
+        before penalties. ${earn.length} things earn points, ${lose.length} lose them.</div>
+    </div>
+    <div class="prose">
+      <p>Then <b>${envs} robots</b> try it at once. Each gets its own random
+        command and its own randomised world. They all fail. The scores say which
+        failures were <i>less bad</i>. Nudge the function toward those. Repeat
+        three thousand times.</p>
+      <p>Every robot&rsquo;s experience pours into <b>one</b> update to <b>one</b>
+        function. That is what makes it a single policy rather than a collection.</p>
+      <div class="callout warn"><b>Training never improves the reward.</b>
+        <p>The reward is your input, not an output. Nothing in that loop edits it
+          except you or me changing numbers in a file. If a behaviour is not in
+          the table, the robot has no reason to do it &mdash; and if something
+          unwanted scores well by accident, it will do that instead. This is the
+          only lever there is.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="plate">
+  <header><div class="pnum">03</div><div>
+    <h2>Two hundred skills are three files, and the test is not what they look like.</h2>
+    <p>The question is never &ldquo;do these look different?&rdquo; It is
+      <b>would the reward function have to change?</b> Walking sideways is the same
+      equation with a different setpoint, so it shares a file. Getting up off its
+      back has no commanded velocity to track, so every tracking term is
+      meaningless and it needs its own.</p>
+  </div></header>
+  <div class="split">
+    <div>
+      <div class="files">
+        ${(lib.runs || []).map(r => `<div class="file">
+          <div class="id">${esc(r.id)}</div>
+          <h4>${esc(r.name)}</h4>
+          <p>${esc(r.rule)}</p>
+          <span class="pill ${/progress/.test(r.state) ? "now" : ""}">${esc(r.state)}</span>
+          <span class="pill">${r.count} rows</span>
+        </div>`).join("")}
+      </div>
+      <div class="callout"><b>Runtime, in one line.</b>
+        <p>Power on into <span class="mono">R2</span>, get upright, hand over to
+          <span class="mono">R1</span> and you steer. Fall over, hand back to
+          <span class="mono">R2</span>. A rule at runtime does the handover
+          &mdash; not a third brain.</p></div>
+    </div>
+    <div class="dwg">
+      <div class="cap">everything else &middot; not a file, not a brain</div>
+      <ul class="notfiles">
+        ${(lib.kinds || []).filter(k => k.key !== "run").map(k => `<li>
+          <span class="k">${esc(k.items.join(" "))}</span>
+          <span><b>${esc(k.name)}</b> &mdash; ${k.count} rows</span></li>`).join("")}
+      </ul>
+      <div class="foot"><b style="color:var(--ink)">D1 is the one worth
+        understanding.</b> Gravel is not a skill and not a file. During R1&rsquo;s
+        training the ground friction, the robot&rsquo;s mass, its centre of mass
+        and the servo stiffness are randomised on every attempt. The policy never
+        sees the word gravel &mdash; it sees the same ${obs.total || 0} numbers
+        arriving in a different pattern.</div>
+    </div>
+  </div>
+</section>
+
+<section class="plate">
+  <header><div class="pnum">04</div><div>
+    <h2>${esc((s.box || {}).lede || "")}</h2>
+    <p>The command is not a list of options. It is a continuous box with one axis
+      per number, and every robot on every attempt is dropped at a random point
+      inside it. Fill the box with ${cmds} draws and the whole box works &mdash;
+      including points it never saw exactly.</p>
+  </div></header>
+  <div class="split">
+    <div class="dwg">
+      <div class="cap">R1&rsquo;s box today &middot; read live from walk_env_cfg.py</div>
+      ${axes.map(track).join("")}
+      <div class="foot">The blue span is what was sampled. The grey line is zero.
+        ${drive.cases && drive.cases.some(c => c.went_nowhere)
+          ? `The red pin is a command that was asked for and produced
+             <b style="color:var(--bad)">no movement at all</b> &mdash; it sits
+             outside the span, and that is the entire explanation.` : ""}</div>
+    </div>
+    <div class="prose">
+      ${((s.box || {}).paras || []).slice(1).map(p => `<p>${esc(p)}</p>`).join("")}
+      ${drive.exists ? `<div class="callout warn"><b>Measured, not argued.</b>
+        <p>Run #${drive.number} driven with a held command, ${drive.robots} robots:
+        asked for a 45&deg; diagonal &mdash; past the sampled edge &mdash; it
+        managed 26&deg;. Asked to walk backward, which is on the far side of an
+        edge it has never crossed, it stood still for eight seconds.
+        <a class="plain" href="/stage2#measured">The full table &rarr;</a></p></div>` : ""}
+    </div>
+  </div>
+</section>
+
+<section class="plate">
+  <header><div class="pnum">05</div><div>
+    <h2>There is no conversion step. That is the answer, and it is why it took so long to explain.</h2>
+    <p>Nothing is compiled, translated, or turned into inverse kinematics. You
+      copy the same few hundred kilobytes onto the Pi and feed it real numbers
+      instead of simulated ones. The function does not change and cannot tell
+      the difference.</p>
+  </div></header>
+  <div class="dwg">
+    <div class="cap">the handover &middot; one file, two worlds</div>
+    <div class="mirror">
+      <div>
+        <h4 class="l">in simulation</h4>
+        <ul class="io">
+          <li><b>&rarr;</b> MuJoCo computes the physics</li>
+          <li><b>&rarr;</b> perfect joint angles, perfect gravity</li>
+          <li><b>&rarr;</b> ${envs} robots at once</li>
+          <li><b>&larr;</b> twelve angles go to simulated joints</li>
+        </ul>
+      </div>
+      <div>
+        <h4 style="color:var(--ok)">on the real robot</h4>
+        <ul class="io">
+          <li><b>&rarr;</b> three IMUs on the trunk</li>
+          <li><b>&rarr;</b> twelve potentiometers through an ADC</li>
+          <li><b>&rarr;</b> one robot, one battery</li>
+          <li><b>&larr;</b> twelve angles go to the PCA9685</li>
+        </ul>
+      </div>
+      <div class="bridge">
+        <span>identical, unchanged</span>
+        <b>the policy file</b>
+      </div>
+    </div>
+    <div class="foot">The box drawn across the divide is not a diagram
+      convenience &mdash; it is the same file, byte for byte.</div>
+  </div>
+  <div class="callout warn"><b>Which is exactly why every honest number matters.</b>
+    <p>The policy cannot tell it moved. If the simulated numbers were wrong
+      &mdash; wrong mass, wrong joint limits, a sensor the real robot does not
+      have &mdash; it fails on contact with the floor and you have no way to know
+      which lie caused it. That is what killed the previous attempt: the policy
+      read joint angles the hardware could not measure, so it could never have
+      run at all.</p></div>
+</section>
+
+<section class="plate">
+  <header><div class="pnum">06</div><div>
+    <h2>Where it actually stands</h2>
+    <p>Standing and taking a push both pass their bars. Walking does not, and
+      today the failure got a name.</p>
+  </div></header>
+  <div class="split">
+    <div class="dwg">
+      <div class="cap">R1 locomotion &middot; best of ${s.status.runs_total} runs, against the bar</div>
+      ${r1 ? r1.criteria.map(barRow).join("") : `<p class="muted">Not measured yet.</p>`}
+      <div class="foot">Green has passed. Red is the distance still to go, drawn
+        honestly &mdash; drift at ${n((s.status.headline || {}).best, 0)} mm against
+        a ${n((s.status.headline || {}).bar, 0)} mm bar is almost nothing done, not
+        nearly finished.</div>
+    </div>
+    <div class="prose">
+      <p><b>The drift failure is not that it cannot steer.</b> Driven with a held
+        command over 64 robots, the average obeys: told to go left it goes left,
+        told right it goes right. What it does not do is steer the same way
+        twice.</p>
+      <p>Straight ahead spans &minus;7&deg; to +18&deg; across 64 robots given the
+        <i>identical</i> command. At five metres, a 4&deg; heading error is
+        already 350 mm &mdash; three and a half times the whole bar.</p>
+      <p>Next, in order: fix the spread on the box as it stands, then R2 getting
+        up, then the sensor batch &mdash; ${(s.batch || {}).added || 0} more
+        numbers on the input list, which is one retrain for all of them at once
+        &mdash; then the real robot.</p>
+      <div class="callout"><b>Stage 3 starts now, in parallel.</b>
+        <p>Not last. Deploy R1 while only one policy rides on stage 1&rsquo;s
+          three guessed numbers, rather than after all three do.
+          <a class="plain" href="/stage3">Stage 3 &rarr;</a></p></div>
+    </div>
+  </div>
+</section>
+
+<section class="plate">
+  <header><div class="pnum">&rarr;</div><div>
+    <h2>Where to go next</h2>
+  </div></header>
+  <div class="files">
+    ${s.project.map(p => `<div class="file">
+      <div class="id">stage ${p.n}</div>
+      <h4>${esc(p.name)}</h4>
+      <p>${esc(p.one_line)}</p>
+      <span class="pill ${p.state === "in progress" ? "now" : p.state === "provisional" ? "" : "now"}">${esc(p.state)}</span>
+      <div style="margin-top:12px"><a class="plain" href="${esc(p.page)}">Open &rarr;</a></div>
+    </div>`).join("")}
+    <div class="file">
+      <div class="id">live</div>
+      <h4>Training centre</h4>
+      <p>Queue runs, watch curves, score a policy against its bar.</p>
+      <span class="pill now">running</span>
+      <div style="margin-top:12px"><a class="plain" href="/runs">Open &rarr;</a></div>
+    </div>
+  </div>
+</section>
+`;
+
+}).catch(err => {
+  document.getElementById("sheet").innerHTML =
+    `<div style="padding:60px 0"><h2>Could not load</h2>
+     <p class="muted">${esc(err)}</p></div>`;
+});
 </script>
 </body>
 </html>

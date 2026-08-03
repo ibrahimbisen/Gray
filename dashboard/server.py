@@ -70,7 +70,16 @@ def model_status() -> dict:
 
 
 def summary_state() -> dict:
+    """Everything the explainer page needs to teach the project in one read.
+
+    The page is the answer to "explain this whole thing to me" - so it carries
+    the observation vector, the sampled box, the measured drive results and the
+    live bar status alongside the plan prose. All of it is read from the same
+    sources the rest of the dashboard uses; nothing here is a second copy.
+    """
     _reload_if_edited()
+    lib = skills.load()
+    sample = plan.sampling()
     return {
         "goal": plan.GOAL,
         "project": plan.PROJECT,
@@ -82,7 +91,45 @@ def summary_state() -> dict:
         "rewards": plan.rewards(),
         "feasibility": plan.FEASIBILITY,
         "model": model_status(),
+        # ---- what the policy is, in numbers ----
+        "observation": plan.sensors().get("observation_now", {}),
+        "batch": plan.sensors().get("batch", {}),
+        "sampling": sample,
+        "box": plan.BOX,
+        "driven": plan.driven(),
+        # ---- what the library collapses to ----
+        "library": {
+            "total": lib["total"],
+            "run_totals": lib["run_totals"],
+            "runs": [{"id": s["id"], "name": s["name"], "rule": s["rule"],
+                      "count": s["count"], "state": s["state"],
+                      "commands": s.get("commands", ""),
+                      "coverage": s["coverage"]}
+                     for s in lib["subsections"] if s["kind"] == "run"],
+            "kinds": [{"key": k["key"], "name": k["name"], "items": k["items"],
+                       "count": k["count"]} for k in lib["kinds"]],
+        },
+        # ---- where it actually stands ----
+        "status": _bar_status(),
     }
+
+
+def _bar_status() -> dict:
+    """The three trained tasks against their bars, trimmed for the explainer."""
+    over = progress.overview(runs.all_summaries())
+    out = []
+    for s in over["subsections"]:
+        if not s["verifiable"]:
+            continue
+        out.append({
+            "id": s["id"], "name": s["name"],
+            "met": s["met"], "failing": s["failing"],
+            "criteria": [{"name": c["name"], "bar": c["bar"], "best": c.get("best"),
+                          "unit": c.get("unit", ""), "better": c.get("better", "")}
+                         for c in s["criteria"]],
+        })
+    return {"tasks": out, "headline": over.get("headline") or {},
+            "runs_total": over.get("runs_total", 0)}
 
 
 def stage_state(n: int) -> dict | None:
