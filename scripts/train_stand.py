@@ -52,7 +52,8 @@ WATCH = {
     "Train/mean_reward": "reward",
     "Train/mean_episode_length": "episode_length",
     "Episode_Reward/height": "height_reward",
-    "Episode_Reward/upright": "upright_penalty",
+    "Episode_Reward/tilt": "tilt_penalty",
+    "Episode_Reward/upright": "tilt_penalty",   # what the term was called before
     "Episode_Termination/tipped_over": "tipped_over",
     "Episode_Termination/collapsed": "collapsed",
     "Policy/mean_std": "exploration",
@@ -157,6 +158,18 @@ def main() -> int:
         gpu_ids=[0],
     )
 
+    # Record what this run is actually scored on, so the dashboard can show it
+    # without anyone reading the task file - and so an old run still says what it
+    # was scored on after the rewards have been changed.
+    from gray.tasks.stand_env_cfg import REWARD_NOTES  # noqa: PLC0415
+
+    scoring = sorted(
+        ({"name": name, "weight": float(term.weight),
+          "what": REWARD_NOTES.get(name, "")}
+         for name, term in cfg.env.rewards.items()),
+        key=lambda r: -abs(r["weight"]),
+    )
+
     run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + f"_{args.name}"
     run_dir = RUNS / run_id
     (run_dir / "videos").mkdir(parents=True, exist_ok=True)
@@ -174,6 +187,7 @@ def main() -> int:
         "finished": None,
         "iterations_target": args.iterations,
         "notes": f"{args.num_envs} robots at once, 50 Hz control.",
+        "scoring": scoring,
     }, indent=2))
 
     print(f"training      Gray-Stand, {args.num_envs} robots, {args.iterations} iterations")

@@ -55,6 +55,30 @@ CONFIG = ROOT / "gray" / "config" / "robot.yaml"
 ROBOT = SceneEntityCfg("robot")
 ALL_JOINTS = SceneEntityCfg("robot", joint_names=(".*",))
 
+# What each scoring term is actually paying for, in plain words. The dashboard
+# shows these beside the weights so a run can be read without opening this file -
+# and so a term that is quietly dominating the total is obvious.
+REWARD_NOTES = {
+    "tilt": "Trunk off level. Measured off gravity, so it needs no outside reference.",
+    "upright": "Trunk off level. (Older runs called this term 'upright'.)",
+    "height": "Trunk at the ride height. 1.0 dead on, falling away over 30 mm.",
+    "still": "Trunk not moving. Standing still means still, not slowly drifting.",
+    "posture": "Joints near the stance they started in, rather than any pose that "
+               "happens to stay up.",
+    "alive": "A small amount for every moment it has not fallen. Stops it ending "
+             "an attempt early to escape a bad score.",
+    "fell_over": "Fell. By far the largest single number here, and the one thing "
+                 "that ends an attempt.",
+    "effort": "Total torque across the twelve joints. Keeps the pose inside what a "
+              "20 kg-cm servo can hold, and saves battery.",
+    "joint_speed": "Joints moving at all. A robot standing still should be still.",
+    "twitching": "How much the commanded angles jump between one moment and the "
+                 "next. Smooth commands are the single biggest factor in whether "
+                 "this survives contact with a real servo.",
+    "end_stops": "Driving a joint into the last few degrees of its travel. On the "
+                 "real robot that is a servo straining against a hard stop.",
+}
+
 
 def _stance() -> tuple[dict[str, float], float]:
     """The standing pose, straight out of scripts/find_stance.py.
@@ -147,14 +171,16 @@ def stand_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
     rewards = {
         # What we want.
-        "upright": RewardTermCfg(func=mdp.flat_orientation_l2, weight=-2.0),
         "height": RewardTermCfg(func=base_height, weight=2.0,
                                 params={"target": height, "std": 0.03}),
         "still": RewardTermCfg(func=base_still, weight=1.0, params={"std": 0.25}),
         "posture": RewardTermCfg(func=mdp.posture, weight=1.5,
                                  params={"asset_cfg": ALL_JOINTS, "std": {".*": 0.35}}),
         "alive": RewardTermCfg(func=mdp.is_alive, weight=0.5),
-        # What we do not.
+        # What we do not. Named for the thing being punished, so the dashboard's
+        # "loses points for" column reads as what it is - "upright" in a penalty
+        # column reads backwards.
+        "tilt": RewardTermCfg(func=mdp.flat_orientation_l2, weight=-2.0),
         "fell_over": RewardTermCfg(func=mdp.is_terminated, weight=-20.0),
         "effort": RewardTermCfg(func=mdp.joint_torques_l2, weight=-0.0002),
         "joint_speed": RewardTermCfg(func=mdp.joint_vel_l2, weight=-0.001),

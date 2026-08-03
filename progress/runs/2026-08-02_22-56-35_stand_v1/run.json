@@ -9,5 +9,57 @@
   "started": "2026-08-02T22:56:35",
   "finished": "2026-08-02T23:03:17",
   "iterations_target": 600,
-  "notes": "3072 robots at once, 50 Hz control."
+  "notes": "3072 robots at once, 50 Hz control.",
+  "scoring": [
+    {
+      "name": "fell_over",
+      "weight": -20.0,
+      "what": "Fell. By far the largest single number here, and the one thing that ends an attempt."
+    },
+    {
+      "name": "upright",
+      "weight": -2.0,
+      "what": "Trunk level. Measured off gravity, so it needs no outside reference."
+    },
+    {
+      "name": "height",
+      "weight": 2.0,
+      "what": "Trunk at the ride height. 1.0 dead on, falling away over 30 mm."
+    },
+    {
+      "name": "posture",
+      "weight": 1.5,
+      "what": "Joints near the stance they started in, rather than any pose that happens to stay up."
+    },
+    {
+      "name": "still",
+      "weight": 1.0,
+      "what": "Trunk not moving. Standing still means still, not slowly drifting."
+    },
+    {
+      "name": "end_stops",
+      "weight": -1.0,
+      "what": "Driving a joint into the last few degrees of its travel. On the real robot that is a servo straining against a hard stop."
+    },
+    {
+      "name": "alive",
+      "weight": 0.5,
+      "what": "A small amount for every moment it has not fallen. Stops it ending an attempt early to escape a bad score."
+    },
+    {
+      "name": "twitching",
+      "weight": -0.01,
+      "what": "How much the commanded angles jump between one moment and the next. Smooth commands are the single biggest factor in whether this survives contact with a real servo."
+    },
+    {
+      "name": "joint_speed",
+      "weight": -0.001,
+      "what": "Joints moving at all. A robot standing still should be still."
+    },
+    {
+      "name": "effort",
+      "weight": -0.0002,
+      "what": "Total torque across the twelve joints. Keeps the pose inside what a 20 kg-cm servo can hold, and saves battery."
+    }
+  ]
 }

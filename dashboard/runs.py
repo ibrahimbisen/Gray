@@ -125,6 +125,10 @@ def read_run(folder: Path) -> dict:
         "videos": videos,
         "checkpoints": checkpoints,
         "verdict": meta.get("verdict", ""),
+        # What this run was scored on, recorded at launch. Kept per-run rather
+        # than read from the task, so an old run still says what IT was scored on
+        # after the rewards have been changed.
+        "scoring": meta.get("scoring", []),
     }
 
 

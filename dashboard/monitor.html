@@ -127,6 +127,8 @@
   .thumb .n{color:var(--muted);width:34px;font-size:11px}
 
   /* ---- tables ---- */
+  .twocol{display:grid;gap:12px;grid-template-columns:1fr 1fr;align-items:start}
+  @media (max-width:900px){.twocol{grid-template-columns:1fr}}
   .wrapx{overflow-x:auto}
   table{width:100%;border-collapse:collapse;font-size:12.5px}
   th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);
@@ -408,6 +410,38 @@ function films(run){
   </section>`;
 }
 
+/* ---------------- what this run is scored on ---------------- */
+
+function scoring(run){
+  const terms = run.scoring || [];
+  if(!terms.length) return "";
+  const earns = terms.filter(t => t.weight > 0);
+  const loses = terms.filter(t => t.weight < 0);
+
+  const table = (rows, positive) => `
+    <div class="card wrapx">
+      <table>
+        <tr><th>${positive ? "Earns points for" : "Loses points for"}</th>
+            <th style="text-align:right">weight</th></tr>
+        ${rows.map(t => `<tr>
+          <td><b style="color:${positive ? "var(--good)" : "var(--crit)"}">${
+              positive ? "+" : "−"}</b> ${esc(t.name.replace(/_/g, " "))}
+            ${t.what ? `<div class="sub">${esc(t.what)}</div>` : ""}</td>
+          <td class="tnum" style="text-align:right;white-space:nowrap">${
+            Math.abs(t.weight)}</td></tr>`).join("")}
+      </table>
+    </div>`;
+
+  return `<section>
+    <div class="sech"><h2>How points are given</h2><div class="grow"></div>
+      <a class="btn" href="/summary#scoring">Why each term exists &rarr;</a></div>
+    <div class="twocol">
+      ${table(earns, true)}
+      ${table(loses, false)}
+    </div>
+  </section>`;
+}
+
 /* ---------------- plan, compact ---------------- */
 
 function pipeline(s, currentStage){
@@ -476,6 +510,7 @@ function draw(){
     run ? tiles(run) : "",
     run ? charts(run) : "",
     run ? films(run) : "",
+    run ? scoring(run) : "",
     pipeline(s, run ? run.stage : null),
     blockers(s.next_up),
     modelRow(s.model),

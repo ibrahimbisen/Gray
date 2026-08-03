@@ -4,12 +4,12 @@
   "stage": 1,
   "stage_name": "Stand still",
   "task": "Gray-Stand",
-  "status": "failed",
+  "status": "running",
   "bar": "30 s without falling. Trunk within 5 mm of 164 mm. Uprightness above 0.99.",
-  "started": "2026-08-02T22:54:38",
-  "finished": "2026-08-02T22:54:42",
+  "started": "2026-08-02T23:09:52",
+  "finished": null,
   "iterations_target": 600,
-  "notes": "8192 robots at once, 50 Hz control.",
+  "notes": "3072 robots at once, 50 Hz control.",
   "scoring": [
     {
       "name": "fell_over",
