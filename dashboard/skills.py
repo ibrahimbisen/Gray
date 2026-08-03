@@ -217,10 +217,17 @@ SUBSECTIONS = [
 #             distance sensors. It means the fix is a new input, a new command or
 #             a separate run, never a new weight in the existing one.
 #   measured  read off a trained policy. Never trained toward.
+#   pilot     a human at the controls supplies it. Added 3 Aug 2026 on the
+#             owner's question - "why does it need to know where it is, I am the
+#             one driving it with a camera and a controller?" He is right, and it
+#             is a real sixth answer rather than a softer word for blocked. A row
+#             that a pilot handles is not missing anything: the robot does not
+#             need to know where it is because somebody who does is steering.
 COVERAGE = {
     "command":   "set a command and it happens - already covered",
     "condition": "a dial in the scene - same reward, different world",
     "emerges":   "nobody asks for it; it falls out of the reward",
+    "pilot":     "the human at the controls does it - nothing is missing",
     "blocked":   "no weight in the current reward reaches it - it needs a new "
                  "input, a new command, or its own run",
     "measured":  "read off a trained policy, never trained toward",
@@ -318,9 +325,31 @@ _COVERAGE_OVERRIDE = {
     59: ("emerges", "an unseen hole is exactly that - felt, not seen"),
     90: ("blocked", "clearance to 60% body height is a crouch, and a crouch is a "
                     "height command - not a jump, whatever the category says"),
-    91: ("blocked", "backing out between two walls needs to know where the walls are"),
+    91: ("pilot", "the pilot can see the corner and steers out of it"),
     99: ("blocked", "'see an obstacle' is the whole point - needs a camera"),
+    # ---- the localisation re-audit, 3 Aug 2026 -----------------------------
+    # These thirteen were all filed as blocked on "knowing where it is". Six of
+    # them were simply misfiled and are not about position at all; the other
+    # seven are, and a human at the controls supplies it. Each is named rather
+    # than swept, because "13 blocked" was wrong in two different directions.
+    126: ("pilot", "the pilot decides where the point is and stops there"),
+    127: ("pilot", "the pilot is looking at it and lets go on the heading wanted"),
+    128: ("pilot", "reversing into a space is what a human on sticks is for"),
+    129: ("command", "walk straight is vx with vy and yaw at zero - and holding "
+                     "that line for 3 m IS R1's existing drift bar, measured in "
+                     "simulation where position is free"),
     130: ("blocked", "stepping stones need to see where the stones are"),
+    131: ("pilot", "lining up on a doorway is a steering job"),
+    193: ("pilot", "a figure eight is a sequence of turn commands, flown"),
+    194: ("command", "a constant forward speed with a constant turn rate IS a "
+                     "circle - two command numbers held, nothing more"),
+    195: ("pilot", "backing out of a dead end is steering"),
+    196: ("emerges", "a wall is felt through the leg when it pushes against it, "
+                     "not seen - the same way a low obstacle already is"),
+    197: ("condition", "a steep slope is terrain, which is a dial in the scene"),
+    198: ("condition", "same - the slope is the condition, backward is a command"),
+    199: ("blocked", "skipping a stair means knowing where the next one is, which "
+                     "is the camera, not position on the floor"),
     170: ("blocked", "belly near the ground is the bottom of the height range"),
     174: ("blocked", "leaning with the feet planted is a pitch and roll command"),
     175: ("blocked", "scanning with the feet planted is a yaw attitude, not a yaw rate"),
@@ -354,14 +383,16 @@ BLOCKED_NEEDS = {
                        "also the hardest sim-to-real jump there is, because the fake "
                        "heightmap is perfect and free and the real one is a noisy "
                        "30 Hz camera full of holes. Its own project."},
+    # Retired 3 Aug 2026. Kept so the concept is documented and so a future row
+    # can be filed here deliberately, but nothing is currently blocked on it:
+    # the owner flies Gray with a camera and a controller, so a human supplies
+    # the position and the seven rows that needed it are `pilot`, not blocked.
     "where":  {"label": "Knowing where it is", "class": "input",
-               "why": "Where it stands on the floor, and where the walls are. The "
-                      "policy is handed nothing about either, so 'walk to a point' "
-                      "and 'back out of a corner' have no target to aim at.",
-               "cost": "Distance sensors give range, not position - turning range "
-                       "into a position on the floor is localisation, a layer above "
-                       "the policy that does not exist yet. Then its output joins "
-                       "the input list, so retrain."},
+               "why": "Where it stands on the floor, and where the walls are.",
+               "cost": "Retired as a blocker. A pilot supplies it. Only comes back "
+                       "if Gray is ever asked to do something with nobody on the "
+                       "sticks - and then it is UWB anchors in the room, because "
+                       "range finders give range, not position."},
     "flight": {"label": "A flight phase", "class": "reward",
                "why": "Detection is NOT the problem - the contact sensor already "
                       "reports zero feet down, today. The reward is the problem: "
@@ -379,9 +410,12 @@ BLOCKED_NEEDS = {
                        "it an entry in _NEED_OVERRIDE or _NEED_BY_CATEGORY."},
 }
 
+# Precision and Path shapes used to map to "where". Both are gone: every row in
+# them is now named individually, and a NEW row in either should surface as a
+# gap ("unsaid") rather than be quietly filed against a retired blocker.
 _NEED_BY_CATEGORY = {
     "Athletic": "flight", "Air movements": "flight",
-    "Perception": "camera", "Precision": "where", "Path shapes": "where",
+    "Perception": "camera",
     "Body control": "height", "Body positions": "height",
 }
 
@@ -390,8 +424,8 @@ _NEED_BY_SUBSECTION = {"flight": "flight", "see": "camera"}
 
 # Rows whose blocker is not what their category implies.
 _NEED_OVERRIDE = {8: "foot", 9: "foot", 10: "foot",
-                  21: "camera", 99: "camera", 130: "camera",
-                  90: "height", 91: "where"}
+                  21: "camera", 99: "camera", 130: "camera", 199: "camera",
+                  90: "height"}
 
 # Where a category goes by default...
 _DEFAULT = {

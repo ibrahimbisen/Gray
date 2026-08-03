@@ -72,10 +72,13 @@ sensors:
 
   - key: imu_trunk
     name: Trunk IMU, three of them
-    part: "6-DOF, front / exact middle / back"
+    part: "9-DOF, front / exact middle / back"
     status: committed
     spec_checked: false
-    measures: "Which way is down, and how fast the trunk is turning."
+    measures: >-
+      Which way is down, and how fast the trunk is turning. Being 9-DOF they also
+      contain magnetometers, which are therefore ALREADY FITTED - see the
+      magnetometer row, which is only about whether to read them.
     adds: 0
     already_in_observation: true
     unblocks: {}
@@ -119,7 +122,8 @@ sensors:
   - key: foot_contact
     name: Foot contact switches
     part: "microswitch or FSR under each foot, 4 off"
-    status: candidate
+    status: committed
+    count: 4
     spec_checked: false
     measures: "Which feet are on the ground."
     adds: 4
@@ -140,7 +144,8 @@ sensors:
   - key: foot_force
     name: Foot load cells
     part: "thin-film force sensor or a small load cell per foot, 4 off"
-    status: candidate
+    status: committed
+    count: 4
     spec_checked: false
     measures: "How hard each foot is pressing, not just whether it is."
     adds: 4
@@ -155,28 +160,38 @@ sensors:
     mass_g: 20
 
   - key: current_sense
-    name: Servo current sensing
-    part: "INA219 / INA226 on the servo rail, or one per servo"
-    status: candidate
+    name: Per-servo current sensing
+    part: "INA219 / INA226, one per servo"
+    status: committed
+    count: 12
     spec_checked: false
-    measures: "How hard the servos are actually working."
-    adds: 1
+    measures: "How hard each individual servo is actually working."
+    adds: 12
     unblocks: {}
     why_anyway: >-
-      The only way to know a servo is stalling, overheating, or being asked for
-      more than it has. It is also the measurement that would replace the guessed
-      servo gains with real ones - the stage 3.3 job. Worth fitting for safety
-      even if it never enters the observation.
-    fake_it: "Available - the simulator knows the actuator force it applied."
+      Per-servo rather than one shunt on the rail, which is the owner's call and
+      the right one: a rail reading is the sum of twelve servos and only says
+      'something is loaded', never which. Twelve channels say which leg is stuck,
+      which servo is weakening, and which joint is carrying the robot.
+      .
+      It is also the closest thing to a torque sensor Gray will have, which makes
+      it the measurement that replaces the guessed servo gains kp = 21 and
+      kv = 0.6 with real ones. That is the stage 3.3 job, and it is currently one
+      of only three numbers in the whole model with no datasheet anywhere.
+    fake_it: >-
+      Available - the simulator knows the force each actuator applied. Turning
+      that into amps needs a torque-per-amp constant, which is one more number to
+      measure rather than a modelling problem.
     trust_it: >-
-      Medium. A rail-level reading is the sum of twelve servos, so it says
-      'something is loaded', not which. Per-servo sensing is twelve more channels.
-    mass_g: 10
+      Good for detecting load, rough as an absolute torque. A hobby servo's
+      internal controller sits between the current and the joint, so the mapping
+      is not exact - but the shape is right, and the shape is what matters.
+    mass_g: 24
 
   - key: battery
     name: Battery voltage and current
     part: "on the same INA-class shunt, or the BMS if the pack has one"
-    status: candidate
+    status: committed
     spec_checked: false
     measures: "Pack voltage under load, and what is left."
     adds: 2
@@ -194,44 +209,70 @@ sensors:
   # --- the cheap answer to "knowing where it is" --------------------------
 
   - key: optical_flow
-    name: Downward optical flow
-    part: "PMW3901 or similar, pointing at the floor"
-    status: candidate
+    name: Downward optical flow, five of them
+    part: "PMW3901 or similar - front, back, centre, left side, right side"
+    status: committed
+    count: 5
     spec_checked: false
-    measures: "How fast the robot is sliding over the ground, in two axes."
-    adds: 2
-    unblocks: {need: where, extent: partly}
+    measures: "How fast the robot is actually sliding over the ground."
+    adds: 3
+    unblocks: {}
     why_anyway: >-
-      This is the cheap answer to 'knowing where it is', and it is how a drone
-      holds position. Integrated over time it gives DEAD RECKONING - a position
-      relative to where it started. That is enough for 'walk two metres and
-      stop', 'hold this line', and the drift measurement that is currently R1's
-      failing bar. It is NOT enough for 'find the stairs' or 'back out of a
-      corner', which need to know where the room is, not where the robot has
-      been.
+      The single most valuable addition on this list, and NOT for the reason it
+      was first listed. Position was the wrong argument - the owner is the pilot,
+      so nothing needs to know where it is. VELOCITY is the argument.
+      .
+      The policy cannot currently measure its own speed. base_lin_vel exists in
+      the simulator but sits in the CRITIC observation group - the half that is
+      thrown away after training - precisely because the real robot has no way to
+      measure it. So the policy infers its speed from joint motion and the
+      gravity vector, while the single largest term in its reward, track_speed,
+      scores exactly that quantity. Optical flow measures it directly. R1's speed
+      error is currently 0.071 m/s against a 0.05 bar.
+      .
+      Five units rather than one, and they are not redundant copies. Each reads
+      its own velocity, and a unit offset from the centre sees v + omega x r - so
+      differencing front against back, and left against right, recovers the yaw
+      rate ABOUT THE GROUND. Compare that against the IMU's yaw rate about the
+      BODY and the difference is slip: the feet are sliding. Nothing else on this
+      list can see a slip. Five also survives two of them sitting over a patch of
+      floor with no texture.
+    feed_as: >-
+      Fused, not raw. Three numbers - vx, vy and ground yaw rate - plus a health
+      flag if wanted. Ten raw readings would make the simulator model five
+      mounting positions to produce numbers the policy has to re-fuse itself.
     fake_it: >-
-      Cheap. The simulator already knows the trunk's true velocity - this is that
-      number with noise and a scale error on it.
+      Cheap. The simulator already computes the true trunk velocity for the
+      critic; each unit is that value offset by omega x r, with noise and a scale
+      error on top.
     trust_it: >-
-      Medium. Needs texture on the floor and a height reference to convert angle
-      to distance, so it pairs with the downward ToF below. Dead reckoning drifts
-      without bound, so it is a rate sensor pretending to be a position sensor.
-    mass_g: 3
+      Medium, and the failure modes are known. Needs texture on the floor and a
+      height reference to turn angle into distance, so it pairs with the downward
+      range finder. Dead reckoning drifts without bound - but drift only matters
+      if the number is INTEGRATED into a position, and it is not: it is used as a
+      rate, which is where this class of sensor is honest.
+    mass_g: 15
     pairs_with: [downward_tof]
 
   - key: downward_tof
     name: Downward range finder
     part: "VL53L1X or similar, one under the trunk"
-    status: candidate
+    status: committed
     spec_checked: false
     measures: "Height of the trunk above the floor."
     adds: 1
     unblocks: {}
     why_anyway: >-
-      Ride height is currently inferred from joint angles and the assumption
-      that the floor is flat. This measures it. It is also the height reference
-      optical flow needs to turn its angle into a distance, and it detects a step
-      down or a hole directly under the robot.
+      The owner's read is that this is redundant, and it nearly is - ride height
+      can be inferred from joint angles. It stays for one reason: optical flow
+      does not work without it. A flow sensor measures an ANGULAR rate, and the
+      only way to turn that into metres per second is to know how far the floor
+      is. Without a height reference the five flow units have an unknown scale
+      factor that changes every time the robot crouches.
+      .
+      Second-order value on top of that: it measures ride height instead of
+      inferring it from a flat-floor assumption, and it sees a step down or a
+      hole directly beneath the robot.
     fake_it: "Cheap - a single downward raycast."
     trust_it: >-
       Medium. Fails on dark carpet, glass and polished floors, and reads the top
@@ -242,11 +283,27 @@ sensors:
 
   - key: tof_array
     name: Forward and side range finders
-    part: "VL53L5CX multi-zone, 8x8 zones each, three to five around the robot"
-    status: candidate
+    part: "VL53L5CX multi-zone, 8x8 zones each - 3 forward, 1 each side, 1 back"
+    status: committed
+    count: 6
     spec_checked: false
-    measures: "Distance to whatever is ahead, in a coarse grid."
-    adds: "64 per unit, or a handful of summary numbers per unit"
+    measures: "Distance to whatever is around it, in a coarse grid."
+    adds: 24
+    layout: >-
+      Six units. Three across the front, because one 45-degree cone ahead leaves
+      the robot blind to anything it is about to clip with a shoulder, and the
+      three together cover the full width of the body plus a stride either side.
+      One each side, aimed slightly down and forward, which is what sees a wall
+      to brace against or a doorway edge. One at the back, because reversing
+      blind is how a robot backs into something - and reversing is a command that
+      already exists. More than six starts to cost I2C bandwidth and gains
+      little; fewer than three across the front leaves a gap the robot walks into.
+    feed_as: >-
+      Not 64 zones per unit - 384 raw numbers is a heightmap, and a heightmap is
+      the depth-camera problem this row exists to avoid. Reduce each unit to four
+      numbers: nearest distance, and the height of the nearest return, in each
+      half of its field. Twenty-four numbers total, and the simulator produces
+      them with a handful of raycasts.
     unblocks: {need: camera, extent: partly}
     why_anyway: >-
       The cheap alternative to a depth camera, and it should be considered before
@@ -285,51 +342,72 @@ sensors:
       full of holes, with a different field of view, mounted somewhere slightly
       different from where the sim thinks it is. This is the hardest sim-to-real
       gap in the whole field. Its own project, after the robot walks.
+    decided: >-
+      Accepted as its own project on 3 Aug 2026 and left parked. Note that this
+      is NOT the camera the owner drives Gray by - that one is a video feed to a
+      human and costs the policy nothing, because the pilot does the seeing. This
+      row is only about a camera the POLICY reads, which is what makes it
+      expensive. Fit the range finders first and find out how much of this is
+      still wanted.
     mass_g: 75
 
   # --- heading, and absolute position -------------------------------------
 
   - key: magnetometer
     name: Magnetometer
-    part: "the third axis set of a 9-DOF IMU"
-    status: candidate
+    part: "already inside the three 9-DOF trunk IMUs"
+    status: committed
+    count: 3
     spec_checked: false
     measures: "Absolute heading, against the earth's field."
-    adds: 2
+    adds: 0
     unblocks: {}
     why_anyway: >-
-      The IMU measures how fast the trunk is TURNING, not which way it is
-      POINTING. Heading has to be integrated from that rate, and an integrated
-      rate drifts. A magnetometer is the only cheap absolute heading reference.
-      Note carefully: R1's current drift failure is a TRAINING problem, not a
-      sensing one - in simulation the heading is exact. This helps on the real
-      robot, not in the run that is failing now.
+      The owner's point stands and settles this row: the IMUs are 9-DOF, so three
+      magnetometers are ALREADY FITTED. Nothing needs buying and nothing needs
+      mounting. The only open question is whether to put the reading into the
+      observation, and the answer for now is no - which is why `adds` is 0.
+      .
+      What it would buy: the IMU measures how fast the trunk is TURNING, not
+      which way it is POINTING. Heading has to be integrated from that rate, and
+      an integrated rate drifts without bound. But with a human on the sticks,
+      heading drift is something the pilot corrects without noticing, the way
+      nobody notices steering a car. Revisit only if a policy is ever asked to
+      hold a heading on its own.
+      .
+      Note also: R1's current drift failure is a TRAINING problem, not a sensing
+      one. In simulation the heading is exact and always was.
     fake_it: "Trivially exact - the simulator knows the true heading."
     trust_it: >-
-      Poor, and this is why it is not higher up. Twelve servos, their currents
-      and any steel in the frame distort the local field badly. A magnetometer
-      bolted near a motor reads the motor. It needs careful placement and
-      hard-iron calibration, and it may still be unusable.
-    mass_g: 2
+      Poor, which is the other half of why it stays out of the observation.
+      Twelve servos, their currents and any steel in the frame distort the local
+      field badly - a magnetometer bolted near a motor reads the motor. Three
+      units at different distances from the servos would at least make the
+      distortion visible. Needs hard-iron calibration and may still be unusable.
+    mass_g: 0
 
   - key: uwb_anchors
     name: Ultra-wideband anchors
     part: "DW1000-class tags, three or more anchors around the room"
-    status: candidate
+    status: not_recommended
     spec_checked: false
     measures: "True absolute position, to a few centimetres."
     adds: 3
-    unblocks: {need: where, extent: fully}
+    unblocks: {}
     why_anyway: >-
-      The honest answer to 'knowing where it is', and the only one on this list
-      that gives a position rather than a rate to integrate. Turns 'walk to a
-      point' and 'back out of a corner' into ordinary commanded skills.
+      Was the honest answer to 'knowing where it is'. Dropped on 3 Aug 2026 with
+      the whole question: the owner flies Gray with a camera and a controller, so
+      a human supplies the position and the robot never needs it. The seven rows
+      this would have unblocked are now marked 'the pilot does it' rather than
+      blocked.
+      .
+      Kept in the file rather than deleted so the decision is recorded. Un-park
+      it only if Gray is ever asked to do something with nobody on the sticks.
     fake_it: "Free. The simulator knows the true position exactly."
     trust_it: >-
-      Good where it works. The catch is not accuracy, it is that the room has to
-      be instrumented: the robot only knows where it is inside the volume the
-      anchors cover. That may be exactly right for a workshop and useless
-      outside it.
+      Good where it works, and that is the catch: the ROOM has to be
+      instrumented. The robot knows where it is inside the volume the anchors
+      cover and nowhere else.
     mass_g: 15
 
   - key: gps
@@ -341,9 +419,15 @@ sensors:
     adds: 2
     unblocks: {}
     why_anyway: >-
-      Listed so the option is closed rather than forgotten. Metre-level accuracy
-      against a robot whose drift bar is 100 mm is two orders of magnitude too
-      coarse, and it does not work indoors, which is where Gray is.
+      The owner is willing to fit one but does not see the point, and is right
+      not to. Metre-level accuracy against a robot whose drift bar is 100 mm is
+      two orders of magnitude too coarse, it does not work indoors, and the
+      position question it answers has just been handed to the pilot anyway. It
+      would occupy slots in the observation to tell the policy something less
+      precise than the thing it is already failing to hold.
+      .
+      Recommendation: do not fit it. Listed so the option is closed rather than
+      forgotten.
     fake_it: "Trivial."
     trust_it: "Irrelevant - the resolution is wrong for the job."
     mass_g: 5
@@ -353,17 +437,18 @@ sensors:
   - key: servo_temp
     name: Servo temperature
     part: "thermistor or an IR spot on each servo case"
-    status: candidate
+    status: not_recommended
     spec_checked: false
     measures: "How hot each servo is getting."
     adds: 0
     unblocks: {}
     why_anyway: >-
-      Not for the policy - for the operator and for a shutdown rule. A hobby
-      servo held against a load cooks itself quietly, and twelve of them in a
-      closed printed body have nowhere to dump heat. Cheap insurance during the
-      first hours of hardware testing.
-    fake_it: "Would need a thermal model. Nothing has one, and nothing needs one."
+      Dropped on the owner's call: Gray will not run long enough in one sitting
+      to cook a servo, so twelve thermistors and twelve more ADC channels buy
+      nothing. Per-servo current sensing is already going in, and a servo that is
+      about to overheat is a servo drawing too much current for too long - so the
+      warning is available from a channel that is being fitted anyway.
+    fake_it: "Would need a thermal model. Nothing has one and nothing needs one."
     trust_it: "Fine - it is a threshold, not a control input."
     mass_g: 12
 

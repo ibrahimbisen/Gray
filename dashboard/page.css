@@ -8,13 +8,20 @@
   --ink:#e7e9ee; --dim:#98a0ae; --faint:#6b7280;
   --ok:#4ade80; --bad:#f87171; --warn:#fbbf24; --accent:#60a5fa;
   --pos:#4ade80; --neg:#f87171;
+  /* The sixth coverage word, "the pilot does it". Purple because it has to sit
+     beside green, blue, amber, grey and red and be told apart from all five.
+     Checked with the dataviz validator: 21.1 dE from its nearest neighbour in
+     normal vision, and it clears the contrast floor against both surfaces.
+     Colour is never the only carrier here - every swatch has its count and its
+     label in text beside it. */
+  --pilot:#a78bfa;
   --side:250px; --top:56px;
 }
 @media (prefers-color-scheme: light) {
   :root { --bg:#f7f8fa; --panel:#fff; --panel2:#f2f4f7; --line:#e3e6ec;
           --ink:#141821; --dim:#5b6472; --faint:#8b94a3;
           --ok:#15803d; --bad:#b91c1c; --warn:#a16207; --accent:#1d4ed8;
-          --pos:#15803d; --neg:#b91c1c; }
+          --pos:#15803d; --neg:#b91c1c; --pilot:#6d28d9; }
 }
 * { box-sizing:border-box; }
 html, body { height:100%; }
@@ -135,6 +142,7 @@ td.dim { color:var(--dim); }
 .cov i.command, .dot.command   { background:var(--ok); }
 .cov i.condition, .dot.condition { background:var(--accent); }
 .cov i.emerges, .dot.emerges   { background:var(--warn); }
+.cov i.pilot, .dot.pilot       { background:var(--pilot); }
 .cov i.measured, .dot.measured { background:var(--faint); }
 .cov i.blocked, .dot.blocked   { background:var(--bad); }
 .dot { width:9px; height:9px; border-radius:2px; display:inline-block;

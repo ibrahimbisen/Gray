@@ -933,8 +933,24 @@ def sensors() -> dict:
         })
     out.sort(key=lambda s: (_STATUS_ORDER.get(s["status"], 9), -s["unblocks_rows"]))
 
+    # What the input list becomes if everything already decided goes in. This is
+    # the number that decides WHEN they go in: they all land in one batch,
+    # because each one on its own would cost the same full retrain.
+    now = raw.get("observation_now", {}).get("total", 0)
+    adding = [s for s in out
+              if s["status"] == "committed" and isinstance(s.get("adds"), int)
+              and s["adds"] > 0]
+    added = sum(s["adds"] for s in adding)
+
     return {"error": "", "sensors": out,
             "observation_now": raw.get("observation_now", {}),
+            "batch": {
+                "sensors": len(adding),
+                "added": added,
+                "after": now + added,
+                "growth": round((now + added) / now, 2) if now else 0,
+                "rows": [{"name": s["name"], "adds": s["adds"]} for s in adding],
+            },
             "actuators": raw.get("actuators", {}),
             "source": "gray/config/sensors.yaml"}
 

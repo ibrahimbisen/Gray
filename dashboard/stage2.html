@@ -22,9 +22,9 @@ document.getElementById("top").innerHTML =
    the previous version split this across fifteen panels, which meant no two
    numbers could ever be held against each other. */
 
-const COV = ["command", "condition", "emerges", "measured", "blocked"];
+const COV = ["command", "condition", "emerges", "pilot", "measured", "blocked"];
 const COV_SHORT = { command: "a command", condition: "a dial", emerges: "falls out",
-                    measured: "read off", blocked: "not by reward" };
+                    pilot: "the pilot", measured: "read off", blocked: "not by reward" };
 // "unreachable" was the wrong word and it read as "this will never happen".
 // It never meant that - cameras and distance sensors are being fitted. It means
 // no WEIGHT in the current reward reaches the row; the fix is a new input, a new
@@ -68,6 +68,7 @@ const lead = () => `
     {k:"Skills in the library", v:s.total, n:`read live from ${s.path}`},
     {k:"Training runs", v:s.runs, n:"the only unit that is a piece of work"},
     {k:"Trained toward", v:rt.command || 0, n:`of ${rt.rows || 0} rows across the ${s.runs} runs`},
+    {k:"The pilot does", v:rt.pilot || 0, n:"a human is steering, so nothing is missing"},
     {k:"Nothing can reach", v:blockedTotal, n:`waiting on ${s.needs.length} missing capabilities`},
     {k:"Commands one R1 run tries", v:(s.sampling.headline || {}).commands || "—",
      n:"in ONE simulation, not one per skill"},
@@ -276,6 +277,18 @@ const sensorsSection = () => {
       <td class="dim" colspan="2">Adding to this list changes its length, which
         makes it a different policy. Every run restarts from zero &mdash; so
         sensors get added in one batch, at a chosen moment, never one at a time.</td></tr>
+    ${(m.batch || {}).added ? `
+    <tr><td><b>Decided, not yet fitted</b>
+        <div class="dim small">${(m.batch.rows || []).map(r =>
+          esc(r.name) + " +" + r.adds).join(" &middot; ")}</div></td>
+      <td class="n" style="color:var(--accent)"><b>+${m.batch.added}</b></td>
+      <td class="dim" colspan="2">from ${m.batch.sensors} sensors</td></tr>
+    <tr><td><b>What it becomes</b></td>
+      <td class="n"><b style="font-size:17px">${m.batch.after}</b></td>
+      <td class="dim" colspan="2"><b>${m.batch.growth}&times; the current input
+        list.</b> That is the whole reason they go in together: each one alone
+        costs the same full retrain as all of them at once. The moment to spend
+        it is after R1 passes its bar, not during.</td></tr>` : ""}
   </table></div>
 
   <h3 style="margin-top:24px">The menu</h3>
@@ -443,7 +456,7 @@ const method = () => `
 paper([
   { id: "top",       label: "Stage 2 - Train", lead: true, html: lead },
   { id: "library",   label: "The library in one table", count: s.total, html: everything },
-  { id: "words",     label: "The five words", count: 5, html: words },
+  { id: "words",     label: "How a row is covered", count: COV.length, html: words },
   { id: "trained",   label: "What the runs train for", count: s.runs, html: trained },
   { id: "sim",       label: "One simulation, not forty", html: sim },
   { id: "blocked",   label: "What no reward reaches", count: blockedTotal, html: unreachable },
