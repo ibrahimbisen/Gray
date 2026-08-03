@@ -20,6 +20,11 @@ sim = ["mujoco", "pillow"]
 train = ["mjlab>=1.5.3"]
 dev = ["pytest"]
 
+# How mjlab finds Gray's training tasks. Without this, `train Gray-Stand` cannot
+# see them, because mjlab discovers out-of-tree tasks through this entry point.
+[project.entry-points."mjlab.tasks"]
+gray = "gray.tasks"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
