@@ -5,3 +5,7 @@
 [22:18:49] j0061  done
 [22:18:49] j0062  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 4500 --name w01_seedfloor --seed 42 --stop-at 0.965
 [22:18:54] j0062  -> progress/runs/2026-08-03_22-18-53_w01_seedfloor
+[00:04:36] j0062  verify exited 1 - training kept, the bar was not met or could not be read
+[00:04:36] j0062  done
+[00:04:36] j0063  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 4500 --name w02_seedfloor --seed 7 --stop-at 0.965
+[00:04:42] j0063  -> progress/runs/2026-08-04_00-04-41_w02_seedfloor

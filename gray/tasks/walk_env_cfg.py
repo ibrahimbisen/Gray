@@ -182,12 +182,21 @@ WALK_NOTES = {
                   "not asked to.",
     "stepping": "Feet spending a sensible time in the air - long enough to be a "
                 "step, short enough not to be a hop. This is what turns 'move "
-                "forwards' into 'walk' rather than 'shuffle'.",
-    "ride_height": "Trunk still at walking height. Without this the cheapest way "
-                   "to move is to sink onto its belly and crawl.",
-    "upright": "Trunk level, measured off gravity. Replaces the stand task's 'tilt' "
-               "penalty with the same measurement scored as a reward, which is what "
-               "the walking references use.",
+                "forwards' into 'walk' rather than 'shuffle'. Pays nothing when "
+                "the robot was told to stand still: it had no such gate until "
+                "3 Aug 2026, and since every term that would charge for marching "
+                "is itself switched off below MOVING, jogging on the spot was the "
+                "cheapest way to obey 'stop'.",
+    "ride_height": "Trunk at the height it was TOLD to hold. Without it the "
+                   "cheapest way to move is to sink onto its belly and crawl. "
+                   "Scored against a fixed 202 mm until 3 Aug 2026, when height "
+                   "became something you can ask for - so this is now what makes "
+                   "'crouch' and 'stand tall' commands rather than accidents.",
+    "upright": "Trunk leaning the way it was TOLD to lean, measured off gravity - "
+               "so it needs no outside reference and works on the real robot from "
+               "its IMU alone. Scored one attitude, level, until 3 Aug 2026, which "
+               "meant a commanded lean was a thing the robot got punished for. "
+               "Level is still here; it is this command at zero.",
     "posture": "Joints near their default pose, but with the tolerance widened once "
                "the robot is asked to move. A fixed tolerance is the thing that "
                "stops a gait developing at all - it pays the robot to keep its legs "
@@ -198,14 +207,27 @@ WALK_NOTES = {
     "swing_height": "How wrong the top of a swing was, scored when the foot lands. "
                     "Catches a foot that skims the floor and one that is thrown "
                     "needlessly high, neither of which survives a real floor.",
+    "landing_speed": "How fast a foot is still falling at the moment it touches. "
+                     "hard_landing charges for the force of the impact; this "
+                     "charges for the approach, which is what a policy can "
+                     "actually do something about - it has to slow the foot "
+                     "BEFORE contact, not react afterwards. Ramped in rather than "
+                     "switched on, because a large landing penalty from step 0 "
+                     "teaches a robot not to put its feet down at all.",
     "hard_landing": "Slamming a foot down. Printed PLA with no suspension, so this "
                     "is set harder than the reference value.",
     "joint_shock": "Joint acceleration. Footfalls spike it, and a servo gearbox is "
                    "what absorbs that spike on the real robot.",
-    "ground_covered": "Ground actually put behind it. Speed tracking alone can be "
-                      "satisfied by rocking forwards and backwards, which averages "
-                      "out to the right speed and gets nowhere. This only pays for "
-                      "net progress, so that trick earns nothing.",
+    "ground_covered": "Ground actually put behind it, along the direction it was "
+                      "told to go. Speed tracking alone can be satisfied by rocking "
+                      "forwards and backwards, which averages out to the right speed "
+                      "and gets nowhere; this only pays for net progress, so that "
+                      "trick earns nothing. Rewritten 3 Aug 2026 - it measured world "
+                      "X against the magnitude of the command, and so could not pay "
+                      "for backward at all, paid nothing for a crab step, paid "
+                      "nothing to a robot walking perfectly while turned 90 degrees, "
+                      "and paid FULL MARKS to a robot told to stand still that "
+                      "drifted forwards.",
     "leg_swing": "How far the thighs and calves swing either side of their own "
                  "average. This is what makes the walk look like a dog rather than "
                  "a table sliding along - without it the cheapest gait is stiff "

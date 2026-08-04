@@ -1472,14 +1472,27 @@
       "verify": true,
       "clamped": "",
       "id": "j0062",
-      "state": "running",
+      "state": "done",
       "created": "2026-08-03T22:14:18",
       "started": "2026-08-03T22:18:49",
-      "finished": null,
+      "finished": "2026-08-04T00:04:36",
       "run_id": "2026-08-03_22-18-53_w01_seedfloor",
-      "exit_code": null,
+      "exit_code": 0,
       "error": "",
-      "steps": [],
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 6283.2,
+          "exit_code": 0,
+          "at": "2026-08-04T00:03:32"
+        },
+        {
+          "name": "verify",
+          "seconds": 32.2,
+          "exit_code": 1,
+          "at": "2026-08-04T00:04:36"
+        }
+      ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0062.log"
     },
@@ -1500,14 +1513,16 @@
       "verify": true,
       "clamped": "",
       "id": "j0063",
-      "state": "queued",
+      "state": "running",
       "created": "2026-08-03T22:14:18",
-      "started": null,
+      "started": "2026-08-04T00:04:36",
       "finished": null,
-      "run_id": null,
+      "run_id": "2026-08-04_00-04-41_w02_seedfloor",
       "exit_code": null,
       "error": "",
-      "steps": []
+      "steps": [],
+      "owner": "12136@221831",
+      "log": "progress/jobs/j0063.log"
     },
     {
       "task": "Gray-Walk",

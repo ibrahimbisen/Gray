@@ -4,14 +4,14 @@
   "stage": 5,
   "stage_name": "Walk",
   "task": "Gray-Walk",
-  "status": "finished",
+  "status": "running",
   "bar": "Walks 5 m without falling, holds commanded speed within 0.05 m/s, and drifts less than 100 mm sideways over 20 s.",
-  "started": "2026-08-03T22:18:53",
-  "finished": "2026-08-04T00:03:28",
+  "started": "2026-08-04T00:04:41",
+  "finished": null,
   "iterations_target": 3000,
   "num_envs": 4500,
   "num_steps_per_env": 24,
-  "seed": 42,
+  "seed": 7,
   "notes": "4500 robots at once, 50 Hz control.",
   "scoring": [
     {
@@ -241,104 +241,5 @@
         }
       ]
     }
-  ],
-  "verdict": "not passed",
-  "verdict_detail": "64 robots x 25 s - stayed up for 25 s: 100% \u00b7 trunk within 40 mm of target: 6.27 mm \u00b7 uprightness above 0.9: 0.9982 \u00b7 covered 5 m: 6.17 m \u00b7 speed within 0.05 m/s of 0.25: 0.029 m/s \u00b7 sideways drift under 100 mm: 1399.2 mm",
-  "verdict_checks": [
-    {
-      "key": "survive",
-      "name": "stayed up for 25 s",
-      "measured": 1.0,
-      "bar": 0.9,
-      "unit": "fraction",
-      "better": "higher",
-      "passed": true,
-      "worst": 1.0,
-      "margin": 0.09999999999999998,
-      "ratio": 1.1111111111111112,
-      "note": "0 of 64 fell",
-      "format": "{:.0%}"
-    },
-    {
-      "key": "height_err",
-      "name": "trunk within 40 mm of target",
-      "measured": 6.269946575164795,
-      "bar": 40.0,
-      "unit": "mm",
-      "better": "lower",
-      "passed": true,
-      "worst": 35.413368225097656,
-      "margin": 33.730053424835205,
-      "ratio": 6.379639685996634,
-      "note": "worst 35.4 mm",
-      "format": "{:.2f} mm"
-    },
-    {
-      "key": "upright",
-      "name": "uprightness above 0.9",
-      "measured": 0.9981886744499207,
-      "bar": 0.9,
-      "unit": "ratio",
-      "better": "higher",
-      "passed": true,
-      "worst": 0.9919050931930542,
-      "margin": 0.09818867444992063,
-      "ratio": 1.1090985271665785,
-      "note": "worst 0.9919",
-      "format": "{:.4f}"
-    },
-    {
-      "key": "distance",
-      "name": "covered 5 m",
-      "measured": 6.174255847930908,
-      "bar": 5.0,
-      "unit": "m",
-      "better": "higher",
-      "passed": true,
-      "worst": 3.1666855812072754,
-      "margin": 1.1742558479309082,
-      "ratio": 1.2348511695861817,
-      "note": "worst 3.17 m",
-      "format": "{:.2f} m"
-    },
-    {
-      "key": "speed_err",
-      "name": "speed within 0.05 m/s of 0.25",
-      "measured": 0.028793999925255775,
-      "bar": 0.05,
-      "unit": "m/s",
-      "better": "lower",
-      "passed": true,
-      "worst": 0.22310090065002441,
-      "margin": 0.021206000074744227,
-      "ratio": 1.7364728808012544,
-      "note": "worst 0.223 m/s",
-      "format": "{:.3f} m/s"
-    },
-    {
-      "key": "drift",
-      "name": "sideways drift under 100 mm",
-      "measured": 1399.1641845703125,
-      "bar": 100.0,
-      "unit": "mm",
-      "better": "lower",
-      "passed": false,
-      "worst": 5327.11083984375,
-      "margin": -1299.1641845703125,
-      "ratio": 0.07147124054687713,
-      "note": "worst 5327 mm",
-      "format": "{:.1f} mm"
-    }
-  ],
-  "verdict_schema": 1,
-  "verdict_at": "2026-08-04T00:04:34",
-  "verdict_context": {
-    "task": "Gray-Walk",
-    "checkpoint": "logs/rsl_rl/gray_walk/2026-08-03_22-18-53_w01_seedfloor/model_2999.pt",
-    "robots": 64,
-    "seconds": 25.0,
-    "target_height_m": 0.2024,
-    "test_speed": 0.25,
-    "drift": []
-  }
+  ]
 }
