@@ -207,6 +207,14 @@ WALK_NOTES = {
     "swing_height": "How wrong the top of a swing was, scored when the foot lands. "
                     "Catches a foot that skims the floor and one that is thrown "
                     "needlessly high, neither of which survives a real floor.",
+    "effort": "What the gait costs in torque. Ramped from almost nothing up to a "
+              "weight worth about 2 points of 190 - enough to break a tie between "
+              "two gaits that score the same on everything else, not enough to "
+              "beat the terms that say where to go. It was 0.036 points until "
+              "4 Aug 2026, which is to say it was a comment rather than a "
+              "constraint. It matters here because the servos are 1.96 N-m and "
+              "the worst joint already holds 1.08 standing still, and because a "
+              "trot costs more than a crawl.",
     "landing_speed": "How fast a foot is still falling at the moment it touches. "
                      "hard_landing charges for the force of the impact; this "
                      "charges for the approach, which is what a policy can "
@@ -818,6 +826,34 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         # the robot can actually hold a direction, and charging for it early just
         # fines a robot for falling over in a way that happens to rotate it.
         "ease_in_straightness": _ramp("veering", (-0.2, -0.5, -1.2, -2.0)),
+        # What the gait COSTS. Added 4 Aug 2026.
+        #
+        # `effort` is not new - it came from the stand task at -0.0002 and has
+        # been in every walking run since. What is new is it being worth
+        # anything. Measured on run 34 it contributed -0.0018 per second, which
+        # over a 20 s episode is 0.036 points of a 190 ceiling: present in the
+        # sum, absent from the decision. A term that cannot change the answer is
+        # not a constraint, it is a comment.
+        #
+        # At -0.02 it is worth roughly 2 points - enough to break a tie between
+        # two gaits that score the same on everything else, and not enough to
+        # beat any of the terms that say where to go. That is the intended size.
+        # It is a tie-breaker, not a director.
+        #
+        # WHY IT MATTERS ON THIS ROBOT, twice over:
+        #   The servos are 1.96 N-m and the worst joint already holds 1.08 just
+        #   standing. A policy indifferent to torque will pick a gait that cooks
+        #   them, and nothing else in this reward would object.
+        #   A trot costs more than a crawl - catching a falling body twice a
+        #   stride is not free - so this pushes toward the crawl 1.2b wants,
+        #   without anyone having to specify what a crawl is. That is the whole
+        #   argument for energy terms over hand-written gait terms, and it can be
+        #   had here without deleting anything.
+        #
+        # Ramped, for the reason every other penalty here is ramped: a large
+        # effort penalty from step 0 teaches a robot that the cheapest way to
+        # spend no torque is to not move.
+        "ease_in_effort": _ramp("effort", (-0.0002, -0.002, -0.01, -0.02)),
         # arriving slowly rather than running into the floor
         "ease_in_landing": _ramp("landing_speed", (-0.1, -0.3, -0.6, -0.8)),
     }
