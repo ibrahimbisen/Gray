@@ -61,6 +61,19 @@ if "GIT_PYTHON_GIT_EXECUTABLE" not in os.environ:
         os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = found
 
 LOG_ROOT = ROOT / "logs" / "rsl_rl"
+
+# Filming. ON for every run; --no-video is the only way off.
+#
+# One clip per 100 iterations, which costs about 4% of throughput. It was every
+# 25 until 3 Aug 2026 - four times the intended rate and four times the cost,
+# for clips nobody could see, because sync_once was throwing them away.
+#
+# STEPS_PER_ITER is mjlab's num_steps_per_env. It is 24 for every Gray task and
+# is named here rather than written as a bare 24 in two places, because the two
+# places have to agree: one sets the recording interval, the other turns the
+# recorder's env-step filenames back into iteration numbers.
+STEPS_PER_ITER = 24
+FILM_EVERY = 100
 RUNS = ROOT / "progress" / "runs"
 
 # What each task is and how it is judged. Kept here rather than in the task file
@@ -237,13 +250,13 @@ def sync_once(run_dir: Path, log_dir: Path) -> None:
         # number the rest of the dashboard speaks in and distinct from
         # film_checkpoints.py's `iter_NNNN.mp4`, so the two can coexist rather
         # than collide at "iteration 0" the way they did before.
-        steps_per_iter = 24
+        steps_per_iter = STEPS_PER_ITER
         for clip in sorted(log_dir.glob("videos/train/rl-video-step-*.mp4")):
             try:
                 step = int(clip.stem.rsplit("-", 1)[1])
             except (IndexError, ValueError):
                 continue
-            out = run_dir / "videos" / f"train_{step // steps_per_iter:04d}.mp4"
+            out = run_dir / "videos" / f"iter_{step // steps_per_iter:04d}.mp4"
             # Size check, not just existence: the recorder writes the file as it
             # goes, so a clip copied mid-write would be a truncated one that
             # never gets corrected.
@@ -409,13 +422,16 @@ def main() -> int:
         print(f"ramp          {term}: {was} -> {want}")
     cfg = TrainConfig(
         env=cfg.env, agent=cfg.agent,
+        # Filming is ON for every run unless --no-video says otherwise. It is not
+        # a nice-to-have: the reward is a weighted sum that can read excellently
+        # while the robot creeps along scuffing its feet, and the film is the only
+        # thing that shows that.
         video=not args.no_video,
         video_length=250,
-        # Every 25 iterations. The recorder counts calls to env.step(), NOT
-        # robot-steps - multiplying by num_envs makes the interval so large it
-        # only ever fires once, at step 0, which is what happened on the first
-        # real run. num_steps_per_env is 24.
-        video_interval=24 * 25,
+        # The recorder counts calls to env.step(), NOT robot-steps - multiplying
+        # by num_envs makes the interval so large it only ever fires once, at
+        # step 0, which is what happened on the first real run.
+        video_interval=STEPS_PER_ITER * FILM_EVERY,
         log_root=str(LOG_ROOT.relative_to(ROOT)),
         gpu_ids=[0],
     )
