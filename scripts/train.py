@@ -182,9 +182,28 @@ def read_scalars(log_dir: Path) -> tuple[list[str], list[dict]]:
     acc = EventAccumulator(str(log_dir), size_guidance={"scalars": 100_000})
     acc.Reload()
     available = set(acc.Tags().get("scalars", []))
+
+    # EVERY reward term, curriculum weight, metric and termination - not the
+    # handful WATCH names. WATCH is still what sets the ORDER and the friendly
+    # column names; everything else follows it, keeping its raw tag.
+    #
+    # Why this changed on 3 Aug 2026. metrics.csv carried 5 of 24 reward terms,
+    # and every bug found in this reward function so far has been a term sitting
+    # silently at zero - `_going_straight` off for backward commands,
+    # `ground_covered` unable to pay backward at all, `stepping` paying a
+    # standing robot to march. A term at zero and a term passing look exactly
+    # the same from outside, and the only way to tell is to be able to see it.
+    # Four times is enough.
+    #
+    # Cost: about 40 columns instead of 12, on a file with one row per
+    # iteration. A 3000-iteration run goes from roughly 300 kB to 1 MB.
+    extra = sorted(t for t in available
+                   if t not in WATCH and t.split("/")[0] in
+                   ("Episode_Reward", "Curriculum", "Metrics", "Episode_Termination"))
+
     rows: dict[int, dict] = {}
     used: list[str] = []
-    for tag, name in WATCH.items():
+    for tag, name in list(WATCH.items()) + [(t, t) for t in extra]:
         if tag not in available:
             continue
         used.append(name)

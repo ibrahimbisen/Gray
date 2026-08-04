@@ -266,15 +266,25 @@ def track_speed(env, std: float, command_name: str = "walk"):
     return torch.exp(-err / (std * std))
 
 
-def stepping(env, sensor_name: str = "feet", lo: float = 0.10, hi: float = 0.45):
+def stepping(env, sensor_name: str = "feet", lo: float = 0.10, hi: float = 0.45,
+             command_name: str = "walk"):
     """Fraction of the four feet that are mid-step, rather than planted or hopping.
 
     Divided by four so the term tops out at 1.0 like every other reward here. The
     mjlab original returns 0-4, which would quietly make this worth four times its
     stated weight and break the reward ceiling RULES.md rule 1 depends on.
+
+    GATED ON BEING TOLD TO MOVE, since 3 Aug 2026. It was not, and about one
+    attempt in seven is commanded to stand still - where planted feet paid 0 and
+    marching on the spot paid 1.0. Every term that would have charged for the
+    marching is itself gated off below MOVING, so nothing anywhere objected: the
+    cheapest way to obey "stand still" was to jog on the spot.
     """
+    command = env.command_manager.get_command(command_name)
+    told_to_move = torch.norm(command[:, :3], dim=1) > MOVING
     air = env.scene[sensor_name].data.current_air_time
-    return torch.sum(((air > lo) & (air < hi)).float(), dim=1) / 4.0
+    mid = torch.sum(((air > lo) & (air < hi)).float(), dim=1) / 4.0
+    return mid * told_to_move.float()
 
 
 def _foot_height(env, asset_cfg) -> torch.Tensor:
@@ -421,19 +431,60 @@ def ground_covered(env, command_name: str = "walk"):
 
     Clamped to [0, 1] per step. Unclamped it would be an unbounded linear reward
     and the ceiling that RULES.md rule 1 depends on would stop meaning anything.
+
+    REWRITTEN 3 Aug 2026. It used to measure world X against the 2-D magnitude of
+    the command, and that was wrong in four separate ways - all of which returned
+    a number rather than an error, so nothing ever reported them:
+
+      backward   progress is negative, the clamp takes it to 0. A backward
+                 command could lose the point and never win it. Harmless while
+                 the box was (0.15, 0.35); fatal now that half of it is negative.
+      standing   `asked` is 0, clamped up to 1e-6, so any forward drift divides
+                 to something enormous and clamps to 1.0. A robot told to stand
+                 still scored FULL MARKS for wandering off.
+      sideways   `asked` was the magnitude of (vx, vy) but progress was X only,
+                 so a crab step was asked for and paid nothing.
+      turning    world X, not the robot's own heading. A robot facing 90 degrees
+                 off and walking perfectly earned zero.
+
+    Now: progress is measured along the direction it was TOLD to go, in its own
+    frame, and compared against the distance that direction implies. Same idea,
+    same clamp, same ceiling - it just answers the question it always claimed to.
     """
-    here = (env.scene["robot"].data.root_link_pos_w[:, 0]
-            - env.scene.env_origins[:, 0])
-    was = getattr(env, "_gray_fwd", None)
-    if was is None or was.shape != here.shape:
-        was = here.clone()
+    robot = env.scene["robot"]
+    pos = robot.data.root_link_pos_w[:, :2] - env.scene.env_origins[:, :2]
+    was = getattr(env, "_gray_fwd_xy", None)
+    if was is None or was.shape != pos.shape:
+        was = pos.clone()
     fresh = env.episode_length_buf <= 1
-    progress = torch.where(fresh, torch.zeros_like(here), here - was)
-    env._gray_fwd = here.detach()
+    moved = torch.where(fresh.unsqueeze(-1), torch.zeros_like(pos), pos - was)
+    env._gray_fwd_xy = pos.detach()
 
     command = env.command_manager.get_command(command_name)
-    asked = torch.norm(command[:, :2], dim=1) * env.step_dt
-    return torch.clamp(progress / torch.clamp(asked, min=1e-6), 0.0, 1.0)
+    asked_speed = torch.norm(command[:, :2], dim=1)
+
+    # The commanded direction, in the world, using the heading the robot has now.
+    # command[:, 0] is along its nose and command[:, 1] is to its left, so the
+    # commanded direction rotates with the robot rather than being pinned to the
+    # arena - which is what makes this work while turning, and what makes a
+    # negative vx count as progress instead of as failure.
+    heading = robot.data.heading_w
+    cos_h, sin_h = torch.cos(heading), torch.sin(heading)
+    want_x = command[:, 0] * cos_h - command[:, 1] * sin_h
+    want_y = command[:, 0] * sin_h + command[:, 1] * cos_h
+    unit = torch.stack((want_x, want_y), dim=1) / torch.clamp(
+        asked_speed.unsqueeze(-1), min=1e-6)
+
+    progress = (moved * unit).sum(dim=1)
+    asked = asked_speed * env.step_dt
+
+    # Told to stand still, there is no distance to cover and no progress to pay
+    # for. Zero, not a division by an epsilon - that epsilon is what paid a
+    # standing robot full marks for drifting.
+    moving = asked_speed > MOVING
+    ratio = progress / torch.clamp(asked, min=1e-6)
+    return torch.where(moving, torch.clamp(ratio, 0.0, 1.0),
+                       torch.zeros_like(ratio))
 
 
 def leg_swing(env, target: float, command_name: str = "walk",
