@@ -93,6 +93,32 @@ is never zero and never negative. Four library rows filed as commands are not.
 **1.2.1 must come first.** Widening the range without it trains backward walking
 with no straightness penalty at all.
 
+### 1.2b Steer it toward a crawl, not a trot — **owner's call, 4 Aug 2026**
+
+The policy currently trots: diagonal pairs, front-right with back-left, lifting
+together. Confirmed by watching run 34's films.
+
+A trot is two feet down and the body falling between steps, caught by the servos
+twice per stride. A crawl is one foot up and three always planted, so the weight
+never leaves the triangle they make and nothing has to be caught.
+
+In simulation the trot is fine — better, even. On the real robot it asks
+DS3218MGs at 50 Hz, with backlash nobody has measured, to arrest a falling 3.1 kg
+body twice a stride. **The owner's judgement is that they will not.** He built the
+robot; that call is his and it is the right way round to be wrong.
+
+So this is a sim-to-real decision made *before* the evidence rather than after,
+which is unusual here and deliberate: finding out in stage 3.3 means every policy
+trained until then is trained toward a gait the hardware cannot run.
+
+**Not yet designed.** The honest options are a duty-factor term paying for three
+feet down, a contact-schedule reward, or simply a much lower top speed — a trot
+is partly what you get for asking for speed. Which one, and what it costs the
+other bars, is the first thing to work out. It is NOT a weight change to
+`stepping`: that term is already earning the maximum a trot can give it.
+
+---
+
 ### 1.3 Turn the dials up
 
 - **1.3.1** Widen what is already on — friction, mass, centre of mass, servo
