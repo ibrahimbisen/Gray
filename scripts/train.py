@@ -256,7 +256,16 @@ def sync_once(run_dir: Path, log_dir: Path) -> None:
                 step = int(clip.stem.rsplit("-", 1)[1])
             except (IndexError, ValueError):
                 continue
-            out = run_dir / "videos" / f"iter_{step // steps_per_iter:04d}.mp4"
+            it = step // steps_per_iter
+            # Only the cadence FILM_EVERY asks for. A run started before that
+            # constant changed keeps recording at its old, denser interval - the
+            # process cannot pick up an edit mid-flight - so without this the
+            # dashboard fills with clips at a spacing nobody asked for and the
+            # strip becomes unreadable. Iteration 0 always survives: it is the
+            # "before" that every later clip is read against.
+            if it and it % FILM_EVERY:
+                continue
+            out = run_dir / "videos" / f"iter_{it:04d}.mp4"
             # Size check, not just existence: the recorder writes the file as it
             # goes, so a clip copied mid-write would be a truncated one that
             # never gets corrected.
