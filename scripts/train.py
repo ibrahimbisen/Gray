@@ -225,10 +225,32 @@ def sync_once(run_dir: Path, log_dir: Path) -> None:
                 for r in rows:
                     w.writerow({k: r.get(k, "") for k in names})
 
-        # mjlab's own recorder is not used for the dashboard: it names files by
-        # env-step, which collides with the checkpoint iterations that
-        # scripts/film_checkpoints.py writes, and both then show as "iteration 0".
-        # Run that script with --watch alongside training instead.
+        # mjlab's own recorder films every 600 env-steps and names the files by
+        # step. Those clips used to be left where they fell, on the grounds that
+        # scripts/film_checkpoints.py would produce nicer ones - but that script
+        # is a SECOND process on the graphics card, so at 4500 robots there is no
+        # room to run it, and in practice nobody starts it. The result was a
+        # dashboard showing one clip from iteration 0 and nothing else, for a run
+        # that had nine clips sitting on disk the whole time.
+        #
+        # So: import them. Named `train_NNNN.mp4` by ITERATION, which is both the
+        # number the rest of the dashboard speaks in and distinct from
+        # film_checkpoints.py's `iter_NNNN.mp4`, so the two can coexist rather
+        # than collide at "iteration 0" the way they did before.
+        steps_per_iter = 24
+        for clip in sorted(log_dir.glob("videos/train/rl-video-step-*.mp4")):
+            try:
+                step = int(clip.stem.rsplit("-", 1)[1])
+            except (IndexError, ValueError):
+                continue
+            out = run_dir / "videos" / f"train_{step // steps_per_iter:04d}.mp4"
+            # Size check, not just existence: the recorder writes the file as it
+            # goes, so a clip copied mid-write would be a truncated one that
+            # never gets corrected.
+            if clip.stat().st_size and (
+                    not out.exists() or out.stat().st_size != clip.stat().st_size):
+                out.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(clip, out)
 
         # The dashboard only counts checkpoints, so a marker per .pt is enough
         # and keeps a few hundred MB of weights out of progress/.

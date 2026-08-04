@@ -1,0 +1,7 @@
+[22:18:31] runner 12136@221831 up. interpreter: C:\Users\Bisen\Desktop\Gray\.venv\Scripts\python.exe
+[22:18:31] queue: progress\queue.json
+[22:18:31] j0061  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 4500 --iterations 3 --name w00_smoke --stop-at 0.965
+[22:18:37] j0061  -> progress/runs/2026-08-03_22-18-36_w00_smoke
+[22:18:49] j0061  done
+[22:18:49] j0062  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 4500 --name w01_seedfloor --seed 42 --stop-at 0.965
+[22:18:54] j0062  -> progress/runs/2026-08-03_22-18-53_w01_seedfloor
