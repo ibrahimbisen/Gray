@@ -1,0 +1,23 @@
+{
+  "axis": {
+    "fwd": "Y",
+    "side": "X",
+    "turn": "Z"
+  },
+  "invert": {
+    "fwd": true,
+    "side": true,
+    "turn": true
+  },
+  "button": {
+    "stop": 2,
+    "reset": 1,
+    "unlock": 6
+  },
+  "full": {
+    "fwd": 0.8,
+    "side": 0.1,
+    "turn": 0.5
+  },
+  "deadzone": 0.12
+}

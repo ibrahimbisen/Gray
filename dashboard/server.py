@@ -2,13 +2,25 @@
 
     python run.py
 
-Two pages:
-    /           the training monitor - what is training now, and the plan
-    /summary    the project summary  - the full curriculum and every scoring term
+Six pages, each answering exactly one question:
+
+    /           Control   what is happening right now
+    /runs       Runs      how did that run go
+    /plan       Plan      what we are doing next, and why
+    /train      Train     what it is being taught
+    /robot      Robot     is the physical model right - the pose editor is here
+    /summary    Summary   how the whole thing works
+
+There used to be eight, and the trouble was never the count. The run table was on
+two of them, built by two different bits of code. The plan was on four of them,
+and they showed four DIFFERENT plans. /index and /index.html served different
+pages. The pose editor had no way back to anything.
 
 Everything they show comes from three places, none of which this file invents:
 dashboard/plan.py for the plan, dashboard/runs.py for what training wrote to disk,
-and tools/check_urdf.py run live against the current model.
+and tools/check_urdf.py run live against the current model. One more thing is
+computed here and only here - nav_state(), the status string in the top bar - so
+that all six pages say the same thing about what is running.
 """
 
 from __future__ import annotations
@@ -70,6 +82,34 @@ def model_status() -> dict:
     return out
 
 
+def nav_state() -> dict:
+    """The one live status string, shown in the top bar of all six pages.
+
+    Computed here, once, and carried in every payload. It used to be recomputed
+    on three pages from three different fields, which is how the same run could
+    read as green on one page and grey on another.
+
+    Three facts, in the order they matter: where the plan is, what is training
+    right now, and the criterion furthest from its bar.
+    """
+    step = (plan.FORWARD or {}).get("here") or (plan.NEXT_UP or {}).get("title") or ""
+    if step:
+        step = f"PLAN {step}"
+    running = queue.load().get("running") or {}
+    over = progress.overview().get("headline") or {}
+    worst = ""
+    if over.get("times_over"):
+        worst = (f"{over.get('name', 'worst criterion')} "
+                 f"{over['times_over']:.0f}x over bar")
+    return {
+        "step": step,
+        # Empty rather than a placeholder, so the bar can say "nothing training"
+        # itself and a paused runner never reads as a running one.
+        "training": running.get("name") or running.get("run") or "",
+        "worst": worst,
+    }
+
+
 def summary_state() -> dict:
     """Everything the explainer page needs to teach the project in one read.
 
@@ -101,6 +141,9 @@ def summary_state() -> dict:
         # ---- what the library collapses to ----
         "library": {
             "total": lib["total"],
+            # How many rows of the original library those stand in for, so "60
+            # rows" never reads as "the list got shorter".
+            "from_rows": lib["from_rows"],
             "run_totals": lib["run_totals"],
             "runs": [{"id": s["id"], "name": s["name"], "rule": s["rule"],
                       "count": s["count"], "state": s["state"],
@@ -112,6 +155,7 @@ def summary_state() -> dict:
         },
         # ---- where it actually stands ----
         "status": _bar_status(),
+        "nav": nav_state(),
     }
 
 
@@ -167,11 +211,14 @@ def week_state() -> dict:
         "paused": bool(q.get("paused")),
         "queued_total": sum(1 for j in q["jobs"] if j.get("state") == "queued"),
         "status": _bar_status(),
+        # PLAN.md's shelved table, each row with the trigger that un-shelves it.
+        "shelved": getattr(plan, "SHELVED", None),
+        "nav": nav_state(),
     }
 
 
 def _bar_status() -> dict:
-    """The three trained tasks against their bars, trimmed for the explainer."""
+    """Every verifiable task against its bars, trimmed for the explainer."""
     over = progress.overview(runs.all_summaries())
     out = []
     for s in over["subsections"]:
@@ -192,11 +239,11 @@ def stage_state(n: int) -> dict | None:
     """One project stage, with anything live it depends on folded in."""
     _reload_if_edited()
     if n == 1:
-        return {**plan.STAGE1, "model": model_status()}
+        return {**plan.STAGE1, "model": model_status(), "nav": nav_state()}
     if n == 2:
-        return plan.stage2_state()
+        return {**plan.stage2_state(), "nav": nav_state()}
     if n == 3:
-        return plan.STAGE3
+        return {**plan.STAGE3, "nav": nav_state()}
     return None
 
 
@@ -224,6 +271,7 @@ def monitor_state() -> dict:
         "stages": plan.STAGES,
         "model": model_status(),
         "metrics_available": runs.metrics_available(),
+        "nav": nav_state(),
     }
 
 
@@ -258,6 +306,7 @@ def overview_state() -> dict:
         "startable": progress.startable(),
         "model": model_status(),
         "feasibility": plan.FEASIBILITY,
+        "nav": nav_state(),
     }
 
 
@@ -375,8 +424,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         path = unquote(self.path.split("?")[0])
         query = parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
 
+        # The pose editor is a tab on /robot now. Redirect rather than 404: it is
+        # the one URL the owner is likely to have bookmarked.
         if path == "/pose":
-            return self._send((HERE / "pose.html").read_bytes(), "text/html; charset=utf-8")
+            self.send_response(302)
+            self.send_header("Location", "/robot#pose")
+            self.end_headers()
+            return None
         if path == "/api/pose/config":
             from dashboard import poser  # noqa: PLC0415
             return self._send(json.dumps(poser.defaults()).encode(), "application/json")
@@ -431,6 +485,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             text = log.read_text(encoding="utf-8", errors="replace")
             return self._send(
                 json.dumps({"text": text[-40000:]}).encode(), "application/json")
+        if path == "/api/dials":
+            _reload_if_edited()
+            return self._send(json.dumps({**plan.dials(), "nav": nav_state()}).encode(),
+                              "application/json")
         if path.startswith("/api/stage/"):
             try:
                 state = stage_state(int(path.rsplit("/", 1)[1]))
@@ -446,20 +504,20 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._send((HERE / "page.js").read_bytes(),
                               "text/javascript; charset=utf-8")
 
-        if path in ("/", "/index.html", "/overview"):
-            return self._send((HERE / "overview.html").read_bytes(),
-                              "text/html; charset=utf-8")
-        if path in ("/runs", "/monitor", "/training"):
-            return self._send((HERE / "monitor.html").read_bytes(),
-                              "text/html; charset=utf-8")
-        if path in ("/summary", "/summary.html"):
-            return self._send((HERE / "index.html").read_bytes(), "text/html; charset=utf-8")
-        if path in ("/programme", "/week"):
-            return self._send((HERE / "plan.html").read_bytes(),
+        # Six pages, each answering one question. `/` is the only one that needs
+        # naming here; the rest are served by the generic rule below, because the
+        # file is named after the route.
+        #
+        # The old aliases - /overview /monitor /training /programme /week
+        # /index.html /summary.html - are gone. Nothing linked to most of them,
+        # and /index vs /index.html served two DIFFERENT pages, which is the kind
+        # of thing that is only ever discovered by accident.
+        if path == "/":
+            return self._send((HERE / "control.html").read_bytes(),
                               "text/html; charset=utf-8")
 
-        # Any page in dashboard/ by its own name: /stage2 serves stage2.html,
-        # /week serves week.html. Listed nowhere, so adding a page never needs
+        # Any page in dashboard/ by its own name: /train serves train.html,
+        # /robot serves robot.html. Listed nowhere, so adding a page never needs
         # this file edited - and server.py is the one module the dashboard does
         # NOT hot-reload, so editing it means a restart, which has now cost two
         # rounds of "why is my page a 404".
@@ -559,13 +617,14 @@ def serve(port: int = 8000, open_browser: bool = True) -> None:
 
     with httpd:
         url = f"http://127.0.0.1:{port}/"
-        print(f"Overview:  {url}            everything, at a glance")
-        print(f"Runs:      {url}runs        one run: curves, films, rewards")
-        print(f"Summary:   {url}summary")
-        print(f"  stage 1: {url}stage1     Prepare - the model (provisional)")
-        print(f"  stage 2: {url}stage2     Train - 200 skills, three training runs")
-        print(f"  stage 3: {url}stage3     Deploy - the real robot (start now)")
-        print(f"Pose:      {url}pose")
+        # Six pages, each answering one question. Printed in nav order, so the
+        # terminal and the top bar agree.
+        print(f"Control  {url}           what is happening right now")
+        print(f"Runs     {url}runs       how did that run go")
+        print(f"Plan     {url}plan       what we are doing next, and why")
+        print(f"Train    {url}train      what it is being taught")
+        print(f"Robot    {url}robot      is the physical model right (pose editor here)")
+        print(f"Summary  {url}summary    how the whole thing works")
         print("Ctrl-C to stop.")
         if open_browser:
             webbrowser.open(url)

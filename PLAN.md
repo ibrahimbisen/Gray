@@ -3,7 +3,20 @@
 Agreed 3 Aug 2026. This replaces the nine-subsection structure the dashboard
 used to show.
 
-**Where we are: 1.1.2**
+**Where we are: 1.1.2 — and 1.2 has already happened.**
+
+**Changed 3 Aug 2026, after 1.1.1.** 1.2 was going to come after 1.1, on the
+grounds that you cannot tell whether a wider box broke something if the narrow
+box was already broken. That was right while the plan was "tune the reward now,
+widen later". It stopped being right the moment the decision was made to widen
+*and* to add height, pitch and roll — because both throw every trained policy
+away, so tuning the reward first would have meant tuning it twice.
+
+So 1.2.1 to 1.2.3 are done, and **1.1 and 1.2.4 are now the same work**: the
+rounds below tune the reward directly on the final box rather than on a box that
+was about to be replaced. What that costs is the thing 1.2 was ordered after 1.1
+to avoid — a harder debugging job if drift is still wrong. What it buys is not
+paying for 25 hours of GPU twice.
 
 ---
 
@@ -47,12 +60,29 @@ difference has to beat it before it means anything.
 
 ### 1.2 The whole command box
 
-- **1.2.1** Fix `_going_straight` to gate on `abs(vx)`. It is positive-only
-  today, so `veering` and `wandering` — the two penalties that hold a line —
-  switch off entirely for a backward command
-- **1.2.2** Widen `WALK_SPEED` through zero to negative
-- **1.2.3** Let `vy` be sampled without `vx`
-- **1.2.4** Retune
+- **1.2.1** Fix `_going_straight` to gate on `abs(vx)` — **done, 3 Aug**
+- **1.2.2** Widen `WALK_SPEED` through zero to negative — **done, 3 Aug.**
+  `(-0.35, 0.35)`. `WALK_SIDE` to `±0.20`, `WALK_TURN` to `±1.00`
+- **1.2.3** Let `vy` be sampled without `vx` — **done, 3 Aug**
+- **1.2.4** Retune — **this is now what 1.1's rounds do**
+- **1.2.5** Add height, pitch and roll to the command — **done, 3 Aug.**
+  Observation 45 → 48. Ranges measured, not chosen: height 0.15–0.25 m, pitch
+  15° up to 8° down, roll ±20°, all inside where `find_stance` says the legs
+  run out
+- **1.2.6** Make the backward bar bite. **Not done.** `verify.py` carries
+  `test_speed_back: -0.35` and reads it nowhere — the walk test still runs one
+  pass, forward. Until it runs two and scores the worse, a run can be marked
+  passed on forward alone. `drive.py --cases "-0.35,0,0"` measures it by hand
+  in the meantime
+
+> **A third thing was found here, and it was not in the plan.** mjlab's
+> `rel_forward_envs` — set to 0.8 — did `.abs().clamp(min=0.3)` on the forward
+> speed. On the old box that meant four attempts in five were forced to at least
+> 0.3 m/s, three quarters of them landing exactly on it: the policy never trained
+> across 0.15–0.35 at all. It trained at one speed. That is a live candidate for
+> why speed tracking has been failing at 0.071 against a 0.05 bar. The `abs()`
+> would also have flipped every backward command positive, so widening the range
+> would have bought nothing. Replaced by `gray/tasks/walk_command.py`.
 
 > **Gate:** the same six criteria, across the full range.
 

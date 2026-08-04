@@ -1024,9 +1024,10 @@ function planPanel(){
         <td class="st ${live(st) ? "now" : ""}">${esc(st.state)}</td>
       </tr>`).join("")}
     </table></div>
-    <div class="sub" style="margin-top:8px">Three of these are training runs. The
-      rest are dials turned inside one, properties checked across all of them, or
-      measurements taken afterwards.</div>
+    <div class="sub" style="margin-top:8px">${
+      s.stages.filter(st => st.kind === "run").length} of these are training runs.
+      The rest are dials turned inside one, properties checked across all of them,
+      measurements taken afterwards, or parked.</div>
 
     <div class="sech" style="margin-top:28px"><h2>Blocking &mdash; ${
       esc(s.next_up.title)}</h2></div>

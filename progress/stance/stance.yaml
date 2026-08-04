@@ -1,32 +1,38 @@
-trunk_height_m: 0.1904
-trunk_height_pct_of_max: 70.0
+source: stated by the owner in gray/config/robot.yaml
+trunk_height_m: 0.2024
+trunk_height_pct_of_max: 74.4
 max_standing_height_m: 0.272
-worst_margin_x: 4.183
+worst_margin_x: 1.821
+lean_margin_mm:
+  forward: 169.6
+  back: 106.0
+  left: 109.2
+  right: 108.4
 angles_deg:
-  fr_hip: 4.19
-  fr_thigh: -4.876
-  fr_calf: 43.674
-  fl_hip: -4.343
-  fl_thigh: -4.931
-  fl_calf: 43.936
-  br_hip: -4.19
-  br_thigh: -3.241
-  br_calf: 44.097
-  bl_hip: 4.343
-  bl_thigh: -3.398
-  bl_calf: 43.883
+  fr_hip: -0.0
+  fr_thigh: -27.0
+  fr_calf: 45.0
+  fl_hip: 0.0
+  fl_thigh: -27.0
+  fl_calf: 45.0
+  br_hip: 0.0
+  br_thigh: -27.0
+  br_calf: 45.0
+  bl_hip: -0.0
+  bl_thigh: -27.0
+  bl_calf: 45.0
 holding_torque_nm:
-  fr_hip: 0.1693
-  fr_thigh: 0.213
-  fr_calf: 0.4686
-  fl_hip: 0.1693
-  fl_thigh: 0.2154
-  fl_calf: 0.466
-  br_hip: 0.1693
-  br_thigh: 0.2201
-  br_calf: 0.4619
-  bl_hip: 0.1693
-  bl_thigh: 0.215
-  bl_calf: 0.4664
+  fr_hip: 0.3636
+  fr_thigh: 0.1838
+  fr_calf: 1.0566
+  fl_hip: 0.3674
+  fl_thigh: 0.1838
+  fl_calf: 1.0566
+  br_hip: 0.3636
+  br_thigh: 0.2204
+  br_calf: 1.0763
+  bl_hip: 0.3674
+  bl_thigh: 0.2204
+  bl_calf: 1.0763
 servo_stall_nm: 1.96
 zero: the sitting pose, as exported from SolidWorks

@@ -1,10 +1,18 @@
-"""Find a standing pose, and work out whether the servos can hold it.
+"""Work out the standing pose, and whether the servos can hold it.
 
     python scripts/find_stance.py                  # sweep heights, pick the best
     python scripts/find_stance.py --height 0.19    # solve one height
+    python scripts/find_stance.py --solved         # ignore the owner's pose
     python scripts/find_stance.py --render         # and film it
 
-Two questions, in order:
+**The owner's pose wins.** If `stance.angles_deg` is set in robot.yaml, those
+twelve angles are the standing pose and this script only measures them: trunk
+height, footprint, lean margin, holding torque. The sweep below still runs and
+still prints, because a solved pose is the comparison that says whether the
+stated one is any good - but it is not what gets written. `--solved` ignores the
+stated pose entirely.
+
+The rest of this file answers two questions, in order:
 
 1. **Where do the joints have to be** for the robot to stand with its feet under
    its hips? The model's zero pose is the sprawl the CAD happened to be in when
@@ -220,6 +228,56 @@ def solve(rb: Robot, height: float, outboard: float = 0.0):
     return dict(zip(keys, sol.x)), float(np.abs(residual(sol.x)).max())
 
 
+def stated_pose(rb: Robot, cfg: dict) -> dict[tuple[str, str], float] | None:
+    """The pose written into robot.yaml by hand, if there is one.
+
+    The stance block may state the twelve angles outright instead of leaving them
+    to be solved. They are written in the pose editor's convention - degrees away
+    from the sitting pose, with + meaning hip out, thigh forward, foot up - so
+    they have to be turned back into the model's own joint angles, whose sign
+    depends on which way each hinge happens to point.
+    """
+    stated = (cfg.get("stance") or {}).get("angles_deg")
+    if not stated:
+        return None
+    signs = joint_signs(rb)
+    return {(leg, seg): signs[(leg, seg)] * np.deg2rad(float(stated[f"{leg}_{seg}"]))
+            for leg in LEGS for seg in ("hip", "thigh", "calf")}
+
+
+def stand_on_floor(rb: Robot, angles: dict[tuple[str, str], float]) -> float:
+    """Put the robot in the pose and drop it until it rests on the ground.
+
+    Returns the trunk height that lands. Measured on the actual mesh vertices,
+    because whatever touches down first is not always the point on the calf that
+    the torque maths calls the foot - in a raked pose the leg rests on its shin.
+    """
+    rb.set_pose(0.6, angles)
+    low = min(
+        (rb.d.geom_xpos[g] + rb.m.mesh_vert[
+            rb.m.mesh_vertadr[rb.m.geom_dataid[g]]:
+            rb.m.mesh_vertadr[rb.m.geom_dataid[g]] + rb.m.mesh_vertnum[rb.m.geom_dataid[g]]
+        ] @ rb.d.geom_xmat[g].reshape(3, 3).T)[:, 2].min()
+        for g in range(rb.m.ngeom)
+        if rb.m.geom_type[g] == mujoco.mjtGeom.mjGEOM_MESH)
+    rb.d.qpos[2] -= low
+    mujoco.mj_forward(rb.m, rb.d)
+    return float(rb.d.xpos[rb.base][2])
+
+
+def lean_margins(rb: Robot) -> dict[str, float]:
+    """How far the centre of mass can travel before it leaves the footprint.
+
+    The smallest of the four is the one that decides whether the robot stands
+    there or works at standing there.
+    """
+    com = rb.d.subtree_com[0]
+    feet = [rb.foot_world(leg) for leg in LEGS]
+    xs, ys = [f[0] for f in feet], [f[1] for f in feet]
+    return {"forward": max(xs) - com[0], "back": com[0] - min(xs),
+            "left": max(ys) - com[1], "right": com[1] - min(ys)}
+
+
 def holding_torque(rb: Robot) -> dict[tuple[str, str], float]:
     """Torque each joint must produce to hold the pose, static.
 
@@ -268,6 +326,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--height", type=float, help="solve one trunk height, in metres")
     ap.add_argument("--render", action="store_true", help="film the chosen pose")
+    ap.add_argument("--solved", action="store_true",
+                    help="ignore the pose stated in robot.yaml and use the solved one")
     args = ap.parse_args()
 
     rb = Robot()
@@ -316,6 +376,31 @@ def main() -> int:
         if abs(h - ride) < 1e-6 and ok:
             best = (h, angles, tau, margin)
 
+    # The owner's own pose, if robot.yaml states one, wins over anything solved
+    # here. The sweep above still ran, and is still worth printing: it is the
+    # comparison that says whether the stated pose is a good one.
+    stated = stated_pose(rb, cfg)
+    if stated is not None and not args.solved:
+        h = stand_on_floor(rb, stated)
+        tau = holding_torque(rb)
+        (leg, seg), worst = max(tau.items(), key=lambda kv: kv[1])
+        margin = cap / worst
+        lean = lean_margins(rb)
+        tips = min(lean, key=lean.get)
+        feet = {l: rb.foot_world(l) for l in LEGS}
+        sy = max(f[1] for f in feet.values()) - min(f[1] for f in feet.values())
+
+        print(f"\nstated in robot.yaml, and this is what gets written:")
+        print(f"  trunk           {h*1000:.1f} mm")
+        print(f"  footprint       {sy*1000:.1f} mm side to side")
+        print(f"  lean margin     {min(lean.values())*1000:.1f} mm before it tips "
+              f"{tips}")
+        print(f"  worst joint     {leg}_{seg} at {worst:.2f} N-m, {margin:.2f}x the servo")
+        if margin < 1.5:
+            print(f"  TOO WEAK        under 1.5x. The servos cannot hold this pose.")
+            return 1
+        angles, best = stated, (h, stated, tau, margin)
+
     if best is None:
         print("\nNo height works. Either the mass is wrong or the servos are too weak.")
         return 1
@@ -331,13 +416,26 @@ def main() -> int:
         print(f"  {leg:>4} {a[0]:8.1f} {a[1]:8.1f} {a[2]:8.1f}   {'|':>14} "
               f"{t[0]:7.2f} {t[1]:7.2f} {t[2]:7.2f}")
 
-    solve(rb, h, outboard)
+    # Put the robot back in the pose being written, so the measurements below
+    # describe it rather than whatever the sweep last tried.
+    if stated is not None and not args.solved:
+        stand_on_floor(rb, angles)
+    else:
+        solve(rb, h, outboard)
+    lean = lean_margins(rb)
+
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "stance.yaml").write_text(yaml.safe_dump({
+        "source": ("stated by the owner in gray/config/robot.yaml"
+                   if stated is not None and not args.solved
+                   else "solved by scripts/find_stance.py"),
         "trunk_height_m": round(float(h), 4),
         "trunk_height_pct_of_max": round(100 * float(h) / float(tall), 1),
         "max_standing_height_m": round(float(tall), 4),
         "worst_margin_x": round(float(margin), 3),
+        # How far the centre of mass can move before it leaves the square the
+        # four feet make. The smallest number is the one that matters.
+        "lean_margin_mm": {k: round(float(v) * 1000, 1) for k, v in lean.items()},
         "angles_deg": {f"{leg}_{seg}": round(float(np.rad2deg(v)), 3)
                        for (leg, seg), v in angles.items()},
         "holding_torque_nm": {f"{leg}_{seg}": round(float(v), 4) for (leg, seg), v in tau.items()},

@@ -59,8 +59,15 @@ from mjlab.tasks.velocity import mdp as vmdp
 
 from mjlab.managers import SceneEntityCfg
 
+from gray.tasks.posture_command import PostureCommandCfg
+from gray.tasks.walk_command import StraightLineVelocityCommandCfg
 from gray.tasks.push_env_cfg import FOOT_SITES, push_env_cfg, push_ppo_cfg
-from gray.tasks.stand_env_cfg import ALL_JOINTS
+from gray.tasks.stand_env_cfg import ALL_JOINTS, _stance
+
+# The trunk, named explicitly. mjlab's default SceneEntityCfg("robot") resolves
+# to every body, and a term expecting one trunk then gets 13 of them - a shape
+# mismatch that names neither the term nor the reason.
+ROBOT = SceneEntityCfg("robot", body_names=("base_link",))
 
 # The two joints that make a stride look like a stride. The hip only swings the
 # leg sideways, so animating it does nothing for how the walk reads.
@@ -69,9 +76,46 @@ SWING_JOINTS = SceneEntityCfg("robot", joint_names=(".*thigh", ".*calf"))
 # How fast it is asked to walk. Slow, because 1.96 N-m servos at 50 Hz are not
 # going to run, and because a speed the robot cannot reach is a reward it can
 # never earn.
-WALK_SPEED = (0.15, 0.35)     # m/s forwards
-WALK_SIDE = (-0.10, 0.10)     # m/s sideways
-WALK_TURN = (-0.50, 0.50)     # rad/s about the vertical
+# THE BOX. Every command the policy will ever be trusted on is drawn from inside
+# these, and nothing outside them means anything: the policy interpolates between
+# things it has seen and produces nonsense past the edge, the same way a curve fit
+# does. Widened 3 Aug 2026 - see the note under WALK_SPEED.
+WALK_SPEED = (-0.35, 0.35)    # m/s, negative is backward
+WALK_SIDE = (-0.20, 0.20)     # m/s sideways
+WALK_TURN = (-1.00, 1.00)     # rad/s about the vertical
+
+# What the old box cost. Until today WALK_SPEED was (0.15, 0.35) - never zero,
+# never negative - so across roughly 900,000 draws a backward command was never
+# issued once. Driving run #25 by hand confirmed it: told to walk backward it
+# covered 0.00 m in 8 seconds, and told to crab sideways, 3 cm. Four rows of the
+# skill library were filed as "a command" when the command had never been asked.
+#
+# WALK_SIDE was symmetric but only ever drawn ON TOP of forward motion of at
+# least 0.15 m/s, so pure sideways never happened either. It happens now because
+# vx can be drawn near zero.
+#
+# THE TRAP THIS DEPENDS ON: _going_straight() gated on `command[:, 0] > MOVING`,
+# positive-only. Widening through zero without fixing that to abs() would have
+# switched `veering` and `wandering` off for every backward command, and backward
+# walking would have trained with no straightness penalty while the terms quietly
+# reported zero. Fixed in the same change; do not separate them.
+
+# Where the trunk should BE. Measured on the owner's stance by solving for the
+# joint angles that keep every foot on its own print while the trunk moves, and
+# finding where the legs run out of travel:
+#
+#     height   120 to 270 mm    holds throughout, 1.59x the servo at the lowest
+#     pitch    nose up 20 deg, nose DOWN only 10 deg
+#     roll     +/- 30 deg, and the sweep never found the limit
+#
+# Commanded ranges sit inside those, because a limit measured standing still is
+# not a limit while walking: a leg already at its end stop has nothing left to
+# swing with. Pitch stays asymmetric because the geometry is - the stance rakes
+# the legs forward, which spends travel that nose-down needs. Squaring it off to
+# +/-10 would throw away half the nose-up travel for tidiness.
+POSE_HEIGHT = (0.15, 0.25)    # m, trunk off the ground
+POSE_PITCH = (-0.26, 0.14)    # rad, nose down positive: 15 deg up, 8 deg down
+POSE_ROLL = (-0.35, 0.35)     # rad, right side down positive: +/- 20 deg
 
 # The band the tracking reward falls off over. See the module docstring - this is
 # the single most important number in the file. docs/REWARDS.md puts it at
@@ -322,11 +366,49 @@ def touchdown_speed(env, sensor_name: str = "feet", asset_cfg=FOOT_SITES):
 
 
 def _going_straight(env, command_name: str = "walk") -> torch.Tensor:
-    """True where the robot has been told to go forward and not to turn."""
+    """True where the robot has been told to hold a line and not to turn.
+
+    `abs`, not `>`. This read `command[:, 0] > MOVING` until 3 Aug 2026, which is
+    positive-only - so the moment the command range was widened through zero to
+    negative, `veering` and `wandering`, the two penalties that hold a line,
+    would have switched off entirely for every backward command. Backward walking
+    would have trained with no straightness penalty at all, and nothing would have
+    reported it: the terms return zero, which looks exactly like passing.
+    """
     command = env.command_manager.get_command(command_name)
-    return ((command[:, 0] > MOVING)
+    return ((torch.abs(command[:, 0]) > MOVING)
             & (torch.abs(command[:, 2]) < 0.05)
             & (torch.abs(command[:, 1]) < 0.05))
+
+
+def commanded_height(env, std: float, command_name: str = "posture",
+                     asset_cfg: SceneEntityCfg = ROBOT):
+    """1.0 when the trunk is at the height it was told, falling off over `std`.
+
+    Replaces the fixed-target `ride_height`. Same shape, same tolerance - the
+    only change is that the target now comes from the command instead of from
+    stance.yaml, which is what makes "crouch" something you can ask for.
+    """
+    asset = env.scene[asset_cfg.name]
+    height = asset.data.root_link_pos_w[:, 2] - env.scene.env_origins[:, 2]
+    want = env.command_manager.get_command(command_name)[:, 0]
+    return torch.exp(-torch.square(height - want) / (std * std))
+
+
+def commanded_attitude(env, std: float, command_name: str = "posture",
+                       asset_cfg: SceneEntityCfg = ROBOT):
+    """1.0 when the trunk is leaning the way it was told.
+
+    Replaces `upright`, which scored one thing: level. Level is now just the
+    commanded attitude with both numbers at zero, so nothing is lost - and a
+    commanded lean stops being a thing the robot is punished for.
+    """
+    from gray.tasks.posture_command import trunk_pitch_roll  # noqa: PLC0415
+
+    pitch, roll = trunk_pitch_roll(env.scene[asset_cfg.name])
+    want = env.command_manager.get_command(command_name)
+    err = torch.square(pitch - want[:, 1]) + torch.square(roll - want[:, 2])
+    return torch.exp(-err / (std * std))
 
 
 def ground_covered(env, command_name: str = "walk"):
@@ -482,26 +564,51 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     cfg.events.pop("shove", None)
 
     cfg.commands = {
-        "walk": vmdp.UniformVelocityCommandCfg(
+        "walk": StraightLineVelocityCommandCfg(
             entity_name="robot",
             resampling_time_range=(5.0, 10.0),
             # About one attempt in seven commands a full stop. Without them the
             # policy never learns that zero means stand, and a robot that cannot
             # stop is not much use.
             rel_standing_envs=0.15,
-            # Four in five get a straight line and nothing else. This stage is
-            # "walk forward"; turning is stage 6, and the small share that still
-            # gets a turn command is there so the policy does not become unable
-            # to do anything but go straight.
-            rel_forward_envs=0.8,
+            # Half get a straight line and nothing else - sideways and turn both
+            # zero, forward speed as drawn INCLUDING backward. `wandering` and
+            # `veering`, the two terms that hold a line, only apply here, so
+            # without a decent share of these there is nothing to train
+            # straightness on: a uniform draw lands inside their +/-0.05 gates
+            # about once in eighty.
+            #
+            # It was 0.8 on mjlab's own rel_forward_envs until 3 Aug 2026, which
+            # forced the speed positive and up to at least 0.3 - see
+            # gray/tasks/walk_command.py. Half, not four fifths, because the
+            # other half now has a much bigger box to cover.
+            rel_forward_envs=0.0,
+            rel_straight_envs=0.5,
+            straight_min_speed=0.10,
             ranges=vmdp.UniformVelocityCommandCfg.Ranges(
                 lin_vel_x=WALK_SPEED, lin_vel_y=WALK_SIDE, ang_vel_z=WALK_TURN),
+        ),
+        # Where the trunk should BE, as opposed to where it should GO. Three more
+        # numbers, on the same clock as the velocity command so one draw is one
+        # coherent instruction rather than two that change at different moments.
+        "posture": PostureCommandCfg(
+            entity_name="robot",
+            resampling_time_range=(5.0, 10.0),
+            nominal_height=_stance()[1],
+            rel_nominal_envs=0.25,
+            ranges=PostureCommandCfg.Ranges(
+                height=POSE_HEIGHT, pitch=POSE_PITCH, roll=POSE_ROLL),
         ),
     }
     # The policy has to be told where it is being sent, or the command is noise.
     for group in ("actor", "critic"):
         cfg.observations[group].terms["command"] = ObservationTermCfg(
             func=vmdp.generated_commands, params={"command_name": "walk"})
+        # And where the trunk should be. Three more numbers, so the observation
+        # goes 45 -> 48 and every policy trained before today is unreadable by
+        # this task - a saved file is a fixed-size mapping, and the size changed.
+        cfg.observations[group].terms["posture"] = ObservationTermCfg(
+            func=vmdp.generated_commands, params={"command_name": "posture"})
 
     # Terms that were the whole point of standing still and are now in the way.
     #   still        - it is being asked to move
@@ -538,12 +645,18 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # body in the robot, and `upright` then hands 13 quaternions per robot to a
     # function expecting one - it fails with a shape mismatch that names neither
     # this term nor the reason.
+    # Both of these now score against the POSTURE COMMAND rather than against a
+    # fixed pose. `upright` scored one attitude - level - so a commanded lean was
+    # a thing the robot got punished for. `ride_height` scored one height, so a
+    # crouch could not be asked for at all. Level and ride height are still there;
+    # they are the command at zero.
     cfg.rewards["upright"] = RewardTermCfg(
-        func=vmdp.upright, weight=1.0,
-        params={"std": 0.45,
-                "asset_cfg": SceneEntityCfg("robot", body_names=("base_link",))})
-    cfg.rewards["ride_height"] = cfg.rewards.pop("height")
-    cfg.rewards["ride_height"].weight = 1.0
+        func=commanded_attitude, weight=1.0,
+        params={"std": 0.45, "command_name": "posture", "asset_cfg": ROBOT})
+    cfg.rewards.pop("height", None)
+    cfg.rewards["ride_height"] = RewardTermCfg(
+        func=commanded_height, weight=1.0,
+        params={"std": 0.05, "command_name": "posture", "asset_cfg": ROBOT})
 
     # Tolerance that widens once the robot is asked to move. The thresholds are
     # the whole point: mjlab's 0.5 / 1.5 are Go1 speeds, and Gray's total command

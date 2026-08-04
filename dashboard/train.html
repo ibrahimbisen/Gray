@@ -3,20 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gray &mdash; stage 2, Train</title>
+<title>Gray &mdash; train</title>
 <link rel="stylesheet" href="/page.css">
 </head>
 <body>
-<div class="top" id="top"></div>
-<div class="shell">
-  <div class="side"></div>
-  <div class="main"></div>
+<div id="nav"></div>
+<div class="segbar" id="mode"></div>
+<div class="app">
+  <aside class="side"></aside>
+  <main class="main"></main>
 </div>
 
 <script src="/page.js"></script>
 <script>
-document.getElementById("top").innerHTML =
-  topbar("/stage2", "Stage 2 of 3 &middot; in progress");
 
 /* One page, read top to bottom. Everything that can be a table is a table -
    the previous version split this across fifteen panels, which meant no two
@@ -53,26 +52,39 @@ const covWords = (cov) => COV.filter(k => cov[k])
 const COV_HEAD = COV.map(k =>
   `<th class="n"><span class="dot ${k}"></span>${COV_SHORT[k]}</th>`).join("");
 
-fetch("/api/stage/2").then(r => r.json()).then(s => {
+get("/api/stage/2").then(s => {
+mountNav("/train", navState(s.nav));
 
 const runs = s.subsections.filter(x => x.kind === "run");
 const rt = s.run_totals || {};
 const blockedTotal = s.needs.reduce((a, n) => a + n.count, 0);
 
 /* ---------------------------------------------------------------- lead --- */
+/* The lead thins with the dial too. Six tiles is the right number when you are
+   reading the whole page; it is four too many when you only want to know how the
+   training is going. */
+const LEAD_FACTS = [
+  {simple: true,  k:"Rows in the library", v:() => s.total,
+   n:() => `read live from ${s.path}, standing in for ${s.from_rows} originals`},
+  {simple: true,  k:"Training runs", v:() => s.runs,
+   n:() => "the only unit that is a piece of work"},
+  {simple: false, k:"Trained toward", v:() => rt.command || 0,
+   n:() => `of ${rt.rows || 0} rows across the ${s.runs} runs`},
+  {simple: false, k:"The pilot does", v:() => rt.pilot || 0,
+   n:() => "a human is steering, so nothing is missing"},
+  {simple: true,  k:"Nothing can reach", v:() => blockedTotal,
+   n:() => `waiting on ${s.needs.length} missing capabilities`},
+  {simple: false, k:"Commands one R1 run tries",
+   v:() => (s.sampling.headline || {}).commands || "—",
+   n:() => "in ONE simulation, not one per skill"},
+];
+
 const lead = () => `
-  <div class="eyebrow">Stage 2 &middot; Train</div>
-  <h1>${s.total} skills. ${s.runs} training runs.</h1>
+  <div class="eyebrow">Train</div>
+  <h1>${s.total} rows. ${s.runs} training runs.</h1>
   <p class="lede">${esc(s.lede)}</p>
-  ${facts([
-    {k:"Skills in the library", v:s.total, n:`read live from ${s.path}`},
-    {k:"Training runs", v:s.runs, n:"the only unit that is a piece of work"},
-    {k:"Trained toward", v:rt.command || 0, n:`of ${rt.rows || 0} rows across the ${s.runs} runs`},
-    {k:"The pilot does", v:rt.pilot || 0, n:"a human is steering, so nothing is missing"},
-    {k:"Nothing can reach", v:blockedTotal, n:`waiting on ${s.needs.length} missing capabilities`},
-    {k:"Commands one R1 run tries", v:(s.sampling.headline || {}).commands || "—",
-     n:"in ONE simulation, not one per skill"},
-  ])}`;
+  ${facts(LEAD_FACTS.filter(f => mode === "complex" || f.simple)
+                    .map(f => ({k: f.k, v: f.v(), n: f.n()})))}`;
 
 /* ------------------------------------------------------- 1. everything --- */
 const everything = () => {
@@ -173,16 +185,16 @@ const trained = () => `
       ${x.gap ? `<div class="risk small"><b>Known gap.</b> ${esc(x.gap)}</div>` : ""}
     </div>`).join("")}
   </div>
-  <h3 style="margin-top:24px">R1 one level down &mdash; by category</h3>
+  <h3 style="margin-top:24px">R1 one level down</h3>
   <div class="tw"><table>
-    <tr><th>Category</th><th class="n">Rows</th><th style="width:130px">Split</th>
-        ${COV_HEAD}<th>Reads as</th></tr>
-    ${(runs[0] || {by_category: []}).by_category.map(c => `<tr>
-      <td><b>${esc(c.category)}</b></td>
-      <td class="n">${c.count}</td>
-      <td>${covBar(c.coverage)}</td>
-      ${covCells(c.coverage)}
-      <td class="dim small">${covWords(c.coverage)}</td></tr>`).join("")}
+    <tr><th class="n">#</th><th>Row</th><th>Covered by</th><th class="n">Stands in for</th>
+        <th>Why</th></tr>
+    ${(runs[0] || {skills: []}).skills.map(k => `<tr>
+      <td class="n dim">${k.n}</td>
+      <td><b>${esc(k.name)}</b></td>
+      <td class="dim"><span class="dot ${k.coverage}"></span>${esc(COV_SHORT[k.coverage])}</td>
+      <td class="n dim">${k.covers.length > 1 ? k.covers.length + " rows" : "&mdash;"}</td>
+      <td class="dim small">${esc(k.note)}</td></tr>`).join("")}
   </table></div>`;
 
 /* ------------------------------------------------------- 4. one sim ------ */
@@ -329,7 +341,7 @@ const measured = () => {
 
 /* ------------------------------------------------------- 7. unreachable -- */
 const unreachable = () => {
-  const cls = s.blocked_classes || {};
+  const classes = s.blocked_classes || {};
   const byClass = {};
   for (const n of s.needs) (byClass[n.class] = byClass[n.class] || []).push(n);
   const order = CLASS_ORDER.filter(k => byClass[k])
@@ -340,7 +352,7 @@ const unreachable = () => {
     and distance sensors are being fitted. It is ${order.length} different problems,
     with ${order.length} different fixes, and only one of them is about sensing.</p>
   ${order.map(k => {
-    const g = cls[k] || {};
+    const g = classes[k] || {};
     const needs = byClass[k];
     const rows = needs.reduce((a, n) => a + n.count, 0);
     return `<div class="card" style="margin-bottom:16px">
@@ -367,7 +379,7 @@ const unreachable = () => {
       <td class="n dim">${r.n}</td>
       <td>${esc(r.name)}</td>
       <td class="dim"><span class="dot blocked"></span>${esc(n.label)}</td>
-      <td class="dim small">${esc((cls[n.class] || {}).label || n.class)}</td>
+      <td class="dim small">${esc((classes[n.class] || {}).label || n.class)}</td>
       <td class="dim small">${esc(r.why)}</td></tr>`)).join("")}
   </table></div>`;
 };
@@ -565,43 +577,52 @@ const every = () => {
   rows.sort((a, b) => a.n - b.n);
   return `
     <p class="lede">The owner's CSV, sorted. This page never invents a row and
-      never stores a copy &mdash; edit <code>${esc(s.path)}</code> and it changes.</p>
+      never stores a copy &mdash; edit <code>${esc(s.path)}</code> and it changes.
+      ${s.total} rows, standing in for the ${s.from_rows} the library used to hold;
+      <b>stands in for</b> says how many each one absorbed.</p>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
-      <input class="filter" id="q" placeholder="filter by skill, group or category"
+      <input class="filter" id="q" placeholder="filter by skill or group"
              style="flex:1;max-width:340px">
       <span class="dim small" id="qn">${rows.length} rows</span>
     </div>
     <div class="tw scroller" style="max-height:calc(100vh - 300px)"><table>
-      <tr><th class="n">#</th><th>Skill</th><th>Category</th><th class="n">Group</th>
-          <th>Covered by</th><th>Difficulty dial</th></tr>
+      <tr><th class="n">#</th><th>Skill</th><th class="n">Group</th>
+          <th>Covered by</th><th class="n">Stands in for</th><th>Difficulty dial</th></tr>
       <tbody id="rows">${rows.map(k => `<tr data-s="${esc(
-          (k.name + " " + k.category + " " + k.sub.id + " " + k.sub.name + " " +
+          (k.name + " " + k.note + " " + k.sub.id + " " + k.sub.name + " " +
            COV_SHORT[k.coverage]).toLowerCase())}">
         <td class="n dim">${k.n}</td>
-        <td>${esc(k.name)}</td>
-        <td class="dim small">${esc(k.category)}</td>
+        <td>${esc(k.name)}
+          ${k.note ? `<div class="dim small">${esc(k.note)}</div>` : ""}</td>
         <td class="n"><span class="chip" style="font-family:ui-monospace">${esc(k.sub.id)}</span></td>
-        <td class="dim"><span class="dot ${k.coverage}"></span>${esc(COV_SHORT[k.coverage])}
-          ${k.coverage_why ? `<div class="dim small" style="margin-left:16px">${esc(k.coverage_why)}</div>` : ""}</td>
+        <td class="dim"><span class="dot ${k.coverage}"></span>${esc(COV_SHORT[k.coverage])}</td>
+        <td class="n dim">${k.covers.length > 1 ? k.covers.length : "&mdash;"}</td>
         <td class="dim small">${k.dial ? esc(k.dial) : "&mdash;"}</td></tr>`).join("")}</tbody>
     </table></div>`;
 };
 
-/* ------------------------------------------------------- 9. judgement ---- */
+/* ------------------------------------------------------- 9. collapsed ---- */
 const calls = () => `
-  <p class="lede">${s.moved.length} skills ended up somewhere other than the
-    category they were filed under. Listed so they can be argued with rather
-    than buried.</p>
+  <p class="lede">The library used to hold ${s.from_rows} rows and now holds
+    ${s.total}. Nothing was thrown away: ${s.collapsed.length} of those rows each
+    stand in for several of the originals, because the old file said the same
+    thing many times over &mdash; 15 rows for jumping, 12 for ride height, 4 for
+    one drop height. The original is kept beside it as
+    <code>gray_skill_library_ORIGINAL_200.csv</code>, and the numbers below say
+    exactly where every one of its rows went.</p>
+  ${s.faults.length ? `<div class="risk small"><b>${s.faults.length} rows do not
+    parse.</b> ${s.faults.map(f => esc(`#${f.n} ${f.name}: ${f.what}`)).join("; ")}</div>`
+    : ""}
   <div class="tw scroller"><table>
-    <tr><th class="n">#</th><th>Skill</th><th>Filed under</th><th>Moved to</th>
-        <th>Kind</th><th>Why</th></tr>
-    ${s.moved.map(m => `<tr>
+    <tr><th class="n">#</th><th>Row</th><th class="n">Group</th>
+        <th class="n">Was</th><th>Old rows</th><th>Why they are one</th></tr>
+    ${s.collapsed.map(m => `<tr>
       <td class="n dim">${m.n}</td>
-      <td>${esc(m.skill)}</td>
-      <td class="dim">${esc(m.from)}</td>
-      <td>${esc(m.to_name)}</td>
-      <td class="dim">${esc(m.to_kind)}</td>
-      <td class="dim small">${esc(m.reason)}</td></tr>`).join("")}
+      <td><b>${esc(m.name)}</b></td>
+      <td class="n"><span class="chip" style="font-family:ui-monospace">${esc(m.group)}</span></td>
+      <td class="n"><b>${m.was}</b></td>
+      <td class="dim small" style="font-family:ui-monospace">${esc(m.covers.join(" "))}</td>
+      <td class="dim small">${esc(m.note)}</td></tr>`).join("")}
   </table></div>`;
 
 /* ------------------------------------------------------ 10. method ------- */
@@ -610,13 +631,14 @@ const method = () => `
     ${s.intro.map(p => `<div class="card"><p class="why small">${esc(p)}</p></div>`).join("")}
   </div>
   <div class="note key small" style="margin-top:16px"><b>Source:</b>
-    <code>${esc(s.path)}</code> for the rows,
-    <code>dashboard/skills.py</code> for where each one lands,
+    <code>${esc(s.path)}</code> for the rows <i>and</i> for where each one lands
+    &mdash; kind, group, coverage and blocker are columns in the file now, not
+    lookup tables in Python;
     <code>gray/tasks/</code> and <code>dashboard/queue.py</code> for every number
     in section 4. Nothing on this page is typed twice.</div>`;
 
-paper([
-  { id: "top",       label: "Stage 2 - Train", lead: true, html: lead },
+const SECTIONS = [
+  { id: "top",       label: "Train", lead: true, html: lead },
   { id: "library",   label: "The library in one table", count: s.total, html: everything },
   { id: "words",     label: "How a row is covered", count: COV.length, html: words },
   { id: "trained",   label: "What the runs train for", count: s.runs, html: trained },
@@ -631,23 +653,84 @@ paper([
   { id: "kinds",     label: "The five kinds", count: s.kinds.length, html: kinds },
   { id: "bars",      label: "Pass bars", count: s.subsections.length, html: bars },
   { id: "every",     label: "Every skill", count: s.total, html: every },
-  { id: "calls",     label: "Judgement calls", count: s.moved.length, html: calls },
+  { id: "calls",     label: "What was collapsed", count: s.collapsed.length, html: calls },
   { id: "method",    label: "How it was sorted", html: method },
-]);
+];
 
-// Live filter on the full library table.
-const q = document.getElementById("q");
-if (q) q.addEventListener("input", () => {
-  const term = q.value.trim().toLowerCase();
-  let shown = 0;
-  for (const tr of document.querySelectorAll("#rows tr")) {
-    const hit = !term || tr.dataset.s.includes(term);
-    tr.classList.toggle("hidden", !hit);
-    if (hit) shown++;
-  }
-  document.getElementById("qn").textContent =
-    term ? `${shown} of ${s.total} rows` : `${s.total} rows`;
-});
+/* SIMPLE is four questions and nothing else:
+     what is it being taught  ->  trained
+     what did it actually do  ->  measured
+     what does it have to beat ->  bars
+     what is missing          ->  blocked
+   Everything cut from it is a justification, a method, or a full listing. None
+   of that is wrong, and none of it is needed to know how the training is going.
+   The complete page is one click away and the dial says so. */
+const SIMPLE = ["top", "trained", "measured", "bars", "blocked"];
+
+const MODES = [
+  { key: "simple",  name: "Simplified",
+    say: "The four questions. Everything else is one click away." },
+  { key: "complex", name: "Complex",
+    say: "Everything - the reasoning, the method and every row." },
+];
+
+/* The dial is deliberately sticky. It is a preference about how much you want to
+   read, not a place in the page, so it should survive a reload and a visit to
+   another page - unlike the section anchor, which is in the URL. */
+const KEY = "gray.train.detail";
+let mode = localStorage.getItem(KEY) === "complex" ? "complex" : "simple";
+
+function draw() {
+  const m = MODES.find(x => x.key === mode);
+  const shown = mode === "simple"
+    ? SECTIONS.filter(x => SIMPLE.includes(x.id))
+    : SECTIONS;
+
+  document.getElementById("mode").innerHTML = `
+    <span class="lbl">How much</span>
+    <span class="seg">${MODES.map(x =>
+      `<button data-m="${x.key}" class="${x.key === mode ? "on" : ""}">${
+        esc(x.name)}</button>`).join("")}</span>
+    <span class="say">${esc(m.say)}
+      &nbsp;<b style="color:var(--ink2)">${shown.length - 1} of ${
+        SECTIONS.length - 1} sections</b></span>`;
+
+  document.querySelectorAll("#mode button[data-m]").forEach(b =>
+    b.onclick = () => {
+      mode = b.dataset.m;
+      localStorage.setItem(KEY, mode);
+      // The anchor may name a section the other mode does not have, and paper()
+      // would silently scroll nowhere. Clear it rather than land in the void.
+      if (!shownIds(mode).includes(location.hash.slice(1)))
+        history.replaceState(null, "", location.pathname);
+      draw();
+    });
+
+  paper(shown, { contents: mode === "simple" ? "The four questions" : "Contents" });
+  wireFilter();
+}
+
+const shownIds = (m) => m === "simple" ? SIMPLE : SECTIONS.map(x => x.id);
+
+// Live filter on the full library table. Rebound after every redraw, because
+// paper() replaces the element the listener was on.
+function wireFilter() {
+  const q = document.getElementById("q");
+  if (!q) return;
+  q.addEventListener("input", () => {
+    const term = q.value.trim().toLowerCase();
+    let shown = 0;
+    for (const tr of document.querySelectorAll("#rows tr")) {
+      const hit = !term || tr.dataset.s.includes(term);
+      tr.classList.toggle("hidden", !hit);
+      if (hit) shown++;
+    }
+    document.getElementById("qn").textContent =
+      term ? `${shown} of ${s.total} rows` : `${s.total} rows`;
+  });
+}
+
+draw();
 
 }).catch(fail);
 </script>

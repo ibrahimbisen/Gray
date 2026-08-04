@@ -231,7 +231,7 @@ function hero(){
         <span>${h ? n2(h.times_over) + "× away" : "unknown"}</span></div>
     </div>
     <div class="card">
-      <h3>The three training runs</h3>
+      <h3>The training runs</h3>
       <div class="wrapx"><table>
         <tr><th></th><th>Run</th><th>State</th><th class="n">met</th>
             <th class="n">failing</th><th class="n">unknown</th></tr>
@@ -527,7 +527,8 @@ function left(){
   const subs = [...S.progress.subsections].sort((a,b) => order[a.kind]-order[b.kind]);
   return `<section>
     <div class="sech"><h2>What is left</h2>
-      <span class="note">the unit of work is a training run, and there are three ·
+      <span class="note">the unit of work is a training run, and there are ${
+        subs.filter(x => x.kind === "run").length} ·
         counts per kind are never summed</span></div>
     <div class="cols3">
       <div class="card wrapx"><table>

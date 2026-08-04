@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gray &mdash; stage 2, Train</title>
+<link rel="stylesheet" href="/page.css">
+</head>
+<body>
+<div class="top" id="top"></div>
+<div class="shell">
+  <div class="side"></div>
+  <div class="main"></div>
+</div>
+
+<script src="/page.js"></script>
+<script>
+document.getElementById("top").innerHTML =
+  topbar("/stage2", "Stage 2 of 3 &middot; in progress");
+
+/* One page, read top to bottom. Everything that can be a table is a table -
+   the previous version split this across fifteen panels, which meant no two
+   numbers could ever be held against each other. */
+
+const COV = ["command", "condition", "emerges", "pilot", "measured", "blocked"];
+const COV_SHORT = { command: "a command", condition: "a dial", emerges: "falls out",
+                    pilot: "the pilot", measured: "read off", blocked: "not by reward" };
+// "unreachable" was the wrong word and it read as "this will never happen".
+// It never meant that - cameras and distance sensors are being fitted. It means
+// no WEIGHT in the current reward reaches the row; the fix is a new input, a new
+// command or a separate run. Section 5 says which, per row.
+const CLASS_ORDER = ["input", "command", "reward"];
+
+const chipFor = (state) =>
+  /^(done|passed)/.test(state) ? "ok"
+  : /^(in progress|partly|ongoing)/.test(state) ? "now" : "warn";
+
+const sum = (cov) => COV.reduce((a, k) => a + (cov[k] || 0), 0);
+
+const covBar = (cov) => {
+  const t = sum(cov) || 1;
+  return `<div class="cov">${COV.filter(k => cov[k]).map(k =>
+    `<i class="${k}" style="width:${(100 * cov[k] / t).toFixed(1)}%"></i>`).join("")}</div>`;
+};
+
+/* Counts as numbers, always, beside the bar. The bar is a shape, not the data. */
+const covCells = (cov) => COV.map(k =>
+  cov[k] ? `<td class="n">${cov[k]}</td>` : `<td class="n dim">&middot;</td>`).join("");
+
+const covWords = (cov) => COV.filter(k => cov[k])
+  .map(k => `${cov[k]} ${COV_SHORT[k]}`).join(" &middot; ");
+
+const COV_HEAD = COV.map(k =>
+  `<th class="n"><span class="dot ${k}"></span>${COV_SHORT[k]}</th>`).join("");
+
+fetch("/api/stage/2").then(r => r.json()).then(s => {
+
+const runs = s.subsections.filter(x => x.kind === "run");
+const rt = s.run_totals || {};
+const blockedTotal = s.needs.reduce((a, n) => a + n.count, 0);
+
+/* ---------------------------------------------------------------- lead --- */
+const lead = () => `
+  <div class="eyebrow">Stage 2 &middot; Train</div>
+  <h1>${s.total} skills. ${s.runs} training runs.</h1>
+  <p class="lede">${esc(s.lede)}</p>
+  ${facts([
+    {k:"Skills in the library", v:s.total, n:`read live from ${s.path}`},
+    {k:"Training runs", v:s.runs, n:"the only unit that is a piece of work"},
+    {k:"Trained toward", v:rt.command || 0, n:`of ${rt.rows || 0} rows across the ${s.runs} runs`},
+    {k:"The pilot does", v:rt.pilot || 0, n:"a human is steering, so nothing is missing"},
+    {k:"Nothing can reach", v:blockedTotal, n:`waiting on ${s.needs.length} missing capabilities`},
+    {k:"Commands one R1 run tries", v:(s.sampling.headline || {}).commands || "—",
+     n:"in ONE simulation, not one per skill"},
+  ])}`;
+
+/* ------------------------------------------------------- 1. everything --- */
+const everything = () => {
+  // The table needs its question stated. Without it the six columns read as
+  // jargon and the row of counts reads as a score, which it is not - it is one
+  // question asked of every row in the CSV, and six possible answers to it.
+  const r1 = runs[0] || {coverage: {}, skills: []};
+  const example = (k) => (r1.skills.find(x => x.coverage === k) || {}).name || "";
+  return `
+  <div class="note key" style="margin-bottom:18px">
+    <b>What this table is.</b> Every one of the ${s.total} rows in your library
+    was asked the same question &mdash; <i>how does this actually get done?</i>
+    &mdash; and there are ${COV.length} possible answers. Each row below is a
+    group, and the numbers are how its skills were answered. A dot means none.
+  </div>
+  <div class="tw" style="margin-bottom:20px"><table>
+    <tr><th>Answer</th><th>Means</th><th class="n">In R1</th>
+        <th>An actual row of yours</th></tr>
+    ${COV.map(k => `<tr>
+      <td><span class="dot ${k}"></span><b>${esc(COV_SHORT[k])}</b></td>
+      <td class="dim small">${esc(s.coverage_words[k] || "")}</td>
+      <td class="n">${r1.coverage[k] || `<span class="dim">&middot;</span>`}</td>
+      <td class="dim small">${esc(example(k)) || "&mdash;"}</td></tr>`).join("")}
+    <tr><td colspan="2" class="dim"><b>R1 adds up to</b></td>
+      <td class="n"><b>${r1.count || 0}</b></td>
+      <td class="dim small">which is every row filed under it, counted once</td></tr>
+  </table></div>
+  <div class="tw"><table>
+    <tr><th class="n"></th><th>Group</th><th>Kind</th><th class="n">Rows</th>
+        <th style="width:130px">Split</th>${COV_HEAD}</tr>
+    ${s.subsections.map(x => `<tr>
+      <td class="n"><span class="chip ${chipFor(x.state)}"
+            style="font-family:ui-monospace">${esc(x.id)}</span></td>
+      <td><b>${esc(x.name)}</b><div class="dim small">${esc(x.rule)}</div></td>
+      <td class="dim">${esc(x.kind)}</td>
+      <td class="n"><b>${x.count}</b></td>
+      <td>${covBar(x.coverage)}</td>
+      ${covCells(x.coverage)}</tr>`).join("")}
+    <tr><td></td><td class="dim"><b>The ${s.runs} runs only</b></td><td class="dim">run</td>
+      <td class="n"><b>${rt.rows || 0}</b></td>
+      <td>${covBar(rt)}</td>${covCells(rt)}</tr>
+  </table></div>
+  <p class="why small">Rows are only added across the ${s.runs} runs, because those
+    are the same kind of thing. A run and a friction value in one total is what made
+    the previous version of this page misleading.</p>
+  <p class="why small"><b>What the split is for.</b> "${r1.count} skills" reads
+    like ${r1.count} pieces of work, and it is not.
+    ${r1.coverage.command || 0} are covered by setting a number,
+    ${r1.coverage.emerges || 0} appear without being asked for, and
+    ${r1.coverage.pilot || 0} are done by whoever is holding the controls. Only
+    ${r1.coverage.blocked || 0} need something built &mdash;
+    <a class="plain" href="#blocked">section 7 says what</a>.</p>`;
+};
+
+/* ------------------------------------------------------- 2. five words --- */
+const words = () => {
+  const tally = {};
+  for (const x of s.subsections)
+    for (const k of COV) tally[k] = (tally[k] || 0) + (x.coverage[k] || 0);
+  return `
+  <p class="lede">Where a skill is filed and how it is covered are different
+    questions. This is the second one, and it is the one that says what training
+    can actually do about a row.</p>
+  <div class="tw"><table>
+    <tr><th>Word</th><th>What it means</th><th class="n">Rows</th>
+        <th class="n">Of ${s.total}</th></tr>
+    ${COV.map(k => `<tr>
+      <td><span class="dot ${k}"></span><b>${esc(COV_SHORT[k])}</b>
+          <div class="dim small" style="margin-left:16px">${esc(k)}</div></td>
+      <td class="dim">${esc(s.coverage_words[k] || "")}</td>
+      <td class="n"><b>${tally[k] || 0}</b></td>
+      <td class="n dim">${Math.round(100 * (tally[k] || 0) / s.total)}%</td></tr>`).join("")}
+  </table></div>`;
+};
+
+/* --------------------------------------------------- 3. what runs train -- */
+const trained = () => `
+  <p class="lede">One reward function is one JOB, not one skill. R1's job is
+    <i>put the trunk where you are told and do not fall</i>. The command is what
+    makes that one job cover many rows &mdash; and it is also what it cannot cover.</p>
+  <div class="tw"><table>
+    <tr><th class="n"></th><th>Run</th><th>Command</th><th class="n">Rows</th>
+        <th style="width:130px">Split</th>${COV_HEAD}</tr>
+    ${runs.map(x => `<tr>
+      <td class="n"><span class="chip ${chipFor(x.state)}"
+            style="font-family:ui-monospace">${esc(x.id)}</span></td>
+      <td><b>${esc(x.name)}</b><div class="dim small">${esc(x.state)}</div></td>
+      <td class="dim small"><code>${esc(x.commands || "—")}</code></td>
+      <td class="n"><b>${x.count}</b></td>
+      <td>${covBar(x.coverage)}</td>
+      ${covCells(x.coverage)}</tr>`).join("")}
+  </table></div>
+  <div class="cols" style="margin-top:18px">
+    ${runs.map(x => `<div class="card">
+      <h3>${esc(x.id)} &nbsp;${esc(x.name)}</h3>
+      <p class="small">${covWords(x.coverage)}.</p>
+      <p class="why small">${esc(x.why)}</p>
+      ${x.gap ? `<div class="risk small"><b>Known gap.</b> ${esc(x.gap)}</div>` : ""}
+    </div>`).join("")}
+  </div>
+  <h3 style="margin-top:24px">R1 one level down</h3>
+  <div class="tw"><table>
+    <tr><th class="n">#</th><th>Row</th><th>Covered by</th><th class="n">Stands in for</th>
+        <th>Why</th></tr>
+    ${(runs[0] || {skills: []}).skills.map(k => `<tr>
+      <td class="n dim">${k.n}</td>
+      <td><b>${esc(k.name)}</b></td>
+      <td class="dim"><span class="dot ${k.coverage}"></span>${esc(COV_SHORT[k.coverage])}</td>
+      <td class="n dim">${k.covers.length > 1 ? k.covers.length + " rows" : "&mdash;"}</td>
+      <td class="dim small">${esc(k.note)}</td></tr>`).join("")}
+  </table></div>`;
+
+/* ------------------------------------------------------- 4. one sim ------ */
+const sim = () => {
+  const m = s.sampling;
+  if (m.error) return `<div class="risk small"><b>Could not read the numbers.</b>
+    ${esc(m.error)}</div>`;
+  return `
+  <p class="lede">Not one simulation per skill. <b>One simulation</b>, holding
+    ${esc(m.headline.envs)} robots, each handed its own random command that rerolls
+    every few seconds. Every number below is read out of the file that sets it.</p>
+  <div class="cols">
+    <div class="card">
+      <h3>What goes in</h3>
+      <div class="tw"><table>
+        <tr><th>Input</th><th class="n">Value</th><th>Read from</th></tr>
+        ${m.inputs.map(i => `<tr>
+          <td><b>${esc(i.label)}</b><div class="dim small">${esc(i.note)}</div></td>
+          <td class="n"><b>${esc(i.value)}</b> <span class="dim">${esc(i.unit)}</span></td>
+          <td class="dim small"><code>${esc(i.source)}</code></td></tr>`).join("")}
+      </table></div>
+    </div>
+    <div class="card">
+      <h3>What comes out</h3>
+      <div class="tw"><table>
+        <tr><th>Quantity</th><th class="n">Value</th><th>How</th></tr>
+        ${m.derived.map(d => `<tr>
+          <td><b>${esc(d.label)}</b><div class="dim small">${esc(d.aside)}</div></td>
+          <td class="n"><b>${esc(d.value)}</b> <span class="dim">${esc(d.unit)}</span></td>
+          <td class="dim small">${esc(d.how)}</td></tr>`).join("")}
+      </table></div>
+      <div class="note key small" style="margin-top:12px"><b>This is the answer
+        to "how many simulations".</b> One run tries ${esc(m.headline.commands)}
+        different command settings. That is how one reward function covers a list
+        of skills without a run per row.</div>
+    </div>
+  </div>`;
+};
+
+/* ---------------------------------------------------------- 5. the box --- */
+const theBox = () => {
+  const b = s.box || {};
+  const axes = (s.sampling || {}).axes || [];
+  return `
+  <p class="lede">${esc(b.lede || "")}</p>
+  <div class="cols">
+    <div class="card">
+      <h3>The box R1 is sampled over, today</h3>
+      <div class="tw"><table>
+        <tr><th>Axis</th><th class="n">From</th><th class="n">To</th>
+            <th>Read from</th><th>Note</th></tr>
+        ${axes.map(a => `<tr>
+          <td><b>${esc(a.axis)}</b></td>
+          <td class="n">${a.lo}</td><td class="n">${a.hi} <span class="dim">${esc(a.unit)}</span></td>
+          <td class="dim small"><code>${esc(a.const)}</code></td>
+          <td class="dim small">${esc(a.note)}</td></tr>`).join("")}
+      </table></div>
+      <div class="risk small"><b>Look at the forward row.</b> It starts at
+        ${(axes[0] || {}).lo}, not at zero and not below it. Every claim on this
+        page about walking backward or crabbing sideways runs into that one
+        number &mdash; those values were not sampled once in
+        ${((s.sampling || {}).headline || {}).commands || "-"} draws.</div>
+    </div>
+    <div class="card">
+      <h3>Why this is the only idea that matters</h3>
+      ${(b.paras || []).map(p => `<p class="why small">${esc(p)}</p>`).join("")}
+    </div>
+  </div>`;
+};
+
+/* --------------------------------------------------------- 6. measured --- */
+const measured = () => {
+  const d = s.driven || {};
+  if (!d.exists) return `<p class="lede">Nothing measured yet. Run
+    <code>python run.py scripts/drive.py --run &lt;n&gt;</code> to drive a trained
+    policy with a chosen command and this fills in.</p>`;
+  const row = (c) => {
+    const gap = c.went_nowhere ? null : c.got_deg - c.asked_deg;
+    return `<tr>
+      <td><code>${esc(c.case)}</code></td>
+      <td class="n">${c.commanded.vx >= 0 ? "+" : ""}${c.commanded.vx},
+        ${c.commanded.vy >= 0 ? "+" : ""}${c.commanded.vy}</td>
+      <td class="n dim">${c.asked_deg > 0 ? "+" : ""}${c.asked_deg}&deg;</td>
+      <td class="n">${c.went_nowhere
+        ? `<span style="color:var(--bad)">did not move</span>`
+        : `<b>${c.got_deg > 0 ? "+" : ""}${c.got_deg}&deg;</b>`}</td>
+      <td class="n dim">${c.went_nowhere ? "&mdash;"
+        : `&plusmn;${c.sd_deg}&deg; <span class="small">(${c.lo_deg}..${c.hi_deg})</span>`}</td>
+      <td class="n">${c.walked.along_m.toFixed(2)} m</td>
+      <td class="dim small">${c.went_nowhere
+        ? "the angle is the direction of its own noise, not a heading"
+        : Math.abs(gap) < 4 ? "close to what was asked"
+        : `${Math.abs(gap).toFixed(1)}&deg; short of the command`}</td></tr>`;
+  };
+  return `
+  <p class="lede">Everything else on this page is a claim about what the reward
+    and the command CAN cover. This is a measurement of what one trained file
+    actually DID when it was told to &mdash; and the two disagreed, which is why
+    the section exists.</p>
+  ${facts([
+    {k:"Policy", v:"run #" + (d.number ?? "?"), n:esc(d.checkpoint || "")},
+    {k:"Robots", v:d.robots, n:"one command held for all of them"},
+    {k:"Each clip", v:(d.seconds || 0) + " s", n:"ground track measured, not eyeballed"},
+    {k:"Commands that did nothing", v:d.cases.filter(c => c.went_nowhere).length,
+     n:"of " + d.cases.length + " tried"},
+  ])}
+  <div class="tw"><table>
+    <tr><th>Case</th><th class="n">vx, vy</th><th class="n">Asked</th>
+        <th class="n">Walked</th><th class="n">Spread</th><th class="n">Distance</th>
+        <th>Reading</th></tr>
+    ${d.cases.map(row).join("")}
+  </table></div>
+  <div class="cols" style="margin-top:16px">
+    <div class="card">
+      <h3>The command works &mdash; on the average</h3>
+      <p class="why small">One policy file, one reward, nothing retrained between
+        clips: the sideways number bends the path, left when told left and right
+        when told right. That is the claim this whole page rests on, and it
+        holds.</p>
+      <p class="why small">It is not symmetric. Off the straight-ahead baseline,
+        asking for +0.10 moves the track about +11&deg; and asking for -0.10 moves
+        it only about -5&deg;. It steers left roughly twice as hard as right, and
+        over 64 robots that gap is well outside the noise.</p>
+    </div>
+    <div class="card">
+      <h3>But the spread is wider than the effect</h3>
+      <p class="why small">Read the spread column, not the mean. Straight ahead
+        spans -7&deg; to +18&deg;; diagonal-left spans -3&deg; to +33&deg;. They
+        overlap almost completely, so on any INDIVIDUAL robot the command cannot
+        be recovered from the path it walked. The average obeys. The individual
+        does not.</p>
+      <div class="risk small"><b>This is the drift bar, seen directly.</b> The bar
+        is 100 mm of sideways error over 5 m. A 4&deg; heading error is already
+        350 mm. The failure is not that the robot cannot steer &mdash; it is that
+        it does not steer the same way twice.</div>
+    </div>
+  </div>
+  <div class="note key small" style="margin-top:14px"><b>Source:</b>
+    <code>${esc(d.source || "")}</code>, written by
+    <code>scripts/drive.py</code> and read live. The clips are on
+    <a class="plain" href="/runs">the run page</a> for run #${d.number ?? "?"},
+    at the top of the strip.</div>`;
+};
+
+/* ------------------------------------------------------- 7. unreachable -- */
+const unreachable = () => {
+  const cls = s.blocked_classes || {};
+  const byClass = {};
+  for (const n of s.needs) (byClass[n.class] = byClass[n.class] || []).push(n);
+  const order = CLASS_ORDER.filter(k => byClass[k])
+    .concat(Object.keys(byClass).filter(k => !CLASS_ORDER.includes(k)));
+  return `
+  <p class="lede">${blockedTotal} rows that no weight in the current reward reaches.
+    <b>Not "impossible", and not "the hardware will never exist"</b> &mdash; cameras
+    and distance sensors are being fitted. It is ${order.length} different problems,
+    with ${order.length} different fixes, and only one of them is about sensing.</p>
+  ${order.map(k => {
+    const g = cls[k] || {};
+    const needs = byClass[k];
+    const rows = needs.reduce((a, n) => a + n.count, 0);
+    return `<div class="card" style="margin-bottom:16px">
+      <h3>${esc(g.label || k)}
+        <span class="chip warn" style="margin-left:8px">${rows} rows</span></h3>
+      <p class="why small">${esc(g.why || "")}</p>
+      <div class="note key small"><b>What it takes:</b> ${esc(g.fix || "")}</div>
+      <div class="tw"><table>
+        <tr><th>Missing</th><th class="n">Rows</th><th>What is not there</th>
+            <th>What it costs</th></tr>
+        ${needs.map(n => `<tr>
+          <td><span class="dot blocked"></span><b>${esc(n.label)}</b></td>
+          <td class="n"><b>${n.count}</b></td>
+          <td class="dim small">${esc(n.why)}</td>
+          <td class="dim small">${esc(n.cost || "")}</td></tr>`).join("")}
+      </table></div>
+    </div>`;
+  }).join("")}
+  <h3 style="margin-top:22px">Named, so none of them is quietly counted as progress</h3>
+  <div class="tw scroller"><table>
+    <tr><th class="n">#</th><th>Skill</th><th>Waiting on</th><th>Problem</th>
+        <th>Note</th></tr>
+    ${s.needs.flatMap(n => n.rows.map(r => `<tr>
+      <td class="n dim">${r.n}</td>
+      <td>${esc(r.name)}</td>
+      <td class="dim"><span class="dot blocked"></span>${esc(n.label)}</td>
+      <td class="dim small">${esc((cls[n.class] || {}).label || n.class)}</td>
+      <td class="dim small">${esc(r.why)}</td></tr>`)).join("")}
+  </table></div>`;
+};
+
+/* ------------------------------------------------------- 6. sensors ------ */
+const STATUS_CHIP = { committed: "ok", candidate: "now", not_recommended: "warn" };
+const STATUS_WORD = { committed: "decided", candidate: "on the menu",
+                      not_recommended: "no" };
+
+const sensorsSection = () => {
+  const m = s.sensors;
+  if (m.error) return `<div class="risk small"><b>Could not read the menu.</b>
+    ${esc(m.error)}</div>`;
+  const obs = m.observation_now || {};
+  const menu = m.sensors || [];
+  const act = m.actuators || {};
+  return `
+  <p class="lede">Section 5 says what is missing. This is the menu of things that
+    would supply it, and what each one really costs.</p>
+  <div class="note key" style="margin-bottom:18px"><b>The rule that orders this
+    whole list.</b> A sensor only helps a trained policy if the SIMULATOR can fake
+    it convincingly. The policy learns entirely in simulation, so a reading the sim
+    cannot generate is one the policy never sees in training &mdash; and on the real
+    robot that reading is noise occupying a slot that used to mean something.
+    Fitting the part is usually the smallest of the three costs.</div>
+  ${facts([
+    {k:"Numbers the policy reads now", v:obs.total || 0, n:"and nothing else reaches it"},
+    {k:"Sensors on the menu", v:menu.length, n:"2 decided, the rest open"},
+    {k:"Rows a camera would clear", v:(menu.find(x => x.key === "depth_camera") || {}).unblocks_rows || 0,
+     n:"the most expensive way to do it"},
+    {k:"Rows range finders would clear", v:(menu.find(x => x.key === "tof_array") || {}).unblocks_rows || 0,
+     n:"partly, and far cheaper — consider first"},
+  ])}
+
+  <h3>What the policy reads today</h3>
+  <div class="tw"><table>
+    <tr><th>Term</th><th class="n">Numbers</th><th>Comes from</th><th>What it is</th></tr>
+    ${(obs.terms || []).map(t => `<tr>
+      <td><code>${esc(t.name)}</code></td>
+      <td class="n"><b>${t.n}</b></td>
+      <td class="dim">${esc(t.from)}</td>
+      <td class="dim small">${esc(t.note)}</td></tr>`).join("")}
+    <tr><td><b>Total</b></td><td class="n"><b>${obs.total || 0}</b></td>
+      <td class="dim" colspan="2">Adding to this list changes its length, which
+        makes it a different policy. Every run restarts from zero &mdash; so
+        sensors get added in one batch, at a chosen moment, never one at a time.</td></tr>
+    ${(m.batch || {}).added ? `
+    <tr><td><b>Decided, not yet fitted</b>
+        <div class="dim small">${(m.batch.rows || []).map(r =>
+          esc(r.name) + " +" + r.adds).join(" &middot; ")}</div></td>
+      <td class="n" style="color:var(--accent)"><b>+${m.batch.added}</b></td>
+      <td class="dim" colspan="2">from ${m.batch.sensors} sensors</td></tr>
+    <tr><td><b>What it becomes</b></td>
+      <td class="n"><b style="font-size:17px">${m.batch.after}</b></td>
+      <td class="dim" colspan="2"><b>${m.batch.growth}&times; the current input
+        list.</b> That is the whole reason they go in together: each one alone
+        costs the same full retrain as all of them at once. The moment to spend
+        it is after R1 passes its bar, not during.</td></tr>` : ""}
+  </table></div>
+
+  <h3 style="margin-top:24px">The menu</h3>
+  <div class="tw scroller" style="max-height:none"><table>
+    <tr><th>Sensor</th><th>Status</th><th class="n">Adds</th><th>Unblocks</th>
+        <th>Why fit it</th><th>Faking it &mdash; the sim cost</th>
+        <th>Trusting it &mdash; sim to real</th><th class="n">g</th></tr>
+    ${menu.map(x => `<tr>
+      <td><b>${esc(x.name)}</b>
+        <div class="dim small">${esc(x.part || "")}</div></td>
+      <td><span class="chip ${STATUS_CHIP[x.status] || ""}">${esc(
+          STATUS_WORD[x.status] || x.status)}</span></td>
+      <td class="n dim small">${esc(String(x.adds))}</td>
+      <td>${x.unblocks_need
+            ? `<span class="dot blocked"></span><b>${x.unblocks_rows} rows</b>
+               <div class="dim small">${esc(x.unblocks_label)}, ${esc(x.unblocks_extent)}</div>`
+            : `<span class="dim">&mdash;</span>`}</td>
+      <td class="dim small">${esc(x.why_anyway || "")}</td>
+      <td class="dim small">${esc(x.fake_it || "")}</td>
+      <td class="dim small">${esc(x.trust_it || "")}</td>
+      <td class="n dim">${x.mass_g != null ? x.mass_g : "&mdash;"}</td></tr>`).join("")}
+  </table></div>
+  <p class="why small" style="margin-top:10px">Part numbers are examples of the
+    CLASS of device, picked because they are common and cheap. Their specs have
+    not been checked against a datasheet &mdash; confirm mass, current and update
+    rate against whatever is actually bought.</p>
+
+  <h3 style="margin-top:26px">Fitting them</h3>
+  <p class="lede">The mechanical design is the owner&rsquo;s. This is only the
+    part the software depends on: a sensor mounted somewhere other than where
+    the simulator thinks it is produces wrong numbers, and produces them
+    silently. For most of the list that does not matter. For three of them the
+    mounting position is <b>in the maths</b>.</p>
+  <div class="tw"><table>
+    <tr><th>Sensor</th><th class="n">Off</th><th>Position matters</th>
+        <th>What the software needs</th><th>Watch for</th></tr>
+    ${(m.fitting || []).map(f => `<tr>
+      <td><b>${esc(f.name)}</b></td>
+      <td class="n dim">&times;${f.count}</td>
+      <td><span class="chip ${f.matters === "critical" ? "warn"
+                            : f.matters === "none" ? "" : "now"}">${esc(f.matters)}</span></td>
+      <td class="dim small">${esc(f.need || "")}</td>
+      <td class="dim small">${esc(f.watch_for || "")}</td></tr>`).join("")}
+  </table></div>
+  ${(m.wiring || {}).notes ? `
+  <div class="card" style="margin-top:16px">
+    <h3>Buses, once all of it is on</h3>
+    <p class="why small">Not mechanical, and the part most likely to be found
+      late &mdash; after the wiring is routed.</p>
+    ${m.wiring.notes.map(x => `<div class="risk small">${esc(x)}</div>`).join("")}
+  </div>` : ""}
+
+  <h3 style="margin-top:26px">Bigger servos</h3>
+  <p class="lede">Available and not expensive in money. The column that matters
+    is <b>mass</b>, not torque.</p>
+  <div class="cols">
+    <div class="card">
+      <div class="tw"><table>
+        <tr><th class="n">Torque</th><th>Case</th><th class="n">Each</th>
+            <th class="n">All 12</th><th>Verdict</th></tr>
+        <tr><td class="n"><b>${(act.now || {}).torque_kgcm} kg&middot;cm</b></td>
+          <td class="dim">${esc((act.now || {}).model || "")} &mdash; now</td>
+          <td class="n">${(act.now || {}).mass_g} g</td>
+          <td class="n dim">&mdash;</td>
+          <td class="dim small">${(act.now || {}).speed_s_per_60deg} s / 60&deg;</td></tr>
+        ${(act.options || []).map(o => `<tr>
+          <td class="n"><b>${o.torque_kgcm} kg&middot;cm</b></td>
+          <td class="dim">${esc(o.case)}</td>
+          <td class="n">${o.mass_g} g</td>
+          <td class="n" style="color:${o.mass_g > 100 ? "var(--bad)" : "var(--ok)"}">
+            ${o.mass_g > (act.now || {}).mass_g
+              ? "+" + (12 * (o.mass_g - (act.now || {}).mass_g)) + " g" : "0 g"}</td>
+          <td class="dim small">${esc(o.verdict)}</td></tr>`).join("")}
+      </table></div>
+      <div class="risk small"><b>Specs unchecked.</b> These are typical figures for
+        the class, not datasheet values. Confirm before buying.</div>
+    </div>
+    <div class="card">
+      <h3>The catch</h3>
+      <p class="why small">${esc(act.the_catch || "")}</p>
+      <h3 style="margin-top:14px">The worse catch</h3>
+      <p class="why small">${esc(act.the_worse_catch || "")}</p>
+      <div class="note key small" style="margin-top:14px"><b>And the real point.</b>
+        ${esc(act.and_the_real_point || "")}</div>
+    </div>
+  </div>`;
+};
+
+/* ------------------------------------------------------- 7. five kinds --- */
+const KIND_LEDE = {
+  run: "A piece of work in its own right.",
+  axis: "Not a piece of work &mdash; a number changed inside one.",
+  constraint: "Never finished, never a stage.",
+  test: "Read off a trained policy, not trained toward.",
+  parked: "Not being worked. Each one names its trigger.",
+};
+const kinds = () => `
+  <div class="tw"><table>
+    <tr><th class="n"></th><th>Kind</th><th class="n">Groups</th><th class="n">Rows</th>
+        <th>What it means</th></tr>
+    ${s.kinds.map(k => `<tr>
+      <td class="n"><span class="chip">${esc(k.items.join(" "))}</span></td>
+      <td><b>${esc(k.name)}</b><div class="dim small">${KIND_LEDE[k.key] || ""}</div></td>
+      <td class="n">${k.subsections}</td>
+      <td class="n"><b>${k.count}</b></td>
+      <td class="dim small">${esc(k.blurb)}</td></tr>`).join("")}
+  </table></div>
+  <h3 style="margin-top:22px">What order, and why</h3>
+  <div class="cols tight">
+    ${s.order.map(o => `<div class="card"><p class="why small">${esc(o)}</p></div>`).join("")}
+  </div>`;
+
+/* ------------------------------------------------------- 7. pass bars ---- */
+const bars = () => `
+  <p class="lede">A group is passed by its bar, never by its curve. Clauses that
+    nothing measures are listed as unknown rather than dropped &mdash; an unlisted
+    clause is worse than a failing one, because it makes the count look complete.</p>
+  <div class="tw"><table>
+    <tr><th class="n"></th><th>Group</th><th>State</th><th>Passes when</th></tr>
+    ${s.subsections.map(x => `<tr>
+      <td class="n"><span class="chip ${chipFor(x.state)}"
+            style="font-family:ui-monospace">${esc(x.id)}</span></td>
+      <td><b>${esc(x.name)}</b></td>
+      <td class="dim">${esc(x.state)}</td>
+      <td class="dim">${esc(x.bar || "—")}
+        ${(x.unverified || []).map(u => `<div class="risk small" style="padding:8px 0 0">
+          <b style="color:var(--warn)">Nothing measures this.</b>
+          ${esc(u)}</div>`).join("")}
+        ${x.trigger ? `<div class="note key small" style="margin:8px 0 0">
+          <b>Un-parks when:</b> ${esc(x.trigger)}</div>` : ""}
+      </td></tr>`).join("")}
+  </table></div>`;
+
+/* ------------------------------------------------------- 8. every row ---- */
+const every = () => {
+  const rows = s.subsections.flatMap(x => x.skills.map(k => ({ ...k, sub: x })));
+  rows.sort((a, b) => a.n - b.n);
+  return `
+    <p class="lede">The owner's CSV, sorted. This page never invents a row and
+      never stores a copy &mdash; edit <code>${esc(s.path)}</code> and it changes.
+      ${s.total} rows, standing in for the ${s.from_rows} the library used to hold;
+      <b>stands in for</b> says how many each one absorbed.</p>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+      <input class="filter" id="q" placeholder="filter by skill or group"
+             style="flex:1;max-width:340px">
+      <span class="dim small" id="qn">${rows.length} rows</span>
+    </div>
+    <div class="tw scroller" style="max-height:calc(100vh - 300px)"><table>
+      <tr><th class="n">#</th><th>Skill</th><th class="n">Group</th>
+          <th>Covered by</th><th class="n">Stands in for</th><th>Difficulty dial</th></tr>
+      <tbody id="rows">${rows.map(k => `<tr data-s="${esc(
+          (k.name + " " + k.note + " " + k.sub.id + " " + k.sub.name + " " +
+           COV_SHORT[k.coverage]).toLowerCase())}">
+        <td class="n dim">${k.n}</td>
+        <td>${esc(k.name)}
+          ${k.note ? `<div class="dim small">${esc(k.note)}</div>` : ""}</td>
+        <td class="n"><span class="chip" style="font-family:ui-monospace">${esc(k.sub.id)}</span></td>
+        <td class="dim"><span class="dot ${k.coverage}"></span>${esc(COV_SHORT[k.coverage])}</td>
+        <td class="n dim">${k.covers.length > 1 ? k.covers.length : "&mdash;"}</td>
+        <td class="dim small">${k.dial ? esc(k.dial) : "&mdash;"}</td></tr>`).join("")}</tbody>
+    </table></div>`;
+};
+
+/* ------------------------------------------------------- 9. collapsed ---- */
+const calls = () => `
+  <p class="lede">The library used to hold ${s.from_rows} rows and now holds
+    ${s.total}. Nothing was thrown away: ${s.collapsed.length} of those rows each
+    stand in for several of the originals, because the old file said the same
+    thing many times over &mdash; 15 rows for jumping, 12 for ride height, 4 for
+    one drop height. The original is kept beside it as
+    <code>gray_skill_library_ORIGINAL_200.csv</code>, and the numbers below say
+    exactly where every one of its rows went.</p>
+  ${s.faults.length ? `<div class="risk small"><b>${s.faults.length} rows do not
+    parse.</b> ${s.faults.map(f => esc(`#${f.n} ${f.name}: ${f.what}`)).join("; ")}</div>`
+    : ""}
+  <div class="tw scroller"><table>
+    <tr><th class="n">#</th><th>Row</th><th class="n">Group</th>
+        <th class="n">Was</th><th>Old rows</th><th>Why they are one</th></tr>
+    ${s.collapsed.map(m => `<tr>
+      <td class="n dim">${m.n}</td>
+      <td><b>${esc(m.name)}</b></td>
+      <td class="n"><span class="chip" style="font-family:ui-monospace">${esc(m.group)}</span></td>
+      <td class="n"><b>${m.was}</b></td>
+      <td class="dim small" style="font-family:ui-monospace">${esc(m.covers.join(" "))}</td>
+      <td class="dim small">${esc(m.note)}</td></tr>`).join("")}
+  </table></div>`;
+
+/* ------------------------------------------------------ 10. method ------- */
+const method = () => `
+  <div class="cols tight">
+    ${s.intro.map(p => `<div class="card"><p class="why small">${esc(p)}</p></div>`).join("")}
+  </div>
+  <div class="note key small" style="margin-top:16px"><b>Source:</b>
+    <code>${esc(s.path)}</code> for the rows <i>and</i> for where each one lands
+    &mdash; kind, group, coverage and blocker are columns in the file now, not
+    lookup tables in Python;
+    <code>gray/tasks/</code> and <code>dashboard/queue.py</code> for every number
+    in section 4. Nothing on this page is typed twice.</div>`;
+
+paper([
+  { id: "top",       label: "Stage 2 - Train", lead: true, html: lead },
+  { id: "library",   label: "The library in one table", count: s.total, html: everything },
+  { id: "words",     label: "How a row is covered", count: COV.length, html: words },
+  { id: "trained",   label: "What the runs train for", count: s.runs, html: trained },
+  { id: "sim",       label: "One simulation, not forty", html: sim },
+  { id: "box",       label: "The box it is sampled over", count: ((s.sampling || {}).axes || []).length,
+    html: theBox },
+  { id: "measured",  label: "What it actually did when told",
+    count: (s.driven.cases || []).length, html: measured },
+  { id: "blocked",   label: "What no reward reaches", count: blockedTotal, html: unreachable },
+  { id: "sensors",   label: "What would unblock it", count: (s.sensors.sensors || []).length,
+    html: sensorsSection },
+  { id: "kinds",     label: "The five kinds", count: s.kinds.length, html: kinds },
+  { id: "bars",      label: "Pass bars", count: s.subsections.length, html: bars },
+  { id: "every",     label: "Every skill", count: s.total, html: every },
+  { id: "calls",     label: "What was collapsed", count: s.collapsed.length, html: calls },
+  { id: "method",    label: "How it was sorted", html: method },
+]);
+
+// Live filter on the full library table.
+const q = document.getElementById("q");
+if (q) q.addEventListener("input", () => {
+  const term = q.value.trim().toLowerCase();
+  let shown = 0;
+  for (const tr of document.querySelectorAll("#rows tr")) {
+    const hit = !term || tr.dataset.s.includes(term);
+    tr.classList.toggle("hidden", !hit);
+    if (hit) shown++;
+  }
+  document.getElementById("qn").textContent =
+    term ? `${shown} of ${s.total} rows` : `${s.total} rows`;
+});
+
+}).catch(fail);
+</script>
+</body>
+</html>

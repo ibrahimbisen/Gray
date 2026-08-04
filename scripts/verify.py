@@ -58,6 +58,21 @@ TASKS = {
                   "bar_survive": 0.90, "bar_err_mm": 40.0, "bar_upright": 0.90,
                   "walk": True,
                   "test_speed": 0.25,        # m/s forward, held for the whole test
+                  # Backward is now inside the box, so it has to be inside the
+                  # bar too - a range you train over and never check is a range
+                  # you are guessing about. Set at -0.35, the EDGE of the box,
+                  # on the owner's call, stated twice.
+                  # in the middle of the box rather than at its 0.35 edge, so a
+                  # policy can pass forward and fail backward on the asymmetry
+                  # alone. That is the owner's decision and it is the strict
+                  # direction to be wrong in.
+                  #
+                  # NOT WIRED UP YET. This value is read by nothing: the walk
+                  # test still runs one pass, forward. Making it two passes and
+                  # scoring the worse of them is the remaining work. Until that
+                  # lands, backward is measurable but not gated - use
+                  #   python scripts/drive.py --run N --cases "-0.35,0,0"
+                  "test_speed_back": -0.35,
                   "bar_distance_m": 5.0,
                   "bar_speed_err": 0.05,     # m/s, mean absolute
                   "bar_drift_mm": 100.0},
@@ -197,9 +212,24 @@ def main() -> int:
         cmd.ranges.lin_vel_y = (0.0, 0.0)
         cmd.ranges.ang_vel_z = (0.0, 0.0)
         cmd.rel_standing_envs = 0.0      # nobody is told to stand still
-        cmd.rel_forward_envs = 1.0       # everybody goes straight
+        cmd.rel_forward_envs = 0.0       # mjlab's version forces the speed
+        cmd.rel_straight_envs = 1.0      # everybody goes straight - ours does not
         # Longer than the test, so it is drawn once and never changes under us.
         cmd.resampling_time_range = (1e6, 1e6)
+
+    # The posture command has to be pinned too, and for exactly the same reason.
+    # It arrived on 3 Aug 2026 and is drawn at random like any other command - so
+    # left alone, a robot being tested on "walk 5 m in a straight line" would
+    # spend the test being told to crouch to 150 mm and lean 20 degrees, and the
+    # result would be a measurement of something nobody asked about.
+    posture = env_cfg.commands.get("posture")
+    if posture is not None:
+        h = posture.nominal_height
+        posture.ranges.height = (h, h)
+        posture.ranges.pitch = (0.0, 0.0)
+        posture.ranges.roll = (0.0, 0.0)
+        posture.rel_nominal_envs = 1.0
+        posture.resampling_time_range = (1e6, 1e6)
     agent_cfg = load_rl_cfg(args.task)
     env = RslRlVecEnvWrapper(ManagerBasedRlEnv(env_cfg, device="cuda:0"),
                              clip_actions=agent_cfg.clip_actions)

@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gray &mdash; dials</title>
+<link rel="stylesheet" href="/page.css">
+<style>
+/* The track. One horizontal scale per dial, because each has its own units -
+   metres per second, radians per second, a bare multiplier. Two dials on one
+   axis would be a lie about their scales, so they never share one.
+
+   A bar would be wrong here: a bar means "how much", measured from zero. These
+   are INTERVALS - a low end and a high end - and what matters is which part of
+   the line is covered and which part is not. So: a full-width line for what the
+   dial can be set to, a solid band for the part actually swept, and nothing at
+   all where it was never swept. Empty means empty.
+
+   Colour carries one thing only, whether the robot reads the dial, and it is
+   never the only carrier: every band is labelled with its own numbers, and the
+   two kinds live under two headings. Validated with the dataviz checker on both
+   surfaces - deltaE 19.6 deutan on the dark surface, 23.7 on the light. */
+.track { position:relative; height:34px; margin:2px 0 0; }
+.track .line { position:absolute; left:0; right:0; top:15px; height:4px;
+  border-radius:99px; background:var(--grid);
+  border:1px dashed var(--line); box-sizing:border-box; }
+.track .band { position:absolute; top:13px; height:8px; border-radius:4px; }
+.track .band.reads { background:var(--s1); }
+.track .band.world { background:var(--s3); }
+/* The zero mark. On `forward` it lands outside the swept band, which is the
+   whole finding, so it is drawn full height rather than as a tick. */
+.track .zero { position:absolute; top:4px; bottom:10px; width:1px;
+  background:var(--muted); }
+.track .zero b { position:absolute; top:-4px; left:3px; font-size:9.5px;
+  color:var(--muted); font-weight:600; }
+/* Direct labels on the ends of the band, not a number on every point. */
+.track .end { position:absolute; top:22px; font-size:10.5px; color:var(--ink2);
+  font-variant-numeric:tabular-nums; white-space:nowrap; }
+.track .end.hi { transform:translateX(-100%); }
+/* A real-world value that falls OUTSIDE the swept band. This is the question a
+   band with no scale beside it cannot answer: is it wide enough? */
+.track .ref { position:absolute; top:9px; height:16px; width:1px;
+  background:var(--crit); }
+.track .ref.inside { background:var(--muted); }
+.track .ref span { position:absolute; top:-11px; left:3px; font-size:9.5px;
+  white-space:nowrap; color:var(--crit); }
+.track .ref.inside span { color:var(--muted); }
+
+.dial { padding:14px 0; border-top:1px solid var(--grid); }
+.dial:first-child { border-top:0; padding-top:2px; }
+.dial .hd { display:flex; align-items:baseline; gap:10px; }
+.dial .hd b { font-size:14px; }
+.dial .hd .u { font-size:11px; color:var(--muted); }
+.dial .hd .rng { margin-left:auto; font-size:12px; font-variant-numeric:tabular-nums;
+  color:var(--ink); }
+.dial .what { font-size:12px; color:var(--ink2); margin:2px 0 0; }
+.dial .gapnote { font-size:11.5px; color:var(--crit); margin-top:4px; }
+
+.key { display:flex; gap:18px; flex-wrap:wrap; font-size:11.5px; margin-bottom:14px; }
+.key span { display:flex; align-items:center; gap:7px; color:var(--ink2); }
+.key i { width:14px; height:8px; border-radius:4px; display:block; }
+.key i.reads { background:var(--s1); }
+.key i.world { background:var(--s3); }
+.key i.none { background:var(--grid); border:1px dashed var(--line);
+  box-sizing:border-box; height:6px; }
+</style>
+</head>
+<body>
+<div id="nav"></div>
+<div class="app">
+  <aside class="side"></aside>
+  <main class="main"></main>
+</div>
+
+<script src="/page.js"></script>
+<script>
+get("/api/dials").then(s => {
+mountNav("/dials", navState(s.nav));
+
+/* Decimal places come from the DIAL, not from each value, so one row never
+   prints "0.800 to 1.20". And a sign is only shown where the dial actually has
+   two sides: a "+" on a friction coefficient reads as a change, not a value. */
+const dp = (d) => {
+  const a = Math.max(Math.abs(d.lo), Math.abs(d.hi));
+  return a >= 100 ? 0 : a >= 10 ? 1 : a >= 1 ? 2 : 3;
+};
+const num = (v, d) => {
+  const places = typeof d === "object" ? dp(d) : 3;
+  const signed = typeof d === "object" ? d.lo < 0 : true;
+  const unit = typeof d === "object" ? d.unit : d;
+  return (v > 0 && signed ? "+" : "") + v.toFixed(places) +
+         (unit ? " " + unit : "");
+};
+const pct = (v, lo, hi) => hi === lo ? 0 : 100 * (v - lo) / (hi - lo);
+
+/* One dial. `kind` is "reads" or "world" - the only thing colour says. */
+function track(d, kind) {
+  const { full_lo: a, full_hi: b } = d;
+  const l = pct(d.lo, a, b), r = pct(d.hi, a, b);
+  const zero = (a < 0 && b > 0)
+    ? `<div class="zero" style="left:${pct(0, a, b)}%"><b>0</b></div>` : "";
+  const refs = (d.refs || []).map(x => {
+    const inside = d.lo <= x.at && x.at <= d.hi;
+    return `<div class="ref ${inside ? "inside" : ""}" style="left:${pct(x.at, a, b)}%"
+      title="${esc(x.what)} — ${num(x.at, d)}"><span>${esc(x.what)}</span></div>`;
+  }).join("");
+  return `<div class="track">
+    <div class="line"></div>
+    <div class="band ${kind}" style="left:${l}%;width:${Math.max(r - l, 1.2)}%"
+         title="swept ${num(d.lo, d)} to ${num(d.hi, d)}"></div>
+    ${zero}${refs}
+    <div class="end" style="left:${l}%">${num(d.lo, d)}</div>
+    <div class="end hi" style="left:${r}%">${num(d.hi, d)}</div>
+  </div>`;
+}
+
+const dial = (d, kind, gap) => `
+  <div class="dial">
+    <div class="hd"><b>${esc(d.name)}</b><span class="u">${esc(d.unit || d.units_note || "")}</span>
+      <span class="rng">${num(d.lo, d)} &nbsp;to&nbsp; ${num(d.hi, d)}</span></div>
+    <p class="what">${esc(d.what)}</p>
+    ${track(d, kind)}
+    ${gap ? `<div class="gapnote">${gap}</div>` : ""}
+  </div>`;
+
+const KEY = `<div class="key">
+  <span><i class="reads"></i>swept, and the robot reads the number</span>
+  <span><i class="world"></i>swept, and the robot never sees it</span>
+  <span><i class="none"></i>not swept &mdash; no answer there, or no dial left</span>
+</div>`;
+
+/* ------------------------------------------------------------------ lead -- */
+const lead = () => `
+  <div class="eyebrow">Dials</div>
+  <h1>Everything that gets varied, and how far</h1>
+  <p class="lede">There are two kinds, and the difference is the only thing you
+    have to hold on to: <b>the robot reads one kind and not the other</b>. Every
+    number on this page is read out of the task files, so it cannot go stale.</p>
+  ${s.missing.length ? `<div class="banner bad"><div><b>Could not read
+    ${s.missing.length}.</b> ${esc(s.missing.join("; "))}</div></div>` : ""}
+  <div class="cols">
+    <div class="card">
+      <h3><span class="sw" style="background:var(--s1)"></span>The robot reads it</h3>
+      <p class="why small">${s.command.length} numbers, handed to it every step, alongside which
+        way is down and where its joints are. This is the whole of what you can
+        <i>ask</i> for. Set them and it obeys &mdash; as well as it can.</p>
+    </div>
+    <div class="card">
+      <h3><span class="sw" style="background:var(--s3)"></span>The world has it</h3>
+      <p class="why small">Rolled fresh at the start of every attempt, and never
+        told to the robot. You cannot ask it to be lighter; you can only make it
+        lighter and see what happens. It finds out through its feet.</p>
+    </div>
+  </div>
+  <div class="note key" style="margin-top:16px"><b>One rule covers both.</b>
+    Inside the range that was swept, it copes. Outside it, it guesses. Never
+    sweep foot grip below 0.4 and ice is a stranger &mdash; exactly as never
+    sweeping forward speed below 0.15 made <i>backward</i> a stranger.</div>`;
+
+/* -------------------------------------------------------------- commands -- */
+const commands = () => {
+  /* An empty stretch of track means one of two completely different things, and
+     saying the wrong one would be worse than saying nothing. Where a limit has
+     been MEASURED the gap is the robot running out of leg; everywhere else it is
+     a part of the dial nobody ever asked for. */
+  const gapFor = (d) => {
+    if (d.measured_limit) return d.limit_note
+      ? `<span style="color:var(--muted)">The ends are where the legs run out,
+         not where the sweep stopped &mdash; ${esc(d.limit_note)}.</span>` : "";
+    if (d.symmetric) return "";
+    const side = d.lo > 0 ? "negative" : "positive";
+    return `The whole ${side} half of this dial has never been swept, and neither
+      has zero. Ask for one and the policy is guessing.`;
+  };
+  return `
+  <p class="lede">${s.command.length} numbers. Not a list of moves &mdash; a joystick. Three say where
+    the body should GO; three say where it should BE.
+    &ldquo;Backward&rdquo; is not a command, it is the first dial set below zero.</p>
+  ${KEY}
+  <div class="card">${s.command.map(d => dial(d, "reads", gapFor(d))).join("")}</div>
+  <div class="note small" style="margin-top:12px"><b>What the empty line means.</b>
+    Each track runs from the swept range mirrored about zero &mdash; so the gap on
+    <i>forward</i> is exactly the half that was never asked for. It is <b>not</b> a
+    physical limit. Nothing has measured a top speed yet, and putting a guess here
+    would be a number nobody could trace; PLAN 1.4.1 is where it gets measured.
+    The two symmetric dials fill their line because they are symmetric, not
+    because they are as wide as they could be.</div>
+  <h3 style="margin-top:22px">The same three dials, at different settings</h3>
+  <div class="tw"><table>
+    <tr><th>What you would call it</th><th class="n">forward</th>
+        <th class="n">sideways</th><th class="n">turn</th><th>Ever asked for?</th></tr>
+    ${[["walk forward", 0.25, 0, 0], ["walk backward", -0.25, 0, 0],
+       ["crab sideways", 0, 0.10, 0], ["diagonal", 0.20, 0.10, 0],
+       ["spin on the spot", 0, 0, 0.5], ["walk a curve", 0.25, 0, 0.3],
+       ["stand still", 0, 0, 0]].map(([n, x, y, t]) => {
+      const f = s.command[0] || {lo: 0, hi: 0};
+      // Standing still IS sampled - one attempt in seven commands a full stop -
+      // so a bare "vx outside the band" test would wrongly mark it never asked.
+      const stop = x === 0 && y === 0 && t === 0;
+      const ok = stop || ((x === 0 || (f.lo <= x && x <= f.hi)) && (x !== 0 || y === 0));
+      return `<tr>
+        <td>${esc(n)}</td>
+        <td class="n">${x ? num(x, "") : "0"}</td>
+        <td class="n">${y ? num(y, "") : "0"}</td>
+        <td class="n">${t ? num(t, "") : "0"}</td>
+        <td>${ok ? `<span class="chip ok">yes</span>`
+                 : `<span class="chip bad">never</span>`}</td></tr>`;
+    }).join("")}
+  </table></div>`;
+};
+
+/* ------------------------------------------------------------------- mix -- */
+const mix = () => {
+  const m = s.mix;
+  const stand = Math.round(m.standing * 100), fwd = Math.round(m.forward_only * 100);
+  return `
+  <p class="lede">The three numbers are not drawn evenly. Every few seconds each
+    robot is handed a fresh set, drawn like this.</p>
+  ${tiles([
+    {k: "A full stop", v: stand + "%", d: `about 1 attempt in ${Math.round(1 / m.standing)}.
+       Without them the policy never learns that zero means stand`},
+    {k: "Straight, nothing else", v: fwd + "%", d: "sideways and turn forced to zero, forward speed as drawn - backward included"},
+    {k: "The full draw", v: (100 - fwd - stand) + "%", d: "the only share that ever gets a turn or a lean"},
+    {k: "Held for", v: `${m.hold_lo}–${m.hold_hi} s`, d: "then re-rolled, mid-stride"},
+  ])}
+  <div class="note"><b>This is why pure sideways has never happened.</b>
+    The ${fwd}% that get a straight line have sideways forced to zero. The rest
+    still draw forward speed from ${num(s.command[0].lo, "")} upward. So a crab
+    step with <i>no</i> forward motion is not in the ${100 - stand}% that move at
+    all, and the ${stand}% that do not move are standing still.</div>`;
+};
+
+/* ----------------------------------------------------------------- world -- */
+const world = () => `
+  <p class="lede">Five numbers the robot is never told. Each one is a thing
+    nobody actually knows about the real robot, so rather than guess a value the
+    policy is made to work across a band of them.</p>
+  ${KEY}
+  <div class="card">${s.world.map(d => dial(d, "world",
+    d.outside.length
+      ? `Outside the band: ${d.outside.map(r =>
+          `<b>${esc(r.what)}</b> at ${num(r.at, d)}`).join(", ")}.
+         It has no answer for ${d.outside.length === 1 ? "that" : "those"} yet.`
+      : "")).join("")}</div>
+  <div class="note key" style="margin-top:16px"><b>None of this is a new skill.</b>
+    The policy never sees the word gravel. It sees the same numbers arriving in a
+    different pattern. That is also where sim-to-real toughness comes from: a
+    policy that survives the band survives the real value, which is the right
+    answer to a number nobody can measure yet.</div>`;
+
+/* ----------------------------------------------------------------- shove -- */
+const shove = () => {
+  const v = s.shove;
+  return `
+  <p class="lede">Not a dial &mdash; an event. Something shoves the robot, from a
+    random angle, and it has to stay up.</p>
+  ${v.on_in_walk
+    ? `<div class="banner ok"><div><b>On</b> in the walk task.</div></div>`
+    : `<div class="banner"><div><b>Off in the walk task, on in the push task.</b>
+        A first walk has enough to deal with, so
+        <code>cfg.events.pop("shove")</code> switches it off. The ground, mass
+        and servo dials above stay on.</div></div>`}
+  ${facts([
+    {k: "Shove speed", v: `${v.speed[0]}–${v.speed[1]} m/s`, n: "sideways kick to the trunk"},
+    {k: "Shove spin", v: `±${v.spin[1]} rad/s`, n: "and it sets it turning too"},
+    {k: "How often", v: `every ${v.every[0]}–${v.every[1]} s`, n: "at a random angle each time"},
+  ])}`;
+};
+
+/* ----------------------------------------------------------------- table -- */
+/* Every value again, as text. A chart that cannot be read as a table is a chart
+   that some people simply cannot read. */
+const table = () => `
+  <p class="lede">The same numbers, as text.</p>
+  <div class="tw"><table>
+    <tr><th>Dial</th><th>Robot reads it</th><th class="n">Low</th><th class="n">High</th>
+        <th>Unit</th><th>Read from</th></tr>
+    ${[...s.command.map(d => [d, "yes"]), ...s.world.map(d => [d, "no"])]
+      .map(([d, reads]) => `<tr>
+        <td><b>${esc(d.name)}</b><div class="sub">${esc(d.what)}</div></td>
+        <td>${reads === "yes" ? `<span class="chip now">yes</span>`
+                              : `<span class="chip">no</span>`}</td>
+        <td class="n">${num(d.lo, "")}</td>
+        <td class="n">${num(d.hi, "")}</td>
+        <td class="dim">${esc(d.unit || d.units_note || "—")}</td>
+        <td class="dim small mono">${esc(d.source)}</td></tr>`).join("")}
+  </table></div>`;
+
+paper([
+  { id: "top",      label: "Dials", lead: true, html: lead },
+  { id: "commands", label: "The ones it reads", count: s.command.length, html: commands },
+  { id: "mix",      label: "How a command is drawn", html: mix },
+  { id: "world",    label: "The ones the world has", count: s.world.length, html: world },
+  { id: "shove",    label: "The shove", html: shove },
+  { id: "table",    label: "All of it, as a table",
+    count: s.command.length + s.world.length, html: table },
+]);
+
+}).catch(fail);
+</script>
+</body>
+</html>

@@ -16,10 +16,13 @@ Stage 1 is not finished and saying it is was the plan contradicting itself: thre
 of the numbers in it have no datasheet and can only come off the physical robot,
 which is stage 3. Stage 3 therefore does not wait for stage 2 - it feeds stage 1.
 
-Stage 2 is the one with depth. It is broken up in dashboard/skills.py, which sorts
-the owner's skill library live from the CSV - by what each row actually IS, not by
-what it looks like. Three training runs, one dial, one constraint, two test groups,
-two parked.
+Stage 2 is the one with depth, and PLAN.md is its plan: five steps, agreed 3 Aug
+2026. FORWARD below is that plan as data, and it is the only plan on the page -
+the six A-F phases and the nine subsections it used to show are gone.
+
+Stage 2 is also broken up in dashboard/skills.py, which sorts the owner's skill
+library live from the CSV - by what each row actually IS, not by what it looks
+like. Two training runs, one dial, one constraint, two test groups, three parked.
 
 The reward terms on the page are NOT written here. They are read off the task
 configs in gray/tasks/, so the page cannot drift from the code the way the old
@@ -101,17 +104,19 @@ PROJECT = [
         "name": "Train",
         "state": "in progress",
         "one_line": "Teach it, in simulation.",
-        "summary": "200 skills in the library, sorted by what each row actually is. "
-                   "Three training runs, one randomisation dial, one constraint, two "
-                   "groups of tests, two parked.",
+        "summary": "PLAN.md's five steps: locomotion, getting up, joining them, then "
+                   "the sensors twice - once to keep what you had, once to use them. "
+                   "Two training runs, one randomisation dial, one constraint, two "
+                   "groups of tests, three parked.",
         "why": "This is where the project lives for a long time, and it is far smaller "
                "than 200 rows makes it look. The unit of work is a training run, not a "
                "skill: the largest group of rows is ONE run with different commands, "
                "the next largest is the range that run is sampled over, and the rest "
                "are checked or measured rather than trained. Live counts are on the "
                "stage 2 page - they are read from the CSV, never written down here.",
-        "headline": "R1 locomotion is training. R2 getting up and R3 foot-on-object "
-                    "not started. Jumping and seeing are parked, each with a trigger.",
+        "headline": "At PLAN.md 1.1.2 - round 0, the noise floor. R2 getting up not "
+                    "started. R3 foot-on-object, jumping and seeing are shelved, each "
+                    "with the thing that un-shelves it.",
         "page": "/stage2",
     },
     {
@@ -349,8 +354,8 @@ STAGE1 = {
 # ---------------------------------------------------------------------------
 
 STAGE2 = {
-    "lede": "200 skills, sorted by what each row actually IS - three training runs, "
-            "one dial, one constraint, two groups of tests, two parked.",
+    "lede": "200 skills, sorted by what each row actually IS - two training runs, "
+            "one dial, one constraint, two groups of tests, three parked.",
     "intro": [
         "The library is the owner's. This page does not invent skills or store a copy "
         "of them; it reads the CSV and sorts it. Edit the CSV and this page changes.",
@@ -363,9 +368,10 @@ STAGE2 = {
         "setpoint, so it shares a run. Getting up off its back has no commanded "
         "velocity to track, so every tracking term is meaningless and it needs its "
         "own. That test is not a judgement call - write the reward down and look.",
-        "Applied to 200 rows it gives three runs. Everything else is a dial turned "
-        "during a run, a property checked across all of them, or a measurement taken "
-        "afterwards - and each of those is cheap in a way a run is not.",
+        "Applied to 200 rows it gives two runs - locomotion, and getting up. They are "
+        "PLAN.md steps 1 and 2. Everything else is a dial turned during a run, a "
+        "property checked across all of them, or a measurement taken afterwards - and "
+        "each of those is cheap in a way a run is not.",
     ],
     "bars": {
         "walk": "Walks 5 m without falling, holds commanded speed within 0.05 m/s, "
@@ -374,7 +380,9 @@ STAGE2 = {
                 "target, uprightness above 0.99.",
         "recover": "Stands up from 9 of 10 random ground poses in under 3 s, and "
                    "hands control back to R1 upright and stable.",
-        "tool": "Moves the target object by the commanded amount without falling.",
+        "tool": "Shelved. It would be: moves the target object by the commanded "
+                "amount without falling. Nothing depends on it, so nothing makes it "
+                "due.",
         "robust": "Every bar above still holds with the dials at full.",
         "quality": "The observation space contains nothing Gray cannot measure, and "
                    "no commanded motion exceeds what 1.96 N-m at 50 Hz can produce.",
@@ -398,9 +406,12 @@ STAGE2 = {
         "R2 before anything that involves leaving the ground. Jumping means falling, "
         "and a robot should be able to get up before it is taught to jump.",
         "T1 only once R1 and R2 both exist - it tests the handover between them, which "
-        "cannot be tested before there are two things to hand over.",
-        "R3 last of the runs. It needs objects in the scene, which nothing else does, "
-        "and nothing depends on it.",
+        "cannot be tested before there are two things to hand over. PLAN.md step 3. "
+        "The preparation for it happens inside R1 and R2, at 1.1.6 and 2.1.2, not "
+        "here.",
+        "R3 is shelved, not queued last. It needs objects in the scene, which nothing "
+        "else does, and nothing depends on it - so there is no event that makes it "
+        "due.",
     ],
 }
 
@@ -467,8 +478,13 @@ STAGE3 = {
 }
 
 # ---------------------------------------------------------------------------
-# The pipeline the training monitor shows. Built from the same subsections, so
-# there is exactly one plan in this repo rather than two that drift apart.
+# What the training monitor shows for the skill library: one row per group in
+# skills.SUBSECTIONS, with the bar each one has to pass.
+#
+# This is NOT the plan. The plan is PLAN.md, and FORWARD below is the only copy
+# of it in this file. These nine rows are a sort of the owner's CSV - what each
+# library row IS - and they were being read as a nine-step plan, which is one of
+# the five competing structures this file used to ship.
 # ---------------------------------------------------------------------------
 
 STAGES = [
@@ -515,7 +531,7 @@ SCORING_INTRO = [
     "Notice what is NOT in the table: there is no 'gravel' term, no 'sideways' term, "
     "no 'recover from a shove' term. The reward says what good MEANS; the "
     "randomisation says which situations you have to be good in. Skills come out of "
-    "the second one, not the first. That is why 200 rows collapse into three runs.",
+    "the second one, not the first. That is why 200 rows collapse into two runs.",
     "Most terms use the same shape: score = exp(-(error squared) / tolerance). That "
     "gives 1.0 for perfect, about 0.6 when the error equals the tolerance, and "
     "approaches 0 beyond it. It is smooth, which matters - a reward that jumps gives "
@@ -643,10 +659,11 @@ PHASES = [
     },
     {
         "n": 2, "name": "Train", "state": "next",
-        "one_line": "Three training runs, not 200 skills.",
-        "detail": "R1 locomotion is training - one policy covering standing, walking, "
-                  "turning and strafing. R2 getting up and R3 foot-on-object are not "
-                  "started. Jumping and seeing are parked with triggers.",
+        "one_line": "Five steps, two training runs, not 200 skills.",
+        "detail": "PLAN.md: locomotion, getting up, join them up, then the sensors "
+                  "twice. At 1.1.2 today - round 0, the noise floor. R2 getting up is "
+                  "not started. R3 foot-on-object, jumping and seeing are shelved, "
+                  "each with the thing that un-shelves it.",
         "needs_robot": False,
     },
     {
@@ -659,30 +676,36 @@ PHASES = [
 ]
 
 NEXT_UP = {
-    "title": "R1  Locomotion",
-    "why": "The largest group in the library, and one policy file. Standing, walking, "
-           "turning and strafing are the same reward with a different setpoint, so "
-           "they train together. It is the largest single piece of the project and "
-           "the only one on the critical path to a robot walking on a floor.",
+    "title": "PLAN.md 1.1.2  Round 0, the noise floor",
+    "why": "Step 1.1 is make it walk, and 1.1.2 is where the project is. Three "
+           "identical configs on three seeds. Whatever those three disagree by is "
+           "the noise floor, and every later difference has to beat it before it "
+           "means anything. It looks like the least of the four rounds and it is the "
+           "one everything after it is read against.",
     "before": [
-        {"task": "Hold the R1 bar", "who": "code",
-         "note": "5 m without falling, commanded speed within 0.05 m/s, under 100 mm "
-                 "of sideways drift over 20 s."},
-        {"task": "Widen the command vector", "who": "code",
-         "note": "Add height, pitch and roll alongside vx, vy and yaw. This is what "
-                 "folds the old balance subsection in. The observation grows by three, "
-                 "so the contract changes and the current policy is superseded - a few "
-                 "hours of retraining."},
-        {"task": "Turn the D1 dials up", "who": "code",
-         "note": "Friction, mass, centre of mass, servo gains and joint friction are "
-                 "already randomised. Terrain, payload and damaged servos come next."},
+        {"task": "1.1.2  Run round 0", "who": "code",
+         "note": "3 runs, one config, three seeds. Nothing varies but the random "
+                 "number stream."},
+        {"task": "1.1.3 to 1.1.5  Rounds 1 to 3", "who": "code",
+         "note": "8 runs on the straightness terms, 4 on the speed terms, then 3 long "
+                 "runs of the winner on seeds it has not seen. Each round is designed "
+                 "after the one before it is read."},
+        {"task": "1.1.6  Handover-shaped resets", "who": "code",
+         "note": "Add R2-like start states to R1's reset mix. This is preparation for "
+                 "step 3 and it has to happen inside step 1 - a runtime rule cannot "
+                 "fix a state R1 never trained on."},
+        {"task": "Close step 1.1's gate", "who": "code",
+         "note": "All six R1 criteria pass. 4 of 6 today: sideways drift is 21x its "
+                 "bar and speed tracking is 1.4x its bar. Only then does 1.2 widen "
+                 "the command box."},
         {"task": "Sit down and list the parts", "who": "owner",
          "note": "Slicer grams per printed part, plus the exact battery, Pi, boards, "
                  "pots and fasteners. Closes the largest guess in stage 1 and needs no "
                  "hardware."},
         {"task": "Start the hardware in parallel", "who": "owner",
-         "note": "Pots, ADC and IMUs. Nothing in training is blocked on it, and "
-                 "everything in stage 3 is."},
+         "note": "Pots, ADC and IMUs. Step 4 fits them, and stage 3.3 measures the "
+                 "three numbers the model is guessing. Nothing in training is blocked "
+                 "on it, and everything in stage 3 is."},
     ],
     "open": [
         {"q": "Three of stage 1's numbers have no datasheet.",
@@ -1072,13 +1095,451 @@ def driven() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# The week. A designed set of experiments rather than a long run.
+# Shelved. Not forgotten, not blocked - decided against, each with the one thing
+# that un-shelves it. Straight out of PLAN.md's shelved table.
 #
-# The owner's ask: start training now, leave the machine going for about a week,
-# and come back to something better. The honest version of that is not one long
-# run - a run always starts from scratch, so repeating a config gives the same
-# answer twice. It is a TEST MATRIX: every run changes one declared thing, gets
-# scored against the same bar, and lands in a table you can read.
+# "The real robot" is on this list, and it is the expensive one. Saying so
+# plainly is the point of the `cost` note: deferring it is a choice the owner
+# made, and a choice with a price is not the same thing as a dependency.
+# ---------------------------------------------------------------------------
+
+SHELVED = {
+    "lede": "Decided against for now. Each row names the thing that un-shelves "
+            "it, so 'later' means something.",
+    "rows": [
+        {"what": "R3 - using a foot on an object",
+         "trigger": "None. Nothing depends on it, and it needs objects in the "
+                    "scene nothing else does."},
+        {"what": "Jumping",
+         "trigger": "Stage 3.3 measures the real servo SPEED under load. Torque "
+                    "is not the blocker - higher-torque hobby servos are usually "
+                    "slower."},
+        {"what": "Seeing",
+         "trigger": "A camera the POLICY reads, plus a heightmap pipeline and the "
+                    "worst sim-to-real gap on the list. Not the camera used to "
+                    "drive the robot."},
+        {"what": "The real robot",
+         "trigger": "Deferred by choice, not blocked by anything."},
+    ],
+    "cost": "On the last one. Stage 3.3 measures three numbers the model is "
+            "guessing - servo gains, backlash, loop latency. Every policy trained "
+            "before it is trained against those guesses. One policy depends on "
+            "them today. After steps 1 to 5, two do, hardened and tuned against a "
+            "robot that may not be the real one. That is the cost of deferring "
+            "it. It is a real cost and it is the owner's call.",
+}
+
+
+# ---------------------------------------------------------------------------
+# The whole thing, forward. PLAN.md, agreed 3 Aug 2026, as data.
+#
+# One plan, not five. This used to ship six A-F phases, three stages, four
+# rounds, nine subsections and a thirteen-section paper layout at the same
+# time, and none of them was the plan that was agreed. They are gone.
+#
+# The shape is GATES rather than dates: a step is over when a number is met,
+# not when a week is up, which is the only honest way to schedule work whose
+# duration nobody knows. Two substeps measure rather than train, and those two
+# carry no gate at all rather than an invented one.
+#
+# `here` is where the project is. It is 1.1.2 and it is stated once, at the top
+# and on the step, so the page cannot show two different answers.
+# ---------------------------------------------------------------------------
+
+FORWARD = {
+    "one_line": "Five steps, each ending on a number rather than a date.",
+    "here": "1.1.2",
+    "lede": "One pattern, applied twice: train it, harden it, measure it. "
+            "Locomotion first, then getting up. Then join them. Then the "
+            "sensors, twice - once to keep what you had, once to use them. "
+            "Where we are: 1.1.2, round 0.",
+    "shape": [
+        "Two things get tuned, and they fight each other. The REWARD says what "
+        "good means. The RANGE says where it has to be good. Widening the range "
+        "makes the same reward harder to satisfy, so they cannot be finished one "
+        "after the other.",
+        "That is why the range stays pinned at its narrowest until 1.1 passes. "
+        "You cannot tell whether a wider range broke something if the narrow one "
+        "was already broken - and until 3 Aug it was: `wandering` was measuring "
+        "drift against a different line from the one the bar scores.",
+        "Every step ends on a number, not a date, because nobody knows how long "
+        "a reward takes to get right. Two substeps below - 1.4 and 2.3 - have no "
+        "gate at all. They measure a trained policy and train nothing, so there "
+        "is nothing for them to pass.",
+    ],
+    "phases": [
+        {"id": "1", "name": "Locomotion", "state": "now", "here": "1.1.2",
+         "gate": "Three gates, one per substep, all the same six R1 criteria: "
+                 "first on today's command range (1.1), then across the whole "
+                 "command box (1.2), then with the dials at full (1.3). 1.4 has "
+                 "no gate - it measures.",
+         "what": "One policy for everything the robot does on its feet. Train it "
+                 "until it walks, widen what it can be told to do, turn the "
+                 "world's dials up, then measure it.",
+         "steps": [
+             "1.1  Make it walk. Gate: all six R1 criteria pass. 4 of 6 today - "
+             "sideways drift is 21x its bar, speed tracking 1.4x its bar",
+             "1.1.1  Fix `wandering` to measure the line it was sent along "
+             "- done, 3 Aug",
+             "1.1.2  Round 0, the noise floor. 3 seeds, one config. WHERE WE ARE",
+             "1.1.3  Round 1, the straightness factorial. 8 runs",
+             "1.1.4  Round 2, the speed terms. 4 runs",
+             "1.1.5  Round 3, the winner, long, on unseen seeds. 3 runs",
+             "1.1.6  Add handover-shaped resets to R1's mix. Preparation for "
+             "step 3",
+             "1.2  The whole command box. Gate: the same six criteria, across "
+             "the full range",
+             "1.2.1  Fix `_going_straight` to gate on abs(vx). It gates on "
+             "`command[:, 0] > MOVING` today, which is positive-only, so "
+             "`veering` and `wandering` switch off entirely for a backward "
+             "command. This one comes first",
+             "1.2.2  Widen WALK_SPEED through zero to negative",
+             "1.2.3  Let vy be sampled without vx",
+             "1.2.4  Retune",
+             "1.3  Turn the dials up. Gate: the same six criteria, dials at full",
+             "1.3.1  Widen what is already on - friction, mass, centre of mass, "
+             "servo gains, joint friction",
+             "1.3.2  Terrain. Slopes first, then uneven ground",
+             "1.3.3  Payload, to +2 kg, off-centre",
+             "1.3.4  Degraded hardware - weak servo, dead servo, low battery",
+             "1.4  Measure. NO GATE: numbers written down, nothing trained",
+             "1.4.1  Top speed, and the speed ladder",
+             "1.4.2  Acceleration, sustained run",
+             "1.4.3  Smoothness, read off the trained policy",
+         ],
+         "cost": "18 runs in 1.1 alone. 1.2 needs more than 1.1, because the "
+                 "range is wider and the number of draws is fixed at 864,000.",
+         "blocked_by": "",
+         "note": "1.2.1 must come first. Widening the range without it trains "
+                 "backward walking with no straightness penalty at all. Measured "
+                 "on run #25: backward walked 0.00 m in 8 seconds and pure "
+                 "sideways walked 3 cm, because WALK_SPEED is (0.15, 0.35), so "
+                 "vx is never zero and never negative. 1.3 turns the dials UP, "
+                 "it does not switch them on - foot friction is already "
+                 "randomised 0.4 to 1.2 on every attempt, alongside +/-20% mass, "
+                 "+/-15 mm centre of mass and +/-30% servo stiffness. None of it "
+                 "is a new skill: the policy never sees the word gravel, it sees "
+                 "the same 45 numbers in a different pattern, and that is also "
+                 "where sim-to-real robustness comes from. 1.4 trains nothing - "
+                 "'find top speed' has no reward term, you raise the command "
+                 "until it fails and write down where.",
+         "subs": [
+             {"id": "1.1", "name": "Make it walk",
+              "gate": "All six R1 criteria pass. 4 of 6 today - sideways drift "
+                      "is 21x its bar and speed tracking is 1.4x its bar.",
+              "why": "Round 0 looks like the least and matters the most. Three "
+                     "identical configs on three seeds; whatever they disagree "
+                     "by is the noise floor, and every later difference has to "
+                     "beat it before it means anything.",
+              "items": [
+                  {"id": "1.1.1", "state": "done",
+                   "what": "Fix `wandering` to measure the line it was sent "
+                           "along - done, 3 Aug"},
+                  {"id": "1.1.2", "state": "now",
+                   "what": "Round 0, the noise floor. 3 seeds, one config"},
+                  {"id": "1.1.3", "state": "next",
+                   "what": "Round 1, the straightness factorial. 8 runs"},
+                  {"id": "1.1.4", "state": "next",
+                   "what": "Round 2, the speed terms. 4 runs"},
+                  {"id": "1.1.5", "state": "next",
+                   "what": "Round 3, the winner, long, on unseen seeds. 3 runs"},
+                  {"id": "1.1.6", "state": "next",
+                   "what": "Add handover-shaped resets to R1's mix. Preparation "
+                           "for step 3 - R1 has to have seen a state like the "
+                           "one R2 will hand it, and no runtime rule can add "
+                           "that afterwards"},
+              ]},
+             {"id": "1.2", "name": "The whole command box",
+              "gate": "The same six criteria, across the full range.",
+              "why": "Measured on run #25: backward walked 0.00 m in 8 seconds "
+                     "and pure sideways walked 3 cm. Neither was ever sampled - "
+                     "WALK_SPEED is (0.15, 0.35), so vx is never zero and never "
+                     "negative. Four library rows filed as commands are not. "
+                     "1.2.1 must come first: widening the range without it "
+                     "trains backward walking with no straightness penalty at "
+                     "all.",
+              "items": [
+                  {"id": "1.2.1", "state": "next",
+                   "what": "Fix `_going_straight` to gate on abs(vx). It gates "
+                           "on `command[:, 0] > MOVING` today, which is "
+                           "positive-only, so `veering` and `wandering` - the "
+                           "two penalties that hold a line - switch off entirely "
+                           "for a backward command"},
+                  {"id": "1.2.2", "state": "next",
+                   "what": "Widen WALK_SPEED through zero to negative"},
+                  {"id": "1.2.3", "state": "next",
+                   "what": "Let vy be sampled without vx"},
+                  {"id": "1.2.4", "state": "next", "what": "Retune"},
+              ]},
+             {"id": "1.3", "name": "Turn the dials up",
+              "gate": "The same six criteria, dials at full.",
+              "why": "The dials are not off. Foot friction is randomised 0.4 to "
+                     "1.2 on every attempt right now, along with +/-20% mass, "
+                     "+/-15 mm centre of mass and +/-30% servo stiffness. This "
+                     "step turns them UP, it does not switch them on. None of it "
+                     "is a new skill - the policy never sees the word gravel, it "
+                     "sees the same 45 numbers in a different pattern. It is "
+                     "also where sim-to-real robustness comes from: a policy "
+                     "that survives the range survives the real value, which is "
+                     "the correct answer to three numbers nobody can measure "
+                     "yet.",
+              "items": [
+                  {"id": "1.3.1", "state": "later",
+                   "what": "Widen what is already on - friction, mass, centre of "
+                           "mass, servo gains, joint friction"},
+                  {"id": "1.3.2", "state": "later",
+                   "what": "Terrain. Slopes first, then uneven ground"},
+                  {"id": "1.3.3", "state": "later",
+                   "what": "Payload, to +2 kg, off-centre"},
+                  {"id": "1.3.4", "state": "later",
+                   "what": "Degraded hardware - weak servo, dead servo, low "
+                           "battery"},
+              ]},
+             {"id": "1.4", "name": "Measure", "gate": "", "no_gate": True,
+              "why": "No gate. Numbers written down, nothing trained. 'Find top "
+                     "speed' has no reward term - you raise the command until it "
+                     "fails and write down where. The trained half of smoothness "
+                     "- twitching, rocking, shaking, joint_shock, landing_speed "
+                     "- is already ramping in during 1.1.",
+              "items": [
+                  {"id": "1.4.1", "state": "later",
+                   "what": "Top speed, and the speed ladder"},
+                  {"id": "1.4.2", "state": "later",
+                   "what": "Acceleration, sustained run"},
+                  {"id": "1.4.3", "state": "later",
+                   "what": "Smoothness, read off the trained policy"},
+              ]},
+         ]},
+
+        {"id": "2", "name": "Getting up", "state": "later",
+         "gate": "Two gates: up from 9 of 10 random ground poses in under 3 s "
+                 "(2.1), and still 9 of 10 with the dials at full (2.2). 2.3 has "
+                 "no gate - it measures.",
+         "what": "The second policy file, and the one group that genuinely needs "
+                 "its own. There is no commanded velocity to track when the "
+                 "robot is on its back, so track_speed, stepping, dragging and "
+                 "wandering are all meaningless.",
+         "steps": [
+             "2.1  Make it stand up. Gate: up from 9 of 10 random ground poses, "
+             "in under 3 s",
+             "2.1.1  Write the recover task - start poses, reward, terminations",
+             "2.1.2  Reward it for ENDING WHERE R1 STARTS: stable, at ride "
+             "height, low joint velocity. Preparation for step 3",
+             "2.1.3  Train it",
+             "2.2  Turn the dials up. Gate: still 9 of 10, dials at full",
+             "2.2.1  The same dials as 1.3, applied to R2",
+             "2.3  Measure. NO GATE",
+             "2.3.1  Time to stand, per start pose",
+         ],
+         "cost": "A new task written from scratch, so slower than a retune.",
+         "blocked_by": "Step 1, so the handover has something to hand to. It can "
+                       "otherwise overlap 1.2 and 1.3.",
+         "note": "2.1.2 is not really part of getting up. It is step 3's "
+                 "preparation, and it is paid for here because that is the only "
+                 "place it can be paid for - what R2 finishes in is what R1 has "
+                 "to be able to start from.",
+         "subs": [
+             {"id": "2.1", "name": "Make it stand up",
+              "gate": "Up from 9 of 10 random ground poses, in under 3 s.",
+              "why": "The one group that genuinely needs its own policy file. "
+                     "There is no commanded velocity to track when the robot is "
+                     "on its back, so track_speed, stepping, dragging and "
+                     "wandering are all meaningless.",
+              "items": [
+                  {"id": "2.1.1", "state": "later",
+                   "what": "Write the recover task - start poses, reward, "
+                           "terminations"},
+                  {"id": "2.1.2", "state": "later",
+                   "what": "Reward it for ENDING WHERE R1 STARTS: stable, at "
+                           "ride height, low joint velocity. Preparation for "
+                           "step 3"},
+                  {"id": "2.1.3", "state": "later", "what": "Train it"},
+              ]},
+             {"id": "2.2", "name": "Turn the dials up",
+              "gate": "Still 9 of 10, dials at full.",
+              "why": "",
+              "items": [
+                  {"id": "2.2.1", "state": "later",
+                   "what": "The same dials as 1.3, applied to R2"},
+              ]},
+             {"id": "2.3", "name": "Measure", "gate": "", "no_gate": True,
+              "why": "No gate. A number written down.",
+              "items": [
+                  {"id": "2.3.1", "state": "later",
+                   "what": "Time to stand, per start pose"},
+              ]},
+         ]},
+
+        {"id": "3", "name": "Join them up", "state": "later",
+         "gate": "100 handovers with no stall and no fall-loop.",
+         "what": "R2 stands the robot up and hands it to R1. Only the switch "
+                 "rule and the test are here - the preparation happened inside "
+                 "steps 1 and 2, at 1.1.6 and 2.1.2.",
+         "steps": [
+             "3.1  The switch rule - hysteresis and a settle time, so control "
+             "cannot chatter at the boundary",
+             "3.2  The test - 100 drops: R2 stands it up, hands over, R1 walks "
+             "5 m",
+         ],
+         "cost": "Small if 1.1.6 and 2.1.2 were done. Two retrains if they were "
+                 "not.",
+         "blocked_by": "Steps 1 and 2. There is nothing to hand over until both "
+                       "policies exist.",
+         "note": "The failure this prevents. R2 finishes and says 'upright, take "
+                 "it.' R1 receives a robot mid-wobble, with joint velocities and "
+                 "a trunk height it has never seen, because R1's resets always "
+                 "start it clean: nudge_base is x, y +/-0.01 m, yaw +/-0.1 rad, "
+                 "velocity_range {}, and the joint reset is velocity +/-0.05 "
+                 "rad/s. That is a robot standing still, and R1 has trained on "
+                 "nothing else. Hand it an out-of-distribution state and it "
+                 "falls; R2 picks it up, hands over, it falls again. No runtime "
+                 "rule fixes that loop. Which is why 1.1.6 and 2.1.2 exist: the "
+                 "preparation happens during training, in the two steps above. "
+                 "Skip it and this step is where you find out.",
+         "subs": [
+             {"id": "3.1", "name": "The switch rule", "gate": "", "why": "",
+              "items": [
+                  {"id": "3.1", "state": "later",
+                   "what": "Hysteresis and a settle time, so control cannot "
+                           "chatter at the boundary"},
+              ]},
+             {"id": "3.2", "name": "The test", "gate": "", "why": "",
+              "items": [
+                  {"id": "3.2", "state": "later",
+                   "what": "100 drops: R2 stands it up, hands over, R1 walks "
+                           "5 m"},
+              ]},
+         ]},
+
+        {"id": "4", "name": "Sensors - keep what you had", "state": "later",
+         "gate": "Every bar that passed before still passes, with 95 inputs.",
+         "what": "Ten sensors decided; seven add inputs. 45 numbers become 95. "
+                 "They go in as one batch because each one alone costs the same "
+                 "full retrain as all of them together.",
+         "steps": [
+             "4.1  Fit them. CAD positions needed for the three where the "
+             "mounting is in the maths",
+             "4.2  Model each one in the simulator, including how it fails",
+             "4.3  Warm-start - grow the network, copy the old weights across, "
+             "initialise the new input columns to ZERO, so day one behaves "
+             "identically to the best policy",
+             "4.4  Retrain R1 and R2 from that warm start",
+         ],
+         "cost": "One retrain of both policies, from a warm start rather than "
+                 "from zero.",
+         "blocked_by": "The mechanical work. Worth doing after steps 1 to 3, so "
+                       "the retrain is spent once on something already working.",
+         "note": "The three where mounting position is a coefficient rather than "
+                 "documentation: the five optical flow units (each reads "
+                 "v + w x r), the middle IMU (offset from the centre of mass), "
+                 "and the six range finders (origin and aim vector, which the "
+                 "simulator turns into raycasts). THIS GATE IS A REGRESSION "
+                 "CHECK. It proves nothing broke. It does not say the sensors "
+                 "were worth fitting - that is step 5, and that is why step 5 "
+                 "exists.",
+         "subs": [
+             {"id": "4", "name": "Keep what you had",
+              "gate": "Every bar that passed before still passes, with 95 "
+                      "inputs. A regression check - it proves nothing broke, not "
+                      "that the sensors were worth fitting.",
+              "why": "Ten sensors decided; seven add inputs. 45 to 95 numbers, "
+                     "which is why they go in as one batch: each one alone costs "
+                     "the same full retrain as all of them together.",
+              "items": [
+                  {"id": "4.1", "state": "later",
+                   "what": "Fit them. CAD positions needed for the three where "
+                           "the mounting is in the maths"},
+                  {"id": "4.2", "state": "later",
+                   "what": "Model each one in the simulator, including how it "
+                           "fails"},
+                  {"id": "4.3", "state": "later",
+                   "what": "Warm-start - grow the network, copy the old weights "
+                           "across, initialise the new input columns to zero so "
+                           "day one behaves identically to the best policy"},
+                  {"id": "4.4", "state": "later",
+                   "what": "Retrain R1 and R2 from that warm start"},
+              ]},
+         ]},
+
+        {"id": "5", "name": "Sensors - use them", "state": "later",
+         "gate": "Numbers that were out of reach before now pass.",
+         "what": "Step 4 proved nothing broke. This is the step that says the "
+                 "sensors were worth fitting: tighter bars, and three reward "
+                 "terms that could not be written before.",
+         "steps": [
+             "5.1  Tighten the bars. They were set for a blind policy",
+             "5.2  Write reward terms that were impossible before",
+             "5.2  slip - five flow units against the IMU's yaw rate. Nothing "
+             "else on the robot can see a slip",
+             "5.2  landing - load cells turn 'did it slam' from a guess into a "
+             "number",
+             "5.2  anticipation - range finders make stepping over something "
+             "before touching it reachable at all",
+             "5.3  Retune against the tighter bars",
+         ],
+         "cost": "A retune rather than a rewrite - but against bars that have "
+                 "moved, so runs get longer before they pass.",
+         "blocked_by": "Step 4. Nothing can score a sensor the policy does not "
+                       "read.",
+         "note": "The policy currently cannot measure its own speed. "
+                 "base_lin_vel sits in the critic group, which is thrown away "
+                 "after training, precisely because the real robot has no way to "
+                 "measure it - so the policy infers its speed while track_speed, "
+                 "its largest reward term, scores exactly that. Optical flow "
+                 "measures it directly. 5.2 also unblocks library rows: some of "
+                 "the rows filed under 'needs a camera' are reachable with range "
+                 "finders instead, which is the cheap half of seeing.",
+         "subs": [
+             {"id": "5", "name": "Use them",
+              "gate": "Numbers that were out of reach before now pass.",
+              "why": "The policy currently cannot measure its own speed - "
+                     "base_lin_vel sits in the critic group, thrown away after "
+                     "training, because the real robot has no way to measure it. "
+                     "Optical flow measures it directly.",
+              "items": [
+                  {"id": "5.1", "state": "later",
+                   "what": "Tighten the bars. They were set for a blind policy"},
+                  {"id": "5.2", "state": "later",
+                   "what": "slip - five flow units against the IMU's yaw rate. "
+                           "Nothing else on the robot can see a slip"},
+                  {"id": "5.2", "state": "later",
+                   "what": "landing - load cells turn 'did it slam' from a guess "
+                           "into a number"},
+                  {"id": "5.2", "state": "later",
+                   "what": "anticipation - range finders make stepping over "
+                           "something before touching it reachable at all"},
+                  {"id": "5.3", "state": "later",
+                   "what": "Retune against the tighter bars"},
+              ]},
+         ]},
+    ],
+    "loop": "It does not close in simulation. Stage 3.3 measures the real "
+            "servos - stiffness, backlash, loop latency - and those three "
+            "numbers change the model every policy was trained against, so some "
+            "of steps 1 to 5 gets done again against a robot the simulator "
+            "finally describes. The real robot is shelved by choice, so that "
+            "loop has not started, and what deferring it costs is on the shelved "
+            "list.",
+    # The page renders this; SHELVED is the source. One list, two shapes, so a
+    # row cannot be un-shelved in one place and still shown in the other.
+    "parked": [{"what": r["what"], "why": r["trigger"]} for r in SHELVED["rows"]],
+    "shelved_cost": SHELVED["cost"],
+}
+
+
+# ---------------------------------------------------------------------------
+# The rounds inside PLAN.md step 1.1. NOT a second plan.
+#
+# These four rounds ARE substeps 1.1.2 to 1.1.5, and each one carries the
+# substep number it is. The page used to show them as a separate "week" beside
+# a separate A-F phase list, which is how the repo ended up with two plans that
+# disagreed. There is one plan - FORWARD - and this is the detail of one leaf
+# of it.
+#
+# The honest version of "leave it running for a week" is not one long run: a
+# run always starts from scratch, so repeating a config gives the same answer
+# twice. It is a TEST MATRIX. Every run changes one declared thing, gets scored
+# against the same bar, and lands in a table you can read.
 #
 # What makes it work unattended is that the runner already claims jobs one at a
 # time and verify.py already scores each one. What it cannot do is design the
@@ -1086,200 +1547,10 @@ def driven() -> dict:
 # rounds - which is what a DOE is, and the reason rounds get smaller as they go.
 # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# The whole thing, forward. Phases and the gate that ends each one.
-#
-# This is the plan the owner asked for after understanding how the project
-# works, and it is deliberately shaped as GATES rather than dates. A phase is
-# over when a number is met, not when a week is up - which is the only honest
-# way to schedule work whose duration nobody knows.
-#
-# It is also a loop rather than a line, and the loop is the part that gets
-# forgotten: the real robot measures three numbers the model is guessing, those
-# numbers go back into stage 1, and some of what was trained gets trained again.
-# ---------------------------------------------------------------------------
-
-FORWARD = {
-    "one_line": "Six phases, each ending on a number rather than a date.",
-    "lede": "Every phase below is over when a measurement says so. Nothing here "
-            "is scheduled by time, because nobody knows how long a reward takes "
-            "to get right - that is what the bars are for.",
-    "shape": [
-        "Two things get tuned, and they fight each other. The REWARD says what "
-        "good means. The RANGE says where it has to be good. Widening the range "
-        "makes the same reward harder to satisfy, so they cannot be finished one "
-        "after the other - they are turned in a loop.",
-        "Which is why the range is pinned at its narrowest right now. You cannot "
-        "tell whether a wider range broke something if the narrow one was already "
-        "broken, and until this morning it was: `wandering` was measuring drift "
-        "against a different line from the one the bar scores.",
-        "And the loop does not close in simulation. The last phase measures three "
-        "numbers the model has been guessing, feeds them back into stage 1, and "
-        "some of what was trained gets trained again against a truer robot.",
-    ],
-    "phases": [
-        {"id": "A", "name": "R1 walks forward", "state": "now",
-         "gate": "All six R1 criteria pass on the current command range.",
-         "what": "The reward is pointed the wrong way and has been since the "
-                 "first walking run. Fix it until a policy holds a line at one "
-                 "speed on flat ground.",
-         "steps": [
-             "Fix `wandering` to measure the line it was actually sent along "
-             "- done, 3 Aug",
-             "Round 0: three seeds, one config. Measure the noise floor",
-             "Round 1: 2x2x2 on the straightness terms",
-             "Round 2: 2x2 on the speed terms",
-             "Round 3: the winner, long, on unseen seeds",
-         ],
-         "cost": "About 18 runs. Roughly a week of continuous training.",
-         "blocked_by": "",
-         "note": "This is the phase the /runs queue is working through."},
-
-        {"id": "B", "name": "R1 walks the whole range", "state": "next",
-         "gate": "The same six criteria pass with vx from -0.35 to 0.35 and vy "
-                 "sampled without vx.",
-         "what": "Backward, sideways, the full command box. Not new skills - the "
-                 "same reward over a bigger region, which is why it is a phase "
-                 "and not a project.",
-         "steps": [
-             "Fix `_going_straight` to gate on abs(vx). It is positive-only "
-             "today, so `veering` and `wandering` switch off entirely for a "
-             "backward command",
-             "Widen WALK_SPEED and let WALK_SIDE stand alone",
-             "Retune. A wider range over a fixed number of draws is a harder "
-             "problem, and the corners being added are harder than the middle",
-         ],
-         "cost": "More runs than A, because the range is bigger and no denser.",
-         "blocked_by": "A. Widening a range that is already failing tells you "
-                       "nothing about which change caused what.",
-         "note": "Unblocks four library rows that currently read as commands and "
-                 "are not - walk backward, walk sideways, walk diagonally, and "
-                 "'any speed + strafe + turn combo'."},
-
-        {"id": "C", "name": "A harder world", "state": "later",
-         "gate": "The same six criteria still pass with the D1 dials at full.",
-         "what": "Terrain, slopes, payload, shoves, weak servos, worn feet. "
-                 "56 library rows and not one new movement in them - the policy "
-                 "never sees the word gravel, it sees the same 45 numbers in a "
-                 "different pattern.",
-         "steps": [
-             "Turn up what is already randomised: friction, mass, centre of "
-             "mass, PD gains, joint friction",
-             "Add terrain and payload",
-             "Add degraded hardware",
-         ],
-         "cost": "Each dial makes every run harder, so runs get longer before "
-                 "they pass.",
-         "blocked_by": "B, mostly. A policy that cannot walk backward on a flat "
-                       "floor will not learn to on gravel.",
-         "note": "This is where sim-to-real robustness actually comes from. A "
-                 "policy that survives the range survives the real value, which "
-                 "is the correct answer to three unmeasurable numbers rather "
-                 "than a workaround."},
-
-        {"id": "D", "name": "R2 gets up, and hands over", "state": "later",
-         "gate": "Stands up from 9 of 10 random ground poses in under 3 s, and "
-                 "T1 runs fall -> get up -> keep walking without a stall.",
-         "what": "The second policy file. Different start state, different "
-                 "reward, different terminations - there is no commanded "
-                 "velocity to track when the robot is on its back, so every "
-                 "tracking term is meaningless.",
-         "steps": [
-             "Write the recover task: start poses, reward, terminations",
-             "Train it",
-             "Write the runtime rule that hands control between R1 and R2",
-             "T1: test the handover, which is where separately-trained policies "
-             "usually fall apart",
-         ],
-         "cost": "A new task from scratch, so slower than a retune.",
-         "blocked_by": "A, for the handover to have something to hand to. Can "
-                       "overlap B and C otherwise.",
-         "note": "The handover is the risk here, not either policy on its own."},
-
-        {"id": "E", "name": "The sensor batch", "state": "later",
-         "gate": "Every bar that passed before still passes with the longer "
-                 "input list.",
-         "what": "Seven sensors, +50 numbers, one retrain of everything. Foot "
-                 "contact, load cells, per-servo current, battery, five optical "
-                 "flow, the downward range finder and the six range finders.",
-         "steps": [
-             "Fit them, and give the CAD positions for the three where the "
-             "mounting is in the maths",
-             "Model each one in the simulator, including how it fails",
-             "Add them to the observation, all at once",
-             "Retrain R1 and R2 from zero",
-         ],
-         "cost": "One full retrain of every policy. Which is exactly why they go "
-                 "in together rather than one at a time.",
-         "blocked_by": "The mechanical work, and worth doing after A to D so the "
-                       "retrain is spent once on something already working.",
-         "note": "Optical flow is the one that may move a bar rather than just "
-                 "add robustness: the policy currently cannot measure its own "
-                 "speed, while track_speed is its largest reward term."},
-
-        {"id": "F", "name": "The real robot", "state": "should be running",
-         "gate": "Gray walks 5 m on the workshop floor.",
-         "what": "The same policy file on the Pi, reading potentiometers and "
-                 "IMUs instead of a simulator. Nothing is converted.",
-         "steps": [
-             "Calibrate the potentiometers: ADC counts to radians, per joint",
-             "Stage 3.3: measure servo gains, backlash and loop latency under "
-             "load",
-             "Feed all three back into stage 1",
-             "Retrain against a model that is no longer guessing",
-         ],
-         "cost": "The retrain in the last step is the loop closing, and it is "
-                 "not optional.",
-         "blocked_by": "Nothing. That is the point - it is deferred by choice, "
-                       "not by dependency.",
-         "note": "Deferred on the owner's call. Worth saying plainly what that "
-                 "costs: three numbers in the model are guesses, and every "
-                 "policy trained before F is trained against them. One policy "
-                 "depends on those guesses today. After A to E, three do."},
-    ],
-    "loop": "F feeds back into A. Measuring the real servos changes the model "
-            "every policy was trained against, so some of A to E gets done "
-            "again - against a robot the simulator finally describes.",
-    "parked": [
-        {"what": "R3, using a foot on something",
-         "why": "Optional. Nothing else depends on it, and it needs objects in "
-                "the scene that nothing else does."},
-        {"what": "P1, jumping",
-         "why": "Un-parks when stage 3.3 measures the real servo speed under "
-                "load. Torque is not the blocker - speed is, and higher-torque "
-                "hobby servos are usually slower."},
-        {"what": "P2, seeing",
-         "why": "A camera the POLICY reads, which is not the camera used to "
-                "drive it. Its own project: a heightmap pipeline, a much longer "
-                "input list, and the worst sim-to-real gap on the list."},
-    ],
-}
-
-
-WEEK = {
-    "lede": "Continuous training for about a week, as a designed experiment "
-            "rather than one long run.",
-    "why": [
-        "A run always starts from scratch. There is no warm start yet, so "
-        "queueing the same config twice gives the same answer twice and a week "
-        "of it gives nothing a single run would not have.",
-        "So the week is a test matrix. Every run changes one declared thing, "
-        "every run is scored by verify.py against the same bar, and the result "
-        "is a table rather than an impression.",
-        "The one thing that has to be measured first is the NOISE FLOOR. Round 0 "
-        "runs the same config on three seeds. Whatever those three disagree by "
-        "is the number every later difference has to beat before it means "
-        "anything. Without it a sweep is just reading noise.",
-    ],
-    "at_a_glance": [
-        {"k": "Per run", "v": "~87 min", "n": "4,500 robots, 3,000 iterations"},
-        {"k": "Round 0 to 2", "v": "15 runs", "n": "queued now, about 23 hours"},
-        {"k": "A week holds", "v": "~115 runs", "n": "so there is room for 4 to 5 rounds"},
-        {"k": "Needs a person", "v": "between rounds", "n": "to read the table and design the next"},
-    ],
-    "rounds": [
+_WEEK_ROUNDS = [
         {
-            "id": "R0", "name": "The fix, and the noise floor", "runs": 3,
+            "id": "R0", "step": "1.1.2",
+            "name": "The fix, and the noise floor", "runs": 3,
             "hours": 4.5,
             "asks": "Did fixing `wandering` move drift at all - and by more than "
                     "two identical runs differ from each other?",
@@ -1292,7 +1563,8 @@ WEEK = {
                      "the next job is reducing variance, not tuning weights.",
         },
         {
-            "id": "R1", "name": "The two straightness terms", "runs": 8,
+            "id": "R1", "step": "1.1.3",
+            "name": "The two straightness terms", "runs": 8,
             "hours": 12.0,
             "asks": "Now that both terms measure the same line, how hard should "
                     "each one push?",
@@ -1304,28 +1576,76 @@ WEEK = {
                      "matters more together than separately.",
         },
         {
-            "id": "R2", "name": "The speed bar", "runs": 4,
+            "id": "R2", "step": "1.1.4",
+            "name": "The speed bar", "runs": 4,
             "hours": 6.0,
             "asks": "Speed error is 0.071 m/s against a 0.05 bar. Does paying "
                     "more for speed close it, or does it just trade drift for "
                     "speed?",
             "design": "2x2 on track_speed and ground_covered. Independent of "
-                      "R1, so it is queued alongside rather than after.",
+                      "round 1, so it is queued alongside rather than after.",
             "reads": "Whether the two bars are in tension. If every run that "
                      "fixes speed worsens drift, the reward needs a different "
                      "shape rather than different weights.",
         },
         {
-            "id": "R3", "name": "The winner, long and repeated", "runs": 3,
+            "id": "R3", "step": "1.1.5",
+            "name": "The winner, long and repeated", "runs": 3,
             "hours": 9.0, "queued": False,
             "asks": "Does the best config hold up at full length, and on seeds "
                     "it has not seen?",
-            "design": "Best settings from R0 to R2, 6,000 iterations, three "
+            "design": "Best settings from rounds 0 to 2, 6,000 iterations, three "
                       "seeds. Designed after the earlier rounds are read.",
-            "reads": "If all three clear the bar, R1 is done. If one does, it "
-                     "was luck.",
+            "reads": "If all three clear the bar, 1.1 is done and 1.2 starts. If "
+                     "one does, it was luck.",
         },
+]
+
+
+def _week_glance(rounds: list[dict]) -> list[dict]:
+    """The week's headline figures, counted off the rounds table above.
+
+    Every figure here used to be typed by hand - "~87 min", "15 runs queued
+    now, about 23 hours", "a week holds ~115 runs" - and none of them was
+    produced by any code. Two of them also contradicted the "~1.9 s per
+    iteration" on the feasibility page. A number nobody computes is a number
+    that goes stale silently, so the ones that could not be counted were
+    deleted rather than re-guessed.
+    """
+    total = sum(r["runs"] for r in rounds)
+    queued = sum(r["runs"] for r in rounds if r.get("queued", True))
+    return [
+        {"k": "Where we are", "v": "1.1.2",
+         "n": "round 0, the noise floor"},
+        {"k": "Rounds", "v": str(len(rounds)),
+         "n": "PLAN.md 1.1.2 to 1.1.5, one per substep"},
+        {"k": "Runs in them", "v": str(total),
+         "n": f"{queued} designed now; the last round is designed from the "
+              f"ones above it"},
+        {"k": "Needs a person", "v": "between rounds",
+         "n": "to read the table and design the next one"},
+    ]
+
+
+WEEK = {
+    "lede": "PLAN.md step 1.1, make it walk. Four rounds - 1.1.2 to 1.1.5 - run "
+            "back to back as a designed experiment rather than one long run.",
+    "step": "1.1",
+    "why": [
+        "A run always starts from scratch. There is no warm start yet, so "
+        "queueing the same config twice gives the same answer twice and a week "
+        "of it gives nothing a single run would not have.",
+        "So step 1.1 is a test matrix. Every run changes one declared thing, "
+        "every run is scored by verify.py against the same bar, and the result "
+        "is a table rather than an impression.",
+        "The one thing that has to be measured first is the NOISE FLOOR, which "
+        "is 1.1.2 and where the project is. Round 0 runs the same config on "
+        "three seeds. Whatever those three disagree by is the number every later "
+        "difference has to beat before it means anything. Without it a sweep is "
+        "just reading noise.",
     ],
+    "at_a_glance": _week_glance(_WEEK_ROUNDS),
+    "rounds": _WEEK_ROUNDS,
     "rules": [
         "One training process at a time. RULES.md rule 4, and the queue makes it "
         "structural rather than something to remember.",
@@ -1339,18 +1659,22 @@ WEEK = {
     ],
     "not_doing": [
         {"what": "Stage 3.3, measuring the real servos",
-         "why": "The owner's call: not now. It stays the thing that settles the "
-                "three guessed numbers, and it is still the trigger for "
-                "un-parking jumping."},
+         "why": "Shelved on the owner's call, not blocked by anything. It stays "
+                "the thing that settles the three guessed numbers, and it is "
+                "still the trigger that un-shelves jumping. What deferring it "
+                "costs is written out on the shelved list."},
         {"what": "The CAD rebuild and the sensor mounts",
-         "why": "Not now either. Nothing in this week's plan waits on it - the "
-                "sensors are decided and recorded, and they go into the "
-                "observation as one batch when the mechanical work happens."},
+         "why": "PLAN.md step 4, and nothing in step 1 waits on it. The sensors "
+                "are decided and recorded, and they go into the observation as "
+                "one batch of 45 to 95 numbers when the mechanical work "
+                "happens."},
         {"what": "Widening the command range to backward and sideways",
-         "why": "Drift is failing on the narrowest range there is. Widening it "
-                "spreads a fixed number of draws over a harder problem and makes "
-                "the failing number worse. Also needs the _going_straight gate "
-                "fixed to abs(vx) first - see stage 2."},
+         "why": "PLAN.md 1.2, and it comes after 1.1 for a reason. Drift is "
+                "failing on the narrowest range there is; widening it spreads a "
+                "fixed number of draws over a harder problem and makes the "
+                "failing number worse. 1.2.1 also has to fix the "
+                "_going_straight gate to abs(vx) first, or backward walking "
+                "trains with no straightness penalty at all."},
     ],
 }
 
@@ -1363,3 +1687,210 @@ def stage2_state() -> dict:
         s["unverified"] = UNVERIFIED_CLAUSES.get(s["key"], [])
     return {**STAGE2, **lib, "sampling": sampling(), "sensors": sensors(),
             "driven": driven(), "box": BOX}
+
+
+# ---------------------------------------------------------------------------
+# The dials
+# ---------------------------------------------------------------------------
+#
+# Everything that gets varied during a run, in one place. There are two kinds and
+# the difference is the whole point of the page that shows them:
+#
+#   the robot READS it   - the command. Three numbers, handed in every step.
+#   the WORLD has it     - domain randomisation. Rolled fresh each attempt, and
+#                          the robot is never told the value. It finds out.
+#
+# Same rule governs both: inside the range that was swept, it copes; outside it,
+# it guesses. Never sweep foot grip below 0.4 and ice is a stranger, exactly as
+# never sweeping forward speed below 0.15 made backward a stranger.
+#
+# Every number below is READ OUT of the task files. Nothing here is typed, so a
+# range that changes in the code changes on the page in the same edit.
+
+# Values a real floor or a real fault actually takes, for marking against the
+# swept band. These are references, not measurements off this robot - they are
+# here to answer "is the band wide enough?", which a band with no scale beside
+# it cannot.
+_REFERENCES = {
+    "ground_grip": [
+        {"at": 0.05, "what": "wet ice"},
+        {"at": 0.15, "what": "wet tile"},
+        {"at": 0.35, "what": "smooth vinyl"},
+        {"at": 0.7, "what": "carpet"},
+        {"at": 1.0, "what": "dry concrete"},
+    ],
+    "servo_strength": [
+        {"at": 0.5, "what": "a servo at half strength"},
+        {"at": 0.2, "what": "a flat battery"},
+    ],
+}
+
+# Where the legs actually run out, solved against the owner's stance on
+# 3 Aug 2026: find_stance puts every foot back on its own print with the trunk
+# moved, and reports where the joints hit their stops. (low, high, why it stops)
+_REACH = {
+    "POSE_HEIGHT": (0.12, 0.27,
+                    "measured: it holds anywhere from 120 to 270 mm, at 1.59x "
+                    "the servo's stall torque at the lowest"),
+    "POSE_PITCH": (-0.35, 0.17,
+                   "measured: nose up 20 deg, nose down only 10, because the "
+                   "stance rakes the legs forward and spends the travel "
+                   "nose-down would need"),
+    "POSE_ROLL": (-0.52, 0.52,
+                  "measured to +/- 30 deg, where the sweep stopped rather than "
+                  "where the robot did - it never found a limit"),
+}
+
+_COMMAND_DIALS = (
+    ("WALK_SPEED", "forward", "m/s",
+     "How fast the body travels nose-first. Negative is backward."),
+    ("WALK_SIDE", "sideways", "m/s",
+     "How fast it slides left or right, still facing the same way."),
+    ("WALK_TURN", "turn", "rad/s",
+     "How fast it spins on the spot."),
+    # Added 3 Aug 2026. Where the trunk should BE, as opposed to where it should
+    # GO - which is what unblocked sit, crouch, crawl, bow, stretch and lean.
+    ("POSE_HEIGHT", "height", "m",
+     "How far off the ground to hold the trunk."),
+    ("POSE_PITCH", "pitch", "rad",
+     "Nose down is positive. Limited by joint travel, and lopsided: the stance "
+     "rakes the legs forward, which spends travel that nose-down needs."),
+    ("POSE_ROLL", "roll", "rad",
+     "Right side down is positive."),
+)
+
+# (event name in the task, label, unit, what it is, how to read the range out)
+_WORLD_DIALS = (
+    ("ground_grip", "foot grip", "", "How much the feet hold. Low is ice.",
+     r'"ground_grip".*?"ranges":\s*\(([-\d.]+),\s*([-\d.]+)\)'),
+    ("how_heavy", "how heavy", "x", "Every part's mass and inertia, scaled.",
+     r'"how_heavy".*?"alpha_range":\s*\(([-\d.]+),\s*([-\d.]+)\)'),  # noqa: E501
+    ("where_the_weight_is", "where the weight sits", "m",
+     "The trunk's centre of mass, moved.",
+     r'"where_the_weight_is".*?"ranges":\s*\(([-\d.]+),\s*([-\d.]+)\)'),
+    ("servo_strength", "servo strength", "x",
+     "How hard every servo pulls toward the angle it was told.",
+     r'"servo_strength".*?"kp_range":\s*\(([-\d.]+),\s*([-\d.]+)\)'),
+    ("gearbox_drag", "gearbox drag", "N-m",
+     "Stiction in the gear train.",
+     r'"gearbox_drag".*?"ranges":\s*\(([-\d.]+),\s*([-\d.]+)\)'),
+)
+
+
+def _read_pair(src: str, pattern: str) -> tuple[float, float] | None:
+    hit = re.search(pattern, src, re.S)
+    return (float(hit.group(1)), float(hit.group(2))) if hit else None
+
+
+def dials() -> dict:
+    """Every dial in use, read out of the task files."""
+    walk = (ROOT / "gray/tasks/walk_env_cfg.py")
+    push = (ROOT / "gray/tasks/push_env_cfg.py")
+    wsrc = walk.read_text(encoding="utf-8") if walk.is_file() else ""
+    psrc = push.read_text(encoding="utf-8") if push.is_file() else ""
+    missing = []
+
+    # ---- the three the robot reads ----
+    command = []
+    for const, name, unit, what in _COMMAND_DIALS:
+        pair = _read_pair(wsrc, rf"{const}\s*=\s*\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)")
+        if pair is None:
+            missing.append(f"{const} in gray/tasks/walk_env_cfg.py")
+            continue
+        lo, hi = pair
+        # What to draw the swept band against. Two different questions, and they
+        # need two different envelopes:
+        #
+        #   speed, sideways, turn - nothing has measured a limit, so the envelope
+        #     is the dial mirrored about zero and the gap means NEVER SWEPT.
+        #     PLAN.md 1.4.1 is where a real top speed gets measured.
+        #   height, pitch, roll - the limit IS measured (find_stance solves for
+        #     where the legs run out of travel), so the envelope is that, and the
+        #     gap means THERE IS NO MORE DIAL. Mirroring height about zero would
+        #     draw a robot standing 250 mm underground.
+        reach = _REACH.get(const)
+        span = max(abs(lo), abs(hi))
+        command.append({
+            "key": const, "name": name, "unit": unit, "what": what,
+            "lo": lo, "hi": hi,
+            "full_lo": reach[0] if reach else -span,
+            "full_hi": reach[1] if reach else span,
+            "measured_limit": bool(reach),
+            "limit_note": reach[2] if reach else "",
+            "symmetric": abs(lo + hi) < 1e-9,
+            "source": "gray/tasks/walk_env_cfg.py",
+        })
+
+    # ---- how the three are drawn ----
+    mix = {}
+    for key, pattern in (
+        ("standing", r"rel_standing_envs\s*=\s*([\d.]+)"),
+        # `rel_straight_envs`, not mjlab's `rel_forward_envs` - which is pinned
+        # to 0 because it forced the speed positive and clamped it up to 0.3.
+        # See gray/tasks/walk_command.py.
+        ("forward_only", r"rel_straight_envs\s*=\s*([\d.]+)"),
+    ):
+        hit = re.search(pattern, wsrc)
+        if hit:
+            mix[key] = float(hit.group(1))
+        else:
+            missing.append(f"{key} in gray/tasks/walk_env_cfg.py")
+    hold = _read_pair(wsrc, r"resampling_time_range\s*=\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)")
+    if hold:
+        mix["hold_lo"], mix["hold_hi"] = hold
+    else:
+        missing.append("resampling_time_range in gray/tasks/walk_env_cfg.py")
+
+    # ---- the ones the world has ----
+    world = []
+    for key, name, unit, what, pattern in _WORLD_DIALS:
+        pair = _read_pair(psrc, pattern)
+        if pair is None:
+            missing.append(f"{key} in gray/tasks/push_env_cfg.py")
+            continue
+        lo, hi = pair
+        if key == "how_heavy":       # written as a +/- fraction, shown as a scale
+            lo, hi = 1 + lo, 1 + hi
+        refs = _REFERENCES.get(key, [])
+        pad = (hi - lo) * 0.35 or 1.0
+        outs = [r["at"] for r in refs]
+        full_lo = min([lo - pad, *outs])
+        # Grip, strength and drag cannot be negative, so an envelope that runs
+        # below zero draws a stretch of dial that does not exist - and puts a
+        # zero mark on a scale that has no meaningful zero on it.
+        if lo >= 0:
+            full_lo = max(full_lo, 0.0)
+        world.append({
+            "key": key, "name": name, "unit": unit, "what": what,
+            # What to print beside the name when there is no unit symbol. A
+            # friction coefficient is a number, not a multiplier, and calling it
+            # one was wrong on the page.
+            "units_note": {"ground_grip": "friction coefficient",
+                           "how_heavy": "of the modelled mass",
+                           "servo_strength": "of the modelled gain"}.get(key, ""),
+            "lo": lo, "hi": hi,
+            "full_lo": full_lo, "full_hi": max([hi + pad, *outs]),
+            "refs": refs,
+            "outside": [r for r in refs if not lo <= r["at"] <= hi],
+            "source": "gray/tasks/push_env_cfg.py",
+        })
+
+    # ---- the shove, which is an event rather than a dial ----
+    shove = {}
+    for key, const in (("speed", "PUSH_MS"), ("spin", "PUSH_SPIN"),
+                       ("every", "PUSH_EVERY_S")):
+        # No `^` anchor: _read_pair searches with re.S, where `^` only matches
+        # the very start of the file. `NAME = (` is unique enough on its own -
+        # the other mentions of these constants pass them, they do not assign.
+        pair = _read_pair(psrc, rf"{const}\s*=\s*\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)")
+        if pair:
+            shove[key] = list(pair)
+    shove["on_in_walk"] = 'cfg.events.pop("shove"' not in wsrc
+
+    return {
+        "command": command,
+        "mix": mix,
+        "world": world,
+        "shove": shove,
+        "missing": missing,
+    }

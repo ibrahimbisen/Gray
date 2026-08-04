@@ -1,20 +1,32 @@
-"""The skill library, sorted by what each row actually *is*.
+"""The skill library, read and counted. The CSV says what everything is.
 
-The owner's CSV is the source. This file only decides where each skill belongs -
-it never invents a skill and never stores a copy of one. Edit the CSV and the page
-changes.
+**This file no longer classifies anything.** It used to: 230 lines of lookup
+tables deciding which subsection each row belonged to, what covered it, and what
+it was blocked on - and about 40% of rows had their filed category contradicted
+by one of those tables. One comment in it read "not a jump, whatever the category
+says", which is Python arguing with data.
 
-**A skill library is not a work list.** The earlier version of this file sorted 200
-rows into nine subsections and gave them equal billing, which made them look like
-nine comparable pieces of work. They are not. Four different kinds of thing were
-wearing one label, and the count at the top - "128 skills teach something new" -
-implied 128 units of work when the real number is three.
+The library now states all of that in its own columns, so this file reads them:
 
-The unit of work is a **training run**, because a training run is what produces a
-policy file. Everything else is a number inside one, a property checked across all
-of them, or a measurement taken afterwards. So each row lands in one of five kinds:
+    id          the row's number
+    name        one canonical phrasing
+    kind        run | axis | constraint | test | parked
+    group       R1 R2 R3 D1 C1 T1 T2 P1 P2
+    coverage    command | condition | emerges | pilot | blocked | measured
+    blocked_on  height | range | foot | camera | flight, and only when blocked
+    dial        a numeric range, or empty
+    note        why, in one sentence
+    covers      which of the original 200 rows this one stands in for
 
-    run         a training run. Produces a policy file. There are three.
+Anything that does not parse goes in `faults` and is shown on the page. A row this
+file quietly guesses at is a row nobody ever finds out is wrong.
+
+**A skill library is not a work list.** The unit of work is a **training run**,
+because a run is what produces a policy file. Everything else is a number inside
+one, a property checked across all of them, or a measurement taken afterwards. So
+each row is one of five kinds:
+
+    run         a training run. Produces a policy file. There are two.
     axis        a dial turned during a run. Not a run of its own.
     constraint  a property every run has to hold. Checked, never trained.
     test        measured after training. Nothing new is learned.
@@ -25,7 +37,10 @@ whether the *reward function* would have to change. Walking sideways is the same
 equation with a different setpoint, so it shares a run. Getting up off its back has
 no commanded velocity to track at all, so it needs its own.
 
-That single test is what collapses 200 rows into three runs.
+That test is what collapses the library into two runs. Deduplicating on top of it
+took 200 rows to 60: the old file spent 15 rows on jumping, 20 on the command box,
+16 on ride height, and 4 on one drop height. `covers` records where every one of
+the original 200 went.
 """
 
 from __future__ import annotations
@@ -34,8 +49,10 @@ import csv
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-# The owner adds to this file. The newest one wins.
-CANDIDATES = ("gray_skill_library (1).csv", "gray_skill_library.csv")
+# One file, named once. This used to be a list with a browser-download name at
+# the front of it - "gray_skill_library (1).csv" - which would have silently
+# shadowed the real library the first time a copy landed in the repo root.
+LIBRARY = "gray_skill_library.csv"
 
 # The five kinds, in the order they appear on the page. `blurb` is what the kind
 # means; it is shown once, above the items, so each item does not have to re-argue
@@ -43,7 +60,8 @@ CANDIDATES = ("gray_skill_library (1).csv", "gray_skill_library.csv")
 KINDS = [
     {"key": "run", "name": "Training runs",
      "blurb": "Each one produces a policy file. This is the only kind that is a "
-              "piece of work in its own right, and there are three."},
+              "piece of work in its own right, and there are two: locomotion, and "
+              "getting up. PLAN.md steps 1 and 2."},
     {"key": "axis", "name": "Dials on a run",
      "blurb": "Conditions varied during a run, not runs of their own. The reward "
               "does not change and neither does the observation - only the world "
@@ -104,15 +122,17 @@ SUBSECTIONS = [
             "control back to R1 once the robot is upright.",
      "commands": "none - the goal is fixed: get upright",
      "state": "not started"},
-    {"id": "R3", "key": "tool", "kind": "run", "name": "Using a foot on something",
+    {"id": "R3", "key": "tool", "kind": "parked", "name": "Using a foot on something",
      "rule": "the goal is the object, not the robot",
      "what": "Push an object, drag it backward, press a pedal, kick, dig, paw or tap.",
      "why": "Fails the shared-reward test in the other direction: success is "
             "measured on something that is not the robot. It needs objects in the "
             "scene, which nothing else does, and a reward that reads the object's "
-            "state. Optional - nothing else in the project depends on it.",
+            "state.",
      "commands": "where to move the object",
-     "state": "not started"},
+     "trigger": "None. PLAN.md shelves it outright - nothing in the project "
+                "depends on it, so there is no event that makes it due.",
+     "state": "parked"},
 
     # ---- dial ------------------------------------------------------------
     {"id": "D1", "key": "robust", "kind": "axis", "name": "A harder world",
@@ -287,102 +307,6 @@ BLOCKED_CLASSES = {
     },
 }
 
-# A row that _OVERRIDE relocated must take its coverage from where it LANDED, not
-# from where it was filed. Without this, "Squeeze under something" - filed under
-# Athletic, moved to R1 because squeezing under is crouched walking - still read
-# as blocked on a flight phase, and "IMU drift and noise" read as blocked on a
-# camera. Both are nonsense, and both were on the page.
-_COVERAGE_BY_SUBSECTION = {
-    "walk": "command", "recover": "command", "tool": "emerges",
-    "robust": "condition", "quality": "condition",
-    "measure": "measured", "chain": "measured",
-    "flight": "blocked", "see": "blocked",
-}
-
-_COVERAGE_BY_CATEGORY = {
-    "Walking": "command", "Turning": "command", "Body control": "command",
-    "Body positions": "command", "Gaits": "command",
-    "Terrain": "condition", "Payload": "condition", "Disturbance": "condition",
-    "Degraded hardware": "condition", "People": "condition",
-    "Hard variants": "condition", "Stuck": "condition",
-    "Feet": "emerges", "Foot movements": "emerges",
-    "Falls & recovery": "command", "Startup": "command",
-    "Athletic": "blocked", "Air movements": "blocked",
-    # These need to know where the robot IS, or where the walls are. That is
-    # localisation and perception - a layer above the policy that does not
-    # exist. Filing them as training targets overstates what the reward can do.
-    "Perception": "blocked", "Precision": "blocked", "Path shapes": "blocked",
-    "Speed": "measured", "Smoothness": "measured", "Self-check": "measured",
-    "Chaining": "measured",
-}
-
-# Rows whose coverage is not what their category implies. Same idea as
-# _OVERRIDE, and each one carries why.
-_COVERAGE_OVERRIDE = {
-    # Height and attitude. The command vector is vx, vy, yaw - there is no ride
-    # height in it and no lean, so none of these can be ASKED for, whatever the
-    # policy is capable of. This is the same fact UNVERIFIED_CLAUSES states in
-    # prose for R1's bar; listing the rows makes the count agree with the prose.
-    1:  ("blocked", "sit to stand is a height command, and there is no height in "
-                    "the command vector"),
-    2:  ("blocked", "a commanded height"),
-    3:  ("blocked", "a commanded height"),
-    4:  ("blocked", "a commanded height"),
-    5:  ("blocked", "this row IS the missing command, named"),
-    6:  ("blocked", "pitch and roll are not in the command vector"),
-    8:  ("blocked", "standing on three legs needs a per-foot command; the vector "
-                    "has vx, vy and yaw and nothing per leg"),
-    9:  ("blocked", "same - two diagonal legs is a per-foot command"),
-    10: ("blocked", "holding one leg out is a per-foot command"),
-    21: ("blocked", "placing a foot on a marked target needs to see the target"),
-    22: ("emerges", "a low object is felt through the leg, not seen"),
-    # ---- measured, not assumed. scripts/drive.py on run #25, 64 robots ------
-    # These four were filed as commands because vx and vy exist in the vector.
-    # Driving the policy showed that is not the same as the value having been
-    # SAMPLED, and three of the four do not work at all.
-    26: ("blocked", "backward walked 0.00 m in 8 s - vx is sampled (0.15, 0.35) "
-                    "and is never negative"),
-    27: ("blocked", "pure sideways walked 3 cm in 8 s - vx is never zero either, "
-                    "so sideways only ever existed as a lean on forward motion"),
-    28: ("blocked", "'all 8 headings' needs backward too. The forward diagonals "
-                    "work and are asymmetric: +0.10 bends the track +11.4 deg off "
-                    "baseline, -0.10 only -4.7"),
-    30: ("blocked", "'full command box' is exactly the claim that fails - the box "
-                    "sampled is a corner of the box written down"),
-    37: ("emerges", "a cable or rug edge is felt on contact"),
-    59: ("emerges", "an unseen hole is exactly that - felt, not seen"),
-    90: ("blocked", "clearance to 60% body height is a crouch, and a crouch is a "
-                    "height command - not a jump, whatever the category says"),
-    91: ("pilot", "the pilot can see the corner and steers out of it"),
-    99: ("blocked", "'see an obstacle' is the whole point - needs a camera"),
-    # ---- the localisation re-audit, 3 Aug 2026 -----------------------------
-    # These thirteen were all filed as blocked on "knowing where it is". Six of
-    # them were simply misfiled and are not about position at all; the other
-    # seven are, and a human at the controls supplies it. Each is named rather
-    # than swept, because "13 blocked" was wrong in two different directions.
-    126: ("pilot", "the pilot decides where the point is and stops there"),
-    127: ("pilot", "the pilot is looking at it and lets go on the heading wanted"),
-    128: ("pilot", "reversing into a space is what a human on sticks is for"),
-    129: ("command", "walk straight is vx with vy and yaw at zero - and holding "
-                     "that line for 3 m IS R1's existing drift bar, measured in "
-                     "simulation where position is free"),
-    130: ("blocked", "stepping stones need to see where the stones are"),
-    131: ("pilot", "lining up on a doorway is a steering job"),
-    193: ("pilot", "a figure eight is a sequence of turn commands, flown"),
-    194: ("command", "a constant forward speed with a constant turn rate IS a "
-                     "circle - two command numbers held, nothing more"),
-    195: ("pilot", "backing out of a dead end is steering"),
-    196: ("emerges", "a wall is felt through the leg when it pushes against it, "
-                     "not seen - the same way a low obstacle already is"),
-    197: ("condition", "a steep slope is terrain, which is a dial in the scene"),
-    198: ("condition", "same - the slope is the condition, backward is a command"),
-    199: ("blocked", "skipping a stair means knowing where the next one is, which "
-                     "is the camera, not position on the floor"),
-    170: ("blocked", "belly near the ground is the bottom of the height range"),
-    174: ("blocked", "leaning with the feet planted is a pitch and roll command"),
-    175: ("blocked", "scanning with the feet planted is a yaw attitude, not a yaw rate"),
-}
-
 # What every blocked row is waiting on. "19 blocked" is only a useful number if
 # it says blocked on WHAT - and the answer is four missing capabilities, not
 # nineteen separate problems. Grouped this way, the list becomes four things to
@@ -448,91 +372,23 @@ BLOCKED_NEEDS = {
     "unsaid": {"label": "Not yet said what", "class": "command",
                "why": "Marked blocked, but nothing here says what it is waiting on.",
                "cost": "That is a gap in this page, not a fact about the robot. Give "
-                       "it an entry in _NEED_OVERRIDE or _NEED_BY_CATEGORY."},
-}
-
-# Precision and Path shapes used to map to "where". Both are gone: every row in
-# them is now named individually, and a NEW row in either should surface as a
-# gap ("unsaid") rather than be quietly filed against a retired blocker.
-_NEED_BY_CATEGORY = {
-    "Athletic": "flight", "Air movements": "flight",
-    "Perception": "camera",
-    "Body control": "height", "Body positions": "height",
-}
-
-# A relocated row's blocker follows where it landed, same rule as its coverage.
-_NEED_BY_SUBSECTION = {"flight": "flight", "see": "camera"}
-
-# Rows whose blocker is not what their category implies.
-_NEED_OVERRIDE = {8: "foot", 9: "foot", 10: "foot",
-                  21: "camera", 99: "camera", 130: "camera", 199: "camera",
-                  90: "height",
-                  26: "range", 27: "range", 28: "range", 30: "range"}
-
-# Where a category goes by default...
-_DEFAULT = {
-    # Everything on its feet is one run. Body control and body positions used to
-    # be their own subsection; they are commands into R1, not a separate policy.
-    "Body control": "walk", "Body positions": "walk",
-    "Turning": "walk", "Feet": "walk", "Walking": "walk", "Precision": "walk",
-    "Gaits": "walk", "Path shapes": "walk", "Foot movements": "walk",
-    "Athletic": "flight", "Air movements": "flight",
-    "Falls & recovery": "recover", "Startup": "recover",
-    "Disturbance": "robust", "Terrain": "robust", "Payload": "robust",
-    "Degraded hardware": "robust", "Stuck": "robust", "Hard variants": "robust",
-    "People": "robust",
-    # Read off a trained policy rather than trained toward.
-    "Speed": "measure", "Smoothness": "measure",
-    "Self-check": "quality",
-    "Chaining": "chain",
-    "Perception": "see",
-}
-
-# ...and the skills whose category is not where they belong. Each one is a
-# judgement, so each one carries its reason.
-_OVERRIDE = {
-    23: ("tool", "the goal is the object, not the robot"),
-    38: ("robust", "a treadmill is a condition, not a skill"),
-    89: ("flight", "taller than a leg - there is no way over without a push-off"),
-    90: ("walk", "squeezing under is crouched walking"),
-    91: ("walk", "walking, plus a decision"),
-    95: ("quality", "IMU noise is simulator honesty, not damage"),
-    96: ("quality", "command delay is simulator honesty, not damage"),
-    106: ("robust", "depends what the event is; mostly it is a shove"),
-    107: ("recover", "felt through the IMU - no eyes needed"),
-    108: ("robust", "a tug is just a force"),
-    125: ("quality", "how it behaves, not what the world does"),
-    134: ("quality", "quiet is a penalty on effort, not something measured after"),
-    137: ("recover", "it gets set down in an unknown pose"),
-    138: ("see", "it has to see the foot coming"),
-    142: ("see", "there has to be a camera for it to be blocked"),
-    143: ("see", "degraded vision"),
-    158: ("robust", "tripping is a disturbance, not a speed measurement"),
-    162: ("flight", "a pronk pushes off with all four - there is a flight phase"),
-    163: ("flight", "a gallop has a flight phase"),
-    164: ("flight", "a hop has a flight phase"),
-    169: ("recover", "a roll starts on the ground"),
-    170: ("walk", "crawling still travels"),
-    177: ("quality", "a power state, not a movement"),
-    180: ("tool", "the goal is the object"),
-    181: ("tool", "the goal is the object"),
-    182: ("tool", "the goal is the object"),
-    183: ("tool", "the goal is the object"),
-    184: ("tool", "the goal is the object"),
+                       "it a blocked_on in the CSV, or stop calling it blocked."},
 }
 
 # Kept for anything still importing it. `kind == "run"` is the real answer now.
 TEACHES_NEW = tuple(s["key"] for s in SUBSECTIONS if s["kind"] == "run")
 
-_KIND_OF = {s["key"]: s["kind"] for s in SUBSECTIONS}
+_KIND_OF = {s["id"]: s["kind"] for s in SUBSECTIONS}
+_NAME_OF = {s["id"]: s["name"] for s in SUBSECTIONS}
+_KEY_OF = {s["id"]: s["key"] for s in SUBSECTIONS}
+
+VALID_COVERAGE = frozenset(COVERAGE)
+VALID_NEEDS = frozenset(BLOCKED_NEEDS)
 
 
 def _csv_path() -> Path | None:
-    for name in CANDIDATES:
-        p = ROOT / name
-        if p.is_file():
-            return p
-    return None
+    p = ROOT / LIBRARY
+    return p if p.is_file() else None
 
 
 def _group_needs(items: list[dict]) -> list[dict]:
@@ -547,94 +403,93 @@ def _group_needs(items: list[dict]) -> list[dict]:
             for k, rows in sorted(seen.items(), key=lambda kv: -len(kv[1]))]
 
 
-def _by_category(items: list[dict]) -> list[dict]:
-    """Category by coverage, biggest first.
-
-    This is the table that answers "what is it actually being trained for" one
-    level down from the totals: 22 rows of Walking that are all one command is a
-    very different thing from 6 rows of Precision that no reward can reach.
-    """
-    seen: dict[str, dict] = {}
-    for i in items:
-        row = seen.setdefault(i["category"] or "(none)",
-                              {"category": i["category"] or "(none)", "count": 0,
-                               "coverage": {}})
-        row["count"] += 1
-        row["coverage"][i["coverage"]] = row["coverage"].get(i["coverage"], 0) + 1
-    return sorted(seen.values(), key=lambda r: (-r["count"], r["category"]))
-
-
 def _empty() -> dict:
-    return {"found": False, "path": "", "total": 0, "subsections": [],
-            "kinds": [], "runs": 0, "dialled": 0, "moved": [],
-            "coverage_words": COVERAGE, "needs": [], "run_totals": {}}
+    return {"found": False, "path": "", "total": 0, "from_rows": 0,
+            "subsections": [], "kinds": [], "runs": 0, "dialled": 0,
+            "collapsed": [], "faults": [], "coverage_words": COVERAGE,
+            "blocked_classes": BLOCKED_CLASSES, "needs": [], "run_totals": {}}
 
 
 def load() -> dict:
-    """Read the library and sort it. Every skill lands in exactly one subsection."""
+    """Read the library and sort it. Every row lands in exactly one subsection.
+
+    There is no classification logic left in this file. The CSV states each row's
+    kind, group, coverage and blocker in its own columns, so this function reads
+    them and counts. Anything it cannot make sense of goes in `faults` and is
+    shown on the page, because a row this file quietly guesses at is a row nobody
+    ever finds out is wrong.
+    """
     path = _csv_path()
     if path is None:
         return _empty()
 
     with path.open(encoding="utf-8-sig", newline="") as fh:
-        rows = [r for r in csv.DictReader(fh) if (r.get("#") or "").strip().isdigit()]
+        rows = [r for r in csv.DictReader(fh) if (r.get("id") or "").strip().isdigit()]
 
-    by_key: dict[str, list] = {s["key"]: [] for s in SUBSECTIONS}
-    moved = []
+    by_group: dict[str, list] = {s["id"]: [] for s in SUBSECTIONS}
+    faults: list[dict] = []
+
+    def fault(n, name, what):
+        faults.append({"n": n, "name": name, "what": what})
+
     for r in rows:
-        n = int(r["#"])
-        category = (r.get("Category") or "").strip()
-        if n in _OVERRIDE:
-            key, reason = _OVERRIDE[n]
-            moved.append({"n": n, "skill": r["Skill / Event"], "from": category,
-                          "to": key, "reason": reason})
-        else:
-            key = _DEFAULT.get(category)
-        if key is None:            # a category nobody has classified yet
-            key = "robust"
-        # Coverage follows where the row LANDED when it was relocated, and its
-        # filed category otherwise. A named override beats both.
-        moved_here = n in _OVERRIDE
-        if n in _COVERAGE_OVERRIDE:
-            cover, cover_why = _COVERAGE_OVERRIDE[n]
-        elif moved_here:
-            cover = _COVERAGE_BY_SUBSECTION.get(key, "condition")
-            cover_why = ""
-        else:
-            cover = _COVERAGE_BY_CATEGORY.get(category, "condition")
-            cover_why = ""
-        by_key[key].append({
+        n = int(r["id"])
+        name = (r.get("name") or "").strip()
+        group = (r.get("group") or "").strip().upper()
+        cover = (r.get("coverage") or "").strip().lower()
+        needs = (r.get("blocked_on") or "").strip().lower()
+        kind = (r.get("kind") or "").strip().lower()
+
+        if group not in by_group:
+            fault(n, name, f"group {group!r} is not one of {', '.join(by_group)}")
+            continue
+        if cover not in VALID_COVERAGE:
+            fault(n, name, f"coverage {cover!r} is not one of "
+                           f"{', '.join(sorted(VALID_COVERAGE))}")
+            cover = "condition"
+        # Only blocked rows are waiting on anything, and a blocked row that names
+        # no blocker is a hole in the CSV rather than a fact about the robot.
+        if cover == "blocked" and not needs:
+            fault(n, name, "blocked, but blocked_on is empty")
+            needs = "unsaid"
+        elif cover != "blocked" and needs:
+            fault(n, name, f"blocked_on is {needs!r} but the row is not blocked")
+            needs = ""
+        if needs and needs not in VALID_NEEDS:
+            fault(n, name, f"blocked_on {needs!r} is not one of "
+                           f"{', '.join(sorted(VALID_NEEDS))}")
+            needs = "unsaid"
+        if kind and kind != _KIND_OF[group]:
+            fault(n, name, f"kind {kind!r} but {group} is a {_KIND_OF[group]}")
+
+        old = [int(t) for t in (r.get("covers") or "").split() if t.isdigit()]
+        by_group[group].append({
             "n": n,
-            "name": (r.get("Skill / Event") or "").strip(),
-            "dial": (r.get("Difficulty dial") or "").strip().lstrip("-").strip(),
-            "category": category,
+            "name": name,
+            "dial": (r.get("dial") or "").strip(),
+            "note": (r.get("note") or "").strip(),
             "coverage": cover,
-            "coverage_why": cover_why,
-            # Only blocked rows are waiting on anything. Everything else is
-            # already reachable, so `needs` stays empty rather than inventing a
-            # blocker for a row that has none.
-            "needs": (_NEED_OVERRIDE.get(n)
-                      or (_NEED_BY_SUBSECTION.get(key) if moved_here else None)
-                      or _NEED_BY_CATEGORY.get(category)
-                      or "unsaid") if cover == "blocked" else "",
+            # The note doubles as the reason a blocked row is blocked, which is
+            # what the grouped-blockers table wants to show.
+            "coverage_why": (r.get("note") or "").strip(),
+            "needs": needs,
+            "covers": old,
         })
 
     out = []
     for s in SUBSECTIONS:
-        items = sorted(by_key[s["key"]], key=lambda i: i["n"])
+        items = sorted(by_group[s["id"]], key=lambda i: i["n"])
         # How this subsection's rows are covered, counted. This is the number
-        # that answers "what are we actually training for" - a run with 69 rows
-        # of which 40 are commands and 9 are blocked is a very different job
-        # from 69 things to teach.
+        # that answers "what is it actually being trained for" - a run of 20 rows
+        # of which 15 are commands and 5 are blocked is a very different job from
+        # 20 things to teach.
         cover: dict[str, int] = {}
         for i in items:
             cover[i["coverage"]] = cover.get(i["coverage"], 0) + 1
         out.append({**s, "count": len(items), "skills": items,
                     "coverage": cover,
                     "blocked": [i for i in items if i["coverage"] == "blocked"],
-                    "needs": _group_needs(items),
-                    "by_category": _by_category(items),
-                    "categories": sorted({i["category"] for i in items})})
+                    "needs": _group_needs(items)})
 
     # Counts are reported PER KIND and never summed across kinds. One combined
     # "teaches something new" number is what made the old page misleading: it put
@@ -646,12 +501,19 @@ def load() -> dict:
                       "subsections": len(items),
                       "count": sum(s["count"] for s in items)})
 
-    dialled = sum(1 for r in rows if (r.get("Difficulty dial") or "").strip() not in ("-", ""))
-    for m in moved:
-        m["to_name"] = next(s["name"] for s in SUBSECTIONS if s["key"] == m["to"])
-        m["to_kind"] = _KIND_OF[m["to"]]
-    # The three runs added up, which is the only cross-subsection total that is
-    # honest: they are the same kind of thing. Kinds are still never summed.
+    every = [i for s in out for i in s["skills"]]
+    # What the collapse did, row by row. The old library said the same thing many
+    # times over - five rows for one drop height, fifteen for one parked idea -
+    # and `covers` records exactly which of the original 200 each row absorbed.
+    # This is the table to read when a row looks like it went missing.
+    collapsed = sorted(
+        ({"n": i["n"], "name": i["name"], "group": g["id"],
+          "kind": g["kind"], "was": len(i["covers"]), "covers": i["covers"],
+          "note": i["note"]}
+         for g in out for i in g["skills"] if len(i["covers"]) > 1),
+        key=lambda c: (-c["was"], c["n"]))
+
+    dialled = sum(1 for i in every if i["dial"])
     run_rows = [i for s in out if s["kind"] == "run" for i in s["skills"]]
     run_totals: dict[str, int] = {"rows": len(run_rows)}
     for i in run_rows:
@@ -660,15 +522,19 @@ def load() -> dict:
     return {
         "found": True,
         "path": path.name,
-        "total": len(rows),
+        "total": len(every),
+        # How many rows of the original library these stand in for. Printed beside
+        # the total so "60 skills" never reads as "the list got shorter".
+        "from_rows": sum(len(i["covers"]) for i in every),
         "subsections": out,
         "kinds": kinds,
         "runs": sum(1 for s in out if s["kind"] == "run"),
         "dialled": dialled,
-        "moved": sorted(moved, key=lambda m: m["n"]),
+        "collapsed": collapsed,
+        "faults": sorted(faults, key=lambda f: f["n"]),
         "coverage_words": COVERAGE,
         "blocked_classes": BLOCKED_CLASSES,
         "run_totals": run_totals,
         # Every blocked row in the library, however it is filed.
-        "needs": _group_needs([i for s in out for i in s["skills"]]),
+        "needs": _group_needs(every),
     }

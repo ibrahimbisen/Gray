@@ -183,7 +183,23 @@ def main() -> None:
     # thrown away before the policy ever sees it.
     cmd.rel_standing_envs = 0.0
     cmd.rel_forward_envs = 0.0
+    if hasattr(cmd, "rel_straight_envs"):
+        cmd.rel_straight_envs = 0.0             # same reason, our own version
     cmd.resampling_time_range = (1e6, 1e6)      # drawn once, never rerolled
+
+    # Hold the posture at nominal unless the caller asked for something else.
+    # Added 3 Aug 2026 with the height/pitch/roll command: without this, driving
+    # a policy "straight ahead at 0.25" would also be telling it to crouch and
+    # lean by amounts nobody chose, and the walked angle this script reports
+    # would be measuring that instead.
+    posture = env_cfg.commands.get("posture")
+    if posture is not None:
+        h = posture.nominal_height
+        posture.ranges.height = (h, h)
+        posture.ranges.pitch = (0.0, 0.0)
+        posture.ranges.roll = (0.0, 0.0)
+        posture.rel_nominal_envs = 1.0
+        posture.resampling_time_range = (1e6, 1e6)
 
     agent_cfg = load_rl_cfg(args.task)
     env = RslRlVecEnvWrapper(ManagerBasedRlEnv(env_cfg, device="cuda:0"),

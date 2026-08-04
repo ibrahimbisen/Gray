@@ -112,3 +112,18 @@ within one checkpoint interval, unharmed — the deadlock costs time, not the ru
 
 **In practice.** `nvidia-smi` before starting anything. If a python process is
 already holding GPU memory, do not start a second one.
+
+**This is not only about training runs.** Anything that opens a simulator counts,
+because the card does not care what the second process is for:
+
+- `Playground\pilot.bat` — driving a policy by hand
+- `scripts/drive.py` — measuring what a policy does when told
+- `scripts/find_stance.py --render` and the pose editor's render
+- any viewer window at all
+
+Opening the Playground viewer during a training run once took the whole machine
+down and lost the run with it. The rule is the same rule: **one thing on the card,
+and training wins**. Wait for the queue to drain, or pause it.
+
+The dashboard itself is safe — it is CPU only. So is `find_stance.py` without
+`--render`.

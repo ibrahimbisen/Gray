@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gray &mdash; robot</title>
+<link rel="stylesheet" href="/page.css">
+<style>
+/* The documented exception. page.css has no component for a server-rendered
+   image you orbit by dragging, and none for a dial row - nothing else in the
+   dashboard has either. Everything else on this page is page.css. */
+.stage { position:relative; cursor:grab; user-select:none; touch-action:none; }
+.stage.drag { cursor:grabbing; }
+.stage img { display:block; width:100%; background:#000; pointer-events:none; }
+.stage.busy img { opacity:.65; }
+.row { display:grid; grid-template-columns:44px 30px minmax(0,1fr) 68px; gap:7px;
+       align-items:center; margin-bottom:7px; }
+.row input { width:100%; accent-color:var(--s1); padding:4px 6px; text-align:right; }
+.limrow { display:grid; grid-template-columns:52px 1fr 1fr; gap:8px; align-items:center;
+          margin-bottom:7px; }
+.limrow input { width:100%; padding:4px 6px; text-align:right; }
+</style>
+</head>
+<body>
+<div id="nav"></div>
+<main id="body"><div class="empty">Loading&hellip;</div></main>
+
+<script src="/page.js"></script>
+<script>
+/* One page about the physical machine. It merges what used to be three:
+   stage1.html (is the digital model right), pose.html (the tool the owner
+   measures the real robot with) and stage3.html (the real robot itself).
+   They were always the same subject read three ways. */
+
+const LEGNAME = { fr: "front right", fl: "front left",
+                  br: "back right", bl: "back left" };
+
+let S1 = null, S3 = null, CFG = null, CFGP = null;
+const ANG = {}, INV = {};
+let LINK = true, AZ = 125, EL = -12, ZOOM = 1.05, PENDING = false, AGAIN = false;
+
+const key = (leg, seg) => leg + "_" + seg;
+
+/* ================================================================== model === */
+
+const modelTab = () => {
+  const s = S1;
+  return `<div class="paper">
+
+  <section class="lead">
+    <div class="eyebrow">Stage 1 &middot; Prepare</div>
+    <h1>A digital Gray worth trusting</h1>
+    <p class="lede">${esc(s.lede)}</p>
+    ${facts(s.facts)}
+    <div class="cols">
+      ${s.story.map(p => `<div class="card"><p class="small">${esc(p)}</p></div>`).join("")}
+    </div>
+  </section>
+
+  <section>
+    <h2>The model, checked live</h2>
+    <p class="lede">These run against the current model every time this page
+      loads, so nothing here can quietly go stale.</p>
+    <div class="card">${modelBlock(s.model)}</div>
+  </section>
+
+  <section>
+    <h2>The parts session</h2>
+    <p class="lede">${esc(s.parts.intro)}</p>
+    <div class="cols">
+      <div class="card">
+        <h3>What is needed, in one go</h3>
+        <div class="tw"><table>
+          <tr><th>Item</th><th>What is needed</th></tr>
+          ${s.parts.needed.map(p => `<tr>
+            <td><b>${esc(p.item)}</b></td>
+            <td class="dim">${esc(p.ask)}</td></tr>`).join("")}
+        </table></div>
+      </div>
+      <div class="card">
+        <h3>Why the slicer number matters most</h3>
+        <p class="why small">${esc(s.parts.why_slicer)}</p>
+        <div class="note key small" style="margin-top:12px"><b>Output:</b>
+          ${esc(s.parts.output)}</div>
+        <div class="risk small"><b>What it cannot fix.</b> ${esc(s.parts.cannot_fix)}</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Where the mass came from</h2>
+    <p class="lede">${esc(s.mass.intro)}</p>
+    <div class="cols">
+      <div class="card">
+        <h3>The numbers</h3>
+        <div class="tw"><table>
+          <tr><th>Part</th><th class="n">Mass</th><th>What is in it</th></tr>
+          ${s.mass.rows.map(r => `<tr><td><b>${esc(r.part)}</b></td>
+            <td class="n">${r.g} g</td><td class="dim">${esc(r.n)}</td></tr>`).join("")}
+          <tr><td><b>Total</b></td><td class="n"><b>${s.mass.total} g</b></td>
+              <td class="dim">estimated, not weighed</td></tr>
+        </table></div>
+      </div>
+      <div class="card">
+        <h3>Why the CAD numbers were dropped</h3>
+        ${s.mass.notes.map(n => `<p class="why small">${esc(n)}</p>`).join("")}
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>How far each joint turns</h2>
+    <p class="lede">${esc(s.limits.intro)}</p>
+    <div class="cols">
+      <div class="card">
+        <div class="tw"><table>
+          <tr><th>Joint</th><th class="n">Travel</th><th>Which way is positive</th></tr>
+          ${s.limits.rows.map(r => `<tr><td><b>${esc(r.joint)}</b></td>
+            <td class="n">${esc(r.range)}</td>
+            <td class="dim">${esc(r.n)}</td></tr>`).join("")}
+        </table></div>
+      </div>
+      <div class="card">
+        <h3>Why this is measured twice</h3>
+        <p class="why small">A limit written into a file is a claim. Turning the
+          joint in the simulator and reading back where it actually stopped is a
+          measurement. They have disagreed before &mdash; two legs exported
+          rotated 180 degrees, which makes every sign in that leg backwards
+          while the file still looks correct.</p>
+        <div class="note key small">Both numbers are recorded in the
+          <b>Pose</b> tab, which is where the travel is measured in the first
+          place.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What had to be fixed in the export</h2>
+    <p class="lede">Each of these was found by a check failing or by the robot
+      behaving impossibly. None of them announce themselves.</p>
+    <div class="cols tight">
+      ${s.fixed.map(f => `<div class="card">
+        <h3>${esc(f.t)}</h3>
+        <p class="why small">${esc(f.d)}</p></div>`).join("")}
+    </div>
+  </section>
+
+  <section>
+    <h2>Still assumed</h2>
+    <p class="lede">An honest list of what this model does not actually know, and
+      the reason this stage reads <i>provisional</i> rather than done. Three of
+      these have no datasheet anywhere &mdash; only the physical robot can settle
+      them, which is step 3.3 in the <b>Hardware</b> tab. They are randomised
+      rather than guessed, and a policy that survives the range survives whatever
+      the truth turns out to be.</p>
+    <div class="cols tight">
+      ${s.open.map(o => `<div class="card">
+        <h3>${esc(o.q)}</h3>
+        <p class="why small">${esc(o.n)}</p></div>`).join("")}
+    </div>
+  </section>
+
+  </div>`;
+};
+
+/* =============================================================== hardware === */
+
+const hardwareTab = () => {
+  const s = S3;
+  return `<div class="paper">
+
+  <section class="lead">
+    <div class="eyebrow">Stage 3 &middot; Deploy</div>
+    <h1>Put it on the real Gray</h1>
+    <p class="lede">${esc(s.lede)}</p>
+    <div class="cols">
+      ${s.intro.map(p => `<div class="card"><p class="small">${esc(p)}</p></div>`).join("")}
+    </div>
+  </section>
+
+  <section>
+    <h2>The steps</h2>
+    <p class="lede">Five of them. Step 3.3 points back at the <b>Model</b> tab on
+      purpose &mdash; measuring the real servos changes the model, and everything
+      trained afterwards is more honest for it.</p>
+    <div class="cols tight">
+      ${s.steps.map(st => `<div class="card">
+        <h3><span class="chip warn">${esc(st.n)}</span>${esc(st.name)}</h3>
+        <p class="why small">${esc(st.d)}</p></div>`).join("")}
+    </div>
+  </section>
+
+  <section>
+    <h2>Software worth writing before the hardware exists</h2>
+    <p class="lede">None of these need the robot. All of them are cheaper now
+      than on the day it is back together and something does not work.</p>
+    <div class="cols tight">
+      ${s.software_first.map(x => `<div class="card">
+        <p class="small">${esc(x)}</p></div>`).join("")}
+    </div>
+  </section>
+
+  </div>`;
+};
+
+/* =================================================================== pose === */
+
+/* The skeleton only. The dials cannot be drawn until /api/pose/config says how
+   many legs and segments there are, and the tab may be drawn before that
+   answers - so buildPose() fills #dials and #lims afterwards. */
+const poseTab = () => `
+  <div class="vwrap">
+    <div>
+      <div class="stage" id="stage">
+        <img id="shot" alt="the robot in the current pose">
+      </div>
+      <div class="banner bad hidden" id="clash" style="margin-top:10px"></div>
+
+      <div class="sech" style="margin-top:10px">
+        <h2 class="tnum" id="camlab"></h2>
+        <span class="note">drag to orbit &middot; scroll to zoom</span>
+        <div class="grow"></div>
+        <button class="btn tiny" data-view="125,-12">3/4</button>
+        <button class="btn tiny" data-view="180,0">side</button>
+        <button class="btn tiny" data-view="90,0">front</button>
+        <button class="btn tiny" data-view="270,0">back</button>
+        <button class="btn tiny" data-view="180,-89">top</button>
+        <button class="btn tiny" data-view="180,45">below</button>
+      </div>
+
+      <div id="facts"></div>
+      <div class="note small" id="ground"></div>
+      <div class="note small" id="hint"></div>
+    </div>
+
+    <div>
+      <div class="card">
+        <div class="sech"><h2>Dials &mdash; degrees from sitting</h2>
+          <div class="grow"></div>
+          <button class="btn tiny" id="link">link legs</button>
+          <button class="btn tiny" id="zeroall">reset</button></div>
+
+        <div class="note small">The <b>&#8644;</b> button next to a dial reverses
+          that joint. Use it when a limb moves the opposite way to the others
+          &mdash; then save it, and the reversal goes into the model itself.</div>
+
+        <div class="note key small">The saved standing pose is
+          <b>hip 0, thigh +27, calf &minus;45</b> on every leg, in these same
+          dials. It lives in <code>gray/config/robot.yaml</code> under
+          <code>stance.angles_deg</code>, and
+          <code>progress/stance/stance.yaml</code> is regenerated from it by
+          <code>scripts/find_stance.py</code>. Nothing here writes it.</div>
+
+        <div id="dials"></div>
+        <button class="btn" id="savedirs" style="width:100%;margin-top:4px">
+          Save reversals to robot.yaml</button>
+        <div class="note small" id="dirnote"></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="sech"><h2>Record the travel</h2></div>
+        <div class="limrow faint"
+             style="font-size:10.5px;text-transform:uppercase;letter-spacing:.08em">
+          <span></span><span>min</span><span>max</span></div>
+        <div id="lims"></div>
+        <button class="btn go" id="save" style="width:100%;margin-top:10px">
+          Save to robot.yaml</button>
+        <div class="note small" id="savenote">
+          Drag a joint until the leg hits the body &mdash; the bar under the
+          picture turns red. That angle is the mechanical limit. Type it in, do
+          the other two, then save.</div>
+      </div>
+    </div>
+  </div>`;
+
+/* Fetched once and kept. The angles survive a tab switch, which is the point -
+   the owner leaves a pose set while reading the mass table. */
+function poseConfig() {
+  if (!CFGP) CFGP = get("/api/pose/config").then(c => {
+    CFG = c;
+    c.legs.forEach(l => c.segments.forEach(s => {
+      if (ANG[key(l, s)] === undefined) ANG[key(l, s)] = 0;
+    }));
+    (c.invert || []).forEach(k => { INV[k] = true; });
+    return c;
+  });
+  return CFGP;
+}
+
+function buildPose() {
+  const hint = $("#hint");
+  if (hint) hint.innerHTML =
+    `<b>+ hip</b> ${esc(CFG.convention.hip.replace("+ ", ""))} &middot;
+     <b>+ thigh</b> ${esc(CFG.convention.thigh.replace("+ ", ""))} &middot;
+     <b>+ calf</b> ${esc(CFG.convention.calf.replace("+ ", ""))}.
+     Every dial is degrees away from the sitting pose, where
+     <b>zero = ${esc(CFG.zero)}</b>. The robot is dropped onto the floor each
+     time, so <b>trunk height</b> is how tall it actually stands.`;
+
+  $("#dials").innerHTML = CFG.legs.map(leg => `
+    <div class="sech" style="margin-top:14px">
+      <h2>${esc(LEGNAME[leg] || leg)}</h2></div>
+    ${CFG.segments.map(seg => `
+      <div class="row">
+        <label class="small faint">${esc(seg)}</label>
+        <button class="btn tiny ${INV[key(leg, seg)] ? "on" : ""}"
+                data-flip="${key(leg, seg)}" title="reverse this joint">&#8644;</button>
+        <input type="range" min="-135" max="135" step="0.5" value="0"
+               data-leg="${leg}" data-seg="${seg}">
+        <input class="filter" type="text" data-num="${key(leg, seg)}" value="0">
+      </div>`).join("")}`).join("");
+
+  $("#lims").innerHTML = CFG.segments.map(seg => `
+    <div class="limrow"><span class="small faint">${esc(seg)}</span>
+      <input class="filter" data-lim="${esc(seg)}" data-end="0" value="${CFG.current[seg][0]}">
+      <input class="filter" data-lim="${esc(seg)}" data-end="1" value="${CFG.current[seg][1]}">
+    </div>`).join("");
+
+  const dials = $("#dials");
+  dials.querySelectorAll("input[type=range]").forEach(el => {
+    el.addEventListener("input",
+      () => setAngle(el.dataset.leg, el.dataset.seg, +el.value));
+  });
+  dials.querySelectorAll("[data-flip]").forEach(el => {
+    el.onclick = () => {
+      const k = el.dataset.flip;
+      INV[k] = !INV[k];
+      el.classList.toggle("on", INV[k]);
+      render();
+    };
+  });
+  dials.querySelectorAll("input[data-num]").forEach(el => {
+    el.addEventListener("change", () => {
+      const [leg, seg] = el.dataset.num.split("_");
+      const v = parseFloat(el.value);
+      if (!isNaN(v)) setAngle(leg, seg, Math.max(-135, Math.min(135, v)));
+    });
+  });
+
+  $("#link").classList.toggle("on", LINK);
+  $("#link").onclick = () => { LINK = !LINK; $("#link").classList.toggle("on", LINK); };
+  $("#zeroall").onclick = () => {
+    Object.keys(ANG).forEach(k => { ANG[k] = 0; });
+    syncInputs(); render();
+  };
+  document.querySelectorAll("[data-view]").forEach(b =>
+    b.onclick = () => {
+      const [a, e] = b.dataset.view.split(",").map(Number);
+      AZ = a; EL = e; render();
+    });
+
+  $("#savedirs").onclick = saveDirections;
+  $("#save").onclick = saveLimits;
+  orbit();
+  syncInputs();
+}
+
+function setAngle(leg, seg, v) {
+  const targets = LINK ? CFG.legs : [leg];
+  targets.forEach(l => { ANG[key(l, seg)] = v; });
+  syncInputs();
+  render();
+}
+
+function syncInputs() {
+  const dials = $("#dials");
+  if (!dials) return;
+  dials.querySelectorAll("input[type=range]").forEach(el => {
+    el.value = ANG[key(el.dataset.leg, el.dataset.seg)] ?? 0;
+  });
+  dials.querySelectorAll("input[data-num]").forEach(el => {
+    el.value = (ANG[el.dataset.num] ?? 0).toFixed(1);
+  });
+}
+
+/* Rendering happens server-side, so a drag coalesces into one request in flight
+   at a time rather than queueing a hundred. Every lookup is guarded because the
+   tab can be switched away mid-request, which takes the elements with it. */
+function render() {
+  const stage = $("#stage");
+  if (!stage || !CFG) return;
+  if (PENDING) { AGAIN = true; return; }
+  PENDING = true;
+  stage.classList.add("busy");
+  const lab = $("#camlab");
+  if (lab) lab.textContent = `az ${Math.round(AZ)}°  el ${Math.round(EL)}°`;
+  const q = new URLSearchParams({ angles: JSON.stringify(ANG), invert: JSON.stringify(INV),
+                                  az: AZ, el: EL, dist: ZOOM });
+  fetch("/api/pose?" + q).then(r => r.json()).then(d => {
+    const img = $("#shot");
+    if (img) img.src = "data:image/png;base64," + d.png;
+    poseFacts(d.facts);
+  }).finally(() => {
+    PENDING = false;
+    const s = $("#stage");
+    if (s) s.classList.remove("busy");
+    if (AGAIN) { AGAIN = false; render(); }
+  });
+}
+
+/* Named poseFacts, not facts: `facts` is page.js's builder and this page uses
+   it, three lines down. */
+function poseFacts(f) {
+  const box = $("#facts");
+  if (!box) return;
+  box.innerHTML = facts([
+    { k: "trunk height", html: `${f.trunk_mm}<span class="faint"
+        style="font-size:13px"> mm</span>`, n: "how tall it actually stands" },
+    { k: "stance, front-back", v: f.stance_x_mm, n: "mm" },
+    { k: "stance, side-side", v: f.stance_y_mm, n: "mm" },
+    { k: "legs on the floor",
+      html: `<span style="color:var(${f.legs_down === 4 ? "--good" : "--warn"})">${
+        f.legs_down}</span><span class="faint" style="font-size:13px"> / 4</span>`,
+      n: `on toes: ${f.toes_down} / 4` },
+    { k: "self-collision",
+      html: `<span style="font-size:16px;color:var(${f.colliding ? "--crit" : "--good"})">${
+        f.colliding ? "HITTING" : "clear"}</span>`,
+      n: f.colliding ? f.clashes.join(", ") : "no part touching another" },
+  ]);
+
+  const g = $("#ground");
+  if (g) g.innerHTML = `<b>Touching the ground:</b> ${
+    f.on_ground.length ? f.on_ground.map(esc).join(" &middot; ") : "nothing"}.
+    <b>Toe heights</b> ${Object.entries(f.toe_height_mm)
+      .map(([k, v]) => `${esc(k)} ${v}`).join(" &middot; ")} mm.`;
+
+  const bar = $("#clash");
+  if (bar) {
+    bar.classList.toggle("hidden", !f.colliding);
+    if (f.colliding) bar.innerHTML =
+      `<b>Hitting:</b> ${esc(f.clashes.join(", "))} &mdash; this is the mechanical limit`;
+  }
+}
+
+/* Free orbit. Drag turns the camera round the robot and tilts it; the wheel
+   pulls in and out. */
+function orbit() {
+  const stage = $("#stage");
+  if (!stage) return;
+  let dragging = false, lx = 0, ly = 0;
+  stage.addEventListener("pointerdown", e => {
+    dragging = true; lx = e.clientX; ly = e.clientY;
+    stage.classList.add("drag"); stage.setPointerCapture(e.pointerId);
+  });
+  stage.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    AZ = (AZ + (e.clientX - lx) * 0.45) % 360;
+    EL = Math.max(-89, Math.min(89, EL + (e.clientY - ly) * 0.35));
+    lx = e.clientX; ly = e.clientY;
+    render();
+  });
+  const stop = e => {
+    dragging = false; stage.classList.remove("drag");
+    try { stage.releasePointerCapture(e.pointerId); } catch (_) { /* already gone */ }
+  };
+  stage.addEventListener("pointerup", stop);
+  stage.addEventListener("pointercancel", stop);
+  stage.addEventListener("wheel", e => {
+    e.preventDefault();
+    ZOOM = Math.max(0.45, Math.min(3.0, ZOOM * (e.deltaY > 0 ? 1.08 : 0.926)));
+    render();
+  }, { passive: false });
+}
+
+/* The two writes. Same endpoints, same bodies, same replies as before - these
+   are the only things on this page that change a file on disk. */
+function saveDirections() {
+  const inv = Object.keys(INV).filter(k => INV[k]);
+  fetch("/api/pose/directions", { method: "POST", body: JSON.stringify({ invert: inv }) })
+    .then(r => r.json()).then(d => {
+      $("#dirnote").innerHTML = d.length
+        ? `<b style="color:var(--good)">Saved.</b> Reversed: ${d.map(esc).join(", ")}.
+           Rebuild with <code>tools/prepare_model.py</code> to apply.`
+        : `<b style="color:var(--good)">Saved.</b> No joints reversed.`;
+    })
+    .catch(e => { $("#dirnote").innerHTML =
+      `<b style="color:var(--crit)">Failed:</b> ${esc(e)}`; });
+}
+
+function saveLimits() {
+  const out = {};
+  CFG.segments.forEach(seg => {
+    const a = document.querySelector(`[data-lim="${seg}"][data-end="0"]`).value;
+    const b = document.querySelector(`[data-lim="${seg}"][data-end="1"]`).value;
+    out[seg] = [parseFloat(a), parseFloat(b)];
+  });
+  fetch("/api/pose/limits", { method: "POST", body: JSON.stringify(out) })
+    .then(r => r.json()).then(d => {
+      $("#savenote").innerHTML = `<b style="color:var(--good)">Saved.</b> hip
+        ${d.hip[0]} to ${d.hip[1]}, thigh ${d.thigh[0]} to ${d.thigh[1]}, calf
+        ${d.calf[0]} to ${d.calf[1]}. Rebuild the model with
+        <code>tools/prepare_model.py</code> to apply them.`;
+    })
+    .catch(e => { $("#savenote").innerHTML =
+      `<b style="color:var(--crit)">Failed:</b> ${esc(e)}`; });
+}
+
+/* ==================================================================== go === */
+
+Promise.all([get("/api/stage/1"), get("/api/stage/3")]).then(([a, b]) => {
+  S1 = a; S3 = b;
+  mountNav("/robot", navState(S1 && S1.nav));
+
+  const m = S1.model || {};
+  tabbed("#body", [
+    { id: "model", label: "Model", html: modelTab,
+      count: m.total ? `${m.passed}/${m.total}` : null },
+    { id: "pose", label: "Pose", html: poseTab },
+    { id: "hardware", label: "Hardware", html: hardwareTab,
+      count: S3.steps.length },
+  ], {
+    onDraw: (id) => {
+      if (id !== "pose") return;
+      poseConfig().then(() => { buildPose(); render(); })
+        .catch(e => { $("#dials").innerHTML = empty("Could not load the pose editor: " + e); });
+    },
+  });
+}).catch(e => { mountNav("/robot", ""); fail(e); });
+</script>
+</body>
+</html>

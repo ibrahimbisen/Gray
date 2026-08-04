@@ -3,8 +3,12 @@
     python run.py scripts/queue_week.py --dry-run     show what it would add
     python run.py scripts/queue_week.py               add it
 
-Rounds 0 to 2, fifteen runs, about 23 hours. Round 3 is designed after these are
-read, because it starts from whichever config won.
+PLAN.md step 1.1, "make it walk". Rounds 0 to 2 are its substeps 1.1.2 to 1.1.4:
+fifteen runs, plus a three-iteration smoke test in front of them. Round 3 (1.1.5)
+is designed after these are read, because it starts from whichever config won.
+
+How long it takes is measured off the runs already on disk rather than asserted
+here. A hardcoded estimate goes stale silently and then gets planned against.
 
 Every job carries a `note` saying what it is testing, because in three days a
 queue of fifteen near-identical walk runs is unreadable without one.
@@ -35,10 +39,12 @@ VEER_HARD = [-0.4, -1.0, -2.4, -4.0]
 # every later comparison has to beat.
 ROUND_0 = [
     {"name": f"w0{i}_seedfloor", "seed": seed,
-     "note": f"R0 noise floor, seed {seed}. Identical config to the other two - "
-             f"whatever these three disagree by is the number a real effect has "
-             f"to beat. Also the first run with wandering measured in the "
-             f"sent-heading frame."}
+     "note": f"PLAN 1.1.2 noise floor, seed {seed}. Identical config to the "
+             f"other two - whatever these three disagree by is the number a real "
+             f"effect has to beat. Also the first runs on two things that changed "
+             f"on 3 Aug 2026: wandering measured in the sent-heading frame, and "
+             f"the owner's standing pose at 202.4 mm. Nothing before them is "
+             f"comparable."}
     for i, seed in enumerate((42, 7, 1234), start=1)
 ]
 
@@ -79,12 +85,66 @@ ROUND_2 = [
 ]
 
 
+# Three iterations of standing still, in front of everything else. It is worth a
+# job of its own whenever the MODEL has changed under the tasks, which it has:
+# the standing pose moved on 3 Aug 2026 from the solved one to the owner's, so
+# every task now spawns the robot at 202.4 mm in a pose it has never trained in.
+# If that is broken, this says so in about a minute instead of six hours from now.
+SMOKE = {
+    "name": "w00_smoke", "task": "Gray-Walk", "iterations": 3,
+    "film": False, "verify": False,
+    "note": "Smoke test, 3 iterations. Not an experiment - it only has to build "
+            "the task, draw a command, step, and score. Gray-Walk rather than "
+            "Gray-Stand on purpose: the standing pose moved on 3 Aug 2026 AND "
+            "the walk task gained a second command term for height, pitch and "
+            "roll. Gray-Stand has no commands at all, so it would exercise none "
+            "of the new code and pass while the walk task was broken.",
+}
+
+
+def measured_minutes() -> float | None:
+    """How long a walk run has actually taken, off the runs on disk.
+
+    This used to be a hardcoded 87 minutes multiplied by the job count. Nothing
+    produced that number and nothing checked it, so it went stale silently - and
+    an estimate nobody can trace is worse than no estimate, because it gets
+    planned against. If there is no finished walk run to measure, say so.
+    """
+    from datetime import datetime  # noqa: PLC0415
+    try:
+        from dashboard import runs  # noqa: PLC0415
+    except Exception:  # noqa: BLE001
+        return None
+
+    mins = []
+    for r in runs.all_summaries():
+        done = r.get("iterations_done") or 0
+        if r.get("task") != "Gray-Walk" or done < 200:
+            continue
+        # A run that was stopped early still times honestly per iteration, so it
+        # counts - scaled up to the 3000 these jobs ask for.
+        try:
+            a = datetime.fromisoformat(r["started"])
+            b = datetime.fromisoformat(r["finished"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        secs = (b - a).total_seconds()
+        if secs > 0:
+            mins.append(secs / 60 * (3000 / done))
+    if not mins:
+        return None
+    mins.sort()
+    return mins[len(mins) // 2]
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true",
                     help="print the commands and add nothing")
     ap.add_argument("--rounds", default="0,1,2",
                     help="which rounds to queue, comma separated")
+    ap.add_argument("--no-smoke", dest="smoke", action="store_false",
+                    help="skip the 3-iteration stand check in front of the queue")
     args = ap.parse_args()
 
     want = {r.strip() for r in args.rounds.split(",") if r.strip()}
@@ -93,7 +153,17 @@ def main() -> None:
     if not jobs:
         raise SystemExit(f"no rounds selected from {args.rounds!r}")
 
-    print(f"{len(jobs)} runs, about {len(jobs) * 87 / 60:.0f} hours\n")
+    if args.smoke:
+        jobs = [SMOKE, *jobs]
+
+    per = measured_minutes()
+    if per:
+        print(f"{len(jobs)} runs, about {len(jobs) * per / 60:.0f} hours "
+              f"at {per:.0f} min each, measured off the runs already on disk\n")
+    else:
+        print(f"{len(jobs)} runs. No finished walk run to time them against yet, "
+              f"so there is no honest estimate of how long.\n")
+
     for job in jobs:
         spec = {"task": "Gray-Walk", "film": True, "verify": True, **job}
         cleaned = queue._clean(dict(queue.DEFAULTS, **spec))
@@ -104,9 +174,13 @@ def main() -> None:
     if args.dry_run:
         print("\nNothing added. Drop --dry-run to queue it.")
     else:
-        state = queue.load()
-        waiting = sum(1 for j in state["jobs"] if j["status"] == "queued")
+        # The job dict's key is `state`. It was `status` here, which is the key
+        # the DASHBOARD renames it to - so this line raised KeyError after every
+        # job had already been added, and the script looked like it had failed
+        # when it had actually worked.
+        waiting = sum(1 for j in queue.load()["jobs"] if j.get("state") == "queued")
         print(f"\nQueued. {waiting} jobs waiting.")
+        print("Start the runner in a second terminal:  run.bat --runner")
 
 
 if __name__ == "__main__":

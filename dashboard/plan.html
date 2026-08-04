@@ -3,152 +3,162 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gray &mdash; the plan</title>
+<title>Gray &mdash; plan</title>
 <link rel="stylesheet" href="/page.css">
 <style>
 /* The plan is a sequence of gates, so it is drawn as one: a rail down the left
-   with a marker per phase and the current one lit. Uses page.css's tokens -
-   same dashboard, not a separate thing. */
-.phase{ display:grid; grid-template-columns:44px 1fr; gap:0 18px; }
-.phase .rail{ position:relative; display:flex; flex-direction:column;
-  align-items:center; }
-.phase .dot{ width:30px; height:30px; border-radius:9px; border:1px solid var(--line);
+   with a marker per step and the current one lit. Only the rail and the gate
+   card live here - everything else on this page is a page.css component. */
+.step { display:grid; grid-template-columns:40px 1fr; gap:0 16px; }
+.step .rail { position:relative; display:flex; flex-direction:column; align-items:center; }
+.step .pip { width:28px; height:28px; border-radius:9px; border:1px solid var(--line);
   display:grid; place-items:center; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-  font-size:13px; font-weight:700; color:var(--faint); background:var(--panel);
+  font-size:13px; font-weight:700; color:var(--muted); background:var(--surface);
   flex:0 0 auto; }
-.phase .line{ flex:1; width:1px; background:var(--line); margin:6px 0; min-height:18px; }
-.phase:last-child .line{ display:none; }
-.phase.now .dot{ border-color:var(--accent); color:var(--accent);
-  box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 12%,transparent); }
-.phase.doing .dot{ border-color:var(--warn); color:var(--warn); }
-.phase .body{ padding-bottom:26px; min-width:0; }
-.phase h3{ margin:4px 0 4px; font-size:19px; letter-spacing:-.02em; }
-.phase .what{ color:var(--dim); font-size:14px; line-height:1.6; margin:0 0 12px;
-  max-width:70ch; }
-.gate{ border:1px solid var(--line); border-left:3px solid var(--ok);
-  border-radius:9px; padding:11px 14px; margin-bottom:12px; background:var(--panel); }
-.gate .lbl{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10px;
-  letter-spacing:.13em; text-transform:uppercase; color:var(--faint); }
-.gate p{ margin:3px 0 0; font-size:14px; }
-.steps{ list-style:none; margin:0 0 12px; padding:0; }
-.steps li{ display:grid; grid-template-columns:16px 1fr; gap:10px; padding:4px 0;
-  font-size:13.5px; color:var(--dim); }
-.steps li::before{ content:""; width:6px; height:6px; border-radius:50%;
-  background:var(--line); margin-top:8px; margin-left:5px; }
-.steps li.done{ color:var(--faint); }
-.steps li.done::before{ background:var(--ok); }
-.pmeta{ display:flex; flex-wrap:wrap; gap:8px 18px; font-size:12.5px;
-  color:var(--faint); margin-bottom:10px; }
-.pmeta b{ color:var(--dim); font-weight:600; }
-.blocked{ border-left:2px solid var(--warn); padding:3px 0 3px 12px;
-  font-size:13px; color:var(--dim); margin-bottom:10px; }
-.loopband{ border:1px dashed var(--accent); border-radius:12px; padding:16px 20px;
-  margin-top:8px; }
-.loopband b{ display:block; margin-bottom:5px; }
-.loopband p{ margin:0; color:var(--dim); font-size:14px; line-height:1.6; }
-.jobs{ width:100%; border-collapse:collapse; font-size:12.5px; }
-.jobs th{ text-align:left; font-size:10px; text-transform:uppercase;
-  letter-spacing:.1em; color:var(--faint); padding:0 10px 7px 0;
-  border-bottom:1px solid var(--line); font-weight:600; }
-.jobs td{ padding:7px 10px 7px 0; border-bottom:1px solid var(--line);
-  vertical-align:top; }
-.jobs tr:last-child td{ border-bottom:0; }
-.jobs .nm, .jobs .cmd{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
-.jobs .cmd{ font-size:11px; color:var(--faint); word-break:break-all; }
-.st{ font-size:10px; text-transform:uppercase; letter-spacing:.09em; padding:2px 8px;
-  border-radius:99px; border:1px solid var(--line); color:var(--dim);
-  white-space:nowrap; display:inline-block; }
-.st.running{ color:var(--accent); border-color:color-mix(in srgb,var(--accent) 45%,transparent); }
-.st.done{ color:var(--ok); border-color:color-mix(in srgb,var(--ok) 40%,transparent); }
-.st.failed,.st.cancelled{ color:var(--bad);
-  border-color:color-mix(in srgb,var(--bad) 40%,transparent); }
-.st.notqueued{ color:var(--faint); border-style:dashed; }
-.banner{ border:1px solid var(--line); border-left-width:3px; border-radius:10px;
-  padding:14px 18px; margin-bottom:20px; background:var(--panel); }
-.banner.go{ border-left-color:var(--ok); }
-.banner.stop{ border-left-color:var(--bad); }
-.banner b{ display:block; margin-bottom:3px; }
-.banner p{ margin:0; color:var(--dim); font-size:13.5px; }
+.step .line { flex:1; width:1px; background:var(--line); margin:6px 0; min-height:18px; }
+.step:last-child .line { display:none; }
+.step.now .pip { border-color:var(--s1); color:var(--s1);
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--s1) 12%,transparent); }
+.step .body { padding-bottom:26px; min-width:0; }
+.step h3 { margin:3px 0 6px; font-size:17px; letter-spacing:-.02em; }
+
+/* The gate is the whole point of a step, so it gets a border of its own rather
+   than being one more line of prose. Green edge = a number you can pass. */
+.gate { border:1px solid var(--line); border-left:3px solid var(--good);
+  border-radius:9px; padding:10px 13px; margin:0 0 12px; background:var(--surface); }
+.gate.none { border-left-color:var(--muted); }
+.gate .lbl { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10px;
+  letter-spacing:.13em; text-transform:uppercase; color:var(--muted); }
+.gate p { margin:3px 0 0; font-size:13px; }
+
+/* Substep list. A done item gets a filled marker; the one the project is on gets
+   a ring, so "where are we" is answerable without reading a word. */
+.items { list-style:none; margin:0 0 10px; padding:0; }
+.items li { display:grid; grid-template-columns:14px 1fr; gap:10px; padding:3px 0;
+  font-size:12.5px; color:var(--ink2); }
+.items li::before { content:""; width:6px; height:6px; border-radius:50%;
+  background:var(--line); margin-top:7px; margin-left:4px; }
+.items li.done { color:var(--muted); }
+.items li.done::before { background:var(--good); }
+.items li.now { color:var(--ink); }
+.items li.now::before { background:var(--s1);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--s1) 25%,transparent); }
+.items .tag { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--muted);
+  margin-right:6px; }
 </style>
 </head>
 <body>
-<div class="top" id="top"></div>
-<div class="shell">
-  <div class="side"></div>
-  <div class="main"></div>
+<div id="nav"></div>
+<div class="app">
+  <aside class="side"></aside>
+  <main class="main"></main>
 </div>
 
 <script src="/page.js"></script>
 <script>
-document.getElementById("top").innerHTML = topbar("/plan", "The plan");
+get("/api/week").then(s => {
+mountNav("/plan", navState(s.nav));
 
-fetch("/api/week").then(r => r.json()).then(s => {
+const F = s.forward, W = s.week, SH = s.shelved || null;
+const HERE = F.here || "";
 
-const F = s.forward, W = s.week;
-const STATE = { "now": "now", "should be running": "doing" };
+/* An item is done, current, or ahead. `state` comes from plan.py; `here` is the
+   one substep the project is actually on. */
+const itemClass = (it) =>
+  it.state === "done" ? "done" : (it.id === HERE || it.state === "now") ? "now" : "";
 
-const phaseBlock = (p) => `
-  <div class="phase ${STATE[p.state] || ""}">
-    <div class="rail"><div class="dot">${esc(p.id)}</div><div class="line"></div></div>
+const subBlock = (sub) => `
+  <div style="margin-bottom:18px">
+    <h3 style="font-size:14px;margin:0 0 6px">
+      <span class="tag mono" style="color:var(--s1)">${esc(sub.id)}</span>${esc(sub.name)}</h3>
+    ${sub.gate
+      ? `<div class="gate"><div class="lbl">Gate</div><p>${esc(sub.gate)}</p></div>`
+      : `<div class="gate none"><div class="lbl">No gate</div>
+           <p>Numbers written down, nothing trained.</p></div>`}
+    <ul class="items">
+      ${(sub.items || []).map(it => `<li class="${itemClass(it)}">
+        <span><span class="tag">${esc(it.id)}</span>${esc(it.what)}${
+          it.id === HERE ? ` &nbsp;<span class="chip now">where we are</span>` : ""}</span>
+      </li>`).join("")}
+    </ul>
+    ${sub.why ? `<p class="why small" style="max-width:72ch;margin:0">${esc(sub.why)}</p>` : ""}
+  </div>`;
+
+const stepBlock = (p) => `
+  <div class="step ${p.state === "now" ? "now" : ""}">
+    <div class="rail"><div class="pip">${esc(p.id)}</div><div class="line"></div></div>
     <div class="body">
       <h3>${esc(p.name)}
-        <span class="chip ${p.state === "now" ? "now"
-          : p.state === "should be running" ? "warn" : ""}"
-          style="vertical-align:3px;margin-left:6px">${esc(p.state)}</span></h3>
-      <p class="what">${esc(p.what)}</p>
-      <div class="gate">
-        <div class="lbl">Over when</div>
-        <p>${esc(p.gate)}</p>
-      </div>
-      <ul class="steps">
-        ${p.steps.map(x => `<li class="${/- done/.test(x) ? "done" : ""}">${esc(x)}</li>`).join("")}
-      </ul>
-      <div class="pmeta"><span><b>Cost:</b> ${esc(p.cost)}</span></div>
-      ${p.blocked_by ? `<div class="blocked"><b>Waits on:</b> ${esc(p.blocked_by)}</div>` : ""}
-      ${p.note ? `<p class="why small" style="max-width:70ch;margin:0">${esc(p.note)}</p>` : ""}
+        <span class="chip ${cls(p.state)}" style="vertical-align:3px;margin-left:6px">${
+          esc(p.state)}</span></h3>
+      <p class="why" style="max-width:72ch;margin:0 0 14px">${esc(p.what)}</p>
+      ${(p.subs || []).length
+        ? p.subs.map(subBlock).join("")
+        : `<div class="gate"><div class="lbl">Gate</div><p>${esc(p.gate)}</p></div>
+           <ul class="items">${(p.steps || []).map(x =>
+             `<li>${esc(x)}</li>`).join("")}</ul>`}
+      ${p.cost ? `<div class="note small"><b>Cost:</b> ${esc(p.cost)}</div>` : ""}
+      ${p.blocked_by ? `<div class="note small"><b>Waits on:</b> ${esc(p.blocked_by)}</div>` : ""}
+      ${p.note ? `<p class="why small" style="max-width:72ch;margin:6px 0 0">${esc(p.note)}</p>` : ""}
     </div>
   </div>`;
 
 const jobRow = (j) => `<tr>
-  <td class="nm">${j.number ? `<a class="plain" href="/runs#${esc(j.run_id)}">#${j.number}</a> ` : ""}${esc(j.name)}</td>
-  <td><span class="st ${esc(j.status || "notqueued")}">${esc(j.status || "not queued")}</span></td>
+  <td class="mono">${j.number
+      ? `<a class="plain" href="/runs#run=${esc(j.run_id)}">#${j.number}</a> ` : ""}${esc(j.name)}</td>
+  <td><span class="chip ${cls(j.status || "")}">${esc(j.status || "not queued")}</span></td>
   <td class="dim">${j.seed ? `seed ${j.seed}` : ""}</td>
   <td class="dim">${j.verdict ? esc(j.verdict)
     : j.iterations_done ? `${j.iterations_done.toLocaleString()} iterations` : "&mdash;"}</td>
-  <td class="cmd">${esc((j.command || "").replace("python scripts/train.py Gray-Walk ", ""))}</td>
+  <td class="dim mono small" style="word-break:break-all">${
+    esc((j.command || "").replace("python scripts/train.py Gray-Walk ", ""))}</td>
 </tr>`;
 
-shell([
+paper([
 
-  { id: "phases", label: "The plan", count: F.phases.length, html: () => `
-    <div class="eyebrow">Gray</div>
+  { id: "here", lead: true, label: "Where we are", html: () => `
+    <div class="eyebrow">The plan</div>
     <h1>${esc(F.one_line)}</h1>
     <p class="lede">${esc(F.lede)}</p>
-    <div class="cols" style="margin-bottom:26px">
+    ${facts([
+      { k: "Where we are", v: HERE || "—", n: (F.phases.find(p => p.state === "now") || {}).name || "" },
+      { k: "Steps", v: String(F.phases.length), n: "each ends on a number, not a date" },
+      { k: "Training runs", v: "2", n: "locomotion, and getting up" },
+      { k: "Shelved", v: String((SH && SH.rows || F.parked || []).length),
+        n: "each one names its trigger" },
+    ])}
+    <div class="cols">
       ${F.shape.map(p => `<div class="card"><p class="why small">${esc(p)}</p></div>`).join("")}
     </div>
-    ${F.phases.map(phaseBlock).join("")}
-    <div class="loopband"><b>And then it starts again.</b>
-      <p>${esc(F.loop)}</p></div>` },
+    <div class="note key" style="margin-top:18px"><b>Source:</b>
+      <code>PLAN.md</code> in the repo root, agreed 3 Aug 2026, transcribed into
+      <code>dashboard/plan.py</code>. If the two ever disagree, PLAN.md is right
+      and this page is stale.</div>` },
 
-  { id: "now", label: "What is running", count: W.rounds.reduce((a, r) => a + r.runs, 0),
-    html: () => `
-    <div class="eyebrow">Phase A</div>
-    <h1>What is running now</h1>
+  { id: "steps", label: "The five steps", count: F.phases.length, html: () => `
+    <p class="lede">One pattern, applied twice: train it, harden it, measure it.
+      Locomotion first, then getting up, then join them, then the sensors twice
+      &mdash; once to keep what you had, once to use them.</p>
+    ${F.phases.map(stepBlock).join("")}
+    <div class="note key"><b>And then it starts again.</b> ${esc(F.loop)}</div>` },
+
+  { id: "week", label: "What is running", count: W.rounds.length, html: () => `
+    <div class="eyebrow">PLAN ${esc(W.step || "1.1")}</div>
+    <h2>The rounds inside ${esc(W.step || "1.1")}</h2>
     <p class="lede">${esc(W.lede)}</p>
-    ${!s.runner_up ? `<div class="banner stop"><b>The runner is not running.</b>
-      <p>Nothing will start, however much is queued. Start it in a second
-        terminal: <code>run.bat --runner</code></p></div>`
-      : s.paused ? `<div class="banner stop"><b>The queue is paused.</b>
-      <p>The runner is up but will not claim anything until it is unpaused.</p></div>`
-      : `<div class="banner go"><b>Running.</b>
-      <p>${s.running ? `${esc(s.running.variant || s.running.name)} &mdash;
-          ${(s.running.iterations_done || 0).toLocaleString()} of
-          ${(s.running.iterations_target || 0).toLocaleString()} iterations.`
-        : "Nothing in flight."}
-        ${s.queued_total} job${s.queued_total === 1 ? "" : "s"} waiting.</p></div>`}
+    ${!s.runner_up ? `<div class="banner bad"><div><b>The runner is not running.</b>
+        Nothing will start, however much is queued. Start it in a second terminal:
+        <code>run.bat --runner</code></div></div>`
+      : s.paused ? `<div class="banner bad"><div><b>The queue is paused.</b>
+        The runner is up but will not claim anything until it is unpaused.</div></div>`
+      : `<div class="banner ok"><div><b>Running.</b>
+        ${s.running ? `${esc(s.running.variant || s.running.name)} &mdash;
+            ${(s.running.iterations_done || 0).toLocaleString()} of
+            ${(s.running.iterations_target || 0).toLocaleString()} iterations.`
+          : "Nothing in flight."}
+          ${s.queued_total} job${s.queued_total === 1 ? "" : "s"} waiting.</div></div>`}
     ${facts(W.at_a_glance)}
-    <div class="cols" style="margin-bottom:22px">
+    <div class="cols" style="margin-bottom:20px">
       <div class="card">
         <h3>Why a matrix and not one long run</h3>
         ${W.why.map(p => `<p class="why small">${esc(p)}</p>`).join("")}
@@ -158,12 +168,14 @@ shell([
         ${W.rules.map(p => `<div class="risk small">${esc(p)}</div>`).join("")}
       </div>
     </div>
-    ${W.rounds.map(r => `<div class="card" style="margin-bottom:14px">
-      <h3><span class="chip">${esc(r.id)}</span> &nbsp;${esc(r.name)}</h3>
+    ${W.rounds.map(r => `<div class="card" style="margin-bottom:12px">
+      <h3><span class="chip">${esc(r.id)}</span>
+        <span class="mono small" style="color:var(--muted)">${esc(r.step || "")}</span>
+        &nbsp;${esc(r.name)}</h3>
       <p class="why small"><b>Asks:</b> ${esc(r.asks)}<br>
         <b>Design:</b> ${esc(r.design)}<br>
         <b>Reads:</b> ${esc(r.reads)}</p>
-      ${r.jobs.length ? `<div class="tw"><table class="jobs">
+      ${r.jobs && r.jobs.length ? `<div class="tw"><table>
         <tr><th>Run</th><th>State</th><th>Seed</th><th>Result</th><th>What varies</th></tr>
         ${r.jobs.map(jobRow).join("")}
       </table></div>`
@@ -173,49 +185,54 @@ shell([
     </div>`).join("")}` },
 
   { id: "bars", label: "What it has to beat", html: () => {
-    const r1 = (s.status.tasks || []).find(t => t.id === "R1");
+    const r1 = (s.status && s.status.tasks || []).find(t => t.id === "R1");
+    if (!r1) return `<p class="muted">No verified run yet, so there is nothing to
+      score against the bar.</p>`;
+    const failing = r1.criteria.filter(c =>
+      c.best != null && (c.better === "lower" ? c.best > c.bar : c.best < c.bar)).length;
     return `
-    <div class="eyebrow">Phase A</div>
-    <h1>What it has to beat</h1>
-    <p class="lede">R1&rsquo;s bar, and the best any run has managed. Two of six
-      are failing, and every run is scored on all six.</p>
+    <p class="lede">R1&rsquo;s bar, and the best any run has managed.
+      ${failing} of ${r1.criteria.length} failing, and every run is scored on all
+      ${r1.criteria.length}.</p>
     <div class="card"><div class="tw"><table>
       <tr><th>Criterion</th><th class="n">Bar</th><th class="n">Best so far</th>
           <th>State</th></tr>
-      ${r1 ? r1.criteria.map(c => {
+      ${r1.criteria.map(c => {
         const better = c.better === "lower";
         const met = c.best == null ? null : better ? c.best <= c.bar : c.best >= c.bar;
-        const dp = c.bar < 1 ? 2 : 1;
         return `<tr>
           <td><b>${esc(c.name)}</b></td>
-          <td class="n dim">${better ? "&le;" : "&ge;"} ${c.bar.toFixed(dp)} ${esc(c.unit || "")}</td>
-          <td class="n" style="color:${met ? "var(--ok)" : "var(--bad)"}">
-            ${c.best == null ? "&mdash;" : c.best.toFixed(dp)}</td>
+          <td class="n dim">${better ? "&le;" : "&ge;"} ${esc(value(c.bar, c.unit))}</td>
+          <td class="n" style="color:${met ? "var(--good)" : "var(--crit)"}">
+            ${c.best == null ? "&mdash;" : esc(value(c.best, c.unit))}</td>
           <td>${met === null ? `<span class="chip">not measured</span>`
               : met ? `<span class="chip ok">passing</span>`
-              : `<span class="chip warn">${(better ? c.best / c.bar : c.bar / c.best).toFixed(1)}&times; off</span>`}
+              : `<span class="chip warn">${
+                  (better ? c.best / c.bar : c.bar / c.best).toFixed(1)}&times; off</span>`}
           </td></tr>`;
-      }).join("") : `<tr><td colspan="4" class="dim">Not measured yet.</td></tr>`}
+      }).join("")}
     </table></div></div>` } },
 
-  { id: "notdoing", label: "Deferred and parked",
-    count: W.not_doing.length + F.parked.length, html: () => `
-    <div class="eyebrow">Gray</div>
-    <h1>Deferred and parked</h1>
-    <p class="lede">Decided against on purpose, with the reason, so none of it
-      looks forgotten later.</p>
-    <h3 style="margin-top:20px">Deferred &mdash; not now, but on the plan</h3>
-    <div class="cols tight">
-      ${W.not_doing.map(x => `<div class="card">
-        <h3>${esc(x.what)}</h3>
-        <p class="why small">${esc(x.why)}</p></div>`).join("")}
-    </div>
-    <h3 style="margin-top:26px">Parked &mdash; each one names its trigger</h3>
-    <div class="cols tight">
-      ${F.parked.map(x => `<div class="card">
-        <h3>${esc(x.what)}</h3>
-        <p class="why small">${esc(x.why)}</p></div>`).join("")}
-    </div>` },
+  { id: "shelved", label: "Shelved",
+    count: (SH && SH.rows || F.parked || []).length, html: () => `
+    <p class="lede">${esc((SH && SH.lede) || "Decided against for now, with the reason, so none of it looks forgotten later.")}</p>
+    <div class="tw"><table>
+      <tr><th style="width:34%">What</th><th>Trigger to un-shelve</th></tr>
+      ${(SH ? SH.rows : (F.parked || []).map(x => ({ what: x.what, trigger: x.why })))
+        .map(x => `<tr>
+          <td><b>${esc(x.what)}</b></td>
+          <td class="dim">${esc(x.trigger)}</td></tr>`).join("")}
+    </table></div>
+    ${(SH && SH.cost) || F.shelved_cost
+      ? `<div class="note key" style="margin-top:16px">${
+          esc((SH && SH.cost) || F.shelved_cost)}</div>` : ""}
+    ${(W.not_doing || []).length ? `
+      <h3 style="margin-top:26px">Deferred &mdash; not now, but on the plan</h3>
+      <div class="cols tight">
+        ${W.not_doing.map(x => `<div class="card">
+          <h3>${esc(x.what)}</h3>
+          <p class="why small">${esc(x.why)}</p></div>`).join("")}
+      </div>` : ""}` },
 
 ]);
 

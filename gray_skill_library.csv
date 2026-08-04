@@ -1,201 +1,61 @@
-#,Category,Skill / Event,Difficulty dial,Notes
-1,Body control,Sit to stand,-,
-2,Body control,Stand to max height,-,
-3,Body control,Max height to sit,-,
-4,Body control,"Sit to max height, direct",-,
-5,Body control,Hold any commanded height,Full height range,
-6,Body control,Pitch and roll while planted,+/- 20 deg,
-7,Body control,Yaw body while planted,+/- 25 deg,
-8,Body control,Stand on 3 legs,Each leg lifted in turn,
-9,Body control,Stand on 2 diagonal legs,Both diagonals,
-10,Body control,Reach one leg out and hold,Forward / side / back,
-11,Turning,"Turn in place, slow",-,
-12,Turning,"Turn in place, fast",Up to max yaw rate,
-13,Turning,Turn exact angles and stop,45 / 90 / 180 / 360 deg,
-14,Turning,Turn while crouched / at max height,Both extremes,
-15,Turning,Turn on slippery ground,Friction 0.3 down to 0.1,
-16,Turning,Turn in a narrow space,Gap 1.5x down to 1.1x body length,
-17,Feet,Lift one foot,-,
-18,Feet,Lift each foot,All four,
-19,Feet,Lift feet in sequence,Rhythm 0.5 to 2 Hz,
-20,Feet,Hold one foot up 10 s,Each leg,
-21,Feet,Place foot on a marked target,Target 60 mm down to 30 mm,
-22,Feet,Step over a low object,Object 10 to 40 mm,
-23,Feet,Paw or tap with a foot,-,
-24,Walking,Step in place,20 s,
-25,Walking,Walk forward,Slow to sprint,
-26,Walking,Walk backward,Slow to fast,
-27,Walking,Walk sideways,Both directions,
-28,Walking,Walk diagonally,All 8 headings,
-29,Walking,"Arc, walk and turn together",Radius 2 m down to 0.3 m,
-30,Walking,Any speed + strafe + turn combo,Full command box,
-31,Walking,"Instant start, stop, reverse",-,
-32,Walking,Sprint to dead stop,From max speed,
-33,Walking,Change direction at full speed,90 deg then 180 deg,
-34,Walking,"Sneak, crouched and slow",Height down to 50% nominal,
-35,Walking,Walk at max height,-,
-36,Walking,Gait switching,Walk / trot / bound,
-37,Walking,"Cross a cable, threshold, rug edge",5 to 20 mm lip,
-38,Walking,Walk on a moving surface,Treadmill 0.1 to 0.5 m/s,
-39,Disturbance,"Push while standing, light",dV 0.15 m/s,
-40,Disturbance,"Push while standing, hard",dV 0.4 m/s,
-41,Disturbance,"Push while standing, hardest",dV raised until it fails,
-42,Disturbance,Push from any direction and height,Body and leg contact points,
-43,Disturbance,Push while walking,dV 0.15 / 0.4 / max,
-44,Disturbance,Sustained lean,"10% to 30% body weight, 10 s",
-45,Disturbance,Tether tug,"Any direction, sharp",
-46,Disturbance,Leg kicked mid-swing,"Swing leg, sideways impulse",
-47,Disturbance,Ground yanked away,Friction 1.0 to 0.05 instantly,
-48,Terrain,Flat hard floor,-,
-49,Terrain,Carpet and rug edges,-,
-50,Terrain,Grass,-,
-51,Terrain,Gravel,-,
-52,Terrain,"Sand or mud, foot sinks",Sink depth to 20 mm,
-53,Terrain,Scattered blocks,10 / 20 / 30 mm,
-54,Terrain,Rubble field,Up to ankle deep,
-55,Terrain,Wet tile or ice,Friction 0.3 / 0.15 / 0.05,
-56,Terrain,Loose plank or wobbly board,Free to tilt 10 deg,
-57,Terrain,Narrow path or beam,Width 2x down to 1x foot spacing,
-58,Terrain,Gaps and holes,Gap up to 1 foot spacing,
-59,Terrain,Step into an unseen hole,Depth to 50 mm,
-60,Terrain,"Curb, single tall step up and down",Height to 1x leg length,
-61,Terrain,"Human stairs, up",Standard 175 mm rise,
-62,Terrain,"Human stairs, down",Standard 175 mm rise,
-63,Terrain,"Hill, up",10 / 20 / 30 deg,
-64,Terrain,"Hill, down",10 / 20 / 30 deg,
-65,Terrain,Side-slope traverse,10 / 20 deg cross-slope,
-66,Terrain,Stairs while carrying load,+1 kg then +2 kg,
-67,Payload,+1 kg centred,Applied across all skills,
-68,Payload,+2 kg centred,Applied across all skills,
-69,Payload,Off-centre load,Offset to 50 mm,
-70,Payload,Sloshing load,Liquid dynamics in sim,
-71,Payload,Load added or removed mid-walk,Step change +/- 1 kg,
-72,Falls & recovery,Get up from belly,-,
-73,Falls & recovery,Get up from side,Both sides,
-74,Falls & recovery,Flip from fully upside down,-,
-75,Falls & recovery,Get up on a slope,10 / 20 deg,
-76,Falls & recovery,Get up in a tight space,Clearance 2x down to 1.2x body height,
-77,Falls & recovery,Drop 0.3 m,-,
-78,Falls & recovery,Drop 0.5 m,-,
-79,Falls & recovery,Drop 0.7 m,-,
-80,Falls & recovery,Drop 1.0 m,-,
-81,Falls & recovery,Drop onto uneven ground,Blocks and slopes,
-82,Falls & recovery,Drop while tilted or rotating,Up to 45 deg off level,
-83,Falls & recovery,Recover from a mid-walk slip,One foot slips out,
-84,Falls & recovery,Choose to fall safely,Unrecoverable states,
-85,Athletic,Jump in place,Height to 50 mm,
-86,Athletic,Jump a gap,Gap to 1 body length,
-87,Athletic,Jump up onto a step,Height to 1x leg length,
-88,Athletic,Jump down from a step,Height to 2x leg length,
-89,Athletic,Climb over a tall obstacle,Taller than leg length,
-90,Athletic,Squeeze under something,Clearance to 60% body height,
-91,Athletic,Back out of a corner,"Two walls, tight",
-92,Degraded hardware,One weak servo,Torque 70% / 50% / 30%,
-93,Degraded hardware,One dead servo,Each joint in turn,
-94,Degraded hardware,Two weak servos,"50% torque, different legs",
-95,Degraded hardware,IMU drift and noise,"Bias to 2 deg, noise to 3x nominal",
-96,Degraded hardware,Delayed commands,20 / 50 / 100 ms lag,
-97,Degraded hardware,"Low battery, reduced torque",Torque 80% then 60%,
-98,Degraded hardware,"Worn feet, no grip",Friction 0.4 of nominal,
-99,Perception,"See an obstacle, step over it",Height 10 to 50 mm,
-100,Perception,"See a hole, avoid it",Any size,
-101,Perception,Find stairs and climb them,From 1 m away,
-102,Perception,Follow a path,Straight then curved,
-103,Perception,React to a sudden appearance,Object enters 1 m view,
-104,Perception,Low light or darkness,Down to 5 lux,
-105,Perception,Reflective or patterned floor,"Mirror, tile, stripes",
-106,Perception,Random unscripted event mid-walk,Anything,
-107,Perception,Picked up and set down elsewhere,-,
-108,Perception,Leashed and tugged while walking,Any direction,
-109,Chaining,"Fall, get up, keep walking",One continuous motion,
-110,Chaining,"Walk, jump, land, keep walking",-,
-111,Chaining,"Sprint, stop, turn 180, sprint back",-,
-112,Chaining,Stairs to flat to stairs,-,
-113,Chaining,Friction change mid-stride,Carpet to tile under one foot,
-114,Chaining,"Freeze mid-stride, hold, resume",Hold 5 s,
-115,Chaining,Emergency stop from any state,-,
-116,Startup,Powers on in a random pose,Any joint configuration,
-117,Startup,Powers on upside down,-,
-118,Startup,Powers on mid-air,Dropped from a hand,
-119,Startup,Powers on with a foot trapped,-,
-120,Stuck,Foot wedged under something,-,
-121,Stuck,Wedged between two objects,"Chair legs, tight gap",
-122,Stuck,Walking into a wall,-,
-123,Stuck,Legs tangled with each other,-,
-124,Stuck,Steps on its own foot,-,
-125,Stuck,Impossible command,"Blocked path, unreachable pose",
-126,Precision,Walk to a point and stop,Distance 0.5 to 3 m,
-127,Precision,Stop on an exact heading,Any target heading,
-128,Precision,Back into a tight spot,Clearance to 50 mm per side,
-129,Precision,Walk a straight line 3 m,-,
-130,Precision,Stepping stones,Spacing 0.5x to 1.5x stride,
-131,Precision,Fit through a doorway,Clearance to 50 mm per side,
-132,Smoothness,Keep an object on its back,Object friction lowered over time,
-133,Smoothness,10 minutes continuous walking,-,
-134,Smoothness,Quiet mode,-,
-135,Smoothness,Efficient gait at each speed,Full speed range,
-136,Smoothness,Same quality at low battery,100% down to 20%,
-137,People,"Picked up, held, set down",-,
-138,People,Step around a moving human foot,-,
-139,People,Handled or petted while standing,Random light contact,
-140,People,Wind gusts,"To 20% body weight, sideways",
-141,People,Puddle then smooth floor,Wet feet,
-142,People,Camera blocked or dirty,Full occlusion,
-143,People,Rain or dust on sensors,Degraded readings,
-144,Hard variants,Balance on a tilting platform,"See-saw, to 15 deg",
-145,Hard variants,Backwards down stairs,Standard rise,
-146,Hard variants,Get up carrying 2 kg,-,
-147,Hard variants,Get up on gravel or a slope,20 deg or loose surface,
-148,Hard variants,Continuous 30 s push,"10% body weight, sustained",
-149,Hard variants,Stairs with one dead servo,Any leg,
-150,Speed,Find top speed,Raise command until it fails,
-151,Speed,Speed ladder,25 / 50 / 75 / 100% of top,
-152,Speed,Acceleration,Zero to top speed,
-153,Speed,Sustained run,60 s at 80% of top speed,
-154,Speed,Top speed per surface,Grass / gravel / carpet / tile,
-155,Speed,Top speed backward and sideways,Each direction,
-156,Speed,Turn at speed,Arc at 80% of top speed,
-157,Speed,Top speed with payload,+1 kg then +2 kg,
-158,Speed,Trip at top speed,Obstacle at max speed,
-159,Gaits,Static crawl,Three feet always down,
-160,Gaits,Pace,Same-side legs together,
-161,Gaits,Amble,Mid speed,
-162,Gaits,Pronk,All four push off together,
-163,Gaits,Gallop,Max speed gait,
-164,Gaits,Three-legged hop,One leg held up,
-165,Gaits,Backward trot,Slow to fast,
-166,Gaits,Step and hold,One step per command,
-167,Body positions,"Lie down flat, prone rest",-,
-168,Body positions,Stretch,"Front forward, rear up",
-169,Body positions,Roll over through the side,Both directions,
-170,Body positions,Crawl at minimum height,Belly near ground,
-171,Body positions,Sit up on hind legs,-,
-172,Body positions,Bow,"Front down, rear up",
-173,Body positions,Shake off,Rotational body shake,
-174,Body positions,Lean around a corner,Feet planted,
-175,Body positions,Scan left to right,Feet planted,
-176,Body positions,Idle sway,-,
-177,Body positions,Power-save lock and wake,-,
-178,Foot movements,Probing step,Tap before committing weight,
-179,Foot movements,Friction scrape test,Before stepping,
-180,Foot movements,Push an object with a foot,Object to 0.5 kg,
-181,Foot movements,Drag something backward,Load to 1 kg,
-182,Foot movements,Press a pedal or button,-,
-183,Foot movements,Kick an object,-,
-184,Foot movements,Dig or scrape the ground,-,
-185,Foot movements,Pivot around one planted foot,Up to 90 deg,
-186,Foot movements,Crossover side step,"Legs cross, not shuffle",
-187,Air movements,Mid-air twist,Up to 90 deg reorientation,
-188,Air movements,Jump backward,To 0.5 body length,
-189,Air movements,Jump sideways,To 0.5 body length,
-190,Air movements,Two jumps back to back,No reset between,
-191,Air movements,Land on a narrow target,Target 2x down to 1x foot spacing,
-192,Air movements,Bound over an obstacle,Height to 1x leg length,
-193,Path shapes,Figure eight,Loop radius 1 m down to 0.4 m,
-194,Path shapes,Circle at fixed radius,0.3 to 2 m,
-195,Path shapes,Reverse out of a dead end,No room to turn,
-196,Path shapes,Brace against a wall and traverse,Gap narrower than stance,
-197,Path shapes,Controlled slide down a steep slope,30 to 45 deg,
-198,Path shapes,Descend a steep slope backward,20 to 30 deg,
-199,Path shapes,"Skip a stair, two at a time",Standard rise,
-200,Self-check,Startup joint sweep,"Every joint, full range",
+id,name,kind,group,coverage,blocked_on,dial,note,covers
+1,Hold a commanded ride height,run,R1,blocked,height,50 to 100 % of nominal height,"Sit, stand, crouch, sneak, squeeze under, crawl and rear up are all one number the command vector does not have.",1 2 3 4 5 14 34 35 90 167 170 171
+2,"Pitch, roll and yaw the body with the feet planted",run,R1,blocked,height,+/- 25 deg,"Bowing, stretching, shaking, leaning and scanning are attitude commands rather than rates; old row 6 gave +/- 20 deg and old row 7 gave +/- 25 deg, so the dial is widened to cover both.",6 7 168 172 173 174 175
+3,Address one leg on its own,run,R1,blocked,foot,,"A three-legged stance, a diagonal pair or one leg held out needs a per-foot command, and nothing in vx, vy, yaw addresses one leg.",8 9 10
+4,Lift a foot and hold it up,run,R1,emerges,,0 to 10 s,"Feet come off the ground because the gait reward makes them, not because anyone asks.",17 18 20
+5,Turn in place,run,R1,command,,45 / 90 / 180 / 360 deg,"Slow, fast, and stopping on an exact angle are the same yaw command.",11 12 13
+6,Turn where the ground or the space is against it,run,R1,command,,0.1 to 0.3 friction,Turning on ice or in a gap 1.1 times the body length is the same command with the world turned up.,15 16
+7,Walk forward at a commanded speed,run,R1,command,,0 to 0.35 m/s,"Stepping in place is this command at zero and holding the line for 3 m is R1's existing drift bar, so idle sway at zero command is not a separate skill.",24 25 129 176
+8,"Walk backward, sideways and diagonally - the whole command box",run,R1,blocked,range,-0.35 to 0.35 m/s,"Measured on run 25: backward walked 0.00 m in 8 s and pure sideways 3 cm, because WALK_SPEED is 0.15 to 0.35 and vx is never zero or negative.",26 27 28 30
+9,"Start, stop and reverse hard",run,R1,command,,90 / 180 deg,"Instant start, a dead stop from a sprint and a 180 at full speed are step changes in the same command.",31 32 33
+10,Walk a constant arc,run,R1,command,,0.3 to 2 m radius,"A constant speed plus a constant turn rate is a circle, a figure eight is two of them flown back to back and turning at speed is the same pair held at 80 % of top, so the radius dial is widened to span every old row.",29 156 193 194
+11,Named gaits,run,R1,command,,,"Static crawl, pace, amble and backward trot are contact patterns the gait reward already shapes; the gaits with a flight phase are parked.",159 160 161 165
+12,Switch gait mid-walk,run,R1,command,,,"Changing gait is a speed change, not a new policy.",36
+13,"Step on command, one step at a time",run,R1,command,,0.5 to 2 Hz,"One step per command, at a commanded rhythm.",19 166
+14,Step over a low object,run,R1,emerges,,5 to 50 mm,"A rug edge, a cable or a 40 mm block is felt through the leg on contact rather than seen, which is why old row 99 filing the same event as blocked on a camera was wrong; PLAN 5.2 notes range finders reach the anticipating half of it, and the dial spans all three old ranges.",22 37 99
+15,Place a foot on a chosen spot,run,R1,blocked,camera,30 to 60 mm target,"Hitting a mark, a stepping stone or the next stair but one needs to see where the spot is, and range finders give range, not a foot-placement map.",21 130 199
+16,Probe the ground before committing weight,run,R1,emerges,,,Tapping and scraping before loading a foot fall out of the contact rewards.,178 179
+17,"Pivot, cross over, and brace on a wall",run,R1,emerges,,0 to 90 deg,"A wall is felt through the leg when it pushes against it, the same way a low obstacle already is.",185 186 196
+18,Reverse out of a tight place,run,R1,pilot,,,"Backing out of a corner, a dead end or a 50 mm gap is what a human on the sticks is for.",91 128 195
+19,Drive to a point and stop on a heading,run,R1,pilot,,0.5 to 3 m,"The pilot decides where the point is, which heading to stop on, and how to line up on a doorway.",126 127 131
+20,Descend a steep slope,run,R1,condition,,20 to 45 deg,"A steep slope is terrain, a dial in the scene, and going down it backward is just a command.",197 198
+21,Get up from any ground pose,run,R2,command,,,"Belly, either side, fully upside down and rolling through the side are one reward with one fixed goal - get upright.",72 73 74 169
+22,Get up on a slope or in a tight space,run,R2,command,,10 / 20 deg,The same reward with the floor tilted or the ceiling at 1.2 times body height.,75 76
+23,Power on in an unknown pose,run,R2,command,,,"Powering on in a random joint pose, upside down, mid-air or with a foot trapped all land in R2's start distribution.",116 117 118 119
+24,Picked up and set down elsewhere,run,R2,command,,,"Being set down is felt through the IMU and lands in an unknown pose, so it is a getting-up start and needs no eyes.",107 137
+25,Survive a drop,run,R2,command,,0.3 to 1.0 m,"Four old rows each named one drop height; the height is a dial, not four skills.",77 78 79 80
+26,Land badly,run,R2,command,,0 to 45 deg off level,"Landing on blocks or a slope, or already rotating, is the same drop with the start state turned up.",81 82
+27,"Recover from a slip, or choose to fall safely",run,R2,command,,,A foot sliding out mid-walk and an unrecoverable state are the two ends of the same reward.,83 84
+28,Use a foot on an object,parked,R3,emerges,,0 to 1 kg,"Pushing, dragging, pressing, kicking, digging and pawing all score the object rather than the robot, and PLAN.md shelves this with no trigger to un-shelve.",23 180 181 182 183 184
+29,Push while standing,axis,D1,condition,,0.15 to 0.4 m/s,"Light, hard and hardest are the same impulse with the number raised, from any direction and contact point.",39 40 41 42
+30,Push while walking,axis,D1,condition,,0.15 to 0.4 m/s,"The same shove, delivered while the feet are moving.",43
+31,Sustained lean or a long push,axis,D1,condition,,10 to 30 % body weight,A lean held for 10 s and a push held for 30 s are one sustained force.,44 148
+32,A sharp tug or a kicked leg,axis,D1,condition,,,"A tether yank and a sideways impulse into the swing leg are sharp, not sustained.",45 46
+33,Low friction underfoot,axis,D1,condition,,0.05 to 1.0,"Ice, wet tile, a puddle, worn feet and the ground yanked away are one number, and friction 0.4 is already inside the 0.4 to 1.2 band randomised on every attempt today.",47 55 98 141
+34,"Grass, gravel and rubble",axis,D1,condition,,,"The policy never sees the word gravel, it sees the same numbers arriving in a different pattern.",50 51 54
+35,Ground the foot sinks into,axis,D1,condition,,0 to 20 mm sink,Sand and mud differ from gravel by letting the foot go down before it stops.,52
+36,"Uneven ground - blocks, gaps, a beam, a rug edge",axis,D1,condition,,10 / 20 / 30 mm,"Flat hard floor is the baseline everything else is measured against rather than a skill, and the rest of these are one roughness dial.",48 49 53 57 58
+37,A surface that moves under it,axis,D1,condition,,10 to 15 deg tilt,"A treadmill is a test rig rather than a skill, and a see-saw and a loose plank are the same tilt dial.",38 56 144
+38,Step into an unseen hole,axis,D1,emerges,,0 to 50 mm deep,"An unseen hole is exactly that - felt, not seen.",59
+39,"Slopes, up, down and across",axis,D1,condition,,10 / 20 / 30 deg,"Up, down and cross-slope are one terrain dial.",63 64 65
+40,A curb or single tall step,axis,D1,condition,,0 to 1 x leg length,A curb is the stair dial with one step in it.,60
+41,"Stairs, up and down",axis,D1,condition,,0 to 175 mm rise,"Human stairs at a standard rise, forward or backward.",61 62 145
+42,Stairs with a load or a dead servo,axis,D1,condition,,+1 / +2 kg,"Stairs are the hard case for every other dial, so the load and the dead servo get a row on top of it.",66 149
+43,Payload,axis,D1,condition,,+/- 2 kg,"Centred, off-centre to 50 mm, sloshing or changing mid-walk, it is one mass dial.",67 68 69 70 71
+44,"Weak, dead or under-powered servos",axis,D1,condition,,30 to 80 % torque,"One weak, two weak, one dead per joint in turn, or a flat battery are all reduced torque.",92 93 94 97
+45,Get up under load or on bad ground,axis,D1,condition,,0 to 20 deg,"Getting up on gravel or a slope carrying 2 kg is R2 with D1's dials turned up, not a new skill.",146 147
+46,Foot wedged or legs tangled,axis,D1,condition,,,"Wedged, tangled or standing on its own foot is a scene condition the policy has to survive.",120 123 124
+47,"Walled in, or walking into a wall",axis,D1,condition,,,Chair legs and a wall are the same condition seen from outside.,121 122
+48,"Handled, tugged and blown sideways",axis,D1,condition,,0 to 20 % body weight,"A leash tug, a hand on the back and a gust are all sideways force.",108 139 140
+49,"Trip at speed, or anything else mid-walk",axis,D1,condition,,,"Anything carries no information and mostly it is a shove, and tripping at speed is a disturbance rather than a speed measurement.",106 158
+50,"Sensor noise, drift and command delay",constraint,C1,condition,,20 / 50 / 100 ms,"IMU bias to 2 deg, noise to 3x nominal and up to 100 ms of lag are simulator honesty, not damage.",95 96
+51,An impossible order,constraint,C1,condition,,,"How it behaves when asked for a blocked path or an unreachable pose is a property of every run, not a run.",125
+52,Quiet running and a power-save lock,constraint,C1,condition,,,"Quiet is a penalty on effort rather than something measured afterwards, and power-save is a state rather than a movement.",134 177
+53,Startup joint sweep,constraint,C1,measured,,,Every joint driven through its full range before anything else runs.,200
+54,"Fall, get up, keep walking",test,T1,measured,,,"PLAN step 3's handover test - R2 stands it up, hands over, R1 walks 5 m, 100 times with no stall and no fall-loop.",109
+55,Chain moves without stopping,test,T1,measured,,0 to 5 s hold,"Sprint-stop-turn-sprint, stairs to flat to stairs, a friction change mid-stride, a freeze and resume, and an emergency stop are read off, never trained.",111 112 113 114 115
+56,Top speed and the speed ladder,test,T2,measured,,25 / 50 / 75 / 100 % of top,"Raise the command until it fails and write down where, per surface, per direction and per payload.",150 151 154 155 157
+57,Acceleration and a sustained run,test,T2,measured,,60 s to 10 min,"Zero to top speed, then hold 80 % of it, then keep walking for ten minutes.",133 152 153
+58,"Smoothness, read off the trained policy",test,T2,measured,,20 to 100 % battery,"Efficient gait at each speed, the same quality on a flat battery, and keeping an object on its back are numbers read off a policy rather than trained toward.",132 135 136
+59,Jumping,parked,P1,blocked,flight,,"Every contact-gated reward term returns zero the moment all four feet leave the ground, so the airborne part needs its own reward and its own run; PLAN.md un-parks it when stage 3.3 measures real servo speed under load.",85 86 87 88 89 110 162 163 164 187 188 189 190 191 192
+60,Seeing,parked,P2,blocked,camera,,"A camera the policy itself reads, plus a depth-to-heightmap pipeline and the worst sim-to-real gap on the list; reacting to an obstacle is already covered blind, only anticipating one needs eyes.",100 101 102 103 104 105 138 142 143

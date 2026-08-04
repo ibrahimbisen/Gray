@@ -1,0 +1,1070 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gray — runs</title>
+<link rel="stylesheet" href="/page.css">
+<style>
+  /* The only rules page.css genuinely does not carry. Everything else on this
+     page - every token, every component - comes from it. */
+
+  /* `.top` in page.css is the global nav bar. This page's run header was also
+     called `.top`: a flex row of title, pills and buttons. Renamed rather than
+     collided with. */
+  .runhead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .runhead h1{margin:0;font-size:24px;letter-spacing:-.02em}
+
+  /* page.css spaces `main > section`. Every section here is one level further
+     down, inside the tab pane, so it would otherwise get no gap at all. */
+  #body > section{margin-top:30px}
+</style>
+</head>
+<body>
+<div id="nav"></div>
+<div class="app">
+  <aside>
+    <div class="brand">Gray<small>training centre</small></div>
+    <div class="side-h"><span>Runs</span><span id="runcount"></span></div>
+    <div id="runlist"></div>
+  </aside>
+  <main>
+    <div id="head"></div>
+    <div id="tabs"></div>
+    <div id="body"></div>
+  </main>
+</div>
+
+<script src="/page.js"></script>
+<script>
+/* esc, $, fmt, label, clock, STATE_CLASS, cls and post all come from page.js.
+   This file used to carry its own copy of every one of them. */
+
+const SLOTS = ["var(--s1)","var(--s2)","var(--s3)","var(--s4)","var(--s5)"];
+const MAX_COMPARE = SLOTS.length;   // never cycle a hue: see the palette comment
+
+let STATE = null, DETAIL = null, DETAIL_FOR = null;
+let SELECTED = null, VIDEO = null, TABLE = false;
+/* The overview links in as /runs#run=<id>. Anything else in the hash is a tab
+   name, which is how this page has always remembered where it was. */
+let TAB = "live";
+{
+  const hash = decodeURIComponent(location.hash.slice(1) || "");
+  if(hash.startsWith("run=")){ SELECTED = hash.slice(4); TAB = "live"; }
+  else if(hash) TAB = hash;
+}
+let COMPARE = [], METRIC = "reward", COMPARE_DATA = null;
+let JOBLOG = null, JOBLOG_TEXT = "";
+let LAST_SIG = null, NAV_SIG = null;
+
+/* The per-metric charts are SMALL MULTIPLES: one chart per metric, one series in
+   each, every one titled and labelled. So they share a single accent rather than
+   each taking a categorical hue. There are eleven metrics and five validated
+   colours, and cycling would have said `reward` and `exploration` are the same
+   thing. The five categorical slots are kept for the compare chart, where they
+   carry real identity - which run is which - and are capped at five. */
+const METRIC_INK = "var(--s1)";
+
+/* ---------------- nav ---------------- */
+
+/* mountNav consumes the #nav placeholder, and this page redraws on every
+   five-second poll. Put a placeholder back before calling it again, or the bar
+   is prepended a second time on every poll. Only redrawn when the live status
+   string it carries has actually moved. */
+function renderNav(){
+  const right = navState(STATE && STATE.nav);
+  if(right === NAV_SIG) return;
+  NAV_SIG = right;
+  const bar = document.querySelector(".top");
+  if(bar) bar.outerHTML = `<div id="nav"></div>`;
+  mountNav("/runs", right);
+}
+
+/* ---------------- sidebar ---------------- */
+
+function renderRuns(runs){
+  $("#runcount").textContent = runs.length || "";
+  if(!runs.length){
+    $("#runlist").innerHTML = `<div class="empty">No runs yet. One appears here the
+      moment training writes <span class="tnum">progress/runs/</span>.</div>`;
+    return;
+  }
+  $("#runlist").innerHTML = runs.map(r => `
+    <div class="rc ${r.id === SELECTED ? "sel" : ""}" data-id="${esc(r.id)}">
+      <div class="r1"><span class="dot ${cls(r.status)}"></span>
+        <span class="nm"><span style="color:var(--muted)">#${r.number}</span>
+          ${esc(r.variant || r.name)}</span>
+        <span class="badge ${cls(r.status)}">${esc(r.status)}</span></div>
+      <div class="pp"><b>${esc(r.name)}</b>${r.task ? ` &middot; ${esc(r.task)}` : ""}</div>
+      ${r.verdict ? `<div class="pp"><span class="badge ${
+        r.verdict === "passed" ? "ok" : "bad"}">${esc(r.verdict)}</span></div>` : ""}
+      <div class="r3">
+        <span>${r.iterations_done.toLocaleString()} iterations</span>
+        <span class="tnum">${esc(r.started_age)}</span>
+      </div>
+      ${r.iterations_target ? `<div class="mini"><i style="width:${
+        Math.round(100 * r.progress)}%"></i></div>` : ""}
+    </div>`).join("");
+  document.querySelectorAll(".rc").forEach(el =>
+    el.onclick = () => { SELECTED = el.dataset.id; VIDEO = null; DETAIL = null;
+                         TAB = "live"; draw(); fetchDetail(); });
+}
+
+/* ---------------- header ---------------- */
+
+function renderHead(){
+  const s = STATE, q = s.queue, m = s.model;
+  const run = s.runs.find(r => r.id === SELECTED) || s.active || null;
+  const live = s.runs.find(r => r.status === "running");
+  $("#head").innerHTML = `
+    <div class="runhead">
+      <h1>${live ? esc(live.name) : "Idle"}</h1>
+      ${live ? `<span class="badge live">training</span>` : ""}
+      <span class="pill ${q.runner.alive ? "running" : "failed"}">runner ${
+        q.runner.alive ? "up" : "down"}</span>
+      <span class="pill">${q.queued.length} queued</span>
+      <div class="grow"></div>
+      <button class="btn ${q.paused ? "go" : "stop"}" id="pausebtn">${
+        q.paused ? "Resume queue" : "Pause queue"}</button>
+      <span class="pill ${m.passed === m.total ? "done" : "failed"}">model ${
+        m.passed}/${m.total}</span>
+    </div>
+    ${!q.runner.alive ? `<div class="banner bad"><b>The runner is not running.</b>
+      Nothing queued will start. In a second terminal:
+      <code>python run.py --runner</code></div>` : ""}
+    ${q.paused ? `<div class="banner"><b>Queue paused.</b> Whatever is training
+      carries on; nothing new will be picked up.</div>` : ""}`;
+  const pb = $("#pausebtn");
+  if(pb) pb.onclick = () => post("/api/queue/pause", {paused: !q.paused}, load);
+  return run;
+}
+
+function renderTabs(){
+  const q = STATE.queue;
+  const tabs = [
+    ["live", "Live", null],
+    ["queue", "Queue", q.queued.length || null],
+    ["history", "History", STATE.runs.length || null],
+    ["compare", "Compare", COMPARE.length || null],
+    ["jobs", "Job log", q.jobs.length || null],
+    ["plan", "Plan", null],
+  ];
+  $("#tabs").innerHTML = `<div class="tabs">${tabs.map(([id, name, n]) =>
+    `<button class="tab ${TAB === id ? "on" : ""}" data-tab="${id}">${esc(name)}${
+      n ? `<span class="n">${n}</span>` : ""}</button>`).join("")}</div>`;
+  document.querySelectorAll(".tab").forEach(el => el.onclick = () => {
+    TAB = el.dataset.tab; history.replaceState(null, "", "#" + TAB); draw();
+    if(TAB === "compare") fetchCompare();
+  });
+}
+
+/* ---------------- charts ----------------
+   One chart per metric. Never two y-scales on one plot: the alignment would be
+   arbitrary and would invent a correlation that is not in the data. */
+
+const GEO = {W:480, H:132, L:44, R:10, T:8, B:22};
+
+function scales(xs, ys, geo){
+  const x0 = Math.min(...xs), x1 = Math.max(...xs) || 1;
+  let lo = Math.min(...ys), hi = Math.max(...ys);
+  if(hi === lo){ hi = lo + 1; lo -= 1; }
+  const pad = (hi - lo) * 0.12; lo -= pad; hi += pad;
+  return {
+    x0, x1, lo, hi,
+    px: v => geo.L + (geo.W - geo.L - geo.R) * ((v - x0) / ((x1 - x0) || 1)),
+    py: v => geo.T + (geo.H - geo.T - geo.B) * (1 - (v - lo) / ((hi - lo) || 1)),
+  };
+}
+
+function axes(sc, geo){
+  const ticksY = [sc.lo + (sc.hi - sc.lo) * 0.08, (sc.lo + sc.hi) / 2,
+                  sc.hi - (sc.hi - sc.lo) * 0.08];
+  const ticksX = [sc.x0, (sc.x0 + sc.x1) / 2, sc.x1];
+  return `
+    ${ticksY.map(t => `<line x1="${geo.L}" x2="${geo.W - geo.R}" y1="${sc.py(t).toFixed(1)}"
+       y2="${sc.py(t).toFixed(1)}" stroke="var(--grid)" stroke-width="1"
+       vector-effect="non-scaling-stroke"/>`).join("")}
+    <line x1="${geo.L}" x2="${geo.L}" y1="${geo.T}" y2="${geo.H - geo.B}" stroke="var(--line)"
+          stroke-width="1" vector-effect="non-scaling-stroke"/>
+    <line x1="${geo.L}" x2="${geo.W - geo.R}" y1="${geo.H - geo.B}" y2="${geo.H - geo.B}"
+          stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+    ${ticksY.map(t => `<text x="${geo.L - 6}" y="${(sc.py(t) + 3.5).toFixed(1)}" text-anchor="end"
+       font-size="9" fill="var(--muted)" class="tnum">${fmt(t)}</text>`).join("")}
+    ${ticksX.map((t, i) => `<text x="${sc.px(t).toFixed(1)}" y="${geo.H - geo.B + 13}"
+       text-anchor="${i === 0 ? "start" : i === 2 ? "end" : "middle"}"
+       font-size="9" fill="var(--muted)" class="tnum">${Math.round(t)}</text>`).join("")}`;
+}
+
+function chartCard(rows, key, colour){
+  // Only rows that actually HAVE this metric. `+null` and `+""` are both 0, so
+  // mapping every row plotted a fabricated zero wherever a value was missing:
+  // a metric that starts logging at iteration 50 drew a flat zero line before
+  // it, dragging the y-axis down and squashing the real curve. Worse, a NaN
+  // reward showed as "0.00" on the chart while the tile and the table both said
+  // "—" - three numbers for one cell, and the chart's was the invented one.
+  const pts = [];
+  for(const r of rows){
+    const v = r[key];
+    if(typeof v === "number" && isFinite(v))
+      pts.push({x: r.iteration ?? pts.length, y: v});
+  }
+  if(pts.length < 2) return `<div class="card">
+    <h3><span class="swatch" style="background:${colour}"></span>${esc(label(key))}
+      <span class="now" style="color:var(--muted)">—</span></h3>
+    <div class="rng">only ${pts.length} usable sample${pts.length === 1 ? "" : "s"}
+      out of ${rows.length} rows</div></div>`;
+
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const sc = scales(xs, ys, GEO);
+  const d = pts.map((p, i) =>
+    `${i ? "L" : "M"}${sc.px(p.x).toFixed(1)},${sc.py(p.y).toFixed(1)}`).join("");
+  const endX = sc.px(xs[xs.length - 1]), endY = sc.py(ys[ys.length - 1]);
+  const gaps = rows.length - pts.length;
+
+  return `<div class="card" data-key="${esc(key)}">
+    <h3><span class="swatch" style="background:${colour}"></span>${esc(label(key))}
+      <span class="now" style="color:${colour}">${fmt(ys[ys.length - 1])}</span></h3>
+    <div class="rng tnum">${fmt(Math.min(...ys))} to ${fmt(Math.max(...ys))} over
+      ${pts.length} samples${gaps ? ` &middot; ${gaps} row(s) had no value` : ""}</div>
+    <div class="plot">
+      <svg viewBox="0 0 ${GEO.W} ${GEO.H}" preserveAspectRatio="none" role="img"
+           aria-label="${esc(label(key))} against training iteration">
+        ${axes(sc, GEO)}
+        <path d="${d}" fill="none" stroke="${colour}" stroke-width="2"
+              stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+        <circle cx="${endX.toFixed(1)}" cy="${endY.toFixed(1)}" r="3.2" fill="${colour}"
+                stroke="var(--surface)" stroke-width="2"/>
+        <g class="cross" opacity="0">
+          <line y1="${GEO.T}" y2="${GEO.H - GEO.B}" stroke="var(--muted)" stroke-width="1"
+                vector-effect="non-scaling-stroke"/>
+          <circle r="4" fill="${colour}" stroke="var(--surface)" stroke-width="2"/>
+        </g>
+        <rect x="${GEO.L}" y="0" width="${GEO.W - GEO.L - GEO.R}" height="${GEO.H}"
+              fill="transparent" class="hit"/>
+      </svg>
+      <div class="tip"></div>
+    </div>
+  </div>`;
+}
+
+function wireHover(rows){
+  document.querySelectorAll(".card[data-key]").forEach(card => {
+    const key = card.dataset.key, svg = card.querySelector("svg");
+    const hit = card.querySelector(".hit"), g = card.querySelector(".cross");
+    if(!hit || !g) return;
+    const line = g.querySelector("line"), dotEl = g.querySelector("circle");
+    const tip = card.querySelector(".tip");
+    // Filtered exactly as chartCard filters. If these disagree the crosshair
+    // lands on a different sample than the line it is tracking, and reports a
+    // number that is not the one under the cursor.
+    const pts = [];
+    for(const r of rows){
+      const v = r[key];
+      if(typeof v === "number" && isFinite(v))
+        pts.push({x: r.iteration ?? pts.length, y: v});
+    }
+    if(pts.length < 2) return;
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    const sc = scales(xs, ys, GEO);
+
+    hit.addEventListener("mousemove", ev => {
+      const b = svg.getBoundingClientRect();
+      const vx = ((ev.clientX - b.left) / b.width) * GEO.W;
+      let best = 0, bd = Infinity;
+      xs.forEach((x, i) => { const dd = Math.abs(sc.px(x) - vx); if(dd < bd){ bd = dd; best = i; } });
+      const cx = sc.px(xs[best]), cy = sc.py(ys[best]);
+      g.setAttribute("opacity", "1");
+      line.setAttribute("x1", cx); line.setAttribute("x2", cx);
+      dotEl.setAttribute("cx", cx); dotEl.setAttribute("cy", cy);
+      tip.style.opacity = "1";
+      tip.style.left = (cx / GEO.W * 100) + "%";
+      tip.style.top = (cy / GEO.H * b.height) + "px";
+      tip.innerHTML = `<b>${fmt(ys[best])}</b> &middot; iteration
+        <span class="tnum">${xs[best]}</span>`;
+    });
+    hit.addEventListener("mouseleave", () => {
+      g.setAttribute("opacity", "0"); tip.style.opacity = "0";
+    });
+  });
+}
+
+function charts(run){
+  const keys = (run.metric_columns || []).filter(k => k !== "iteration");
+  const rows = run.metrics || [];
+  if(!keys.length || rows.length < 2) return "";
+  return `<section>
+    <div class="sech"><h2>Metrics</h2><div class="grow"></div>
+      <button class="btn ${TABLE ? "on" : ""}" id="tbtn">${TABLE ? "Charts" : "Table"}</button>
+    </div>
+    <div class="charts ${TABLE ? "hide" : ""}">${
+      keys.map(k => chartCard(rows, k, METRIC_INK)).join("")}</div>
+    ${TABLE ? metricTable(run, keys) : ""}
+  </section>`;
+}
+
+/* Every chart has a table twin - a value is never reachable only by hovering. */
+function metricTable(run, keys){
+  const rows = (run.metrics || []).slice().reverse();
+  return `<div class="card wrapx"><table>
+    <tr><th>iteration</th>${keys.map(k => `<th>${esc(label(k))}</th>`).join("")}</tr>
+    ${rows.map(r => `<tr><td class="tnum">${r.iteration}</td>${
+      keys.map(k => `<td class="tnum">${fmt(r[k])}</td>`).join("")}</tr>`).join("")}
+  </table></div>`;
+}
+
+/* ---------------- compare ---------------- */
+
+function compareChart(data){
+  const live = (data.series || []).filter(ser => ser.points.length);
+  if(!live.length) return `<div class="empty">No run in the selection recorded
+    <b>${esc(data.metric)}</b>.</div>`;
+
+  const geo = {...GEO, H: 260, R: 96};   // room on the right for direct labels
+  const xs = live.flatMap(ser => ser.points.map(p => p.x));
+  const ys = live.flatMap(ser => ser.points.map(p => p.y));
+  const sc = scales(xs, ys, geo);
+
+  // Colour by position in the SELECTION, not in the filtered list. A selected
+  // run with no data for this metric is dropped from `live`, which used to shift
+  // every colour after it - the button green and its own line orange.
+  // Named `ser`, not `s`: `s` is STATE everywhere else in this file.
+  const hue = ser => SLOTS[Math.max(0, COMPARE.indexOf(ser.id)) % SLOTS.length];
+
+  const paths = live.map(ser => {
+    const c = hue(ser);
+    const d = ser.points.map((p, n) =>
+      `${n ? "L" : "M"}${sc.px(p.x).toFixed(1)},${sc.py(p.y).toFixed(1)}`).join("");
+    const last = ser.points[ser.points.length - 1];
+    return `
+      <path d="${d}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"
+            stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+      <circle cx="${sc.px(last.x).toFixed(1)}" cy="${sc.py(last.y).toFixed(1)}" r="3.2"
+              fill="${c}" stroke="var(--surface)" stroke-width="2"/>
+      <text x="${(sc.px(last.x) + 7).toFixed(1)}" y="${(sc.py(last.y) + 3.5).toFixed(1)}"
+            font-size="10" fill="var(--ink2)">${esc(ser.label)}</text>`;
+  }).join("");
+
+  return `
+    <div class="card pad">
+      <div class="plot big">
+        <svg viewBox="0 0 ${geo.W} ${geo.H}" preserveAspectRatio="none" role="img"
+             aria-label="${esc(data.metric)} for ${live.length} runs against iteration">
+          ${axes(sc, geo)}${paths}
+        </svg>
+      </div>
+      <div class="legend">${live.map(ser => `<span>
+        <i style="background:${hue(ser)}"></i>${esc(ser.label)}
+        <span class="tnum" style="color:var(--muted)">${fmt(
+          ser.points[ser.points.length - 1].y)}</span></span>`).join("")}</div>
+      ${(data.series || []).length > live.length ? `<div class="sub"
+        style="margin-top:6px">${(data.series || []).length - live.length} selected
+        run(s) recorded no <b>${esc(data.metric)}</b> and are not drawn.</div>` : ""}
+    </div>
+    <div class="card wrapx" style="margin-top:12px"><table>
+      <tr><th>Run</th><th>Task</th><th class="tnum">samples</th>
+          <th class="tnum">first</th><th class="tnum">last</th><th class="tnum">change</th></tr>
+      ${live.map(ser => {
+        const a = ser.points[0].y, b = ser.points[ser.points.length - 1].y;
+        return `<tr><td><b>${esc(ser.label)}</b></td><td class="sub">${esc(ser.task)}</td>
+          <td class="tnum">${ser.n}</td><td class="tnum">${fmt(a)}</td>
+          <td class="tnum">${fmt(b)}</td>
+          <td class="tnum" style="color:${b >= a ? "var(--good)" : "var(--crit)"}">${
+            b >= a ? "+" : ""}${fmt(b - a)}</td></tr>`;
+      }).join("")}
+    </table></div>`;
+}
+
+function comparePanel(){
+  const runs = STATE.runs;
+  const metrics = STATE.metrics_available || [];
+  return `<section style="margin-top:0">
+    <div class="sech"><h2>Compare runs</h2><div class="grow"></div>
+      <select id="metricsel" style="background:var(--surface2);color:var(--ink);
+        border:1px solid var(--line);border-radius:7px;padding:6px 9px;font:inherit;
+        font-size:12px">
+        ${metrics.map(m => `<option value="${esc(m)}" ${m === METRIC ? "selected" : ""}>${
+          esc(label(m))}</option>`).join("")}
+      </select>
+      <button class="btn" id="clearcmp">Clear</button>
+    </div>
+    <div class="card pad" style="margin-bottom:12px">
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:9px">
+        Pick up to ${MAX_COMPARE} runs. There are five colours and no sixth &mdash; a
+        repeated colour would say two different runs are the same run.
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${runs.map(r => {
+          const on = COMPARE.indexOf(r.id);
+          const full = COMPARE.length >= MAX_COMPARE && on < 0;
+          return `<button class="btn tiny ${on >= 0 ? "on" : ""}" data-cmp="${esc(r.id)}"
+            ${full ? "disabled" : ""}
+            style="${on >= 0 ? `border-color:${SLOTS[on]};color:var(--ink)` : ""}">
+            ${on >= 0 ? `<span style="display:inline-block;width:8px;height:8px;
+              border-radius:2px;background:${SLOTS[on]};margin-right:5px"></span>` : ""}
+            ${esc(r.variant)}</button>`;
+        }).join("")}
+      </div>
+    </div>
+    ${COMPARE.length === 0
+      ? `<div class="empty">Select runs above to lay their curves over each other.
+         This is the view that answers "is it getting better?", which no single run
+         page can.</div>`
+      : (COMPARE_DATA ? compareChart(COMPARE_DATA) : `<div class="empty">Loading…</div>`)}
+  </section>`;
+}
+
+/* ---------------- queue ---------------- */
+
+function jobRow(j, i, n){
+  const canMove = j.state === "queued";
+  return `<tr class="${j.state === "running" ? "now" : ""}">
+    <td class="n tnum">${i + 1}</td>
+    <td><b>${esc(j.name || j.task)}</b>
+      <div class="sub">${esc(j.task)} &middot; ${j.num_envs} robots${
+        j.iterations ? ` &middot; ${j.iterations} iterations` : ""} &middot; stop at ${
+        Math.round(j.stop_at * 100)}%</div>
+      ${j.note ? `<div class="sub">${esc(j.note)}</div>` : ""}
+      ${Object.keys(j.rewards || {}).length ? `<div class="sub">${
+        Object.entries(j.rewards).map(([k, v]) =>
+          `<span class="chip ${v >= 0 ? "pos" : "neg"}">${esc(k)} = ${v}</span>`).join("")
+      }</div>` : ""}
+      <div class="sub"><code>${esc(j.command || "")}</code></div></td>
+    <td><span class="badge ${cls(j.state)}">${esc(j.state)}</span>
+      ${j.film ? `<span class="chip">film</span>` : ""}
+      ${j.verify ? `<span class="chip">verify</span>` : ""}
+      ${j.error ? `<div class="sub" style="color:var(--crit)">${esc(j.error)}</div>` : ""}
+      ${j.run_id ? `<div class="sub"><a class="btn tiny" data-open="${esc(j.run_id)}"
+        >open run &rarr;</a></div>` : ""}</td>
+    <td style="white-space:nowrap">
+      ${canMove ? `<button class="btn tiny" data-move="${esc(j.id)}" data-d="-1"
+        ${i === 0 ? "disabled" : ""}>&uarr;</button>
+      <button class="btn tiny" data-move="${esc(j.id)}" data-d="1"
+        ${i === n - 1 ? "disabled" : ""}>&darr;</button>` : ""}
+      <button class="btn tiny" data-dup="${esc(j.id)}">copy</button>
+      <button class="btn tiny stop" data-del="${esc(j.id)}">${
+        j.state === "running" ? "stop" : "×"}</button>
+    </td>
+  </tr>`;
+}
+
+function queuePanel(){
+  const q = STATE.queue;
+  const active = q.jobs.filter(j => j.state === "queued" || j.state === "running");
+  return `<section style="margin-top:0">
+    <div class="sech"><h2>Queue</h2><div class="grow"></div>
+      <button class="btn" id="clearfin">Clear finished</button></div>
+    ${active.length
+      ? `<div class="card wrapx"><table>
+          <tr><th class="n"></th><th>Job</th><th>State</th><th></th></tr>
+          ${active.map((j, i) => jobRow(j, i, active.length)).join("")}
+        </table></div>`
+      : `<div class="empty">Queue is empty. Add a job below and the runner picks it
+         up within a few seconds.</div>`}
+
+    <div class="sech" style="margin-top:28px"><h2>Add a job</h2></div>
+    <div class="card pad">
+      <div class="form">
+        <div class="f"><label>Task</label>
+          <select id="j_task">${q.tasks.map(t =>
+            `<option ${t === "Gray-Walk" ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
+        <div class="f"><label>Name</label><input id="j_name" placeholder="walk_v5">
+          <div class="hint">blank = the task's own name</div></div>
+        <div class="f"><label>Robots at once</label>
+          <input id="j_envs" type="number" value="3072" min="1" max="8192">
+          <div class="hint">4096 is this card's ceiling</div></div>
+        <div class="f"><label>Iterations</label>
+          <input id="j_iters" type="number" value="0" min="0">
+          <div class="hint">0 = the task default</div></div>
+        <div class="f"><label>Stop at</label>
+          <input id="j_stop" type="number" value="0.965" step="0.005" min="0" max="1">
+          <div class="hint">fraction of the reward ceiling &mdash; RULES.md rule 1</div></div>
+        <div class="f wide"><label>Why this run exists</label>
+          <input id="j_note" placeholder="what this one is testing"></div>
+        <div class="f wide"><label>Reward overrides</label>
+          <input id="j_rewards" placeholder="twitching=-0.05, leg_swing=1.5">
+          <div class="hint">comma separated, term=weight. Recorded on the run, so it
+            always says what it was actually scored on.</div></div>
+        <div class="f wide checks">
+          <label><input type="checkbox" id="j_film" checked> film checkpoints</label>
+          <label><input type="checkbox" id="j_verify" checked> verify against the bar</label>
+          <label><input type="checkbox" id="j_first"> put it next in the queue</label>
+          <div class="grow"></div>
+          <button class="btn go" id="j_add">Add to queue</button>
+        </div>
+      </div>
+    </div>
+
+    ${q.history.length ? `
+      <div class="sech" style="margin-top:28px"><h2>Finished jobs</h2></div>
+      <div class="card wrapx"><table>
+        <tr><th>Job</th><th>State</th><th class="tnum">steps</th><th>Finished</th><th></th></tr>
+        ${q.history.map(j => `<tr>
+          <td><b>${esc(j.name || j.task)}</b><div class="sub">${esc(j.task)}</div>
+            ${j.error ? `<div class="sub" style="color:var(--crit)">${esc(j.error)}</div>` : ""}</td>
+          <td><span class="badge ${cls(j.state)}">${esc(j.state)}</span></td>
+          <td class="sub">${(j.steps || []).map(st =>
+            `${esc(st.name)} ${Math.round(st.seconds)}s`).join("<br>") || "—"}</td>
+          <td class="sub tnum">${esc(j.finished || "")}</td>
+          <td style="white-space:nowrap">
+            ${j.run_id ? `<button class="btn tiny" data-open="${esc(j.run_id)}">run</button>` : ""}
+            <button class="btn tiny" data-dup="${esc(j.id)}">requeue</button></td>
+        </tr>`).join("")}
+      </table></div>` : ""}
+  </section>`;
+}
+
+function wireQueue(){
+  const g = id => $("#" + id);
+  const add = g("j_add");
+  if(add) add.onclick = () => {
+    const rewards = {};
+    (g("j_rewards").value || "").split(",").forEach(part => {
+      const [k, v] = part.split("=").map(s => (s || "").trim());
+      if(k && v !== undefined && v !== "" && !isNaN(+v)) rewards[k] = +v;
+    });
+    post("/api/queue/add", {
+      position: g("j_first").checked ? "next" : "end",
+      job: {
+        task: g("j_task").value, name: g("j_name").value.trim(),
+        note: g("j_note").value.trim(),
+        num_envs: +g("j_envs").value, iterations: +g("j_iters").value,
+        stop_at: +g("j_stop").value, rewards,
+        film: g("j_film").checked, verify: g("j_verify").checked,
+      },
+    }, load);
+  };
+  const cf = g("clearfin");
+  if(cf) cf.onclick = () => post("/api/queue/clear", {}, load);
+  document.querySelectorAll("[data-move]").forEach(el => el.onclick = () =>
+    post("/api/queue/move", {id: el.dataset.move, delta: +el.dataset.d}, load));
+  document.querySelectorAll("[data-dup]").forEach(el => el.onclick = () =>
+    post("/api/queue/duplicate", {id: el.dataset.dup}, load));
+  document.querySelectorAll("[data-del]").forEach(el => el.onclick = () => {
+    if(confirm("Remove this job? A running job is stopped."))
+      post("/api/queue/remove", {id: el.dataset.del}, load);
+  });
+  document.querySelectorAll("[data-open]").forEach(el => el.onclick = () => {
+    SELECTED = el.dataset.open; DETAIL = null; VIDEO = null; TAB = "live";
+    draw(); fetchDetail();
+  });
+}
+
+/* ---------------- live run ---------------- */
+
+/* Named metricTiles, not tiles: page.js exports a `tiles` builder of its own and
+   two top-level declarations of one name is a syntax error, not a shadowing. */
+function metricTiles(run){
+  const keys = (run.metric_columns || []).filter(k => k !== "iteration");
+  if(!keys.length) return "";
+  const rows = run.metrics || [], last = rows[rows.length - 1] || {}, first = rows[0] || {};
+  return `<div class="tiles">${keys.map((k, i) => {
+    const c = METRIC_INK, now = last[k], was = first[k];
+    const d = (typeof now === "number" && typeof was === "number") ? now - was : null;
+    return `<div class="tile">
+      <div class="k"><span class="swatch" style="background:${c}"></span>${esc(label(k))}</div>
+      <div class="v">${fmt(now)}</div>
+      <div class="d">${d === null ? "&nbsp;" :
+        `<b>${d >= 0 ? "+" : ""}${fmt(d)}</b> since start`}</div>
+    </div>`;
+  }).join("")}</div>`;
+}
+
+/* Seconds per iteration, and what is left, from the clock rather than from
+   steps_per_second. total_fps counts robot-steps and one iteration is
+   robots x 24 of them, so reading pace off it means carrying that factor around
+   and getting it wrong when num_steps_per_env changes. Elapsed / done cannot
+   drift out of step with reality. */
+function pace(run){
+  const left = Math.max(0, (run.iterations_target || 0) - (run.iterations_done || 0));
+  const running = run.status === "running";
+
+  // Preferred: the rate training itself reports. Perf/total_fps counts
+  // robot-steps and one iteration is num_envs x num_steps_per_env of them, so
+  // this is the CURRENT pace and owes nothing to how long startup took.
+  const rows = run.metrics || [];
+  const envs = run.num_envs, per_env = run.num_steps_per_env;
+  if(envs && per_env && rows.length){
+    const recent = rows.slice(-20)
+      .map(r => r.steps_per_second)
+      .filter(v => typeof v === "number" && v > 0);
+    if(recent.length){
+      const sps = recent.reduce((a, b) => a + b, 0) / recent.length;
+      const per = (envs * per_env) / sps;
+      return {per, left, eta: left * per, running, source: "measured"};
+    }
+  }
+
+  // Fallback for older runs with no num_envs recorded. Elapsed-since-start
+  // INCLUDES the 40 s of building the environment and loading torch, so it
+  // reads slow - about 2.4 s/iter against a true 1.9 at 90 iterations in. Say
+  // so rather than presenting it as the same number.
+  if(!run.started || !run.iterations_done) return null;
+  const from = new Date(run.started).getTime();
+  const to = run.finished ? new Date(run.finished).getTime() : Date.now();
+  const secs = (to - from) / 1000;
+  if(!(secs > 0)) return null;
+  const per = secs / run.iterations_done;
+  return {per, left, eta: left * per, running, source: "wall clock, incl. startup"};
+}
+
+/* Films show what a policy did on a command it was given. The Playground lets you
+   give it one yourself, with a gamepad, which is the only way to find out how it
+   feels rather than how it scores. Shown here because this is where you are when
+   the question comes up - and with the warning attached, because it opens a
+   second process on the card. */
+function driveNote(run){
+  if(!run || !run.number) return "";
+  const busy = STATE && STATE.queue && STATE.queue.running;
+  return `<div class="note small" style="margin-top:8px">
+    <b>Drive it yourself.</b>
+    <code>Playground\\pilot.bat --run ${run.number}</code>
+    &mdash; gamepad or numpad, and ctrl-drag on the robot shoves it.
+    ${busy ? `<span style="color:var(--warn)">Not now &mdash; ${esc(
+        busy.name || "a run")} is training, and there is no room on the card for a
+        second process. RULES.md rule 4.</span>` : ""}</div>`;
+}
+
+function runHeader(run){
+  const pct = Math.round(100 * (run.progress || 0));
+  const p = pace(run);
+  return `
+    <div class="runhead" style="margin-bottom:4px">
+      <h1 style="font-size:19px">${run.number ? "#" + run.number + " " : ""}${esc(run.name)}</h1>
+      <span class="pill tnum">${esc(run.variant || run.id)}</span>
+      <span class="badge ${cls(run.status)}">${esc(run.status)}</span>
+      ${run.verdict ? `<span class="badge ${cls(run.verdict)}">${esc(run.verdict)}</span>` : ""}
+      ${run.duration ? `<span class="pill">${esc(run.duration)}</span>` : ""}
+    </div>
+    ${run.purpose ? `<div class="purpose">${esc(run.purpose)}</div>` : ""}
+    ${run.bar ? `<div class="purpose" style="color:var(--muted)"><b>Passes when:</b>
+      ${esc(run.bar)}</div>` : ""}
+    ${run.verdict_detail ? `<div class="purpose" style="color:var(--muted)">
+      <b>Verified:</b> ${esc(run.verdict_detail)}</div>` : ""}
+    ${run.notes ? `<div class="purpose" style="color:var(--muted)">${esc(run.notes)}</div>` : ""}
+    ${driveNote(run)}
+    <div class="prog"><i style="width:${pct}%"></i></div>
+    <div class="proglab">
+      <span class="tnum">${(run.iterations_done || 0).toLocaleString()} /
+        ${(run.iterations_target || 0).toLocaleString()} iterations</span>
+      <span class="tnum">${pct}% &middot; started ${esc(run.started_age || "")}</span>
+    </div>
+    ${p ? `<div class="proglab" style="margin-top:3px">
+      <span class="tnum"><b>${p.per.toFixed(2)} s</b> per iteration
+        ${run.num_envs ? `&middot; ${run.num_envs.toLocaleString()} robots` : ""}
+        <span style="color:var(--muted)">${p.source === "measured" ? "" :
+          "&middot; " + p.source}</span></span>
+      <span class="tnum">${p.running
+        ? `${p.left.toLocaleString()} left &middot; <b>~${clock(p.eta)}</b> to go`
+        : `${clock(p.per * (run.iterations_done || 0))} of training`}</span>
+    </div>` : ""}`;
+}
+
+/* A clip is labelled by its iteration, EXCEPT that not every clip has one.
+   scripts/drive.py writes clips named for the command that produced them, and
+   those were rendering as five identical "iteration ?" thumbs among sixty-six
+   numbered ones - present, and impossible to find. A clip without an iteration
+   is labelled by its name instead. */
+const vTitle = (f) => f.iteration != null
+  ? `iteration ${f.iteration}`
+  : String(f.name || "").replace(/^drive_/, "").replace(/_/g, " ");
+const vBadge = (f) => f.iteration != null ? String(f.iteration) : "cmd";
+
+function films(run){
+  const v = run.videos || [];
+  if(!v.length){
+    return `<section><div class="sech"><h2>Checkpoints</h2></div>
+      <div class="empty">No videos yet. One is filmed every time training saves a
+      checkpoint.</div></section>`;
+  }
+  if(VIDEO === null) VIDEO = v.length - 1;
+  const cur = v[Math.min(VIDEO, v.length - 1)];
+  const driven = v.filter(f => f.iteration == null).length;
+  return `<section>
+    <div class="sech"><h2>Checkpoints</h2><div class="grow"></div>
+      ${driven ? `<span class="pill">${driven} driven by hand</span>` : ""}
+      <span class="pill tnum">${v.length} filmed</span></div>
+    <div class="vwrap">
+      <div class="stage">
+        <video src="${esc(cur.file)}" controls autoplay muted loop playsinline></video>
+        <div class="cap"><span class="tnum">${esc(vTitle(cur))}</span>
+          <span>${cur.iteration == null ? "driven with scripts/drive.py"
+                  : VIDEO === v.length - 1 ? "latest" : ""}</span></div>
+      </div>
+      <div class="strip">${v.slice().reverse().map(f => {
+        const i = v.indexOf(f);
+        return `<div class="thumb ${i === VIDEO ? "sel" : ""}${
+            f.iteration == null ? " driven" : ""}" data-i="${i}">
+          <span class="n tnum">${esc(vBadge(f))}</span>
+          <span>${esc(vTitle(f))}</span></div>`;
+      }).join("")}</div>
+    </div>
+  </section>`;
+}
+
+function scoring(run){
+  const terms = run.scoring || [];
+  if(!terms.length) return "";
+  const earns = terms.filter(t => t.weight > 0);
+  const loses = terms.filter(t => t.weight < 0);
+  const table = (rows, positive) => `
+    <div class="card wrapx">
+      <table>
+        <tr><th>${positive ? "Rewards" : "Penalties"}
+              <span style="text-transform:none;letter-spacing:0;font-weight:400">
+                &mdash; ${positive ? "earn" : "lose"} points</span></th>
+            <th style="text-align:right">weight</th></tr>
+        ${rows.map(t => `<tr>
+          <td><b style="color:${positive ? "var(--good)" : "var(--crit)"}">${
+              positive ? "+" : "−"}</b> ${esc(t.name.replace(/_/g, " "))}
+            ${t.what ? `<div class="sub">${esc(t.what)}</div>` : ""}</td>
+          <td class="tnum" style="text-align:right;white-space:nowrap">${
+            Math.abs(t.weight)}</td></tr>`).join("")}
+      </table>
+    </div>`;
+  const perSec = earns.reduce((a, t) => a + t.weight, 0);
+  return `<section>
+    <div class="sech"><h2>Reward function</h2>
+      <span style="font-size:11.5px;color:var(--muted)">what this run was scored on,
+        recorded when it launched</span>
+      <div class="grow"></div>
+      <a class="btn" href="/summary#scoring">Why each term exists &rarr;</a></div>
+    <div class="twocol">${table(earns, true)}${table(loses, false)}</div>
+    <div class="sub" style="margin-top:8px">
+      The rewards are capped at 1.0 each, so the most an episode can score is
+      <b>${perSec.toFixed(1)} per second</b>. Training stops at 96.5% of that
+      &mdash; past there only the penalties have any room left to move.
+    </div>
+  </section>`;
+}
+
+function livePanel(){
+  const run = DETAIL;
+  if(!SELECTED && !STATE.active)
+    return `<div class="empty">Nothing has trained yet. Queue a job and the runner
+      picks it up within a few seconds.</div>`;
+  if(!run) return `<div class="empty">Loading run…</div>`;
+  return runHeader(run) + metricTiles(run) + charts(run) + films(run) + scoring(run);
+}
+
+/* ---------------- history ---------------- */
+
+function historyPanel(){
+  const runs = STATE.runs;
+  if(!runs.length) return `<div class="empty">No runs yet.</div>`;
+  return `<section style="margin-top:0">
+    <div class="sech"><h2>Every run</h2><div class="grow"></div>
+      <span class="pill">${runs.length}</span></div>
+    <div class="card wrapx"><table>
+      <tr><th class="n">#</th><th>Run</th><th>Task</th><th>Status</th><th>Verdict</th>
+          <th class="tnum">iterations</th><th class="tnum">reward</th>
+          <th>Took</th><th class="tnum">films</th><th>Started</th></tr>
+      ${runs.map(r => `<tr class="click ${r.id === SELECTED ? "now" : ""}"
+          data-open="${esc(r.id)}">
+        <td class="n tnum">${r.number}</td>
+        <td><b>${esc(r.variant)}</b><div class="sub">${esc(r.name)}</div></td>
+        <td class="sub">${esc(r.task)}</td>
+        <td><span class="badge ${cls(r.status)}">${esc(r.status)}</span></td>
+        <td>${r.verdict ? `<span class="badge ${cls(r.verdict)}">${esc(r.verdict)}</span>`
+             : `<span class="sub">—</span>`}</td>
+        <td class="tnum">${r.iterations_done.toLocaleString()}${
+          r.iterations_target ? ` / ${r.iterations_target.toLocaleString()}` : ""}</td>
+        <td class="tnum">${fmt(r.latest && r.latest.reward)}</td>
+        <td class="sub tnum">${esc(r.duration)}</td>
+        <td class="tnum">${r.videos}</td>
+        <td class="sub tnum">${esc(r.started_age)}</td>
+      </tr>`).join("")}
+    </table></div>
+  </section>`;
+}
+
+/* ---------------- job log ---------------- */
+
+function jobsPanel(){
+  const q = STATE.queue;
+  if(!q.jobs.length) return `<div class="empty">No jobs yet.</div>`;
+  return `<section style="margin-top:0">
+    <div class="sech"><h2>Runner output</h2>
+      <span style="font-size:11.5px;color:var(--muted)">where "why did that fail"
+        actually lives</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      ${q.jobs.slice().reverse().map(j => `<button class="btn tiny ${
+        JOBLOG === j.id ? "on" : ""}" data-log="${esc(j.id)}">
+        ${esc(j.id)} ${esc(j.name || j.task)}</button>`).join("")}
+    </div>
+    ${JOBLOG ? `<pre class="log">${esc(JOBLOG_TEXT || "…")}</pre>`
+             : `<div class="empty">Pick a job to read its output.</div>`}
+  </section>`;
+}
+
+/* ---------------- plan ---------------- */
+
+function planPanel(){
+  const s = STATE;
+  const lab = {done:"done", next:"next", later:"later", blocked:"needs robot",
+               provisional:"provisional", "start now":"start now"};
+  const live = st => /^(in progress|partly|ongoing)/.test(st.state || "");
+  return `<section style="margin-top:0">
+    <div class="sech"><h2>Pipeline</h2><div class="grow"></div>
+      <a class="btn" href="/summary">Full plan &amp; every scoring term &rarr;</a></div>
+    <div class="card wrapx"><table>
+      <tr><th class="n"></th><th>Phase</th><th>State</th></tr>
+      ${s.phases.map(p => `<tr class="${p.state === "next" ? "now" : ""}">
+        <td class="n tnum">${p.n}</td>
+        <td><b>${esc(p.name)}</b><div class="sub">${esc(p.one_line)}</div></td>
+        <td class="st ${p.state === "done" ? "done" : p.state === "next" ? "now" : ""}">${
+          esc(lab[p.state] || p.state)}</td></tr>`).join("")}
+    </table></div>
+    <div class="card wrapx" style="margin-top:10px"><table>
+      <tr><th></th><th>Kind</th><th>Passes when</th><th>State</th></tr>
+      ${s.stages.map(st => `<tr class="${live(st) ? "now" : ""}">
+        <td><b>${esc(st.name)}</b></td>
+        <td class="sub">${esc(st.kind)}</td>
+        <td class="sub">${esc(st.bar)}</td>
+        <td class="st ${live(st) ? "now" : ""}">${esc(st.state)}</td>
+      </tr>`).join("")}
+    </table></div>
+    <div class="sub" style="margin-top:8px">${
+      s.stages.filter(st => st.kind === "run").length} of these are training runs.
+      The rest are dials turned inside one, properties checked across all of them,
+      measurements taken afterwards, or parked.</div>
+
+    <div class="sech" style="margin-top:28px"><h2>Blocking &mdash; ${
+      esc(s.next_up.title)}</h2></div>
+    <div class="card wrapx"><table>
+      <tr><th>Needed first</th><th></th></tr>
+      ${s.next_up.before.map(b => `<tr><td style="white-space:nowrap"><b>${esc(b.task)}</b>
+        <div class="sub">${esc(b.who)}</div></td>
+        <td class="sub">${esc(b.note)}</td></tr>`).join("")}
+      ${s.next_up.open.map(o => `<tr><td style="white-space:nowrap;color:var(--warn)">open</td>
+        <td class="sub"><b>${esc(o.q)}</b> ${esc(o.note)}</td></tr>`).join("")}
+    </table></div>
+
+    <div class="sech" style="margin-top:28px"><h2>Model</h2></div>
+    <div class="tiles" style="margin-top:0">
+      <div class="tile"><div class="k">checks</div>
+        <div class="v" style="color:${s.model.passed === s.model.total
+          ? "var(--good)" : "var(--crit)"}">${s.model.passed}/${s.model.total}</div>
+        <div class="d">${esc(s.model.urdf)}</div></div>
+      ${(s.model.checks || []).filter(c => !c.passed).slice(0, 3).map(c =>
+        `<div class="tile"><div class="k">failing</div>
+        <div class="v" style="font-size:15px;line-height:1.3">${esc(c.title)}</div>
+        <div class="d">${esc(c.detail)}</div></div>`).join("")}
+    </div>
+  </section>`;
+}
+
+/* ---------------- draw ---------------- */
+
+/* What the current panel actually depends on. The page polls every five seconds
+   and used to rewrite #body unconditionally, which made the queue form
+   impossible to type into - every keystroke was erased within five seconds - and
+   restarted any checkpoint video from zero before it could be watched. Nothing
+   is redrawn unless something it shows has changed. */
+function bodySignature(){
+  const s = STATE, q = s.queue;
+  const base = `${TAB}|${s.runs.length}`;
+  if(TAB === "queue")
+    return base + "|" + q.paused + "|" + q.jobs.map(j =>
+      [j.id, j.state, j.run_id, j.error, (j.steps || []).length].join(":")).join(",");
+  if(TAB === "live")
+    return base + `|${SELECTED}|${TABLE}|${VIDEO}|` + (DETAIL
+      ? [DETAIL.id, DETAIL.status, (DETAIL.metrics || []).length,
+         (DETAIL.videos || []).length, DETAIL.verdict].join(":")
+      : "none");
+  if(TAB === "history")
+    return base + `|${SELECTED}|` + s.runs.map(r =>
+      [r.id, r.status, r.iterations_done, r.verdict].join(":")).join(",");
+  if(TAB === "compare")
+    return base + `|${COMPARE.join(",")}|${METRIC}|` + (COMPARE_DATA
+      ? COMPARE_DATA.series.map(x => `${x.id}:${x.n}`).join(",") : "none");
+  if(TAB === "jobs")
+    // The TAIL, not the length. The server caps the reply at 40 000 chars, so
+    // once a log passes that the length is pinned there for ever - and the one
+    // tab whose entire job is watching output live would stop updating, on
+    // exactly the long runs you want to watch. j0006.log is already 817 KB.
+    return base + `|${JOBLOG}|${q.jobs.length}|${JOBLOG_TEXT.length}|` +
+      JOBLOG_TEXT.slice(-160);
+  // Everything else, the plan tab included. model_status() re-runs the URDF
+  // checks on every poll and the header pill shows the result, so the plan tab's
+  // own copy of that number has to move with it or the page contradicts itself.
+  return base + `|${s.model.passed}/${s.model.total}`;
+}
+
+/* Even when a redraw IS needed, whatever is half-typed - or half-watched -
+   survives it. The live run's metric count ticks up every five seconds, so the
+   live panel genuinely does have to redraw while a checkpoint film is playing;
+   without carrying the video's position across, it restarts from zero and can
+   never be watched, which is precisely the case worth watching. */
+function saveInputs(){
+  const out = {focus: null, start: null, end: null, values: {}, video: null};
+  document.querySelectorAll("#body input,#body select,#body textarea").forEach(el => {
+    if(el.id) out.values[el.id] = el.type === "checkbox" ? el.checked : el.value;
+  });
+  const a = document.activeElement;
+  if(a && a.id && out.values.hasOwnProperty(a.id)){
+    out.focus = a.id;
+    try{ out.start = a.selectionStart; out.end = a.selectionEnd; }catch(e){}
+  }
+  const v = document.querySelector("#body video");
+  if(v) out.video = {src: v.getAttribute("src"), time: v.currentTime, paused: v.paused};
+  return out;
+}
+
+function restoreInputs(saved){
+  document.querySelectorAll("#body input,#body select,#body textarea").forEach(el => {
+    if(!el.id || !saved.values.hasOwnProperty(el.id)) return;
+    if(el.type === "checkbox") el.checked = saved.values[el.id];
+    else el.value = saved.values[el.id];
+  });
+  const v = saved.video && document.querySelector("#body video");
+  // Only if it is the SAME film. Restoring a timestamp onto a different video
+  // would drop the viewer into the middle of something they did not choose.
+  if(v && v.getAttribute("src") === saved.video.src){
+    try{
+      v.currentTime = saved.video.time;
+      if(saved.video.paused) v.pause();
+    }catch(e){}
+  }
+  if(!saved.focus) return;
+  const el = document.getElementById(saved.focus);
+  if(!el) return;
+  el.focus();
+  try{ if(saved.start !== null) el.setSelectionRange(saved.start, saved.end); }catch(e){}
+}
+
+function draw(){
+  if(!STATE) return;
+  const s = STATE;
+  if(SELECTED === null) SELECTED = (s.active && s.active.id) || null;
+
+  renderNav();
+  renderRuns(s.runs);
+  renderHead();
+  renderTabs();
+
+  const sig = bodySignature();
+  if(sig === LAST_SIG) return;      // nothing this panel shows has moved
+  LAST_SIG = sig;
+
+  const panels = {
+    live: livePanel, queue: queuePanel, history: historyPanel,
+    compare: comparePanel, jobs: jobsPanel, plan: planPanel,
+  };
+  const saved = saveInputs();
+  $("#body").innerHTML = (panels[TAB] || livePanel)();
+  restoreInputs(saved);
+
+  if(TAB === "live" && DETAIL && !TABLE) wireHover(DETAIL.metrics || []);
+  const tb = $("#tbtn");
+  // Switching to the table needs the rows the chart fetch thinned away, so it
+  // refetches. Otherwise the table would silently show 500 of 3000 iterations
+  // while claiming to be the complete twin of the chart.
+  if(tb) tb.onclick = () => { TABLE = !TABLE; draw(); fetchDetail(); };
+  document.querySelectorAll(".thumb").forEach(el =>
+    el.onclick = () => { VIDEO = +el.dataset.i; draw(); });
+
+  if(TAB === "queue") wireQueue();
+  if(TAB === "history") document.querySelectorAll("[data-open]").forEach(el =>
+    el.onclick = () => { SELECTED = el.dataset.open; DETAIL = null; VIDEO = null;
+                         TAB = "live"; draw(); fetchDetail(); });
+  if(TAB === "compare"){
+    document.querySelectorAll("[data-cmp]").forEach(el => el.onclick = () => {
+      const id = el.dataset.cmp, at = COMPARE.indexOf(id);
+      if(at >= 0) COMPARE.splice(at, 1);
+      else if(COMPARE.length < MAX_COMPARE) COMPARE.push(id);
+      COMPARE_DATA = null; draw(); fetchCompare();
+    });
+    const sel = $("#metricsel");
+    if(sel) sel.onchange = () => { METRIC = sel.value; COMPARE_DATA = null;
+                                   draw(); fetchCompare(); };
+    const cc = $("#clearcmp");
+    if(cc) cc.onclick = () => { COMPARE = []; COMPARE_DATA = null; draw(); };
+  }
+  if(TAB === "jobs") document.querySelectorAll("[data-log]").forEach(el =>
+    el.onclick = () => { JOBLOG = el.dataset.log; JOBLOG_TEXT = ""; draw(); fetchLog(); });
+}
+
+/* ---------------- fetch ---------------- */
+
+async function fetchDetail(){
+  // Capture which run we are asking about BEFORE awaiting. Reading the global
+  // afterwards means that clicking A then B, with A's reply landing second,
+  // leaves DETAIL holding A while DETAIL_FOR and SELECTED both say B - so the
+  // poll guard sees them agree and never corrects it. You read A's curves under
+  // B's name, with nothing to say so.
+  const id = SELECTED;
+  if(!id) return;
+  // Thin for charts, full for the table. A 3000-iteration walk run records 16
+  // metrics, and the whole history is over a megabyte - refetched every five
+  // seconds while it trains. The charts are ~480px wide, so 500 points is more
+  // resolution than the screen has. The table twin is the one thing that needs
+  // every row, and it is only on when you ask for it.
+  const points = TABLE ? 0 : 500;
+  try{
+    const r = await fetch(`/api/run/${encodeURIComponent(id)}?points=${points}`);
+    if(!r.ok){
+      // Clear DETAIL_FOR too. Leaving it equal to SELECTED makes the poll guard
+      // think this run is already loaded, so it never retries and the panel
+      // says "Loading run…" for ever.
+      if(SELECTED === id){ DETAIL = null; DETAIL_FOR = null; draw(); }
+      return;
+    }
+    const got = await r.json();
+    if(SELECTED !== id) return;          // the user moved on; this reply is stale
+    DETAIL = got;
+    DETAIL_FOR = id;
+    if(TAB === "live") draw();
+  }catch(e){
+    if(SELECTED === id) DETAIL_FOR = null;   // let the poll try again
+  }
+}
+
+async function fetchCompare(){
+  if(!COMPARE.length) return;
+  // Same stale-reply guard as fetchDetail. Toggle two runs quickly and the
+  // slower reply can land last, leaving COMPARE_DATA describing a selection
+  // that is no longer on screen - and because the signature is then stable,
+  // draw() never corrects it. A lit button with no line, permanently.
+  const want = COMPARE.join(",") + "|" + METRIC;
+  try{
+    const r = await fetch(`/api/compare?runs=${encodeURIComponent(COMPARE.join(","))}` +
+                          `&metric=${encodeURIComponent(METRIC)}`);
+    const got = await r.json();
+    if(COMPARE.join(",") + "|" + METRIC !== want) return;
+    COMPARE_DATA = got;
+    if(TAB === "compare") draw();
+  }catch(e){ /* leave the placeholder up; the next click retries */ }
+}
+
+async function fetchLog(){
+  if(!JOBLOG) return;
+  try{
+    const r = await fetch(`/api/job-log?id=${encodeURIComponent(JOBLOG)}`);
+    JOBLOG_TEXT = (await r.json()).text || "(nothing written yet)";
+    if(TAB === "jobs") draw();
+  }catch(e){ /* leave it */ }
+}
+
+async function load(){
+  try{
+    const r = await fetch("/api/monitor");
+    STATE = await r.json();
+    if(!STATE.metrics_available.includes(METRIC))
+      METRIC = STATE.metrics_available[0] || "reward";
+    draw();
+    // Refresh the open run's curves too - but only when it is actually moving,
+    // so a page left on a finished run is not refetching it every five seconds.
+    const run = STATE.runs.find(x => x.id === SELECTED);
+    if(SELECTED && (DETAIL_FOR !== SELECTED || (run && run.status === "running")))
+      fetchDetail();
+    if(TAB === "jobs" && JOBLOG) fetchLog();
+  }catch(e){
+    $("#head").innerHTML = `<h1>Could not load</h1>
+      <div class="purpose">${esc(e)}</div>`;
+  }
+}
+load();
+setInterval(load, 5000);
+</script>
+</body>
+</html>

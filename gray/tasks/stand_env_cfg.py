@@ -1,9 +1,9 @@
 """Smoke test - stand still.
 
-The robot starts in the ride-height stance and has to stay there: trunk level,
-trunk at the solved stance height (190.4 mm, read from progress/stance/stance.yaml
-rather than written here, so the two cannot disagree), feet where they were put,
-not falling over.
+The robot starts in the standing pose and has to stay there: trunk level, trunk
+at the stance height (202.4 mm, read from progress/stance/stance.yaml rather than
+written here, so the two cannot disagree), feet where they were put, not falling
+over.
 
 This is NOT a shipped policy and it is not a subsection of the plan. Standing is
 the zero-velocity corner of R1 locomotion - same reward, same observation, so the
@@ -12,7 +12,7 @@ right before six hours are spent finding out otherwise.
 
 Why this is the first thing trained, before anything that moves: it is the
 cheapest possible test of whether the model is right. A static torque check says
-twelve servos at 1.96 N-m hold 2030 g with 4.18x to spare, and the drop test
+twelve servos at 1.96 N-m hold 3100 g in this pose with 1.82x to spare, and the drop test
 says the robot holds itself up for four seconds without a controller at all - so
 if a policy cannot learn to stand, the fault is in the reward or the training
 setup, not in the robot. Minutes to find that out here; six hours to find it out
@@ -92,8 +92,13 @@ REWARD_NOTES = {
 def _stance() -> tuple[dict[str, float], float]:
     """The standing pose, straight out of scripts/find_stance.py.
 
-    Solved against the owner's measured joint travel, then verified: held for
-    four seconds under gravity at uprightness 1.0000 with 0.8 mm of drift.
+    Since 3 Aug 2026 those twelve angles are the owner's, stated by hand in
+    gray/config/robot.yaml, and find_stance.py only measures them. The pose it
+    used to solve for planted each foot under its own hip; this one slides them
+    forward and outward, which puts the footprint under the centre of mass
+    instead of behind it. Worst lean margin goes 94.6 mm -> 106.0 mm, and the
+    knees pay for it: 0.72 N-m -> 1.08 N-m, 1.82x the servo's stall instead of
+    2.74x.
     """
     st = yaml.safe_load(STANCE.read_text())
     # stance.yaml names joints fr_hip; the model calls them frhip.

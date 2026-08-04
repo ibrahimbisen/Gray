@@ -167,20 +167,68 @@ feedback:
   calibrated: false          # raw ADC counts -> radians, per joint, not yet measured
 
 stance:
-  # The owner drove the model to its tallest standing pose in the pose editor on
-  # 2 Aug 2026 and read 273.8 mm off it. Ride height is 40% below that, which is
-  # where the robot walks: high enough to swing a leg through, low enough to have
-  # somewhere to go when it stumbles.
-  max_height_m: 0.2738
-  ride_drop: 0.30            # ride at 70% of full height -> 191.7 mm
-  measured_by: owner, in the pose editor
+  # THE STANDING POSE. Chosen by the owner in the pose editor, 3 Aug 2026, and
+  # written down here by hand. Everything starts from it: every task spawns the
+  # robot in this pose, `ride_height` scores the trunk against the height it
+  # produces, and `posture` scores the joints against these angles.
+  #
+  # It is stated rather than solved. find_stance.py used to solve for a pose that
+  # put each foot straight under its own hip; that pose is still worked out and
+  # printed for comparison, but it is no longer what the robot trains in.
+  #
+  # Why the owner's pose won. The solved pose planted the feet directly below the
+  # hips, and the centre of mass does not sit above the hips - it is 35 mm
+  # forward of the middle of the footprint. So the robot stood on a square its own
+  # weight was not centred in, with 106 mm of lean available forwards and 175 mm
+  # backwards. Sliding the feet forward and outward moves the square under the
+  # weight and widens it:
+  #
+  #                          solved pose      this pose
+  #   worst lean margin         94.6 mm        106.0 mm      + 12%
+  #   tip angle                   26.4 deg       28.4 deg
+  #   footprint, side-side     189.4 mm        217.6 mm      + 28 mm
+  #   trunk height             194.3 mm        202.4 mm
+  #
+  # The lean margin is how far the centre of mass can travel before it leaves the
+  # square the four feet make. That is what "stands still without working at it"
+  # means, and the owner's pose is better at it in every direction at once.
+  #
+  # WHAT IT COSTS, stated plainly. The legs are raked forward, so the lever from
+  # each foot back to its knee is longer and the knee has to hold more:
+  #
+  #   worst holding torque      0.72 N-m       1.08 N-m
+  #   margin to the 1.96 N-m stall   2.74x        1.82x
+  #
+  # 1.82x still holds the robot up with room to spare, but the knee servos now
+  # sit at 55% of stall just standing there, and a servo held at 55% of stall gets
+  # hot. If they cook during a long stand, the first thing to try is thigh +20
+  # instead of +27: it keeps the footprint and drops the worst joint to 0.98 N-m.
+  #
+  # Degrees away from the sitting pose, in the pose editor's convention:
+  #   hip   + swings the leg OUT      thigh + swings it FORWARD    calf + lifts the foot
+  angles_deg:
+    fr_hip:  0.0
+    fr_thigh: 27.0
+    fr_calf: -45.0
+    fl_hip:  0.0
+    fl_thigh: 27.0
+    fl_calf: -45.0
+    br_hip:  0.0
+    br_thigh: 27.0
+    br_calf: -45.0
+    bl_hip:  0.0
+    bl_thigh: 27.0
+    bl_calf: -45.0
+  chosen_by: owner, in the pose editor, 3 Aug 2026
 
-  # How far outboard of its hip each foot is planted. Straight under the hip puts
-  # the feet at +/-60.7 mm, and the trunk is +/-83.4 mm wide - so the robot stands
-  # on a base narrower than its own body and rolls easily. 34 mm out puts each
-  # foot at +/-94.7 mm, about 11 mm proud of the body, which is what a quadruped
-  # standing steady actually looks like.
-  foot_outboard_mm: 34.0
+  # The owner drove the model to its tallest standing pose in the pose editor on
+  # 2 Aug 2026 and read 273.8 mm off it.
+  max_height_m: 0.2738
+
+  # Inputs to the solved pose only, kept so the comparison above can be
+  # reproduced. They do not affect what the robot trains in.
+  ride_drop: 0.30            # ride at 70% of full height -> 191.7 mm
+  foot_outboard_mm: 34.0     # each foot this far outboard of its own hip
 
 joint_limits:
   measured: true
