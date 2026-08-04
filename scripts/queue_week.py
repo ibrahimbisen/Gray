@@ -41,10 +41,18 @@ ROUND_0 = [
     {"name": f"w0{i}_seedfloor", "seed": seed,
      "note": f"PLAN 1.1.2 noise floor, seed {seed}. Identical config to the "
              f"other two - whatever these three disagree by is the number a real "
-             f"effect has to beat. Also the first runs on two things that changed "
-             f"on 3 Aug 2026: wandering measured in the sent-heading frame, and "
-             f"the owner's standing pose at 202.4 mm. Nothing before them is "
-             f"comparable."}
+             f"effect has to beat. It matters more than usual this time, because "
+             f"EIGHT things changed on 3 Aug 2026 and nothing before these runs "
+             f"is comparable to anything after: the standing pose is the owner's "
+             f"at 202.4 mm; the command box went from (0.15, 0.35) forward to "
+             f"(-0.35, 0.35) with sideways +/-0.20 and turn +/-1.0; height, "
+             f"pitch and roll became commands, so the observation is 48 numbers "
+             f"not 45; wandering is measured in the sent-heading frame; "
+             f"_going_straight gates on abs(vx); mjlab's forward-only clamp is "
+             f"gone; ground_covered is measured along the commanded direction "
+             f"instead of world X; and stepping no longer pays a standing robot "
+             f"to march. Every bar the old runs were scored against was scored "
+             f"on a different task."}
     for i, seed in enumerate((42, 7, 1234), start=1)
 ]
 
@@ -70,26 +78,37 @@ for n in range(8):
         "ramps": {"veering": VEER_HARD} if veer_hard else {},
         "note": f"R1 {tag}: wandering {wander}, veering "
                 f"{'x2' if veer_hard else 'stock'}, skidding {skid}. "
-                f"Corner {n + 1} of 8 in the straightness factorial.",
+                f"Corner {n + 1} of 8 in the straightness factorial. On the WIDE box, so "
+                f"these terms are now being asked to hold a line backward and "
+                f"sideways as well as forward - which they were never tested on.",
     })
 
-# Round 2. The speed bar, which is failing at 0.071 against 0.05. Independent of
-# round 1, so it is queued alongside rather than after it.
+# Round 2. The speed bar. It was failing at 0.071 against 0.05 - but that number
+# was measured on the OLD box, where mjlab's forward-only clamp forced four
+# attempts in five to at least 0.3 m/s, three quarters of them landing exactly on
+# it. The policy was never trained across a speed range at all. So the 0.071 is
+# not a starting point any more; round 0 measures what it actually is now, and
+# this round may turn out to be tuning something that already passes.
 ROUND_2 = [
     {"name": f"w2{n + 1}_spd{ts}x{gc}",
      "rewards": {"track_speed": ts, "ground_covered": gc},
-     "note": f"R2: track_speed {ts}, ground_covered {gc}. Testing whether paying "
-             f"more for speed closes the 0.071 vs 0.05 gap, or just trades drift "
-             f"for it."}
+     "note": f"R2: track_speed {ts}, ground_covered {gc}. Does paying more for "
+             f"speed close the speed-tracking gap, or just trade drift for it? "
+             f"Both terms changed on 3 Aug 2026: the speed range is real now "
+             f"rather than clamped to one value, and ground_covered is measured "
+             f"along the commanded direction rather than world X - so it can pay "
+             f"for backward and sideways, which it never could. Read round 0 "
+             f"first; the 0.071 vs 0.05 this round was designed around was "
+             f"measured on a task that no longer exists."}
     for n, (ts, gc) in enumerate(((2.0, 1.0), (4.0, 1.0), (2.0, 2.0), (4.0, 2.0)))
 ]
 
 
-# Three iterations of standing still, in front of everything else. It is worth a
-# job of its own whenever the MODEL has changed under the tasks, which it has:
-# the standing pose moved on 3 Aug 2026 from the solved one to the owner's, so
-# every task now spawns the robot at 202.4 mm in a pose it has never trained in.
-# If that is broken, this says so in about a minute instead of six hours from now.
+# Three iterations of walking, in front of everything else. It is worth a
+# job of its own whenever the MODEL or the TASK has changed under the runs, and
+# on 3 Aug 2026 both did: a new standing pose, a wider command box, three new
+# commanded numbers, and three reward terms rewritten. If any of that is broken
+# this says so in about a minute instead of six hours from now.
 SMOKE = {
     "name": "w00_smoke", "task": "Gray-Walk", "iterations": 3,
     "film": False, "verify": False,
