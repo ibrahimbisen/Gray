@@ -830,5 +830,23 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 def walk_ppo_cfg():
     cfg = push_ppo_cfg()
     cfg.experiment_name = "gray_walk"
-    cfg.max_iterations = 3000
+    # 2000, down from 3000 on 4 Aug 2026. Measured off three finished runs rather
+    # than guessed - reward at iteration 2000, as a fraction of the best that run
+    # ever reached:
+    #
+    #     w01_seedfloor   97.4%      walk_m3100_c   97.5%      walk_m3100_g   96.8%
+    #
+    # and what the last thousand iterations then bought: +1.2, -0.0, +0.8. Under
+    # one percent, against a seed-to-seed noise floor of about two - so those
+    # iterations produce a difference nobody can tell apart from luck, for a third
+    # of the run's wall clock.
+    #
+    # Not 1500, though the curve looks flat there: walk_m3100_g gained +3.3
+    # between 1500 and 2000. Flat-looking and finished are different things, and
+    # 2000 is where they actually meet.
+    #
+    # This is a CAP, not a target. RULES.md rule 1 stops a run early the moment
+    # reward reaches 96.5% of its ceiling - it has never fired on a walk run,
+    # because the ceiling is 190 and the best so far is 136.
+    cfg.max_iterations = 2000
     return cfg

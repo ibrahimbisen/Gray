@@ -1,5 +1,5 @@
 {
-  "paused": false,
+  "paused": true,
   "next_id": 77,
   "jobs": [
     {
@@ -1513,14 +1513,21 @@
       "verify": true,
       "clamped": "",
       "id": "j0063",
-      "state": "running",
+      "state": "failed",
       "created": "2026-08-03T22:14:18",
       "started": "2026-08-04T00:04:36",
-      "finished": null,
+      "finished": "2026-08-04T00:42:39",
       "run_id": "2026-08-04_00-04-41_w02_seedfloor",
-      "exit_code": null,
-      "error": "",
-      "steps": [],
+      "exit_code": 4294967295,
+      "error": "training exited 4294967295 - see j0063.log",
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 2259.1,
+          "exit_code": 4294967295,
+          "at": "2026-08-04T00:42:15"
+        }
+      ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0063.log"
     },

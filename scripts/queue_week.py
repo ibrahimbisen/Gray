@@ -141,7 +141,7 @@ def measured_minutes() -> float | None:
         if r.get("task") != "Gray-Walk" or done < 200:
             continue
         # A run that was stopped early still times honestly per iteration, so it
-        # counts - scaled up to the 3000 these jobs ask for.
+        # counts - scaled to the 2000 these jobs now ask for.
         try:
             a = datetime.fromisoformat(r["started"])
             b = datetime.fromisoformat(r["finished"])
@@ -149,7 +149,7 @@ def measured_minutes() -> float | None:
             continue
         secs = (b - a).total_seconds()
         if secs > 0:
-            mins.append(secs / 60 * (3000 / done))
+            mins.append(secs / 60 * (2000 / done))
     if not mins:
         return None
     mins.sort()
