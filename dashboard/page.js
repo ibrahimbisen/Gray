@@ -40,7 +40,20 @@ function value(v, unit) {
   if (unit === "m/s")      return (+v).toFixed(3) + " m/s";
   if (unit === "deg")      return (+v).toFixed(1) + "°";
   if (unit === "s")        return (+v).toFixed(1) + " s";
-  return String(v);
+  /* rad/s is the unit of `turn_err`, and it had no case here. Every criterion
+     that carries it fell through to the line below and printed the raw double -
+     `turn rate 0.11773093044757843` sat in a column of numbers rounded to three
+     places, on four pages at once. Three decimals, to match m/s: both are a
+     rate, and the bar for this one is 0.2. */
+  if (unit === "rad/s")    return (+v).toFixed(3) + " rad/s";
+  /* Anything else is a unit nobody has taught this function. `fmt` at least
+     rounds it, which is a better answer than seventeen significant figures - but
+     the unit still needs a case above, so it says so. */
+  if (typeof v === "number") {
+    console.warn(`value(): no rule for unit ${JSON.stringify(unit)}`);
+    return fmt(v) + (unit ? " " + unit : "");
+  }
+  return esc(String(v));
 }
 
 /* Seconds as a human duration. The server has its own copy for durations it
@@ -80,13 +93,17 @@ const timesOver = (c) => (!c.ratio || c.ratio <= 0 || c.ratio >= 1) ? null : 1 /
 
 /* ===================================================================== nav === */
 
+/* THE list of pages. dashboard/server.py parses this array to print its startup
+   banner, so the terminal and this bar cannot disagree. They did: the banner
+   named seven, this named eight, and server.py's docstring said six. */
 const PAGES = [
-  ["/",        "Control", "what is happening right now"],
+  ["/",        "Now",     "what is happening right now"],
   ["/runs",    "Runs",    "how did that run go"],
   ["/plan",    "Plan",    "what we are doing next, and why"],
   ["/train",   "Train",   "what it is being taught"],
-  ["/dials",   "Dials",   "every number that gets varied, and its range"],
+  ["/dials",   "Dials",   "every number that gets varied, and what it was"],
   ["/robot",   "Robot",   "is the physical model right"],
+  ["/controller", "Controller", "what each control does, and what is still free"],
   ["/summary", "Summary", "how the whole thing works"],
 ];
 
@@ -214,6 +231,43 @@ function tabbed(root, tabs, opts = {}) {
 
 /* =============================================================== builders === */
 
+/* THE block: a bordered panel with a mono caption bar that names it and counts
+   what is in it. Promoted out of carry.html, which is where the dashboard's
+   density came from. Every page builds these, so the markup is written once.
+
+   `count` is optional and `right` takes anything that belongs on the far end of
+   the caption - a chip, a link. The body is raw HTML, because it is always a
+   table or a grid the caller has already built. */
+const blk = (title, count, body, right) => `
+  <div class="blk"><h2><b>${esc(title)}</b>${
+    count != null ? `<span class="n">${count}</span>` : ""}${
+    right ? `<span class="n">${right}</span>` : ""}</h2>${body}</div>`;
+
+/* The title block at the head of a sheet. `cells` is [label, value] pairs, and
+   the first one is the sheet's name and gets the big treatment.
+
+   Every page states where its numbers come from, here, in the same place, in the
+   same words. That is the rule this repo runs on: a number without a source is
+   the fault verify.py warns about. Pass `{html:true}` on a cell whose value is
+   markup, otherwise it is escaped. */
+const titleblock = (cells) => `<div class="titleblock">${cells.map((c, i) => `
+  <div class="${i === 0 ? "name" : ""}">
+    <div class="k">${esc(c.k)}</div>
+    <div class="v ${i === 0 ? "big" : ""}">${c.html || esc(c.v ?? "")}</div>
+  </div>`).join("")}</div>`;
+
+/* The first sentence of an explanation, for a `why` column beside a number.
+
+   A reward term's note runs to five or six sentences, which is right on the page
+   that explains the reward function and wrong in a table cell - twenty-four of
+   them turn a table into an essay. The whole note goes on the row's `title`, so
+   nothing is lost, and /summary is one link away. */
+const firstSentence = (s) => {
+  const t = String(s || "").trim();
+  const cut = t.search(/\.\s/);
+  return cut === -1 ? t : t.slice(0, cut + 1);
+};
+
 const facts = (rows) => `<div class="facts">${rows.map(f => `
   <div class="fact"><div class="k">${esc(f.k)}</div>
     <div class="v">${f.html || esc(f.v)}</div>
@@ -247,6 +301,349 @@ function modelBlock(m) {
           ${(c.rows || []).length
             ? `<ul>${c.rows.map(p => `<li>${esc(p)}</li>`).join("")}</ul>` : ""}
         </div></div>`).join("")}`;
+}
+
+/* ========================================================== the on-track card === */
+
+/* "Is this run going to pass the bar?" - the same six gates scripts/verify.py
+   scores, one row each. Built here rather than on a page because BOTH pages ask
+   it: the Control page about whatever is training, and the Runs page about
+   whichever run you have open. It was written on Control first and was about to
+   be copied; `chartCard` above is in this file for exactly the same reason.
+
+   Every row carries where its number came from, because the two sources are not
+   the same kind of fact:
+
+     verified        scripts/verify.py measured it on a checkpoint, on a fixed
+                     test, after the run. This is the real thing.
+     from training   read off metrics.csv as the run goes. Measures something
+                     ADJACENT to the bar - see the caveat on each chip - and is
+                     indicative, never a verdict.
+     not logged      nothing measures it during training. Says so, borrows
+                     nothing, and shows the last verified number instead.
+
+   A run that has been verified shows its OWN verdict; one still training shows
+   estimates. The card is the same either way, which is the point - you read the
+   two against each other without re-learning the layout. */
+
+/* Position on the distance axis. Log scale, fixed 0.1x - 100x domain, so the bar
+   tick sits at the same x in every row and rows are comparable at a glance. A
+   linear "percent of bar" would put something at 4% of target near a full-looking
+   bar's left edge, which is the lie this exists to avoid. */
+const trackPos = (r) => (!r || r <= 0) ? null
+  : Math.max(0, Math.min(100, ((Math.log10(r) + 1) / 3) * 100));
+
+/* Distance to bar, in words. `ratio` is 1.0 AT the bar and above 1.0 passing, in
+   both directions - so the multiple reads the same whether the criterion wants
+   more or less. */
+function gapText(ratio, passed) {
+  if (ratio === null || ratio === undefined || !isFinite(ratio) || ratio <= 0) return "";
+  return passed === false ? `${fmt(1 / ratio)}&times; over`
+       : passed === true  ? `${fmt(ratio)}&times; inside`
+       : `${ratio >= 1 ? fmt(ratio) + "&times; inside" : fmt(1 / ratio) + "&times; over"}`;
+}
+
+/* Two readings of one criterion in one slot: the lamp is the number this row is
+   reporting, the hollow ring is the other one - so a live estimate is shown
+   against the verifier's last word, and a verdict against what training thought
+   at the time. */
+function boardTrack(r) {
+  const now = trackPos(r.ratio);
+  const was = trackPos(r.other && r.other.ratio);
+  if (now === null && was === null) return `<span class="faint small">&mdash;</span>`;
+  const lamp = now === null ? ""
+    : `<span class="dot ${r.passed === true ? "ok" : r.passed === false ? "bad" : ""}"
+         style="left:${now}%" title="${esc(r.source === "verified"
+           ? "measured by verify.py" : "estimated from training")}"></span>`;
+  const ghost = was === null ? ""
+    : `<span class="ghost" style="left:${was}%" title="${
+        esc(r.other.what || "the other reading")}"></span>`;
+  return `<div class="track"><div class="ax"></div>
+    <div class="tick" style="left:33.3%"></div>${ghost}${lamp}</div>`;
+}
+
+/* Where a number came from, as a word. `.badge` already IS this pill - see the
+   note beside `.badge.src` in page.css - so this is a modifier of it and not a
+   fourth spelling. Never the word "live": a card can be looking at a run that
+   finished last week, and every row labelled LIVE would be the page lying about
+   its own freshness. */
+function srcChip(source, caveat) {
+  const word = { live: "from training", verified: "verified",
+                 unmeasured: "not logged" }[source] || esc(source);
+  const mod = source === "verified" ? "verified"
+            : source === "unmeasured" ? "unlogged" : "";
+  // How this number differs from what the bar asks for hangs off the chip that
+  // names where it came from, which is the thing you would hover to ask. On the
+  // row itself it was a line of grey text on every passing gate - noise on the
+  // rows that are fine, and it buried the ones that are not.
+  return `<span class="badge src ${mod}"${caveat ? ` title="${esc(caveat)}"` : ""
+    }>${word}</span>`;
+}
+
+/* The legend. The scale is built on `.lrow` rather than a div of its own so it
+   borrows the row grid: `0.1x`, `bar` and `100x` land over the track column
+   exactly, and stay there when the window changes width. A hand-placed margin
+   would be right at one width only. */
+function boardLegend() {
+  return `<div class="legend marks">
+      <span><b style="color:var(--good)">✓</b>met</span>
+      <span><b style="color:var(--crit)">✗</b>failing</span>
+      <span><b>·</b>not judged</span>
+      <span><span class="dot ok"></span>this row's number</span>
+      <span><span class="ghostkey"></span>the other reading</span>
+    </div>
+    <div class="lrow head">
+      <span></span><span></span><span></span><span></span>
+      <div class="scalerow"><span>0.1&times;</span><span class="at">bar</span>
+        <span>100&times;</span></div>
+      <span class="gap">distance</span>
+      <span class="lnote">note</span>
+    </div>`;
+}
+
+/* The LAST CELL of a row, not a line under it. It was a `.lsub` block once, and
+   three of the six gates had a paragraph wedged beneath them - so the board read
+   as three separate huddles instead of one set of gates. The gates are the whole
+   point; they have to sit together. Anything that will not fit on the line lives
+   on the `title` and in a footnote under the whole board. */
+function boardNote(row) {
+  if (row.source === "unmeasured") {
+    const text = row.last
+      ? `not logged &mdash; last verified <b>${value(row.last.value, row.unit)}</b> on
+         <a href="/runs#run=${encodeURIComponent(row.last.run)}">${
+         esc(row.last.label)}</a>${row.last.ratio && row.last.ratio < 1
+           ? `, ${fmt(1 / row.last.ratio)}&times; over` : ""}`
+      : `not logged while training, and never verified either`;
+    return `<span class="lnote" title="nothing logs this criterion during training">${
+      text}</span>`;
+  }
+  if (row.source === "verified" && row.note)
+    return `<span class="lnote" title="${esc(row.note)}">${esc(row.note)}</span>`;
+  if (!row.judged && row.why_unjudged)
+    return `<span class="lnote" title="${esc(row.why_unjudged)}">reported, not judged`
+         + ` &mdash; see below</span>`;
+  // A gate that is measured and judged says nothing here. Its caveat is on the
+  // source chip, where hovering "from training" asks exactly that question.
+  return `<span class="lnote"></span>`;
+}
+
+/* The long caveats, gathered UNDER the board. One line each, named by the
+   criterion it belongs to, so it can be tied back without the prose sitting
+   inside the rows and breaking them apart. */
+function boardFootnotes(rows) {
+  const out = rows.filter(r => !r.judged && r.why_unjudged && r.source !== "unmeasured");
+  if (!out.length) return "";
+  return out.map(r => `<div class="lsub" style="margin-top:7px">
+    <b>${esc(r.name)} is reported, not judged.</b> ${esc(r.why_unjudged)}</div>`).join("");
+}
+
+/* `board` is dashboard/live.py's bar_board(); `run` is the run it describes.
+   opts.training says the run is still going, which only changes the subtitle. */
+function onTrackCard(board, run, opts) {
+  const o = opts || {}, r = run || {};
+  if (!board || !board.has_verifier) return `<div class="readout"><h3>On track?</h3>
+    ${empty(`${String(r.task || "this task").replace("Gray-", "")} has no verifier,
+             so there is no bar to be on track for.`)}</div>`;
+
+  const sub = o.training
+    ? `${(r.iterations_done || 0).toLocaleString()}/${(r.iterations_target || 0)
+        .toLocaleString()} &middot; ${Math.round(100 * (r.progress || 0))}%`
+    : `${esc(r.status || "")}${r.duration ? ` &middot; ${esc(r.duration)}` : ""}`;
+  const anyLive = board.rows.some(x => x.source === "live");
+
+  return `<div class="readout">
+    <h3>On track?
+      <span class="who">${r.number ? "#" + r.number + " " : ""}${
+        esc(r.variant || r.name || "")}</span>
+      <span class="say">${sub}</span>
+      <span class="grow"></span>
+      <span class="say"><b style="color:var(--good)">${board.met} met</b>
+        &middot; <b style="color:${board.failing ? "var(--crit)" : "var(--muted)"}">${
+          board.failing} failing</b>
+        &middot; ${board.unknown} not judged</span></h3>
+    ${boardLegend()}
+    ${board.rows.map(row => {
+      const cls = row.passed === true ? "pass" : row.passed === false ? "fail" : "";
+      const mk = row.passed === true ? "✓" : row.passed === false ? "✗" : "·";
+      const has = row.measured !== null && row.measured !== undefined;
+      return `<div class="lrow ${cls}">
+        <span class="mk">${mk}</span>
+        <span class="nm">${esc(row.name)}</span>
+        <span class="v ${has ? "" : "none"}">${
+          has ? value(row.measured, row.unit) : "&mdash;"}</span>
+        ${srcChip(row.source, row.caveat)}
+        ${boardTrack(row)}
+        <span class="gap">${row.judged ? gapText(row.ratio, row.passed)
+          : "bar " + value(row.bar, row.unit)}</span>
+        ${boardNote(row)}
+      </div>`;
+    }).join("")}
+    ${boardFootnotes(board.rows)}
+    ${!anyLive ? "" : `<div class="lsub" style="padding-left:0;margin-top:7px">
+      <b>A number off the training logs is not a verdict.</b> It measures something
+      next to what the bar asks for; <code>verify.py</code> scores a checkpoint on a
+      fixed test after the run, and that is the one that counts.
+    </div>`}
+  </div>`;
+}
+
+/* ================================================================== charts === */
+
+/* One line chart, used by /runs (forty-four of them, 132px) and by / (four of
+   them, 96px, one of which carries a reference line). It lived on /runs and was
+   about to be copied onto the control page, which is how this file got its
+   docstring - so it moved here first.
+
+   Never two y-scales on one plot: the alignment between them is arbitrary and
+   invents a correlation that is not in the data. One metric, one chart. */
+
+const CHART = { W: 480, H: 132, L: 44, R: 10, T: 8, B: 22 };
+
+/* The filter, in ONE place, because the chart and its crosshair both need it and
+   a disagreement between them lands the crosshair on a different sample than the
+   line it is tracking.
+
+   `+null` and `+""` are both 0, so mapping every row plotted a fabricated zero
+   wherever a value was missing: a metric that starts logging at iteration 50 drew
+   a flat zero line before it, dragging the y-axis down and squashing the real
+   curve. Worse, a NaN reward showed as "0.00" on the chart while the tile and the
+   table both said "—" - three numbers for one cell, and the chart's was invented. */
+function chartPoints(rows, key) {
+  const pts = [];
+  for (const r of rows || []) {
+    const v = r[key];
+    if (typeof v === "number" && isFinite(v))
+      pts.push({ x: r.iteration ?? pts.length, y: v });
+  }
+  return pts;
+}
+
+/* The y-range includes `extra` - the reference line - so a bar sitting outside
+   the data's own range is still on the canvas rather than clipped off the top. */
+function chartScales(xs, ys, geo, extra) {
+  const x0 = Math.min(...xs), x1 = Math.max(...xs) || 1;
+  const all = (typeof extra === "number" && isFinite(extra)) ? ys.concat([extra]) : ys;
+  let lo = Math.min(...all), hi = Math.max(...all);
+  if (hi === lo) { hi = lo + 1; lo -= 1; }
+  const pad = (hi - lo) * 0.12; lo -= pad; hi += pad;
+  return {
+    x0, x1, lo, hi,
+    px: v => geo.L + (geo.W - geo.L - geo.R) * ((v - x0) / ((x1 - x0) || 1)),
+    py: v => geo.T + (geo.H - geo.T - geo.B) * (1 - (v - lo) / ((hi - lo) || 1)),
+  };
+}
+
+/* Gridlines and axes are SOLID hairlines one shade off the surface. A dashed
+   grid reads as "threshold" or "projection" when it is only a grid. */
+function chartAxes(sc, geo) {
+  const ticksY = [sc.lo + (sc.hi - sc.lo) * 0.08, (sc.lo + sc.hi) / 2,
+                  sc.hi - (sc.hi - sc.lo) * 0.08];
+  const ticksX = [sc.x0, (sc.x0 + sc.x1) / 2, sc.x1];
+  return `
+    ${ticksY.map(t => `<line x1="${geo.L}" x2="${geo.W - geo.R}" y1="${sc.py(t).toFixed(1)}"
+       y2="${sc.py(t).toFixed(1)}" stroke="var(--grid)" stroke-width="1"
+       vector-effect="non-scaling-stroke"/>`).join("")}
+    <line x1="${geo.L}" x2="${geo.L}" y1="${geo.T}" y2="${geo.H - geo.B}" stroke="var(--line)"
+          stroke-width="1" vector-effect="non-scaling-stroke"/>
+    <line x1="${geo.L}" x2="${geo.W - geo.R}" y1="${geo.H - geo.B}" y2="${geo.H - geo.B}"
+          stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+    ${ticksY.map(t => `<text x="${geo.L - 6}" y="${(sc.py(t) + 3.5).toFixed(1)}" text-anchor="end"
+       font-size="9" fill="var(--muted)" class="tnum">${fmt(t)}</text>`).join("")}
+    ${ticksX.map((t, i) => `<text x="${sc.px(t).toFixed(1)}" y="${geo.H - geo.B + 13}"
+       text-anchor="${i === 0 ? "start" : i === 2 ? "end" : "middle"}"
+       font-size="9" fill="var(--muted)" class="tnum">${Math.round(t)}</text>`).join("")}`;
+}
+
+/* opts: {colour, geo, bar, barLabel, note, range}
+   `bar` draws a reference hairline. `range` prints the min-to-max line under the
+   title - /runs wants it, the control page has no room for it. */
+function chartCard(rows, key, opts) {
+  const o = opts || {};
+  const geo = o.geo || CHART;
+  const colour = o.colour || "var(--s1)";
+  const pts = chartPoints(rows, key);
+  const head = (now, tone) => `<h3><span class="swatch" style="background:${colour}"></span>${
+    esc(label(key))}<span class="now" style="color:${tone}">${now}</span></h3>`;
+
+  if (pts.length < 2) return `<div class="card">${head("—", "var(--muted)")}
+    <div class="rng">only ${pts.length} usable sample${pts.length === 1 ? "" : "s"}
+      out of ${(rows || []).length} rows</div></div>`;
+
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const sc = chartScales(xs, ys, geo, o.bar);
+  const d = pts.map((p, i) =>
+    `${i ? "L" : "M"}${sc.px(p.x).toFixed(1)},${sc.py(p.y).toFixed(1)}`).join("");
+  const endX = sc.px(xs[xs.length - 1]), endY = sc.py(ys[ys.length - 1]);
+  const gaps = (rows || []).length - pts.length;
+  const barY = (typeof o.bar === "number" && isFinite(o.bar)) ? sc.py(o.bar) : null;
+
+  return `<div class="card" data-key="${esc(key)}" data-geo="${geo.H}">
+    ${head(fmt(ys[ys.length - 1]), colour)}
+    ${o.note ? `<div class="rng">${esc(o.note)}</div>`
+     : o.range === false ? ""
+     : `<div class="rng tnum">${fmt(Math.min(...ys))} to ${fmt(Math.max(...ys))} over
+        ${pts.length} samples${gaps ? ` &middot; ${gaps} row(s) had no value` : ""}</div>`}
+    <div class="plot">
+      <svg viewBox="0 0 ${geo.W} ${geo.H}" preserveAspectRatio="none" role="img"
+           style="height:${geo.H}px"
+           aria-label="${esc(label(key))} against training iteration">
+        ${chartAxes(sc, geo)}
+        ${barY === null ? "" : `<line class="barref" x1="${geo.L}" x2="${geo.W - geo.R}"
+           y1="${barY.toFixed(1)}" y2="${barY.toFixed(1)}"
+           vector-effect="non-scaling-stroke"/>
+          <text x="${geo.W - geo.R}" y="${(barY - 4).toFixed(1)}" text-anchor="end"
+             font-size="9" fill="var(--muted)">${esc(o.barLabel || "bar")}</text>`}
+        <path d="${d}" fill="none" stroke="${colour}" stroke-width="2"
+              stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+        <circle cx="${endX.toFixed(1)}" cy="${endY.toFixed(1)}" r="3.2" fill="${colour}"
+                stroke="var(--surface)" stroke-width="2"/>
+        <g class="cross" opacity="0">
+          <line y1="${geo.T}" y2="${geo.H - geo.B}" stroke="var(--muted)" stroke-width="1"
+                vector-effect="non-scaling-stroke"/>
+          <circle r="4" fill="${colour}" stroke="var(--surface)" stroke-width="2"/>
+        </g>
+        <rect x="${geo.L}" y="0" width="${geo.W - geo.L - geo.R}" height="${geo.H}"
+              fill="transparent" class="hit"/>
+      </svg>
+      <div class="tip"></div>
+    </div>
+  </div>`;
+}
+
+/* The crosshair. Snaps to the nearest sample in x, so the reader aims at an
+   iteration rather than at a 2px line. */
+function wireCharts(root, rows, opts) {
+  const geo = (opts || {}).geo || CHART;
+  (root || document).querySelectorAll(".card[data-key]").forEach(card => {
+    const key = card.dataset.key, svg = card.querySelector("svg");
+    const hit = card.querySelector(".hit"), g = card.querySelector(".cross");
+    if (!hit || !g) return;
+    const line = g.querySelector("line"), dotEl = g.querySelector("circle");
+    const tip = card.querySelector(".tip");
+    const pts = chartPoints(rows, key);
+    if (pts.length < 2) return;
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    const sc = chartScales(xs, ys, geo, (opts || {}).bars ? (opts.bars[key]) : undefined);
+
+    hit.addEventListener("mousemove", ev => {
+      const b = svg.getBoundingClientRect();
+      const vx = ((ev.clientX - b.left) / b.width) * geo.W;
+      let best = 0, bd = Infinity;
+      xs.forEach((x, i) => { const dd = Math.abs(sc.px(x) - vx); if (dd < bd) { bd = dd; best = i; } });
+      const cx = sc.px(xs[best]), cy = sc.py(ys[best]);
+      g.setAttribute("opacity", "1");
+      line.setAttribute("x1", cx); line.setAttribute("x2", cx);
+      dotEl.setAttribute("cx", cx); dotEl.setAttribute("cy", cy);
+      tip.style.opacity = "1";
+      tip.style.left = (cx / geo.W * 100) + "%";
+      tip.style.top = (cy / geo.H * b.height) + "px";
+      tip.innerHTML = `<b>${fmt(ys[best])}</b> &middot; iteration
+        <span class="tnum">${xs[best]}</span>`;
+    });
+    hit.addEventListener("mouseleave", () => {
+      g.setAttribute("opacity", "0"); tip.style.opacity = "0";
+    });
+  });
 }
 
 const empty = (msg) => `<div class="empty">${esc(msg)}</div>`;

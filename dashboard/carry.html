@@ -1,0 +1,209 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gray &mdash; what carries over</title>
+<link rel="stylesheet" href="/page.css">
+<style>
+/* ---------------------------------------------------------------------------
+   DENSE ON PURPOSE. This is a reference sheet, not an essay: you arrive knowing
+   which number you want and the job is to have it on screen already rather than
+   a scroll away. So the type is one step down from every other page, the rows
+   are tight, and the tables sit two and three across wherever they fit.
+
+   Everything here is a TABLE. Prose is confined to the two lines at the top and
+   to one `why` column per table, because the moment an explanation needs a
+   paragraph it belongs on /plan or in the code that does the thing.
+   --------------------------------------------------------------------------- */
+.sheet { max-width:1500px; margin:0 auto; padding:0 20px 90px; }
+
+.head { padding:28px 0 18px; border-bottom:1px solid var(--line); }
+.head h1 { font-size:23px; letter-spacing:-.02em; margin:0 0 4px; }
+.head .sub { font-size:12px; color:var(--ink2); max-width:96ch; line-height:1.5; }
+.head .verdict { display:inline-block; margin-top:8px; }
+
+.lede { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:14px 0 0; }
+.lede p { font-size:12.5px; line-height:1.55; color:var(--ink2); margin:0;
+  max-width:72ch; }
+@media (max-width:860px){ .lede { grid-template-columns:1fr; } }
+
+/* Tables flow into as many columns as fit rather than a fixed grid: the reward
+   table is 24 rows and the tolerance table is 6, and a fixed grid would leave
+   the short one padding out a column the tall one needed. */
+.grid { display:grid; gap:14px; margin-top:16px;
+  grid-template-columns:repeat(auto-fit,minmax(370px,1fr)); }
+.grid.wide { grid-template-columns:repeat(auto-fit,minmax(560px,1fr)); }
+
+.blk { border:1px solid var(--line); border-radius:9px; background:var(--surface);
+  overflow:hidden; }
+.blk > h2 { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10px;
+  letter-spacing:.11em; text-transform:uppercase; color:var(--muted);
+  margin:0; padding:8px 11px; border-bottom:1px solid var(--line);
+  background:var(--surface2); display:flex; gap:8px; align-items:baseline; }
+.blk > h2 b { color:var(--ink); font-weight:600; letter-spacing:0;
+  text-transform:none; font-size:11.5px; font-family:inherit; }
+.blk > h2 .n { margin-left:auto; color:var(--muted); font-weight:400; }
+
+table.t { width:100%; border-collapse:collapse; font-size:11.5px; }
+table.t th { text-align:left; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:9.5px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--muted); font-weight:600; padding:5px 11px; border-bottom:1px solid var(--line); }
+table.t td { padding:4px 11px; border-bottom:1px solid var(--line);
+  vertical-align:top; line-height:1.4; }
+table.t tr:last-child td { border-bottom:0; }
+table.t .n { text-align:right; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-variant-numeric:tabular-nums; white-space:nowrap; }
+table.t .why { color:var(--ink2); font-size:11px; }
+table.t .k { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; }
+table.t .pos { color:var(--good); font-weight:700; }
+table.t .neg { color:var(--crit); font-weight:700; }
+.ramped { font-size:8.5px; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--s1); border:1px solid var(--line); border-radius:3px;
+  padding:0 3px; margin-left:5px; }
+.arrow { color:var(--muted); }
+.chips span { display:inline-block; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:10.5px; border:1px solid var(--line); border-radius:4px;
+  padding:1px 5px; margin:2px 3px 2px 0; color:var(--ink2); }
+.pass { color:var(--good); font-weight:700; }
+.fail { color:var(--crit); font-weight:700; }
+</style>
+</head>
+<body>
+<div id="nav"></div>
+<div class="sheet" id="sheet"></div>
+
+<script src="/page.js"></script>
+<script>
+get("/api/carry").then(s => {
+mountNav("/carry", navState(s.nav));
+
+if (s.error) {
+  $("#sheet").innerHTML = `<div class="head"><h1>What 1.1 left behind</h1></div>
+    <div class="empty" style="margin-top:16px">${esc(s.error)}</div>`;
+  return;
+}
+
+/* `blk()` moved into page.js when the rest of the dashboard adopted this page's
+   block. Declaring it here as well is a SyntaxError, not a shadow - see the note
+   in now.html - so this page uses the shared one. */
+
+/* --- the bars, and the runs that met them ---------------------------------- */
+/* Eleven, not six, since 4 Aug 2026. The first six are the straight-line bars
+   that closed 1.1 - scored on the worse of the forward and backward passes. The
+   five after them arrived with PLAN.md 1.2: three for walking sideways, which is
+   its own ask at its own speed and cannot be merged into the forward numbers,
+   and two for turning on the spot, which has no line to hold and so has no
+   distance, speed or drift row at all.
+   Keys missing from a run are skipped, so runs verified before 1.2 still show
+   their six. */
+const ORDER = ["survive", "height_err", "upright", "distance", "speed_err", "drift",
+               "side_distance", "side_speed_err", "side_drift",
+               "turn_err", "turn_wander"];
+const closing = s.closing_runs || [];
+const bars = () => {
+  if (!closing.length) return "";
+  const byKey = {};
+  for (const r of closing)
+    for (const c of r.checks || []) (byKey[c.key] = byKey[c.key] || []).push(c);
+  const rows = ORDER.filter(k => byKey[k]).map(k => {
+    const cs = byKey[k], first = cs[0];
+    const val = (c) => `<td class="n ${c.passed ? "pass" : "fail"}">${
+      (c.format || "{}").replace("{:.0%}", (c.measured * 100).toFixed(0) + "%")
+        .replace(/\{:[^}]*\}/, (+c.measured).toFixed(3))}</td>`;
+    return `<tr><td>${esc(first.name.replace(/ under .*| above .*| within .*/, ""))}</td>
+      ${cs.map(val).join("")}
+      <td class="n" style="color:var(--muted)">${first.bar}</td></tr>`;
+  }).join("");
+  return blk("The six bars, and the runs that closed the step", null, `
+    <table class="t">
+      <tr><th>criterion</th>${closing.map(r =>
+        `<th class="n">seed ${r.seed ?? "?"}</th>`).join("")}<th class="n">bar</th></tr>
+      ${rows}
+    </table>`);
+};
+
+/* --- reward function ------------------------------------------------------- */
+const terms = s.terms || [];
+const termTable = (rows, positive) => `
+  <table class="t">
+    <tr><th>${positive ? "earns" : "costs"}</th><th class="n">weight</th><th>what it charges</th></tr>
+    ${rows.map(t => `<tr>
+      <td class="k"><span class="${positive ? "pos" : "neg"}">${positive ? "+" : "−"}</span>
+        ${esc(t.name.replace(/_/g, " "))}${t.ramped ? `<span class="ramped">ramp</span>` : ""}</td>
+      <td class="n">${t.ramped
+        ? `${Math.abs(t.start)} <span class="arrow">&rarr;</span> <b>${Math.abs(t.end)}</b>`
+        : Math.abs(t.end)}</td>
+      <td class="why">${esc((t.note || "").split(". ")[0])}</td></tr>`).join("")}
+  </table>`;
+
+/* --- generic two and three column tables ----------------------------------- */
+const rowsOf = (heads, rows) => `
+  <table class="t">
+    <tr>${heads.map(h => `<th${h[1] ? ` class="${h[1]}"` : ""}>${esc(h[0])}</th>`).join("")}</tr>
+    ${rows.map(r => `<tr>${r.map(c =>
+      `<td class="${c[1] || ""}">${c[2] ? c[0] : esc(c[0])}</td>`).join("")}</tr>`).join("")}
+  </table>`;
+
+$("#sheet").innerHTML = `
+  <div class="head">
+    <h1>What ${esc(s.step)} left behind</h1>
+    <div class="sub">A step's runs are thrown away and so is its policy. This is
+      what survives: a configuration, and the things that turned out to be true.
+      Every number below is read from the code as this page loads &mdash; the
+      weights and ranges from <span class="k">gray/tasks/</span>, the bars from
+      <span class="k">scripts/verify.py</span>. Nothing here is a copy.</div>
+    <span class="chip ok verdict">closed ${esc(s.closed)}</span>
+    <span class="sub"> ${esc(s.verdict)}</span>
+    <div class="lede">${(s.lede || []).map(p => `<p>${esc(p)}</p>`).join("")}</div>
+  </div>
+
+  <div class="grid wide">
+    ${bars()}
+    ${blk("What we learned", (s.learned || []).length, rowsOf(
+      [["fact"], ["measured", "n"], ["how we know"]],
+      (s.learned || []).map(l => [[l.fact], [l.number, "n"], [l.why, "why"]])))}
+  </div>
+
+  <div class="grid">
+    ${blk("Reward &mdash; earns points", terms.filter(t => t.end > 0).length,
+      termTable(terms.filter(t => t.end > 0), true))}
+    ${blk("Reward &mdash; costs points", terms.filter(t => t.end < 0).length,
+      termTable(terms.filter(t => t.end < 0), false))}
+  </div>
+
+  <div class="grid">
+    ${blk("Tolerances", (s.tolerances || []).length, rowsOf(
+      [["term"], ["value", "n"], ["what it decides"]],
+      (s.tolerances || []).map(t => [
+        [t.term, "k"], [`${t.value} ${t.unit}`, "n"], [t.why, "why"]])))}
+    ${blk("What the policy reads", (s.observes || []).length,
+      `<table class="t"><tr><td class="chips">${
+        (s.observes || []).map(o => `<span>${esc(o.replace(/_/g, " "))}</span>`).join("")}
+        <div class="why" style="margin-top:5px">A saved policy is a fixed-size
+        mapping. Two runs whose lists differ cannot load each other's
+        checkpoints.</div></td></tr></table>`)}
+    ${blk("What it can be told to do", (s.commands || []).length, rowsOf(
+      [["command"], ["range", "n"]],
+      (s.commands || []).map(c => [[c.name], [`${c.range} ${c.unit}`, "n"]])))}
+    ${blk("How a run is set up", (s.training || []).length, rowsOf(
+      [["setting"], ["value", "n"], ["why"]],
+      (s.training || []).map(t => [[t.name], [t.value, "n"], [t.why, "why"]])))}
+  </div>
+
+  <div class="grid wide">
+    ${blk("Tried and rejected", (s.rejected || []).length, rowsOf(
+      [["what was tried"], ["result", "n"], ["verdict"]],
+      (s.rejected || []).map(r => [[r.what], [r.result, "n"], [r.verdict, "why"]])))}
+    ${blk("Rules that cost something to learn", (s.rules || []).length, rowsOf(
+      [["rule"], ["cost", "n"], ["what happened"]],
+      (s.rules || []).map(r => [[r.rule], [r.cost, "n"], [r.detail, "why"]])))}
+  </div>
+
+  <div class="grid">
+    ${blk("Curriculum ramps", (s.ramps || []).length, rowsOf(
+      [["term"], ["0", "n"], ["2400", "n"], ["6000", "n"], ["12000", "n"]],
+      (s.ramps || []).map(r => [[r.name, "k"],
+        ...r.stages.map(w => [String(w), "n"])])))}
+  </div>`;
+}).catch(e => fail(e, "#sheet"));
+</script>
+</body></html>

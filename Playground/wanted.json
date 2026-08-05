@@ -1,0 +1,62 @@
+[
+  {
+    "name": "speed up",
+    "does": "Step the walking speed up one notch, without moving the stick.",
+    "kind": "action",
+    "where": "r"
+  },
+  {
+    "name": "slow down",
+    "does": "Step the walking speed down one notch, without moving the stick.",
+    "kind": "action",
+    "where": "l"
+  },
+  {
+    "name": "e-stop",
+    "does": "Cut all twelve servos at once, in hardware, whatever the policy is asking for.",
+    "kind": "action",
+    "where": "home"
+  },
+  {
+    "name": "follow me",
+    "does": "Walk towards whoever is holding the controller and hold a set distance.",
+    "kind": "action",
+    "where": "key-1"
+  },
+  {
+    "name": "stairs",
+    "does": "Switch to the gait for going up and down steps.",
+    "kind": "action",
+    "where": "dpad-up"
+  },
+  {
+    "name": "rough ground",
+    "does": "Switch to the gait for uneven ground, where a foot can land anywhere.",
+    "kind": "action",
+    "where": "dpad-left"
+  },
+  {
+    "name": "look up and down",
+    "does": "Pitch the whole body to aim it up or down, with the feet staying put.",
+    "kind": "number",
+    "where": "right-stick-updown"
+  },
+  {
+    "name": "body height +",
+    "does": "rise up",
+    "kind": "action",
+    "where": "plus"
+  },
+  {
+    "name": "lower body-",
+    "does": "lower down",
+    "kind": "action",
+    "where": "minus"
+  },
+  {
+    "name": "arm/ disarm /get up gait",
+    "does": "opening getup policy",
+    "kind": "action",
+    "where": "capture"
+  }
+]

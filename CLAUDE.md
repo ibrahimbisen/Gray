@@ -1,56 +1,12 @@
 # CLAUDE.md
 
 ## How to talk to the user
+Always no matter what use ASD-STE100 Simplified Technical English (STE).
 
-# SHORT. CONCISE. SIMPLE.
+Load the `ste` skill at the start of every session, before you write the first reply. It
+holds the rules, the word substitutions, and the self-check.
 
-These rules override every other instinct. The user's time is the scarce resource.
-
-Every message must be **short**, **concise**, and **simple**.
-
-Before sending anything, check it three ways:
-
-1. Is it **SHORT**? Cut it in half. Then cut it again.
-2. Is it **CONCISE**? Every word must earn its place. Delete the rest.
-3. Is it **SIMPLE**? A person who has never seen this code must understand it first read.
-
-If a message fails any of the three, rewrite it. Do not send it.
-
-**Be extremely short.**
-
-- Answer in as few words as the answer allows.
-- No preamble. No recap of the question. No summary of what you just did unless asked.
-- Lead with the answer. Reasoning only if asked, or if it changes the decision.
-- One idea per sentence. Short sentences. Plain words.
-- Prefer 3 short lines over a paragraph. Never write a wall of text.
-- No tables or headings for a two-line answer.
-
-**Be extremely clear.**
-
-- No jargon. If a technical word is unavoidable, define it in five words in the same
-  sentence.
-- Say the thing directly. Do not hedge, qualify, or stack caveats.
-- Numbers over adjectives. "675 mm in 12 s", not "walks reasonably well".
-- If you are unsure, say "not sure" in those words and say what would settle it.
-
-**Never.**
-
-- No flattery. No "Great question", "You're absolutely right", "Excellent point".
-- No apologising or self-criticism. Fix it and move on.
-- No emoji unless the user uses them first.
-- No listing options you are not going to take.
-- No claiming something works when it was not run. If it failed, say it failed and paste
-  the error.
-
-**The user is a mechanical engineer, not a software person.**
-
-- Explain software concepts plainly and briefly.
-- Do not explain mechanical or CAD concepts. They know more than you do there.
-
-**Ask before.** Deleting files, force-pushing, rewriting history, or anything that touches
-`robot/` or `Overview/`.
-
-**The rule again, because it is the one that matters: SHORT. CONCISE. SIMPLE.**
+**The rule again, because it is the one that matters: always use ASD-STE100 Simplified Technical English (STE)**
 
 ---
 

@@ -10,8 +10,23 @@ None of them is a new skill and none needs its own policy. They are one control
 the command vector did not have. This adds it:
 
     height   how far off the ground to hold the trunk, in metres
-    pitch    nose down positive, nose up negative, in radians
+    pitch    nose down NEGATIVE, nose up positive, in radians
     roll     right side down positive, in radians
+
+These two lines said "nose down positive" until 5 Aug 2026 and the code has
+always done the opposite - `trunk_pitch_roll` below reads pitch as
+atan2(-g_x, down), and tipping the nose forward swings gravity toward +x, so
+nose down comes back negative. Measured in the sim to settle it: set the trunk
+to a known 10 deg nose-down and it reports -0.175 rad.
+
+The cost of the wrong comment was walk_env_cfg's POSE_PITCH, which was written
+to match it and therefore ran backwards for two days - commanding up to 15 deg
+of nose-down into 10 deg of available travel, and leaving 12 of the 20 deg of
+nose-up unasked for. It also left the average commanded pitch 3.4 deg nose-down,
+which is how it was eventually found: the owner noticed the robot walking with
+its nose down in the checkpoint films. Nothing measured it, because
+`error_pitch` is an absolute value and `upright` scores the lean the robot was
+TOLD to hold.
 
 RANGES ARE MEASURED, NOT CHOSEN. scripts/find_stance.py solves for the joint
 angles that keep every foot on its own print while the trunk moves, and reports
@@ -130,12 +145,16 @@ class PostureCommandCfg(CommandTermCfg):
     @dataclass
     class Ranges:
         height: tuple[float, float]
-        pitch: tuple[float, float]     # radians, nose down positive
+        pitch: tuple[float, float]     # radians, nose down NEGATIVE
         roll: tuple[float, float]      # radians, right side down positive
 
+    # These defaults carried the same swapped pitch signs as walk_env_cfg's
+    # POSE_PITCH until 5 Aug 2026. The walk task overrides all three, so the
+    # default was never what trained - but it is what anything that forgets to
+    # override would get, which is how a fixed bug comes back.
     ranges: Ranges = field(
         default_factory=lambda: PostureCommandCfg.Ranges(
-            height=(0.15, 0.25), pitch=(-0.26, 0.14), roll=(-0.35, 0.35)))
+            height=(0.15, 0.25), pitch=(-0.14, 0.26), roll=(-0.35, 0.35)))
 
     def build(self, env: ManagerBasedRlEnv) -> PostureCommand:
         return PostureCommand(self, env)

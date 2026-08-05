@@ -11,7 +11,7 @@
 <div class="segbar" id="mode"></div>
 <div class="app">
   <aside class="side"></aside>
-  <main class="main"></main>
+  <main></main>
 </div>
 
 <script src="/page.js"></script>
@@ -55,9 +55,14 @@ const COV_HEAD = COV.map(k =>
 get("/api/stage/2").then(s => {
 mountNav("/train", navState(s.nav));
 
-const runs = s.subsections.filter(x => x.kind === "run");
+/* Everything read straight off the payload is defaulted HERE, once. The section
+   list below runs before any renderer does, so a field missing from the payload
+   used to throw before `paper()` was ever called - and the page died into
+   "Could not load" with no clue which field it was. Each renderer already
+   guards; this line is what the list itself needs. */
+const runs = (s.subsections || []).filter(x => x.kind === "run");
 const rt = s.run_totals || {};
-const blockedTotal = s.needs.reduce((a, n) => a + n.count, 0);
+const blockedTotal = (s.needs || []).reduce((a, n) => a + (n.count || 0), 0);
 
 /* ---------------------------------------------------------------- lead --- */
 /* The lead thins with the dial too. Six tiles is the right number when you are
@@ -327,9 +332,16 @@ const measured = () => {
         be recovered from the path it walked. The average obeys. The individual
         does not.</p>
       <div class="risk small"><b>This is the drift bar, seen directly.</b> The bar
-        is 100 mm of sideways error over 5 m. A 4&deg; heading error is already
-        350 mm. The failure is not that the robot cannot steer &mdash; it is that
-        it does not steer the same way twice.</div>
+        is 4&deg; off the line it was sent along. The failure was not that the
+        robot could not steer &mdash; it was that it did not steer the same way
+        twice, and nothing in its 48 inputs told it which way it was pointing.
+        <code>off_line</code> answers that now, since 4 Aug 2026, and the
+        observation is 49 wide. A second input, <code>off_track</code> &mdash;
+        how far off the line it has ENDED UP rather than which way it points
+        &mdash; was tried on 5 Aug and is off by default: it made crab drift and
+        turn rate both worse, and unbounded it nearly stopped the robot walking.
+        The reasoning behind it still stands, so the code is kept and
+        <code>--with-off-track</code> puts it back.</div>
     </div>
   </div>
   <div class="note key small" style="margin-top:14px"><b>Source:</b>
@@ -646,14 +658,14 @@ const SECTIONS = [
   { id: "box",       label: "The box it is sampled over", count: ((s.sampling || {}).axes || []).length,
     html: theBox },
   { id: "measured",  label: "What it actually did when told",
-    count: (s.driven.cases || []).length, html: measured },
+    count: ((s.driven || {}).cases || []).length, html: measured },
   { id: "blocked",   label: "What no reward reaches", count: blockedTotal, html: unreachable },
-  { id: "sensors",   label: "What would unblock it", count: (s.sensors.sensors || []).length,
+  { id: "sensors",   label: "What would unblock it", count: ((s.sensors || {}).sensors || []).length,
     html: sensorsSection },
-  { id: "kinds",     label: "The five kinds", count: s.kinds.length, html: kinds },
-  { id: "bars",      label: "Pass bars", count: s.subsections.length, html: bars },
+  { id: "kinds",     label: "The five kinds", count: (s.kinds || []).length, html: kinds },
+  { id: "bars",      label: "Pass bars", count: (s.subsections || []).length, html: bars },
   { id: "every",     label: "Every skill", count: s.total, html: every },
-  { id: "calls",     label: "What was collapsed", count: s.collapsed.length, html: calls },
+  { id: "calls",     label: "What was collapsed", count: (s.collapsed || []).length, html: calls },
   { id: "method",    label: "How it was sorted", html: method },
 ];
 

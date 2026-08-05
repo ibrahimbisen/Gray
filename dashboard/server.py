@@ -2,19 +2,19 @@
 
     python run.py
 
-Six pages, each answering exactly one question:
+Each page answers exactly one question. **The list of them lives in page.js**,
+in `PAGES`, and nothing restates it: page.js draws the bar, nav_pages() below
+reads that same array to print the startup banner, and this docstring names no
+page at all.
 
-    /           Control   what is happening right now
-    /runs       Runs      how did that run go
-    /plan       Plan      what we are doing next, and why
-    /train      Train     what it is being taught
-    /robot      Robot     is the physical model right - the pose editor is here
-    /summary    Summary   how the whole thing works
+That is deliberate. This docstring used to name six, the banner printed seven,
+and the bar drew eight. Three lists, one of them wrong at any moment, and the
+only one a person could see was the bar.
 
-There used to be eight, and the trouble was never the count. The run table was on
-two of them, built by two different bits of code. The plan was on four of them,
-and they showed four DIFFERENT plans. /index and /index.html served different
-pages. The pose editor had no way back to anything.
+The trouble was never the count. The run table was on two pages, built by two
+different bits of code. The plan was on four, and they showed four DIFFERENT
+plans. /index and /index.html served different pages. The pose editor had no way
+back to anything.
 
 Everything they show comes from three places, none of which this file invents:
 dashboard/plan.py for the plan, dashboard/runs.py for what training wrote to disk,
@@ -29,8 +29,10 @@ import http.server
 import json
 import mimetypes
 import os
+import re
 import socketserver
 import sys
+import threading
 import webbrowser
 from pathlib import Path
 from urllib.parse import parse_qs, unquote
@@ -38,21 +40,39 @@ from urllib.parse import parse_qs, unquote
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from dashboard import plan, progress, queue, runs, skills  # noqa: E402
+from dashboard import controls, live, plan, progress, queue, runs, skills  # noqa: E402
 from tools import check_urdf  # noqa: E402
 
 # Modules whose contents the pages are built from. The HTML is re-read on every
 # request, but these are imported once at startup - so editing a reward
 # description or a status rule and seeing no change on the page is a trap that
 # looks like a bug in the page. Reload them when the file on disk moves.
-_WATCHED = (skills, plan, runs, queue, progress)
+_WATCHED = (skills, plan, runs, queue, progress, live, controls)
+
+# poser is imported lazily - it pulls in numpy and holds the MuJoCo model - so it
+# cannot be named above. It is watched by module name instead, and appears here
+# only once the pose editor has been opened. Without this, editing poser.py did
+# nothing until the whole dashboard was restarted, and the two save functions
+# that used to delete half of robot.yaml went on deleting it after the fix.
+_WATCHED_LAZY = ("dashboard.poser",)
 _MTIMES: dict[str, float] = {}
+# The server answers requests on several threads, and importlib.reload() rebuilds
+# a module's namespace in place. Two threads reloading the same module at once
+# can hand a third thread a half-built one, which fails as a missing attribute
+# somewhere far away from here.
+_RELOAD_LOCK = threading.Lock()
 
 
 def _reload_if_edited() -> None:
+    with _RELOAD_LOCK:
+        _reload_now()
+
+
+def _reload_now() -> None:
     import importlib  # noqa: PLC0415
 
-    for module in _WATCHED:
+    lazy = [m for m in (sys.modules.get(n) for n in _WATCHED_LAZY) if m is not None]
+    for module in (*_WATCHED, *lazy):
         path = Path(module.__file__)
         try:
             stamp = path.stat().st_mtime
@@ -65,6 +85,25 @@ def _reload_if_edited() -> None:
 HERE = Path(__file__).resolve().parent
 URDF = ROOT / "sim" / "models" / "gray.urdf"
 MEDIA = ROOT / "progress"
+
+
+# A query string is typed by whoever is holding the address bar, so nothing in
+# one is known to be a number or to be JSON. These two say what to fall back to
+# instead of raising, because a 500 here reaches a fetch that has nowhere to put
+# the error - the pose editor just stops redrawing and says nothing.
+def _num(query: dict, key: str, fallback: float) -> float:
+    try:
+        return float(query.get(key, [fallback])[0])
+    except (TypeError, ValueError, IndexError):
+        return fallback
+
+
+def _obj(query: dict, key: str) -> dict:
+    try:
+        got = json.loads(query.get(key, ["{}"])[0])
+    except (TypeError, ValueError, IndexError):
+        return {}
+    return got if isinstance(got, dict) else {}
 
 
 def model_status() -> dict:
@@ -275,6 +314,17 @@ def monitor_state() -> dict:
     }
 
 
+def live_state() -> dict:
+    """The Control page's poll: the run in front of you, distilled.
+
+    Unlike /api/monitor this DOES carry metric rows - but only for one run and
+    thinned to 240 points, which is about 40 KB. The monitor's 1.6 MB problem was
+    every row of every run; one run's thinned curve is what the page is for.
+    """
+    _reload_if_edited()
+    return {**live.live_state(), "nav": nav_state()}
+
+
 def overview_state() -> dict:
     """The project against its bars. Reuses one walk of progress/runs/.
 
@@ -311,8 +361,21 @@ def overview_state() -> dict:
 
 
 def run_detail(run_id: str, points: int = 0) -> dict | None:
+    """One run in full, with the on-track card's numbers attached.
+
+    The card is composed HERE rather than inside runs.detail() because live.py
+    imports runs.py, so runs.py cannot import live.py back. This file already has
+    both, and it is the only place that needs them together.
+
+    It rides on this endpoint rather than getting its own so the Runs page keeps
+    making one request per poll: it is already fetching the detail, and the card
+    is built from the rows that request has just read off disk.
+    """
     _reload_if_edited()
-    return runs.detail(run_id, points=points)
+    run = runs.detail(run_id, points=points)
+    if run is not None:
+        run["readout"] = live.readout(run)
+    return run
 
 
 def compare_state(run_ids: list[str], metric: str) -> dict:
@@ -322,6 +385,44 @@ def compare_state(run_ids: list[str], metric: str) -> dict:
         "available": runs.metrics_available(),
         "series": runs.series(run_ids, metric),
     }
+
+
+def dials_state() -> dict:
+    """Every dial in use, and its range, read out of gray/tasks/."""
+    return {**plan.dials(), "nav": nav_state()}
+
+
+def controls_state() -> dict:
+    """What each pad control does, and what is still free."""
+    return {**controls.read(), "nav": nav_state()}
+
+
+def carry_state() -> dict:
+    """What a finished step left behind.
+
+    The prose half is plan.CARRY; every number is read off gray/tasks/ and
+    scripts/verify.py as this is called, plus the bars and the runs that met them.
+
+    These three lived inside do_GET as expression bodies. They are functions so
+    that tools/api_contract_check.py can call them - a payload that only exists
+    inside a request handler is a payload nothing can check.
+    """
+    state = plan.carry_over()
+    # carry.html calls navState(s.nav) like every other page, and this payload
+    # was the one that never sent it - so the top bar on /carry showed the plan
+    # step and the training run as an empty space. Found by the contract check.
+    state["nav"] = nav_state()
+    state["bars"] = progress.current_bars("Gray-Walk")
+    summaries = runs.all_summaries()
+    finals = [r for r in summaries
+              if str(r.get("variant") or r.get("name") or "").startswith(
+                  ("r5a_", "r5b_", "r5c_"))]
+    state["closing_runs"] = [
+        {"name": r.get("variant") or r.get("name"), "id": r.get("id"),
+         "seed": r.get("seed"), "verdict": r.get("verdict"),
+         "checks": r.get("verdict_checks") or []}
+        for r in sorted(finals, key=lambda r: r.get("started") or "")]
+    return state
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -338,8 +439,18 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         """
         try:
             super().handle_one_request()
-        except (ConnectionResetError, BrokenPipeError):
-            self.close_connection = True        # the browser went away; normal
+        except ConnectionError:
+            # The browser went away mid-response. Normal, and it happens on every
+            # single page change while a poll is in flight.
+            #
+            # This caught ConnectionResetError and BrokenPipeError by name, and
+            # Windows raises neither: it raises ConnectionAbortedError, WinError
+            # 10053. So clicking from one page to the next printed a fifteen-line
+            # traceback, three of them at once when all three polls were open, and
+            # a real fault scrolled past in the noise. All three are subclasses of
+            # ConnectionError; catching the base class covers both platforms and
+            # anything else the socket layer decides to raise.
+            self.close_connection = True
         except Exception as exc:  # noqa: BLE001
             import traceback  # noqa: PLC0415
 
@@ -409,6 +520,30 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             except Exception as exc:  # noqa: BLE001
                 return self._json({"error": f"{type(exc).__name__}: {exc}"})
 
+        if path == "/api/controls" or path.startswith("/api/controls/"):
+            _reload_if_edited()
+            do = {"/api/controls": controls.save,
+                  "/api/controls/button": controls.set_button,
+                  "/api/controls/wanted/add": controls.add_wanted,
+                  "/api/controls/wanted/where": controls.set_where,
+                  "/api/controls/wanted/remove": controls.remove_wanted}.get(path)
+            if do is None:
+                return self.send_error(404)
+            try:
+                saved = do(body)
+            except ValueError as exc:
+                # controls.py raises ValueError for everything it refuses on
+                # purpose, and the message is already written for the reader.
+                return self._json({"error": str(exc)})
+            except Exception as exc:  # noqa: BLE001
+                # Anything else is a bug in here, not a bad request. Say which,
+                # because "too many values to unpack" popping up over a button
+                # map reads as the map being wrong.
+                return self._json({"error": f"Bug in the dashboard, not in what "
+                                            f"you asked for - nothing was saved. "
+                                            f"{type(exc).__name__}: {exc}"})
+            return self._json({**saved, "nav": nav_state()})
+
         if path not in ("/api/pose/limits", "/api/pose/directions"):
             return self.send_error(404)
         from dashboard import poser  # noqa: PLC0415
@@ -434,16 +569,32 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if path == "/api/pose/config":
             from dashboard import poser  # noqa: PLC0415
             return self._send(json.dumps(poser.defaults()).encode(), "application/json")
+        if path == "/api/robot/frame":
+            # The hero on /robot: the standing robot with its own axes drawn on
+            # it. Cached in poser, so this is a dictionary lookup after the first
+            # call rather than a render.
+            import base64  # noqa: PLC0415
+
+            from dashboard import poser  # noqa: PLC0415
+            png, overlay = poser.frame_hero_cached()
+            return self._send(json.dumps({
+                **overlay, "png": base64.b64encode(png).decode(),
+            }).encode(), "application/json")
         if path == "/api/pose":
             import base64  # noqa: PLC0415
 
             from dashboard import poser  # noqa: PLC0415
+
+            # Every one of these came off a query string, so every one of them
+            # can be rubbish. They used to go straight into float() and
+            # json.loads(), and a single bad character answered with a 500 that
+            # the pose editor has no .catch for - the render simply froze.
             png, facts = poser.pose_report(
-                json.loads(query.get("angles", ["{}"])[0]),
-                azimuth=float(query.get("az", [125])[0]),
-                elevation=float(query.get("el", [-12])[0]),
-                distance=float(query.get("dist", [1.05])[0]),
-                invert=json.loads(query.get("invert", ["{}"])[0]),
+                _obj(query, "angles"),
+                azimuth=_num(query, "az", 125.0),
+                elevation=_num(query, "el", -12.0),
+                distance=_num(query, "dist", 1.05),
+                invert=_obj(query, "invert"),
             )
             return self._send(json.dumps({
                 "png": base64.b64encode(png).decode(), "facts": facts,
@@ -455,8 +606,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._send(json.dumps(summary_state()).encode(), "application/json")
         if path == "/api/overview":
             return self._send(json.dumps(overview_state()).encode(), "application/json")
+        if path == "/api/live":
+            return self._send(json.dumps(live_state()).encode(), "application/json")
         if path == "/api/week":
             return self._send(json.dumps(week_state()).encode(), "application/json")
+        if path == "/api/carry":
+            _reload_if_edited()
+            return self._send(json.dumps(carry_state()).encode(), "application/json")
         if path == "/api/queue":
             _reload_if_edited()
             return self._send(json.dumps(queue.load()).encode(), "application/json")
@@ -464,7 +620,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             # points= thins the curve for drawing. 0 means every sample, which is
             # what the table twin needs - a value must never be reachable only by
             # hovering a chart.
-            pts = int(query.get("points", ["0"])[0] or 0)
+            pts = int(_num(query, "points", 0.0))
             state = run_detail(unquote(path[len("/api/run/"):]), points=pts)
             if state is None:
                 return self.send_error(404)
@@ -487,8 +643,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 json.dumps({"text": text[-40000:]}).encode(), "application/json")
         if path == "/api/dials":
             _reload_if_edited()
-            return self._send(json.dumps({**plan.dials(), "nav": nav_state()}).encode(),
-                              "application/json")
+            return self._send(json.dumps(dials_state()).encode(), "application/json")
+        if path == "/api/controls":
+            _reload_if_edited()
+            return self._send(json.dumps(controls_state()).encode(), "application/json")
         if path.startswith("/api/stage/"):
             try:
                 state = stage_state(int(path.rsplit("/", 1)[1]))
@@ -513,7 +671,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         # and /index vs /index.html served two DIFFERENT pages, which is the kind
         # of thing that is only ever discovered by accident.
         if path == "/":
-            return self._send((HERE / "control.html").read_bytes(),
+            return self._send((HERE / "now.html").read_bytes(),
                               "text/html; charset=utf-8")
 
         # Any page in dashboard/ by its own name: /train serves train.html,
@@ -590,6 +748,44 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         pass
 
 
+class _Server(socketserver.ThreadingTCPServer):
+    """One thread per request.
+
+    It was one request at a time, and three things routinely take seconds: the
+    first plan.rewards() (torch, five to six seconds), a MuJoCo pose render, and
+    a range read out of a 40 MB film. While any of those ran, EVERY page hung -
+    including the five-second status poll, so the dashboard looked dead at
+    exactly the moments it was working hardest.
+
+    What this is safe against, and why. The queue is written under a lock file
+    with an atomic replace, so two edits cannot interleave (see queue._Lock).
+    The MuJoCo model has its own lock in poser, so two renders serialise. Module
+    reloads take _RELOAD_LOCK above. The caches in plan and runs are plain dicts:
+    two threads may compute the same value twice, which wastes work and changes
+    no answer.
+
+    daemon_threads, so Ctrl-C does not wait for a browser holding a video open.
+    """
+
+    daemon_threads = True
+
+
+def nav_pages() -> list[tuple[str, str, str]]:
+    """The nav bar, read out of page.js. (href, label, what it answers).
+
+    Parsed rather than restated. page.js draws the bar on every page, so it is
+    the only list that can be wrong, and a second copy in Python is a second
+    thing to forget - which is how the banner came to name seven pages while the
+    bar drew eight.
+    """
+    text = (HERE / "page.js").read_text(encoding="utf-8")
+    block = re.search(r"const PAGES\s*=\s*\[(.*?)\];", text, re.S)
+    if not block:
+        return []
+    return re.findall(r'\[\s*"([^"]*)"\s*,\s*"([^"]*)"\s*,\s*"([^"]*)"\s*\]',
+                      block.group(1))
+
+
 def serve(port: int = 8000, open_browser: bool = True) -> None:
     # SO_REUSEADDR means two different things on the two platforms, and on this
     # one it is a trap. On Linux it only lets a restarted server re-bind a port
@@ -603,9 +799,9 @@ def serve(port: int = 8000, open_browser: bool = True) -> None:
     # from before half this file existed. Nothing in the terminal said so.
     #
     # So: only on POSIX, where it means what it is supposed to mean.
-    socketserver.TCPServer.allow_reuse_address = os.name != "nt"
+    _Server.allow_reuse_address = os.name != "nt"
     try:
-        httpd = socketserver.TCPServer(("127.0.0.1", port), Handler)
+        httpd = _Server(("127.0.0.1", port), Handler)
     except OSError as exc:
         print(f"Could not listen on port {port}: {exc}")
         print()
@@ -617,20 +813,34 @@ def serve(port: int = 8000, open_browser: bool = True) -> None:
 
     with httpd:
         url = f"http://127.0.0.1:{port}/"
-        # Six pages, each answering one question. Printed in nav order, so the
-        # terminal and the top bar agree.
-        print(f"Control  {url}           what is happening right now")
-        print(f"Runs     {url}runs       how did that run go")
-        print(f"Plan     {url}plan       what we are doing next, and why")
-        print(f"Train    {url}train      what it is being taught")
-        print(f"Robot    {url}robot      is the physical model right (pose editor here)")
-        print(f"Summary  {url}summary    how the whole thing works")
+        # Printed from page.js's own list, so the terminal and the top bar cannot
+        # disagree. They did: this banner named seven pages, the nav bar drew
+        # eight, and the docstring at the top of this file said six.
+        for href, label, question in nav_pages():
+            print(f"{label:<11}{url}{href.lstrip('/'):<11}{question}")
         print("Ctrl-C to stop.")
+
+        # Warm the one slow read, off the request path. plan.rewards() imports
+        # torch and builds three env configs - five to six seconds - and whoever
+        # opened /summary first used to pay all of it. It is cached afterwards.
+        threading.Thread(target=plan.rewards, daemon=True,
+                         name="warm-rewards").start()
+
         if open_browser:
             webbrowser.open(url)
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
+            pass
+        finally:
+            # Hand the OpenGL context back on the thread that owns it. Without
+            # this the renderer is destroyed from the main thread during
+            # interpreter shutdown and the process dies with an access violation
+            # AFTER saying it stopped. Imported the same lazy way as everywhere
+            # else, and a no-op if nothing was ever rendered.
+            from dashboard import poser  # noqa: PLC0415
+
+            poser.shutdown()
             print("\nStopped.")
 
 

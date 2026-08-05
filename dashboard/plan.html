@@ -24,6 +24,34 @@
 
 /* The gate is the whole point of a step, so it gets a border of its own rather
    than being one more line of prose. Green edge = a number you can pass. */
+/* The goal is what the step is FOR; `produces` is what it leaves behind once
+   its runs are finished and its policy has been thrown away. Those artifacts -
+   the observation list, the weights, the bars, the noise floor - are what the
+   next step is built on, and they were only ever recoverable by reading this
+   file. The gate says when a step is done; these say what it was worth. */
+.goal { margin:0 0 8px; font-size:13px; max-width:72ch; }
+/* The link to what a finished step produced. Deliberately a block rather than a
+   pill in the toolbar: it is the whole output of a step, it only exists for
+   steps that are DONE, and it belongs beside that step rather than in a global
+   nav where it would sit there being wrong for every step that has not closed
+   yet. Sized so it reads as a destination, not a footnote. */
+.carry { display:flex; align-items:center; gap:14px; text-decoration:none;
+  border:1px solid var(--line); border-left:3px solid var(--good);
+  border-radius:9px; padding:11px 14px; margin:0 0 10px; max-width:72ch;
+  background:var(--surface); color:var(--ink); transition:border-color .12s; }
+.carry:hover { border-color:var(--good); }
+.carry b { font-size:14px; font-weight:650; white-space:nowrap; }
+.carry span { font-size:11.5px; color:var(--ink2); line-height:1.4; }
+.carry i { margin-left:auto; font-style:normal; font-size:17px; color:var(--good); }
+@media (max-width:620px){ .carry { flex-wrap:wrap; gap:4px; } .carry i { display:none; } }
+/* Two lines per numbered item: what it is FOR, and what it leaves behind. The
+   gate says when a step is finished; these say what it was worth. Kept to one
+   sentence each on purpose - a paragraph here is a paragraph nobody reads. */
+.io { display:block; margin:3px 0 0; max-width:66ch; }
+.io span { display:block; font-size:12px; color:var(--muted); }
+.io b { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10px;
+  letter-spacing:.06em; text-transform:uppercase; color:var(--s1);
+  margin-right:5px; }
 .gate { border:1px solid var(--line); border-left:3px solid var(--good);
   border-radius:9px; padding:10px 13px; margin:0 0 12px; background:var(--surface); }
 .gate.none { border-left-color:var(--muted); }
@@ -51,7 +79,7 @@
 <div id="nav"></div>
 <div class="app">
   <aside class="side"></aside>
-  <main class="main"></main>
+  <main></main>
 </div>
 
 <script src="/page.js"></script>
@@ -67,10 +95,62 @@ const HERE = F.here || "";
 const itemClass = (it) =>
   it.state === "done" ? "done" : (it.id === HERE || it.state === "now") ? "now" : "";
 
+/* A finished substep folds away. The page is nine substeps long and eight of
+   them are history - 1.1 and 1.2 together are most of its height, and every one
+   of their items reads "done". Scrolling past them to reach the one substep the
+   project is actually on is the page failing at its own job.
+   OPEN IS DECIDED BY `here`, not by a state field, so the fold can never
+   disagree with the "where we are" chip beside it. */
+/* The batch plan for a substep: what each batch changes, how many runs it is,
+   what it asks, and WHERE YOU HAVE TO STOP AND DECIDE. The stop rows are the
+   point of the table. A plan that lists only the work reads as if it runs
+   itself, and this one does not - it has nine places where somebody has to look
+   at a number and choose. Batches with no stop row after them run straight on,
+   because what they do is already settled by the batch before. */
+const batchTable = (sub) => {
+  const rows = sub.batches || [];
+  if (!rows.length) return "";
+  const stops = rows.filter(r => r.stop).length;
+  return `<div class="note" style="margin-top:12px">
+    <div class="lbl">The batches &mdash; ${rows.filter(r => !r.stop).length}
+      of them, and ${stops} places you decide</div>
+    <div class="wrapx"><table class="t" style="margin-top:6px">
+      <tr><th></th><th>stage</th><th>what the code does</th>
+          <th class="n">runs</th><th>asks</th></tr>
+      ${rows.map(r => r.stop
+        ? `<tr style="background:var(--surface2)"><td></td>
+             <td colspan="4"><b>&larr; you decide</b>
+               <span class="why"> &nbsp;${esc(r.stop)}</span></td></tr>`
+        : `<tr><td class="k">${esc(r.n || "")}</td><td class="k">${esc(r.stage || "")}</td>
+             <td class="why">${esc(r.code || "")}</td>
+             <td class="n">${esc(r.runs || "")}</td>
+             <td class="why">${esc(r.asks || "")}</td></tr>`).join("")}
+    </table></div>
+    ${sub.batches_note ? `<p class="why small" style="margin:8px 0 0;max-width:78ch">${
+      esc(sub.batches_note)}</p>` : ""}
+  </div>`;
+};
+
+const isOpen = (sub) => (sub.items || []).some(it => it.id === HERE)
+  || (sub.items || []).some(it => it.state === "now");
+
+const doneCount = (sub) =>
+  (sub.items || []).filter(it => it.state === "done").length;
+
 const subBlock = (sub) => `
-  <div style="margin-bottom:18px">
-    <h3 style="font-size:14px;margin:0 0 6px">
+  <details style="margin-bottom:18px" ${isOpen(sub) ? "open" : ""}>
+    <summary style="cursor:pointer;list-style:none">
+    <h3 style="font-size:14px;margin:0 0 6px;display:inline">
       <span class="tag mono" style="color:var(--s1)">${esc(sub.id)}</span>${esc(sub.name)}</h3>
+    ${!isOpen(sub) ? `<span class="chip ok" style="margin-left:8px">${
+      doneCount(sub)}/${(sub.items || []).length} done</span>` : ""}
+    </summary>
+    ${sub.goal ? `<p class="goal">${esc(sub.goal)}</p>` : ""}
+    ${sub.carry ? `<a class="carry" href="${esc(sub.carry)}">
+       <b>What ${esc(sub.id)} left behind</b>
+       <span>the settings it produced, and what turned out to be true &mdash;
+         reward weights, tolerances, inputs, and every experiment that failed</span>
+       <i>&rarr;</i></a>` : ""}
     ${sub.gate
       ? `<div class="gate"><div class="lbl">Gate</div><p>${esc(sub.gate)}</p></div>`
       : `<div class="gate none"><div class="lbl">No gate</div>
@@ -78,11 +158,16 @@ const subBlock = (sub) => `
     <ul class="items">
       ${(sub.items || []).map(it => `<li class="${itemClass(it)}">
         <span><span class="tag">${esc(it.id)}</span>${esc(it.what)}${
-          it.id === HERE ? ` &nbsp;<span class="chip now">where we are</span>` : ""}</span>
+          it.id === HERE ? ` &nbsp;<span class="chip now">where we are</span>` : ""}
+          ${it.goal || it.gets ? `<span class="io">
+            ${it.goal ? `<span><b>Goal</b> ${esc(it.goal)}</span>` : ""}
+            ${it.gets ? `<span><b>Gets</b> ${esc(it.gets)}</span>` : ""}
+          </span>` : ""}</span>
       </li>`).join("")}
     </ul>
     ${sub.why ? `<p class="why small" style="max-width:72ch;margin:0">${esc(sub.why)}</p>` : ""}
-  </div>`;
+    ${batchTable(sub)}
+  </details>`;
 
 const stepBlock = (p) => `
   <div class="step ${p.state === "now" ? "now" : ""}">

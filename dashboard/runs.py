@@ -88,6 +88,20 @@ def _read_metrics(path: Path) -> tuple[list[str], list[dict]]:
     return cols, clean
 
 
+def _iterations_done(latest: dict, rows: list) -> int:
+    """How far the run got, from its last metrics row. The row count if it cannot say.
+
+    `iteration` comes straight out of metrics.csv, and _read_metrics above turns
+    a NaN into None and keeps an unparseable cell as a string. int() raises on
+    both. all_summaries() is called by nav_state(), which every endpoint calls,
+    so one torn last row in one run's csv answered EVERY request with a 500.
+    """
+    try:
+        return int(float(latest["iteration"]))
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return len(rows)
+
+
 def _newest_mtime(folder: Path) -> float:
     """When anything in this run was last written, 0.0 if nothing could be read.
 
@@ -161,7 +175,7 @@ def read_run(folder: Path) -> dict:
 
     latest = rows[-1] if rows else {}
     target = meta.get("iterations_target") or 0
-    done = int(latest.get("iteration", len(rows)))
+    done = _iterations_done(latest, rows)
 
     # A run that says it is running but has not written for a while was killed
     # without getting the chance to say so.
@@ -214,6 +228,24 @@ def read_run(folder: Path) -> dict:
         # than read from the task, so an old run still says what IT was scored on
         # after the rewards have been changed.
         "scoring": meta.get("scoring", []),
+        # The three things `scoring` alone cannot say, all recorded by train.py
+        # and none of them reaching a page until 4 Aug 2026:
+        #
+        #   ramps       a curriculum term's weight CLIMBS. `scoring` holds its
+        #               stage-0 value, so the page showed twitching at -0.05
+        #               while the run trained it to -0.25, and veering at -0.2
+        #               against the -2.0 it reached by iteration 500. A weight
+        #               five times weaker than the real one, printed as fact.
+        #   tolerances  the std inside a term decides what it MEANS, not what it
+        #               is worth. track_turn at std 0.80 scored a 0.018 rad/s
+        #               bias at 99.95% of full marks - invisible in a weights
+        #               table, and the whole of round 0's straightness failure.
+        #   observes    which inputs the policy read. It decides whether a
+        #               checkpoint can even be loaded, and it changed twice in
+        #               two days.
+        "ramps": meta.get("ramps", []),
+        "tolerances": meta.get("tolerances", {}),
+        "observes": meta.get("observes", []),
     }
 
 
@@ -297,7 +329,7 @@ def all_summaries() -> list[dict]:
         cols, rows = _metrics_cached(p / "metrics.csv")
         latest = rows[-1] if rows else {}
         target = meta.get("iterations_target") or 0
-        done = int(latest.get("iteration", len(rows)))
+        done = _iterations_done(latest, rows)
         status = {"done": "finished", "stopped": "cancelled"}.get(
             meta.get("status", "unknown"), meta.get("status", "unknown"))
         if status == "running":
@@ -331,6 +363,11 @@ def all_summaries() -> list[dict]:
             "duration": _duration(meta.get("started"), meta.get("finished")),
             "iterations_done": done,
             "iterations_target": target,
+        # Which draw of the dice this run got. In the summary as well as the
+        # detail because "is that difference real or is it the seed" is asked of
+        # a LIST of runs, and re-reading every run.json to answer it is what the
+        # summary exists to avoid.
+        "seed": meta.get("seed"),
         "num_envs": meta.get("num_envs"),
         "num_steps_per_env": meta.get("num_steps_per_env"),
             "progress": (done / target) if target else 0.0,

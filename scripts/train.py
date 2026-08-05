@@ -355,6 +355,47 @@ def main() -> int:
                          "--ramp veering=-0.4,-1.0,-2.4,-4.0. One weight per "
                          "stage. Needed because a curriculum re-applies its own "
                          "weight, so --reward on a ramped term is a silent no-op.")
+    ap.add_argument("--turn-std", type=float, default=0.0, metavar="RAD_PER_S",
+                    help="how sharply `track_turn` scores yaw rate. 0 keeps the "
+                         "task's own (0.80). This is a tolerance, not a weight, "
+                         "so --reward cannot reach it: the term pays "
+                         "exp(-err^2/std^2), and at std 0.80 the 0.018 rad/s "
+                         "bias that produced round 0's whole straightness "
+                         "failure still collected 99.95%% of full marks. Try "
+                         "0.15.")
+    ap.add_argument("--upright-std", type=float, default=0.0, metavar="RAD",
+                    help="how sharply `upright` scores trunk tilt. 0 keeps the "
+                         "task's own (0.45 rad, which is 26 DEGREES). Measured "
+                         "on r1a: the robot holds 2.9 deg of tilt, and at std "
+                         "0.45 holding perfectly level instead would earn it "
+                         "0.8%% of one term. Try 0.15.")
+    ap.add_argument("--gyro-noise", type=float, nargs=2, default=None,
+                    metavar=("BIAS", "WALK"),
+                    help="how wrong the heading the policy READS may be, in "
+                         "radians: a per-episode offset, and a wander in rad per "
+                         "root-second. Defaults 0.009 and 0.008, about half a "
+                         "degree and 2 deg over a 20 s episode. '0 0' hands the "
+                         "policy a perfect heading, which is the setting that "
+                         "does not survive contact with a real gyro.")
+    ap.add_argument("--no-heading-obs", action="store_true",
+                    help="train BLIND to which way it is off the line - the 48-"
+                         "input policy every run before 4 Aug 2026 used. Here so "
+                         "the heading input can be measured against its own "
+                         "absence rather than against a run that also differs in "
+                         "iterations and robot count.")
+    ap.add_argument("--crab-share", type=float, default=None,
+                    help="the share of commands drawn as a PURE sideways step, "
+                         "0 to 1. The task uses 0.15. It is here because it "
+                         "turned out to cost turn accuracy, so it has to be "
+                         "variable to be measured - 0 switches it off entirely "
+                         "and gives the draw mix as it was before 5 Aug 2026.")
+    ap.add_argument("--with-off-track", action="store_true",
+                    help="ADD the cross-track input, making the observation 50 "
+                         "wide instead of 49. Off by default because it lost "
+                         "ground on every criterion it was meant to help - see "
+                         "off_track_obs in gray/tasks/walk_env_cfg.py. Kept "
+                         "because the reasoning behind it is still the best "
+                         "account of why crab drift is hard.")
     args = ap.parse_args()
 
     import gray.tasks  # noqa: F401  - registers the tasks
@@ -393,6 +434,61 @@ def main() -> int:
     ramped = {c.params["reward_name"]: c
               for c in (cfg.env.curriculum or {}).values()
               if c.params.get("reward_name")}
+
+    # Tolerances, not weights. These live in a term's `params`, so --reward and
+    # --ramp cannot touch them, and until 4 Aug 2026 nothing could - which is how
+    # TURN_STD sat at a value that priced the whole straightness failure at five
+    # parts in ten thousand for as long as it did.
+    if args.turn_std:
+        turn = cfg.env.rewards.get("track_turn")
+        if turn is None:
+            raise SystemExit(f"{args.task} has no 'track_turn' term to sharpen")
+        was = turn.params["std"]
+        turn.params["std"] = args.turn_std
+        print(f"tolerance     track_turn std: {was} -> {args.turn_std} rad/s")
+    if args.upright_std:
+        up = cfg.env.rewards.get("upright")
+        if up is None:
+            raise SystemExit(f"{args.task} has no 'upright' term to sharpen")
+        was = up.params["std"]
+        up.params["std"] = args.upright_std
+        print(f"tolerance     upright std: {was} -> {args.upright_std} rad "
+              f"({args.upright_std * 57.3:.0f} deg)")
+    if args.no_heading_obs:
+        gone = [g for g in ("actor", "critic")
+                if cfg.env.observations[g].terms.pop("off_line", None) is not None]
+        if not gone:
+            raise SystemExit("this task has no 'off_line' observation to remove")
+        print(f"observation   off_line removed from {', '.join(gone)} - "
+              f"the policy trains blind to its heading error")
+    if args.crab_share is not None:
+        walk_cmd = cfg.env.commands.get("walk")
+        if walk_cmd is None or not hasattr(walk_cmd, "rel_crab_envs"):
+            raise SystemExit(f"{args.task} has no crab share to set")
+        was = walk_cmd.rel_crab_envs
+        walk_cmd.rel_crab_envs = args.crab_share
+        print(f"command mix   pure sideways share: {was} -> {args.crab_share}")
+    if args.with_off_track:
+        from mjlab.managers import ObservationTermCfg  # noqa: PLC0415
+
+        from gray.tasks.walk_env_cfg import off_track_obs  # noqa: PLC0415
+
+        for g in ("actor", "critic"):
+            terms = getattr(cfg.env.observations.get(g), "terms", None)
+            if terms is None:
+                continue
+            terms["off_track"] = ObservationTermCfg(
+                func=off_track_obs, params={"command_name": "walk"})
+        print("observation   off_track ADDED to actor, critic - the policy is "
+              "told how far off the line it has ended up, 50 inputs not 49")
+    if args.gyro_noise is not None:
+        walk_cmd = cfg.env.commands.get("walk")
+        if walk_cmd is None or not hasattr(walk_cmd, "gyro_bias_rad"):
+            raise SystemExit(f"{args.task} has no heading observation to corrupt")
+        bias, wander = args.gyro_noise
+        was = (walk_cmd.gyro_bias_rad, walk_cmd.gyro_walk_rad_per_s)
+        walk_cmd.gyro_bias_rad, walk_cmd.gyro_walk_rad_per_s = bias, wander
+        print(f"sensor        heading noise: {was} -> {(bias, wander)}")
 
     for change in args.reward:
         term, _, weight = change.partition("=")
@@ -499,6 +595,28 @@ def main() -> int:
                     f"{shove.params['spin_range'][1]} rad/s." if shove else ""),
         "scoring": scoring,
         "ramps": ramps,
+        # Numbers that decide what a term MEANS rather than what it is worth.
+        # They are not weights, so they were invisible to every page that reads
+        # `scoring` - and `track_turn`'s std is the one that let a 0.018 rad/s
+        # turning bias collect 99.95% of full marks through all of round 0.
+        # Recorded from the live config, so a sweep over them can be read back.
+        "tolerances": {
+            "track_turn_std": float(cfg.env.rewards["track_turn"].params["std"])
+            if "track_turn" in cfg.env.rewards else None,
+            "upright_std": float(cfg.env.rewards["upright"].params["std"])
+            if "upright" in cfg.env.rewards else None,
+            "gyro_bias_rad": getattr(cfg.env.commands.get("walk"),
+                                     "gyro_bias_rad", None),
+            "gyro_walk_rad_per_s": getattr(cfg.env.commands.get("walk"),
+                                           "gyro_walk_rad_per_s", None),
+        },
+        # WHAT the policy reads, by name. Not how many numbers - that needs a
+        # built env and this runs before one exists. The names are the useful
+        # part anyway: a saved policy is a fixed-size mapping, so two runs whose
+        # lists differ cannot load each other's checkpoints, and this list is
+        # what says which. It has changed twice in two days.
+        "observes": sorted(getattr(cfg.env.observations.get("actor"),
+                                   "terms", {}) or {}),
     }, indent=2))
 
     ceiling = reward_ceiling(cfg.env.rewards) * cfg.env.episode_length_s

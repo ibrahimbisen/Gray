@@ -13,6 +13,26 @@
 .stage.drag { cursor:grabbing; }
 .stage img { display:block; width:100%; background:#000; pointer-events:none; }
 .stage.busy img { opacity:.65; }
+/* The hero. Same idea as .stage - a server-rendered image - but with the axes
+   drawn over it as SVG rather than baked in, so the text stays sharp at any
+   width and the picture itself is one cached render. */
+.heroblock { margin-bottom:var(--sp-5); }
+/* CAPPED, and scaled rather than cropped. The render is nearly square, so across
+   a 1500px sheet it came out 900px tall and pushed every block on the page below
+   the fold - the drawing became the page instead of leading it.
+   `object-fit:cover` is not available here: the axes are an SVG laid over the
+   image in the RENDER's own coordinates, so cropping one would slide the labels
+   off the robot. Capping the block scales the image and its overlay together. */
+.hero { position:relative; border:1px solid var(--line); border-radius:var(--r);
+        overflow:hidden; background:#000; max-width:920px; margin:0 auto; }
+.hero img { display:block; width:100%; }
+.hero svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+/* Two sizes that are not on the shared scale, and cannot be: these sit ON a
+   black render, not on the page, and they need to hold up at any width the
+   block is scaled to. The stroke behind them is the same near-black. */
+.hero text { font-size:15px; font-weight:600; paint-order:stroke;
+             stroke:rgba(6,7,10,.85); stroke-width:4px; stroke-linejoin:round; }
+.hero text.turn { font-size:13.5px; font-weight:500; font-style:italic; }
 .row { display:grid; grid-template-columns:44px 30px minmax(0,1fr) 68px; gap:7px;
        align-items:center; margin-bottom:7px; }
 .row input { width:100%; accent-color:var(--s1); padding:4px 6px; text-align:right; }
@@ -43,162 +63,270 @@ const key = (leg, seg) => leg + "_" + seg;
 
 /* ================================================================== model === */
 
+/* The hero: the robot standing, with its own six directions drawn on it.
+   Everything the policy reads or writes is in this frame - which way is down,
+   which way it is turning, which way it was told to walk - and nothing else on
+   the dashboard says which way is which. The picture and the arrow positions
+   both come from /api/robot/frame, so the arrows are the model's real axes
+   projected through the same camera, not a drawing that has to be kept in step.
+
+   FRAME holds the answer once it lands, because the Model tab is redrawn every
+   time it is switched to and the render is not worth repeating. */
+let FRAME = null;
+
+const heroBlock = () => `
+  <div class="heroblock">
+    <div class="hero" id="hero">
+      <div class="empty" style="border:0;margin:0">Drawing the robot&hellip;</div>
+    </div>
+    <div class="legend" id="herokey" style="margin:10px 0 0"></div>
+    <div class="note small" style="margin-top:8px">
+      The axes are fixed to the trunk and move with it &mdash; forward means where
+      the nose points now, not north. They start at the trunk's centre of mass,
+      which is where the middle IMU sits and where <code>projected_gravity</code>
+      and <code>base_ang_vel</code> are defined. Each rotation is named after the
+      axis it turns about, and the curved arrow shows which way counts as
+      positive. This is the standing pose from <code>robot.yaml</code>, the pose
+      every task spawns the robot in.
+    </div>
+  </div>`;
+
+/* An arrowhead as an SVG polygon: a triangle at `to`, pointing away from `from`. */
+function head(from, to, size) {
+  const dx = to[0] - from[0], dy = to[1] - from[1];
+  const n = Math.hypot(dx, dy) || 1;
+  const ux = dx / n, uy = dy / n, px = -uy, py = ux;
+  const b = [to[0] - ux * size, to[1] - uy * size];
+  return `${to[0]},${to[1]} ${b[0] + px * size * .42},${b[1] + py * size * .42} ` +
+         `${b[0] - px * size * .42},${b[1] - py * size * .42}`;
+}
+
+function drawFrame(d) {
+  const box = $("#hero");
+  if (!box || !d.origin) return;
+  const o = d.origin;
+  const anchor = (p) => p[0] < o[0] ? "end" : "start";
+
+  /* poser.project() returns null for a point behind the camera, so any of these
+     can be missing at some viewing angles. An axis that cannot be placed is left
+     off the drawing; the render underneath is still correct, and the key below
+     still names all three. Reading [0] off the null took the whole tab down. */
+  const at = (p) => Array.isArray(p) && p.length > 1 && p[0] != null;
+
+  const arms = (d.axes || []).filter(a => at(a.tip) && at(a.far)).map(a => {
+    const c = `var(${a.colour})`;
+    const arc = (a.arc || []).filter(at);
+    const turn = at(a.turn_at);
+    return `
+      <line x1="${o[0]}" y1="${o[1]}" x2="${a.tip[0]}" y2="${a.tip[1]}"
+            stroke="${c}" stroke-width="2.6" stroke-linecap="round"/>
+      <polygon points="${head(o, a.tip, 13)}" fill="${c}"/>
+      <text x="${a.far[0]}" y="${a.far[1]}" fill="${c}"
+            text-anchor="${anchor(a.far)}" dy=".32em">${esc(a.label)}</text>
+      ${arc.length > 1 ? `<polyline points="${arc.map(p => p.join(",")).join(" ")}"
+                 fill="none" stroke="${c}" stroke-width="2.2" opacity=".92"/>
+               <polygon points="${head(arc[arc.length - 2], arc[arc.length - 1], 11)}"
+                 fill="${c}"/>` : ""}
+      ${turn ? `<text class="turn" x="${a.turn_at[0]}" y="${a.turn_at[1]}" fill="${c}"
+            text-anchor="${anchor(a.turn_at)}" dy=".32em">${esc(a.turn)}</text>` : ""}`;
+  }).join("");
+
+  box.innerHTML = `
+    <img src="data:image/png;base64,${d.png}"
+         alt="Gray standing, with its X, Y and Z axes and its roll, pitch and yaw drawn on it">
+    <svg viewBox="0 0 ${d.w} ${d.h}">
+      ${arms}
+      <circle cx="${o[0]}" cy="${o[1]}" r="4.5" fill="var(--ink)"
+              stroke="rgba(6,7,10,.8)" stroke-width="1.5"/>
+    </svg>`;
+
+  const key = $("#herokey");
+  if (key) key.innerHTML = (d.axes || []).map(a => `
+    <span><i style="background:var(${a.colour})"></i>
+      <span><b style="color:var(--ink)">${esc(a.label)}</b> &middot;
+        <em>${esc(a.turn)}</em> ${esc(a.meaning)}</span></span>`).join("");
+}
+
+/* Fetched once per page load, then redrawn from FRAME on every later visit to
+   this tab. A failure is said out loud rather than left as a spinner. */
+function loadFrame() {
+  if (FRAME) return drawFrame(FRAME);
+  get("/api/robot/frame")
+    .then(d => { FRAME = d; drawFrame(d); })
+    .catch(e => {
+      const box = $("#hero");
+      if (box) box.innerHTML = empty("Could not draw the robot: " + e);
+    });
+  return undefined;
+}
+
+/* The Model tab, as a drawing sheet.
+
+   It was six sections of the same shape: a heading, a lede, then two cards side
+   by side - one holding a table and the other holding an essay ABOUT that table.
+   Six tables and six essays, alternating, down one 1180px column.
+
+   That shape is why the page read as long without saying much. A paragraph
+   sitting beside a table is a paragraph nobody reads, because the table already
+   answered the question; and it pushed the next table a screen further down. So
+   each pair became one block: the table, and the one line of it that was worth
+   keeping, as a `why` column or a single note underneath.
+
+   The render leads, full width, because this is the page about the machine and
+   that is the machine. /summary borrowed it; this is where it lives. */
 const modelTab = () => {
   const s = S1;
-  return `<div class="paper">
+  const m = s.model || {};
+  const massTotal = (s.mass || {}).total;
+  return `<div class="sheet">
 
-  <section class="lead">
-    <div class="eyebrow">Stage 1 &middot; Prepare</div>
-    <h1>A digital Gray worth trusting</h1>
-    <p class="lede">${esc(s.lede)}</p>
-    ${facts(s.facts)}
-    <div class="cols">
-      ${s.story.map(p => `<div class="card"><p class="small">${esc(p)}</p></div>`).join("")}
-    </div>
-  </section>
+  ${titleblock([
+    { k: "sheet", v: "A digital Gray worth trusting" },
+    { k: "subject", v: "stage 1 · the model everything trains against" },
+    { k: "mass", v: massTotal ? `${massTotal} g` : "—" },
+    { k: "joints", v: `${(s.limits || {}).rows ? s.limits.rows.length * 4 : 12} across 4 legs` },
+    { k: "checks", v: m.total ? `${m.passed} of ${m.total} pass` : "—" },
+    { k: "checked", html: `<span class="mono">every page load</span>` },
+  ])}
 
-  <section>
-    <h2>The model, checked live</h2>
-    <p class="lede">These run against the current model every time this page
-      loads, so nothing here can quietly go stale.</p>
-    <div class="card">${modelBlock(s.model)}</div>
-  </section>
+  <p class="lede">${esc(s.lede)}</p>
 
-  <section>
-    <h2>The parts session</h2>
-    <p class="lede">${esc(s.parts.intro)}</p>
-    <div class="cols">
-      <div class="card">
-        <h3>What is needed, in one go</h3>
-        <div class="tw"><table>
-          <tr><th>Item</th><th>What is needed</th></tr>
-          ${s.parts.needed.map(p => `<tr>
-            <td><b>${esc(p.item)}</b></td>
-            <td class="dim">${esc(p.ask)}</td></tr>`).join("")}
-        </table></div>
-      </div>
-      <div class="card">
-        <h3>Why the slicer number matters most</h3>
-        <p class="why small">${esc(s.parts.why_slicer)}</p>
-        <div class="note key small" style="margin-top:12px"><b>Output:</b>
-          ${esc(s.parts.output)}</div>
-        <div class="risk small"><b>What it cannot fix.</b> ${esc(s.parts.cannot_fix)}</div>
-      </div>
-    </div>
-  </section>
+  ${heroBlock()}
 
-  <section>
-    <h2>Where the mass came from</h2>
-    <p class="lede">${esc(s.mass.intro)}</p>
-    <div class="cols">
-      <div class="card">
-        <h3>The numbers</h3>
-        <div class="tw"><table>
-          <tr><th>Part</th><th class="n">Mass</th><th>What is in it</th></tr>
-          ${s.mass.rows.map(r => `<tr><td><b>${esc(r.part)}</b></td>
-            <td class="n">${r.g} g</td><td class="dim">${esc(r.n)}</td></tr>`).join("")}
-          <tr><td><b>Total</b></td><td class="n"><b>${s.mass.total} g</b></td>
-              <td class="dim">estimated, not weighed</td></tr>
-        </table></div>
-      </div>
-      <div class="card">
-        <h3>Why the CAD numbers were dropped</h3>
-        ${s.mass.notes.map(n => `<p class="why small">${esc(n)}</p>`).join("")}
-      </div>
-    </div>
-  </section>
+  ${facts(s.facts)}
 
-  <section>
-    <h2>How far each joint turns</h2>
-    <p class="lede">${esc(s.limits.intro)}</p>
-    <div class="cols">
-      <div class="card">
-        <div class="tw"><table>
-          <tr><th>Joint</th><th class="n">Travel</th><th>Which way is positive</th></tr>
-          ${s.limits.rows.map(r => `<tr><td><b>${esc(r.joint)}</b></td>
-            <td class="n">${esc(r.range)}</td>
-            <td class="dim">${esc(r.n)}</td></tr>`).join("")}
-        </table></div>
-      </div>
-      <div class="card">
-        <h3>Why this is measured twice</h3>
-        <p class="why small">A limit written into a file is a claim. Turning the
-          joint in the simulator and reading back where it actually stopped is a
-          measurement. They have disagreed before &mdash; two legs exported
-          rotated 180 degrees, which makes every sign in that leg backwards
-          while the file still looks correct.</p>
-        <div class="note key small">Both numbers are recorded in the
-          <b>Pose</b> tab, which is where the travel is measured in the first
-          place.</div>
-      </div>
-    </div>
-  </section>
+  <div class="grid wide">
+    ${blk("The model, checked live", m.total ? `${m.passed}/${m.total}` : null,
+      `<div style="padding:11px">${modelBlock(m)}</div>`,
+      `<span class="mono">tools/check_urdf.py</span>`)}
 
-  <section>
-    <h2>What had to be fixed in the export</h2>
-    <p class="lede">Each of these was found by a check failing or by the robot
-      behaving impossibly. None of them announce themselves.</p>
-    <div class="cols tight">
-      ${s.fixed.map(f => `<div class="card">
-        <h3>${esc(f.t)}</h3>
-        <p class="why small">${esc(f.d)}</p></div>`).join("")}
-    </div>
-  </section>
+    ${blk("Where the mass came from", (s.mass.rows || []).length, `
+      <table class="t">
+        <tr><th>part</th><th class="n">mass</th><th>what is in it</th></tr>
+        ${s.mass.rows.map(r => `<tr><td class="k">${esc(r.part)}</td>
+          <td class="n">${r.g} g</td><td class="why">${esc(r.n)}</td></tr>`).join("")}
+        <tr><td class="k"><b>total</b></td><td class="n"><b>${s.mass.total} g</b></td>
+            <td class="why">estimated, not weighed</td></tr>
+      </table>
+      <details id="masswhy">
+        <summary>why these numbers and not the CAD's<span class="grow"></span>
+          <b>${s.mass.notes.length}</b> notes</summary>
+        <div style="padding:0 11px 11px">
+          ${s.mass.notes.map(n => `<p class="why">${esc(n)}</p>`).join("")}
+        </div>
+      </details>`, `<span class="mono">robot.yaml</span>`)}
+  </div>
 
-  <section>
-    <h2>Still assumed</h2>
-    <p class="lede">An honest list of what this model does not actually know, and
-      the reason this stage reads <i>provisional</i> rather than done. Three of
-      these have no datasheet anywhere &mdash; only the physical robot can settle
-      them, which is step 3.3 in the <b>Hardware</b> tab. They are randomised
-      rather than guessed, and a policy that survives the range survives whatever
-      the truth turns out to be.</p>
-    <div class="cols tight">
-      ${s.open.map(o => `<div class="card">
-        <h3>${esc(o.q)}</h3>
-        <p class="why small">${esc(o.n)}</p></div>`).join("")}
-    </div>
-  </section>
+  <div class="note" style="margin:var(--sp-4) 0">${esc(s.mass.intro)}</div>
+
+  <div class="grid wide">
+    ${blk("How far each joint turns", (s.limits.rows || []).length, `
+      <table class="t">
+        <tr><th>joint</th><th class="n">travel</th><th>which way is positive</th></tr>
+        ${s.limits.rows.map(r => `<tr><td class="k">${esc(r.joint)}</td>
+          <td class="n">${esc(r.range)}</td>
+          <td class="why">${esc(r.n)}</td></tr>`).join("")}
+      </table>
+      <div class="note key" style="margin:11px"><b>Measured, not stated.</b> A
+        limit written into a file is a claim; turning the joint in the simulator
+        and reading where it stopped is a measurement. They have disagreed - two
+        legs once exported rotated 180 degrees, which makes every sign in that
+        leg backwards while the file still looks right. Both numbers are recorded
+        in the <b>Pose</b> tab, which is where the travel is measured.</div>`)}
+
+    ${blk("The parts session", (s.parts.needed || []).length, `
+      <table class="t">
+        <tr><th>item</th><th>what is needed</th></tr>
+        ${s.parts.needed.map(p => `<tr><td class="k">${esc(p.item)}</td>
+          <td class="why">${esc(p.ask)}</td></tr>`).join("")}
+      </table>
+      <div class="note key" style="margin:11px"><b>Output:</b> ${esc(s.parts.output)}
+        <br>${esc(s.parts.why_slicer)}</div>
+      <div class="note bad" style="margin:11px"><b>What it cannot fix.</b>
+        ${esc(s.parts.cannot_fix)}</div>`)}
+  </div>
+
+  <div class="grid wide" style="margin-top:var(--sp-4)">
+    ${blk("What had to be fixed in the export", (s.fixed || []).length, `
+      <table class="t">
+        <tr><th>fault</th><th>what it did</th></tr>
+        ${s.fixed.map(f => `<tr><td class="k">${esc(f.t)}</td>
+          <td class="why">${esc(f.d)}</td></tr>`).join("")}
+      </table>
+      <div class="note" style="margin:11px">Each was found by a check failing or
+        by the robot behaving impossibly. None of them announce themselves.</div>`)}
+
+    ${blk("Still assumed", (s.open || []).length, `
+      <table class="t">
+        <tr><th>what is not known</th><th>what is done about it</th></tr>
+        ${s.open.map(o => `<tr><td class="k">${esc(o.q)}</td>
+          <td class="why">${esc(o.n)}</td></tr>`).join("")}
+      </table>
+      <div class="note" style="margin:11px">This is why stage 1 reads
+        <i>provisional</i> rather than done. Three of these have no datasheet
+        anywhere &mdash; only the physical robot can settle them, which is step
+        3.3 on the <b>Hardware</b> tab. They are randomised rather than guessed,
+        and a policy that survives the range survives whatever the truth is.</div>`)}
+  </div>
+
+  <div class="grid" style="margin-top:var(--sp-4)">
+    ${s.story.map(p => `<div class="blk"><div class="why"
+      style="padding:11px">${esc(p)}</div></div>`).join("")}
+  </div>
 
   </div>`;
 };
 
 /* =============================================================== hardware === */
 
+/* The Hardware tab. It was three grids of cards, and every card held one
+   paragraph and nothing else - so the page was prose wearing boxes. Cards are
+   for things with several fields; a list of sentences is a list.
+
+   The steps ARE a sequence and they are numbered, so they are a numbered table.
+   The rest is one column of rows. */
 const hardwareTab = () => {
   const s = S3;
-  return `<div class="paper">
+  return `<div class="sheet">
 
-  <section class="lead">
-    <div class="eyebrow">Stage 3 &middot; Deploy</div>
-    <h1>Put it on the real Gray</h1>
-    <p class="lede">${esc(s.lede)}</p>
-    <div class="cols">
-      ${s.intro.map(p => `<div class="card"><p class="small">${esc(p)}</p></div>`).join("")}
-    </div>
-  </section>
+  ${titleblock([
+    { k: "sheet", v: "Put it on the real Gray" },
+    { k: "subject", v: "stage 3 · deploy" },
+    { k: "steps", v: `${(s.steps || []).length}` },
+    { k: "needs the robot", v: "yes, all of it" },
+    { k: "can be written first", v: `${(s.software_first || []).length} things` },
+    { k: "blocked on", html: `<a class="plain" href="#model">stage 1</a>, partly` },
+  ])}
 
-  <section>
-    <h2>The steps</h2>
-    <p class="lede">Five of them. Step 3.3 points back at the <b>Model</b> tab on
-      purpose &mdash; measuring the real servos changes the model, and everything
-      trained afterwards is more honest for it.</p>
-    <div class="cols tight">
-      ${s.steps.map(st => `<div class="card">
-        <h3><span class="chip warn">${esc(st.n)}</span>${esc(st.name)}</h3>
-        <p class="why small">${esc(st.d)}</p></div>`).join("")}
-    </div>
-  </section>
+  <p class="lede">${esc(s.lede)}</p>
 
-  <section>
-    <h2>Software worth writing before the hardware exists</h2>
-    <p class="lede">None of these need the robot. All of them are cheaper now
-      than on the day it is back together and something does not work.</p>
-    <div class="cols tight">
-      ${s.software_first.map(x => `<div class="card">
-        <p class="small">${esc(x)}</p></div>`).join("")}
-    </div>
-  </section>
+  <div class="grid wide">
+    ${blk("The steps", (s.steps || []).length, `
+      <table class="t">
+        <tr><th class="n">#</th><th>step</th><th>what it involves</th></tr>
+        ${s.steps.map(st => `<tr>
+          <td class="n">${esc(st.n)}</td>
+          <td class="k">${esc(st.name)}</td>
+          <td class="why">${esc(st.d)}</td></tr>`).join("")}
+      </table>
+      <div class="note key" style="margin:11px">Step 3.3 points back at the
+        <b>Model</b> tab on purpose. Measuring the real servos changes the model,
+        and everything trained after that is more honest for it.</div>`)}
+
+    ${blk("Worth writing before the hardware exists", (s.software_first || []).length, `
+      <table class="t">
+        <tr><th>what</th></tr>
+        ${s.software_first.map(x => `<tr><td class="why">${esc(x)}</td></tr>`).join("")}
+      </table>
+      <div class="note" style="margin:11px">None of these need the robot, and all
+        of them are cheaper now than on the day it is back together and something
+        does not work.</div>`)}
+  </div>
+
+  <div class="grid" style="margin-top:var(--sp-4)">
+    ${s.intro.map(p => `<div class="blk"><div class="why"
+      style="padding:11px">${esc(p)}</div></div>`).join("")}
+  </div>
 
   </div>`;
 };
@@ -215,6 +343,7 @@ const poseTab = () => `
         <img id="shot" alt="the robot in the current pose">
       </div>
       <div class="banner bad hidden" id="clash" style="margin-top:10px"></div>
+      <div class="hidden" id="poseerr" style="margin-top:10px"></div>
 
       <div class="sech" style="margin-top:10px">
         <h2 class="tnum" id="camlab"></h2>
@@ -387,9 +516,18 @@ function render() {
   const q = new URLSearchParams({ angles: JSON.stringify(ANG), invert: JSON.stringify(INV),
                                   az: AZ, el: EL, dist: ZOOM });
   fetch("/api/pose?" + q).then(r => r.json()).then(d => {
+    /* A render that failed says so. Without this the image simply held its last
+       good pose while every dial went on moving, which reads as "the model does
+       not respond to the calf" rather than "the render is broken". */
+    if (!d || d.error || !d.png) throw new Error((d && d.error) || "no render came back");
     const img = $("#shot");
     if (img) img.src = "data:image/png;base64," + d.png;
     poseFacts(d.facts);
+    const say = $("#poseerr");
+    if (say) say.className = "hidden";
+  }).catch(e => {
+    const say = $("#poseerr");
+    if (say) { say.className = "banner bad"; say.textContent = `The render failed: ${e.message}`; }
   }).finally(() => {
     PENDING = false;
     const s = $("#stage");
@@ -468,6 +606,9 @@ function saveDirections() {
   const inv = Object.keys(INV).filter(k => INV[k]);
   fetch("/api/pose/directions", { method: "POST", body: JSON.stringify({ invert: inv }) })
     .then(r => r.json()).then(d => {
+      /* The server answers a refusal with {error}, not with the list. Reading
+         .length off that gave "Failed: TypeError" instead of the reason. */
+      if (!Array.isArray(d)) throw new Error((d && d.error) || "the server sent no list back");
       $("#dirnote").innerHTML = d.length
         ? `<b style="color:var(--good)">Saved.</b> Reversed: ${d.map(esc).join(", ")}.
            Rebuild with <code>tools/prepare_model.py</code> to apply.`
@@ -486,6 +627,8 @@ function saveLimits() {
   });
   fetch("/api/pose/limits", { method: "POST", body: JSON.stringify(out) })
     .then(r => r.json()).then(d => {
+      /* Same as saveDirections: {error} is a legal reply and it has no .hip. */
+      if (!d || d.error || !d.hip) throw new Error((d && d.error) || "the server saved nothing");
       $("#savenote").innerHTML = `<b style="color:var(--good)">Saved.</b> hip
         ${d.hip[0]} to ${d.hip[1]}, thigh ${d.thigh[0]} to ${d.thigh[1]}, calf
         ${d.calf[0]} to ${d.calf[1]}. Rebuild the model with
@@ -510,6 +653,7 @@ Promise.all([get("/api/stage/1"), get("/api/stage/3")]).then(([a, b]) => {
       count: S3.steps.length },
   ], {
     onDraw: (id) => {
+      if (id === "model") return loadFrame();
       if (id !== "pose") return;
       poseConfig().then(() => { buildPose(); render(); })
         .catch(e => { $("#dials").innerHTML = empty("Could not load the pose editor: " + e); });

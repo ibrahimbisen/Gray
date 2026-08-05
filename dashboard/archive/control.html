@@ -8,37 +8,11 @@
      Each rule below is here because page.css genuinely has no equivalent, and
      each says why. */
 
-  /* Distance to bar. Log scale, fixed 0.1x - 100x domain, so the bar tick sits
-     at the same x in every row and rows are comparable at a glance. A linear
-     "percent of bar" would put something at 4% of target near a full-looking
-     bar's left edge, which is the lie this exists to avoid.
-     Not in page.css: this axis exists on one table on one page, and page.css's
-     `.bar` and `.prog` are both linear 0-100% meters - the exact thing this
-     component was built to replace. Sharing a name with either would invite
-     someone to swap them. */
-  .track { position:relative; height:15px; min-width:132px; }
-  /* the baseline the marker sits on - `.bar` is a filled meter, not an axis */
-  .track .ax { position:absolute; left:0; right:0; top:7px; height:1px;
-               background:var(--line); }
-  /* the 1.0x gridline. Nothing in page.css marks a single point on a scale. */
-  .track .tick { position:absolute; top:1px; width:1px; height:13px;
-                 background:var(--s1); }
-  /* The marker is a status lamp - met or failing - so it is a CIRCLE and it is
-     `.dot`, and it takes its colour from page.css's `.dot.ok` / `.dot.bad`.
-     Only its size and its position on the axis are set here. */
-  .track .dot { position:absolute; top:2.5px; width:10px; height:10px;
-                border-radius:50%; margin-left:-5px; }
-  /* scored against a task that changed after it trained */
-  .track .dot.drift { outline:1.5px dashed var(--warn); outline-offset:1.5px; }
-  /* best ever seen, behind the current value. Nothing else shows two values of
-     one metric in one slot. */
-  .track .ghost { position:absolute; top:3.5px; width:8px; height:8px;
-                  border-radius:50%; margin-left:-4px; border:1.5px solid var(--muted); }
-  /* the 0.1x / bar / 100x labels, inside a `th`. They have to undo `th`'s
-     uppercase, letter-spacing and weight, which no shared class does. */
-  .scalerow { display:flex; justify-content:space-between; font-size:9.5px;
-              color:var(--muted); font-weight:400; text-transform:none;
-              letter-spacing:0; }
+  /* `.track` - the distance-to-bar axis - and `.scalerow` used to be here, on
+     the argument that they existed on one table on one page. Both are in
+     page.css now: the on-track card put the same axis on the Runs page, and a
+     component written once per page is how the same thing ends up looking three
+     ways. */
   /* The gap-closing sparkline. page.css's `.plot svg` is 132px tall with axes
      and a hover crosshair; this is a 38px trace with no axis at all, and
      forcing one to be the other would change every chart on /runs. */
@@ -65,13 +39,19 @@
 
 let S = null;                 /* /api/overview */
 let M = null;                 /* /api/monitor  */
+let L = null;                 /* /api/live - the run in front of you, distilled */
 let TAB = "now";
 let JOBLOG = null, JOBLOG_TEXT = "";
 let SIG = { strip: null, pane: null };
 
-const trackPos = (r) => (!r || r <= 0) ? null
-  : Math.max(0, Math.min(100, ((Math.log10(r) + 1) / 3) * 100));
+/* `trackPos` is in page.js, beside the on-track card that also needs it. It was
+   declared here too for a moment, which is not a shadow but a SyntaxError: two
+   top-level `const`s of one name across two classic scripts share the global
+   lexical scope, and the second one stops the whole file from parsing.
 
+   `track()` below is the PROJECT bar board's marker - best-ever plus latest,
+   across every run - and stays here, because that is a different question from
+   the per-run card's. */
 function track(c) {
   const best = trackPos(c.ratio), latest = trackPos(c.latest_ratio);
   if (best === null) return `<span class="faint small">no scale</span>`;
@@ -226,7 +206,7 @@ function board() {
           <th class="n">Worst robot</th>
           <th style="min-width:150px">Distance
             <div class="scalerow"><span>0.1&times;</span>
-              <span style="color:var(--s1)">bar</span><span>100&times;</span></div></th>
+              <span class="at">bar</span><span>100&times;</span></div></th>
           <th>From</th><th></th></tr>
       ${rows.map(c => {
         const over = timesOver(c);
@@ -340,7 +320,206 @@ function lastRuns() {
     </table></div></section>`;
 }
 
-const nowPanel = () => rail() + headline() + board() + trend() + lastRuns();
+/* The project view. Everything above answers "where is the project against its
+   bars", across every run ever verified. It is good and it is not what you open
+   this page for while something is training, so it is its own tab. */
+const projectPanel = () => rail() + headline() + board() + trend() + lastRuns();
+
+/* ====================================================== the run in front === */
+
+/* Five blocks, in the order the questions get asked:
+
+     is it on track  ->  why did the last one fail  ->  what is it doing
+     ->  where do the points go  ->  is it still learning
+
+   The first three are always open, because they are the answer. The last two
+   are folded, because they are the working. The whole thing is built to fit one
+   screen: single-line rows, no hero number, evidence beside the claim rather
+   than under it. A fact below the fold during a two-hour run is a fact nobody
+   reads.
+
+   Every number here comes from dashboard/live.py. Nothing is judged in this
+   file - the thresholds, the pass marks and the calibration between a live
+   estimate and a verified one all live in Python, where they can be tested. */
+
+const pct = (v) => Math.round(100 * (v || 0));
+
+/* A metric name short enough for the evidence column. `label()` turns
+   `Metrics/posture/error_roll` into "Metrics/posture/error roll", which is right
+   on a chart title with a card to itself and forty characters of noise on a row
+   that has six of them side by side. The leading path is the same on every key
+   in a group, so it carries nothing here. */
+const short = (k) => label(String(k).split("/").pop());
+
+/* ---- block 1: is it on track to pass the bar ---- */
+
+/* The card itself is `onTrackCard()` in page.js, along with trackPos, gapText,
+   srcChip, boardTrack, boardLegend, boardNote and boardFootnotes. It was written
+   here and then the Runs page needed the same card on whichever run is open, so
+   it moved rather than got copied - the same trade `chartCard` made earlier.
+
+   What is left on this page is which run to point it at. */
+const barBoard = () => onTrackCard(L.board, L.run, { training: L.training });
+
+
+/* ---- block 2: why did the last one fail ---- */
+
+function lastFail() {
+  const p = L.previous;
+  if (!p) return "";
+  const link = `/runs#run=${encodeURIComponent(p.id)}`;
+  const head = `<h3>The last verdict
+    <span class="who"><a href="${link}">#${p.number} ${esc(p.label)}</a></span>
+    <span class="say">${esc(p.age)}</span>
+    <span class="grow"></span>
+    <span class="badge ${cls(p.verdict)}">${esc(p.verdict)}</span>
+    ${p.structured ? `<span class="say">${p.passed_count} of ${p.total} met</span>` : ""}
+    ${p.drifted ? `<span class="chip warn">task drifted</span>` : ""}</h3>`;
+
+  if (!p.structured) return `<div class="readout">${head}
+    <div class="lsub" style="padding-left:0">${esc(p.detail)}
+      <br><b>Prose only.</b> This verdict predates the structured format, so it can
+      be read but not compared or charted.</div></div>`;
+
+  if (!p.failed.length) return `<div class="readout">${head}
+    <div class="lsub" style="padding-left:0">Passed every criterion.</div></div>`;
+
+  // Where the live board is watching the same criterion, say what it reads now.
+  // That is the whole reason this block sits directly under the board: the
+  // question is not "what went wrong" but "is this one doing it again".
+  const now = {};
+  for (const r of (L.board && L.board.rows) || []) now[r.key] = r;
+
+  return `<div class="readout">${head}
+    ${p.failed.map(f => {
+      const mine = now[f.key];
+      // Same seven-column grid as the board above it, on purpose: the two blocks
+      // are read against each other, so the name, the number and the distance
+      // have to sit in the same places in both.
+      return `<div class="lrow fail">
+        <span class="mk">✗</span>
+        <span class="nm">${esc(f.name)}</span>
+        <span class="v">${value(f.measured, f.unit)}</span>
+        ${srcChip("verified")}
+        <span class="lnote" title="${esc(f.note)}">bar ${
+          value(f.bar, f.unit)} &middot; ${esc(f.note)}</span>
+        <span class="gap">${gapText(f.ratio, false)}</span>
+        <span class="lnote">${!mine ? "" : `this run: ${
+          mine.measured === null || mine.measured === undefined
+            ? `<b>not measured while training</b>`
+            : `<b>${value(mine.measured, mine.unit)}</b> from training${
+               mine.judged ? "" : ", not comparable"}`}`}</span>
+      </div>`;
+    }).join("")}
+  </div>`;
+}
+
+/* ---- block 3: what it is doing right now ---- */
+
+function readsPanel() {
+  const rows = L.readings || [];
+  if (!rows.length) return "";
+  const bad = rows.filter(r => r.state !== "good").length;
+  return `<div class="readout">
+    <h3>Right now<span class="grow"></span>
+      <span class="say">${bad ? `${bad} worth a look` : "nothing standing out"}</span></h3>
+    ${rows.map(r => `<div class="readrow ${r.state}">
+      <span class="ttl">${esc(r.title)}</span>
+      <span class="says">${esc(r.says)}</span>
+      <span class="ev">${r.evidence.map(e =>
+        `${esc(short(e.key))} ${fmt(e.value)}`).join(" &middot; ")}</span>
+    </div>`).join("")}
+    <div class="lsub" style="padding-left:0;margin-top:5px">Judgement, not bars
+      &mdash; the bars are above. The numbers each line is drawn from are on its
+      right, so a threshold you disagree with is visible rather than hidden.</div>
+  </div>`;
+}
+
+/* ---- block 4: where the points go ---- */
+
+function budgetPanel() {
+  const b = L.budget;
+  if (!b || !b.earning || !b.earning.length) return "";
+
+  // ONE scale, zero at a fixed point. Giving the penalty side its own scale so
+  // its bars looked bigger would be a dual axis by another name - and the fact
+  // that the penalties are a tenth of the rewards IS the finding.
+  const maxE = Math.max(...b.earning.map(r => r.cap), 0.001);
+  const maxL = Math.max(...b.leaking.map(r => -r.value), 0.001);
+  const span = maxE + maxL, zero = 100 * maxL / span;
+  const w = v => 100 * Math.abs(v) / span;
+
+  const row = (r, earn) => `<div class="brow">
+    <span class="nm" title="${esc(r.what)}">${esc(r.name.replace(/_/g, " "))}</span>
+    <span class="bax">
+      ${earn ? `<span class="cap" style="left:${zero}%;width:${w(r.cap)}%"></span>` : ""}
+      <i class="${earn ? "earn" : "lose"}" style="${earn
+        ? `left:${zero}%;width:${w(r.value)}%`
+        : `left:${(zero - w(r.value)).toFixed(2)}%;width:${w(r.value)}%`}"></i>
+      <span class="zero" style="left:${zero}%"></span>
+    </span>
+    <span class="n">${earn
+      ? `<b>${r.value.toFixed(2)}</b> of ${r.cap.toFixed(2)}`
+      : `<b>${r.value.toFixed(2)}</b>`}</span>
+  </div>`;
+
+  return `<details class="fold" id="budgetfold">
+    <summary>Where the points go<span class="grow"></span>
+      <span class="say">earning <b>${b.earned.toFixed(2)}</b> of ${b.ceiling}
+        per second, leaking <b>${(-b.lost).toFixed(2)}</b></span></summary>
+    <div class="in">
+      <div class="scalerow" style="margin-bottom:4px"><span>&minus;${maxL.toFixed(2)}</span>
+        <span>points per second</span><span>+${maxE.toFixed(2)}</span></div>
+      ${b.earning.map(r => row(r, true)).join("")}
+      <div class="brule"></div>
+      ${b.leaking.map(r => row(r, false)).join("")}
+      <div class="lsub" style="padding-left:0;margin-top:8px">
+        Every reward is capped at 1.0 before its weight, so the pale block is what
+        a term COULD earn and the solid one is what it does. ${
+        b.accounted ? `The terms come to <b>${b.net.toFixed(2)}</b> per second and
+          the score is <b>${fmt(b.reward)}</b> over ${b.seconds.toFixed(0)} s
+          episodes, so nothing is missing from this split.`
+        : `<b style="color:var(--warn)">These terms do not add up to the score</b>
+          &mdash; a reward term has been renamed and this split is missing it.`}
+        One scale, zero in the middle: the penalties really are that small next to
+        the rewards.
+      </div>
+    </div>
+  </details>`;
+}
+
+/* ---- block 5: is it still learning ---- */
+
+/* 96px rather than the 132 on /runs: four charts have to sit under three blocks
+   of text and still be on the same screen. Same builder, different geometry. */
+const LIVE_GEO = { W: 480, H: 96, L: 40, R: 10, T: 6, B: 20 };
+
+function curves() {
+  const rows = L.metrics || [];
+  const picks = L.charts || [];
+  if (rows.length < 2 || !picks.length) return "";
+  const learning = (L.readings || []).find(r => r.id === "learning");
+  return `<details class="fold" id="curvefold">
+    <summary>The curves<span class="grow"></span>
+      <span class="say">${learning ? esc(learning.says) : `${picks.length} of the
+        ${(L.run.metric_columns || []).length || 44} metrics`}</span></summary>
+    <div class="in">
+      <div class="charts">${picks.map(c => chartCard(rows, c.key,
+        { geo: LIVE_GEO, note: c.note, bar: c.bar, barLabel: c.barLabel })).join("")}</div>
+      <div class="lsub" style="padding-left:0;margin-top:9px">Four of the forty-four.
+        <a class="plain" href="/runs#run=${encodeURIComponent(L.run.id)}"
+           style="color:var(--s1)">all of them, with films and the reward table,
+           on the runs page &rarr;</a></div>
+    </div>
+  </details>`;
+}
+
+function nowPanel() {
+  if (!L) return empty("Loading the run…");
+  if (!L.run) return empty("Nothing has trained yet. Queue a job and the runner "
+                         + "picks it up within a few seconds.");
+  return barBoard() + lastFail() + readsPanel() + budgetPanel() + curves();
+}
 
 /* ================================================================= queue === */
 
@@ -618,6 +797,7 @@ const blockedTab = () =>
 
 const TABS = [
   { id: "now",     label: "Now",     count: null, html: () => nowPanel() },
+  { id: "project", label: "Project", count: null, html: () => projectPanel() },
   { id: "queue",   label: "Queue",   count: null, html: () => queuePanel() },
   { id: "jobs",    label: "Job log", count: null, html: () => jobsPanel() },
   { id: "blocked", label: "Blocked", count: null, html: () => blockedTab() },
@@ -633,6 +813,10 @@ function tabCounts() {
   // the tab bar, which would destroy the pane under it.
   return {
     now: null,
+    // How many bar criteria are failing right now. Null rather than 0 while the
+    // live read has not arrived, so the span is written once and then updated -
+    // see the note above about counts that start null.
+    project: S.progress.subsections.reduce((a, s) => a + s.failing, 0),
     queue: q.jobs.filter(j => j.state === "queued" || j.state === "running").length,
     jobs: q.jobs.length,
     blocked,
@@ -647,6 +831,18 @@ function wire(id, pane) {
   if (id === "queue") wireQueue();
   if (id === "jobs") pane.querySelectorAll("[data-log]").forEach(el =>
     el.onclick = () => { JOBLOG = el.dataset.log; JOBLOG_TEXT = ""; redraw(); fetchLog(); });
+  // The crosshair on the four live curves. Same wiring as /runs, same geometry
+  // object - reading a value off a chart must not depend on which page it is on.
+  //
+  // The bars go with it. A reference line widens the y-range so it fits on the
+  // canvas, so a crosshair that did not know about it would build a DIFFERENT
+  // scale from the line it is tracking and report the value from a point the
+  // cursor is not on. Same reason chartPoints() is shared rather than copied.
+  if (id === "now" && L) {
+    const bars = {};
+    for (const c of L.charts || []) if (c.bar != null) bars[c.key] = c.bar;
+    wireCharts(pane, L.metrics || [], { geo: LIVE_GEO, bars });
+  }
 }
 
 /* ================================================ redraw without disturbing === */
@@ -684,18 +880,32 @@ function paneSig() {
   if (TAB === "blocked")
     return base + "|" + p.subsections.map(s =>
       [s.id, s.state, (s.blocked_skills || []).length].join(":")).join(",");
-  // now
-  return base + `|${p.runs_total}|${p.runs_verified}|${p.runs_structured}`
-       + `|${M.model.passed}/${M.model.total}|`
-       + p.subsections.map(s => [s.id, s.met, s.failing, s.never_measured].join(":")).join(",")
-       + "|" + (S.runs || []).map(r => `${r.id}:${r.status}:${r.iterations_done}`).join(",");
+  if (TAB === "project")
+    return base + `|${p.runs_total}|${p.runs_verified}|${p.runs_structured}`
+         + `|${M.model.passed}/${M.model.total}|`
+         + p.subsections.map(s => [s.id, s.met, s.failing, s.never_measured].join(":")).join(",")
+         + "|" + (S.runs || []).map(r => `${r.id}:${r.status}:${r.iterations_done}`).join(",");
+  // now. Keyed off the iteration count and the board's own verdict, so the panel
+  // is rebuilt when training writes a new row and not otherwise - a rebuild on
+  // every poll would close both folds under whoever had just opened one.
+  if (!L) return base + "|loading";
+  const b = L.board || {}, r = L.run || {};
+  return base + `|${r.id}:${r.status}:${r.iterations_done}`
+       + `|${b.met}:${b.failing}:${b.unknown}`
+       + `|${(L.previous || {}).id || ""}`
+       + "|" + (L.readings || []).map(x => x.id + ":" + x.state).join(",");
 }
 
 function saveInputs(root) {
-  const out = { focus: null, start: null, end: null, values: {} };
+  const out = { focus: null, start: null, end: null, values: {}, open: {} };
   root.querySelectorAll("input,select,textarea").forEach(el => {
     if (el.id) out.values[el.id] = el.type === "checkbox" ? el.checked : el.value;
   });
+  // The two folded blocks. Training writes a metric row every ten seconds, which
+  // moves the pane signature, which rebuilds the pane - so without this a fold
+  // slams shut ten seconds after it is opened, on the one page you would sit and
+  // watch. Same reason the half-typed queue form is saved beside it.
+  root.querySelectorAll("details[id]").forEach(el => { out.open[el.id] = el.open; });
   const a = document.activeElement;
   if (a && a.id && Object.prototype.hasOwnProperty.call(out.values, a.id)) {
     out.focus = a.id;
@@ -709,6 +919,10 @@ function restoreInputs(root, saved) {
     if (!el.id || !Object.prototype.hasOwnProperty.call(saved.values, el.id)) return;
     if (el.type === "checkbox") el.checked = saved.values[el.id];
     else el.value = saved.values[el.id];
+  });
+  root.querySelectorAll("details[id]").forEach(el => {
+    if (Object.prototype.hasOwnProperty.call(saved.open || {}, el.id))
+      el.open = saved.open[el.id];
   });
   if (!saved.focus) return;
   const el = document.getElementById(saved.focus);
@@ -796,8 +1010,9 @@ async function fetchLog() {
 }
 
 async function reload() {
-  const [over, mon] = await Promise.all([get("/api/overview"), get("/api/monitor")]);
-  S = over; M = mon;
+  const [over, mon, liv] = await Promise.all([
+    get("/api/overview"), get("/api/monitor"), get("/api/live")]);
+  S = over; M = mon; L = liv;
   draw();
   if (TAB === "jobs" && JOBLOG) fetchLog();
 }
@@ -817,7 +1032,15 @@ first();
    the monitor's own five seconds. Nothing on /api/overview changes faster than
    a run finishing and being verified, so it is polled at twenty. */
 setInterval(async () => {
-  try { M = await get("/api/monitor"); draw(); if (TAB === "jobs" && JOBLOG) fetchLog(); }
+  try {
+    // Both on the same clock, because they are the two halves of one picture: the
+    // strip says what is training and the Now tab says how it is going. Fetched
+    // together so they can never disagree by one poll.
+    const [mon, liv] = await Promise.all([get("/api/monitor"), get("/api/live")]);
+    M = mon; L = liv;
+    draw();
+    if (TAB === "jobs" && JOBLOG) fetchLog();
+  }
   catch (e) { /* keep the last good picture rather than blanking the page */ }
 }, 5000);
 

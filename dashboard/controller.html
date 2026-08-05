@@ -1,0 +1,1329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gray — controller</title>
+<link rel="stylesheet" href="/page.css">
+<style>
+/* Page-private, because page.css has no equivalent and should not grow one for
+   a drawing that exists on exactly one page.
+
+   NOTHING HERE SETS A SIZE OF ITS OWN. Every length is a token from page.css.
+   This block used to carry eight raw font sizes and four radii, which is why
+   this page read as a different document from the rest - the drawing was fine,
+   the furniture around it was not.
+
+   SVG is the exception that proves it: `fill` is not `color` and a `<text>`
+   takes neither of page.css's text classes, so the drawing's inks and sizes are
+   restated below. They are restated AS THE TOKENS, so they cannot drift from
+   the page they sit on.
+
+   page.css's only svg rule is `.plot svg`, which pins height to 132px because a
+   chart is a fixed-height card. This drawing has to keep its aspect ratio and
+   shrink with the column instead, so it needs its own rule rather than an
+   override of that one.
+
+   Fills the column, but never below the point where the callouts stop being
+   readable - under about 820px the labels drop below 8px. The card is a `.tw`,
+   so past that the drawing scrolls sideways instead of getting smaller. */
+.diagram { display:block; width:100%; height:auto; min-width:820px; }
+.scrollhint { display:none; }
+@media (max-width:900px) { .scrollhint { display:block; } }
+
+/* The two states, and each is carried twice: stroke colour AND stroke pattern.
+   Solid accent = the control does something. Dashed grey = free. Colour is
+   never the only signal, which is the rule at the top of page.css. */
+/* THE BODY IS FILLED. It was `fill:none` on every part, which is why the whole
+   drawing read as a wireframe however the outline was shaped - an object is a
+   surface with things sitting on it, and an outline is a diagram of one.
+
+   Three surfaces, one step apart, so the shape is legible without a single
+   shadow: the Joy-Cons sit on the console, and the console sits on the page. */
+.diagram .shell  { fill:var(--surface2); stroke:var(--ink2); stroke-width:2.2;
+                   stroke-linejoin:round; }
+.diagram .console { fill:var(--surface); stroke:var(--ink2); stroke-width:2.2; }
+/* A screen is DARK, in both schemes, because it is a screen. It was
+   `var(--plane)` - the page colour - so the one part of the object that is not
+   plastic looked exactly like plastic. */
+.diagram .screen { fill:#0b0f16; stroke:none; }
+.diagram .bezel  { fill:#1b2027; stroke:none; }
+/* Anything written ON the screen is lit by it, so it does not take the page's
+   ink - which in light mode is near-black and would vanish. */
+.diagram .screentext .fn,
+.diagram .screentext .cap  { fill:#8f9bab; }
+.diagram .screentext .num  { fill:#eef2f7; }
+.diagram .screentext .brow { fill:#5f6b7d; }
+.diagram .ctl    { fill:none; stroke:var(--muted); stroke-width:1.5; stroke-dasharray:4 3; }
+/* --s1, not --accent. `--accent` is an alias of --s1 that only this page and
+   train.html ever used, so the same blue was reached by two names. One name. */
+.diagram .ctl.on { stroke:var(--s1); stroke-width:2.6; stroke-dasharray:none; }
+/* --line is a border colour: on a 1px leader over the page it disappears. */
+.diagram .lead   { fill:none; stroke:var(--muted); stroke-width:1; opacity:.5; }
+
+/* Clickable controls. `pointer-events:all` is the load-bearing one: these shapes
+   are stroke-only, so without it only the 1px outline is clickable and the
+   middle of a button does nothing. Hover thickens rather than recolours, so the
+   solid/dashed meaning survives being pointed at. */
+.diagram [data-pick] { cursor:pointer; }
+.diagram [data-pick], .diagram [data-pick] * { pointer-events:all; }
+.diagram [data-pick]:hover { stroke-width:3.4; }
+.diagram [data-pick]:focus { outline:none; stroke-width:3.4; }
+/* Plain ink, not --s1. Blue already means "does something now" in the legend,
+   so a focused free control drawn blue would read as an assigned one. */
+.diagram [data-pick]:focus-visible { stroke:var(--ink); }
+/* A third state, and it must not be mistakable for the first two. Amber, wider
+   dashes than `free`, and the word `planned` next to it every time - because a
+   plan drawn like a working control is exactly the lie this page exists to
+   avoid. Never picks up the hover thickening: it is not clickable.
+
+   NOT called `.mark`. page.css already has a `.mark` - the round pass/fail badge
+   on the model checks - and it sets width and height. On a <div> that is
+   styling; on an SVG <rect> those are GEOMETRY and they beat the width and
+   height attributes outright. Every ring came out a small circle at the top-left
+   corner of the control it was supposed to surround. page.css's names are
+   global, and SVG shares the namespace. */
+.diagram .planring { fill:none; stroke:var(--warn); stroke-width:1.6;
+                     stroke-dasharray:7 5; pointer-events:none; }
+.diagram .plantxt { fill:var(--warn); font-size:var(--t-data); }
+.diagram .planlab { fill:var(--warn); font-size:var(--t-mark);
+                    font-weight:var(--w-bold); letter-spacing:.1em; }
+
+/* SVG text takes `fill`, not `color`, so none of page.css's text classes reach
+   inside here. Same four inks, same six sizes, named rather than typed.
+
+   A label ON the drawing is monospaced and a sentence ABOUT it is not - the
+   rule the whole dashboard is drawn to. The control's own name is the exception:
+   `ZL` and `A` are what is printed on the plastic, so they are set in the sans
+   face at ink weight, like the silk-screen they copy. */
+.diagram text        { font-family:var(--sans); }
+.diagram .name       { fill:var(--ink);   font-size:var(--t-body);
+                       font-weight:var(--w-bold); }
+.diagram .name.free  { fill:var(--muted); font-weight:400; }
+.diagram .fn         { fill:var(--ink2);  font-size:var(--t-data); font-weight:400; }
+.diagram .fn.free    { fill:var(--muted); }
+.diagram .brow       { fill:var(--muted); font-size:var(--t-cap);
+                       font-weight:var(--w-bold); letter-spacing:.14em;
+                       font-family:var(--mono); }
+.diagram .num        { fill:var(--ink);   font-size:var(--t-body);
+                       font-weight:var(--w-bold); font-family:var(--mono); }
+.diagram .cap        { fill:var(--muted); font-size:var(--t-mark);
+                       font-family:var(--mono); }
+/* The digit inside one of the five extra buttons. It sits inside the same <g>
+   as the box, which carries `.ctl`, so it must refuse the stroke or it comes
+   out as outlined text with a dashed outline. */
+.diagram .keynum { stroke:none; fill:var(--muted); font-size:var(--t-data);
+                   font-weight:var(--w-bold); font-family:var(--mono); }
+.diagram .ctl.on .keynum { fill:var(--s1); }
+
+/* The menu that opens on a control. Fixed to the viewport, not to the card: the
+   card is a `.tw` with overflow-x:auto, and anything inside it gets clipped at
+   the edge or scrolls away with the drawing.
+
+   The shadow is the only one in the dashboard and it is here because this thing
+   genuinely floats over the drawing - it has to detach from it or the two read
+   as one diagram. It was `rgba(0,0,0,.45)`, a hard black that is right on the
+   film and a smudge on blueprint paper. color-mix against --plane follows the
+   scheme, and the ring under it does the work the blur used to. */
+.pop { position:fixed; z-index:60; background:var(--surface);
+       border:1px solid var(--line); border-radius:var(--r); padding:var(--sp-2);
+       min-width:250px;
+       box-shadow:0 1px 0 var(--line), 0 10px 28px
+                  color-mix(in srgb,var(--plane) 55%,transparent); }
+.pop .pk { font-size:var(--t-cap); text-transform:uppercase; letter-spacing:.1em;
+           color:var(--muted); margin-bottom:var(--sp-2); font-family:var(--mono); }
+.pop .row { display:block; width:100%; text-align:left; font:inherit;
+            font-size:var(--t-body); color:var(--ink2); background:none; border:0;
+            border-radius:var(--r-sm); padding:var(--sp-1) var(--sp-2); cursor:pointer; }
+.pop .row:hover { background:var(--surface2); color:var(--ink); }
+.pop .row.on { color:var(--ink); background:var(--surface2);
+               font-weight:var(--w-bold); }
+.pop .row.on::after { content:" ✓"; color:var(--s1); }
+/* page.css styles `.btn:disabled`, and these are `.row` - so a disabled job sat
+   there looking exactly like a live one, complete with a hover highlight, and
+   clicking it did nothing at all with no explanation. */
+.pop .row:disabled { opacity:.3; cursor:not-allowed; }
+.pop .row:disabled:hover { background:none; color:var(--ink2); }
+/* Taking a job off is not one of the jobs, so it does not sit in the list as if
+   it were a fourth one. */
+.pop .row.clear { color:var(--muted); border-top:1px solid var(--line);
+                  border-radius:0 0 var(--r-sm) var(--r-sm); margin-top:var(--sp-1);
+                  padding-top:var(--sp-2); }
+.pop .row.clear:hover { color:var(--crit); background:none; }
+.pop .why { font-size:var(--t-mark); color:var(--muted); margin:var(--sp-2) 0 0; }
+.pop .prow { display:flex; gap:var(--sp-2); align-items:center;
+             margin-bottom:var(--sp-2); }
+.pop .prow .pl { width:64px; font-size:var(--t-data); color:var(--ink2); }
+/* Which direction of the stick, or which part of the control, a plan is for.
+   Amber, matching its ring on the drawing. */
+.pop .plannedlab { width:82px; color:var(--warn); font-weight:var(--w-bold); }
+
+/* A keycap. page.css has .chip and .btn; neither is square, and a numpad only
+   reads as a numpad if the keys are on a 3x3 grid at equal size. */
+.numpad { display:grid; grid-template-columns:repeat(3,minmax(0,1fr));
+          gap:var(--sp-2); max-width:400px; }
+.numpad .key { background:var(--surface2); border:1px solid var(--line);
+               border-radius:var(--r-sm); padding:var(--sp-2) var(--sp-3); }
+.numpad .key.wide { grid-column:1 / -1; }
+.numpad .key.hole { background:transparent; border:0; }
+.numpad .key b { display:block; font-family:var(--mono); font-size:var(--t-body);
+                 color:var(--ink); }
+.numpad .key span { font-size:var(--t-mark); color:var(--ink2); }
+
+/* Inputs sitting in a row rather than a form grid, where page.css sizes them to
+   fill their column. */
+.pick { width:auto; min-width:70px; }
+.amt  { width:80px; text-align:right; font-family:var(--mono); }
+</style>
+</head>
+<body>
+<div id="nav"></div>
+
+<main>
+<div class="paper">
+
+  <!-- Filled by draw(), because the counts in it come off the payload. This is
+       STATIC HTML, not a template literal - a `${...}` written here is printed
+       as the characters `${...}`, which is exactly what happened. -->
+  <div id="titleblock"></div>
+
+  <p class="lede">The plan is a handheld in the shape of a Switch.
+  <b>Click any control on the drawing</b> to pick what it does. It saves
+  straight to the map the simulator reads.</p>
+
+  <div id="warn"></div>
+
+  <div class="card tw" style="padding:14px 16px;">
+  <!-- viewBox is cropped to what is actually drawn, labels included, so the
+       drawing fills the card instead of floating in dead margin.
+
+       The geometry is fixed; the labels and the solid/dashed states are not.
+       Everything with an id is filled in from /api/controls, so moving `stop`
+       from button 2 to button 3 lights up X instead of A here.
+
+       data-pick says what clicking a shape opens:
+         button       one of the eight measured buttons - pick its job
+         stick        the axis, direction and full-stick value it drives
+         unmeasured   nothing to pick yet, and the menu says why -->
+  <svg class="diagram" viewBox="105 136 1150 574" role="img"
+       aria-label="Switch-shaped controller with every control labelled">
+
+    <!-- ============================ the body ============================
+         Drawn as the object rather than as three boxes. A Joy-Con is not a
+         rounded rectangle: its outer edge is one continuous curve running from
+         the shoulder to the base, and its inner edge is dead straight because
+         that is where the rail is. Getting that one line right is most of why
+         it reads as a Switch.
+
+         Nothing in here is clickable and nothing in here moved. Every control
+         sits where it always sat, because the leader lines are drawn to fixed
+         coordinates - the shell changed underneath them. -->
+
+    <!-- ============================================================ SCALE ==
+         Measured, not eyeballed. A Switch OLED is 242 x 102 mm overall and a
+         Joy-Con is 35.9 x 102 mm, so the console between them is
+         242 - 2(35.9) = 170.2 mm.
+
+              242 mm -> 720 units        2.98 units per mm
+              102    -> 304
+               35.9  -> 107   each Joy-Con     14.8% of the width
+              170.2  -> 506   the console      70.3%
+              155.0  -> 462   the screen, a 7.0" panel at 16:9
+               87.2  -> 260
+
+         It was drawn with 160-unit Joy-Cons and a 400-unit console - 22% and
+         56%. The Joy-Cons were half again too wide and the console a third too
+         narrow, which is why it read as a games pad with a screen in the middle
+         rather than as a tablet with two controllers clipped onto it.
+
+         Sources: nintendo.com Joy-Con specs (35.9 x 102 x 13.9 mm) and
+         dimensions.com (242 x 102 mm overall). -->
+
+    <!-- Left Joy-Con: 340 -> 447. Straight inner edge, one curve outboard. The
+         corner radius scales with it: 66 on a 107-wide body would have been most
+         of the Joy-Con. -->
+    <path class="shell" d="M 447,230 H 384 A 44,44 0 0 0 340,274
+                           V 490 A 44,44 0 0 0 384,534 H 447 Z"/>
+    <!-- The rail: the track the Joy-Con slides down to lock onto the console.
+         Two hairlines, because that is what it is - a channel, not an edge. -->
+    <path class="lead" d="M 443,244 V 520 M 451,244 V 520"/>
+
+    <!-- Console: 447 -> 953. Square-cornered, and a shade lighter so the two
+         Joy-Cons read as clipped ON to it rather than sitting beside it. -->
+    <rect class="console" x="447" y="234" width="506" height="296"/>
+
+    <!-- Right Joy-Con: 953 -> 1060, mirrored. -->
+    <path class="shell" d="M 953,230 H 1016 A 44,44 0 0 1 1060,274
+                           V 490 A 44,44 0 0 1 1016,534 H 953 Z"/>
+    <path class="lead" d="M 949,244 V 520 M 957,244 V 520"/>
+
+    <!-- The screen, with its bezel. The glass runs almost to the console edge
+         and the picture sits inside it - one rect could not say that. -->
+    <!-- ONE dark rectangle, square corners, even margins.
+
+         It was a bezel with a screen inside it, and at this size that is a thick
+         grey band around a darker rectangle - which reads as a rendering fault,
+         not as a device. Two tones of near-black only tell a story on a drawing
+         detailed enough to carry them; this one is not, and it should not
+         pretend. The glass front IS the screen here.
+
+         12px clear on all four sides: the same gap under the numbered buttons as
+         at the console's foot, so it sits in its case rather than floating high
+         in it. The speaker grilles went with the bezel - there is no longer room
+         for them beside the glass, and invented texture in a 12px margin is
+         decoration. -->
+    <!-- 352 x 198 is 16:9, which is what a 7.0" Switch OLED panel is (155.1 x
+         87.2 mm). It was 376 x 236 - 1.59:1 - because I sized it for even
+         margins and let the aspect ratio fall where it liked. A screen has one
+         shape and it is not negotiable.
+
+         At 16:9 the margins come out even anyway: 49 units clear above and
+         below, 24 either side. The panel is centred in the console because that
+         is where it sits on the object. -->
+    <!-- 462 x 260 is 155.0 x 87.2 mm, which is a 7.0" 16:9 panel - the OLED's
+         own screen, at the same 2.98 units/mm as the body. Centred in the
+         console: 22 units clear either side, 18 above and below. -->
+    <rect class="screen" x="469" y="252" width="462" height="260"/>
+
+    <!-- Five extra buttons along the top of the console, between the grips.
+         Nothing like them exists on a real Switch - they are part of what is
+         being built. Each is a <g> so the number rides the same on/free state
+         as the box round it, instead of needing its own bookkeeping. -->
+    <!-- ABOVE the console, not on it. They used to sit on the console face,
+         which at the real screen size is where the glass is - there is no bare
+         plastic on a Switch's front. That is honest anyway: these five do not
+         exist on the object, and drawing them off the body says so. -->
+    <g class="ctl" data-pick="control" data-name="1" tabindex="0">
+      <rect x="491" y="194" width="62" height="24" rx="5"/>
+      <text class="keynum" x="522" y="210" text-anchor="middle">1</text></g>
+    <g class="ctl" data-pick="control" data-name="2" tabindex="0">
+      <rect x="581" y="194" width="62" height="24" rx="5"/>
+      <text class="keynum" x="612" y="210" text-anchor="middle">2</text></g>
+    <g class="ctl" data-pick="control" data-name="3" tabindex="0">
+      <rect x="671" y="194" width="62" height="24" rx="5"/>
+      <text class="keynum" x="702" y="210" text-anchor="middle">3</text></g>
+    <g class="ctl" data-pick="control" data-name="4" tabindex="0">
+      <rect x="761" y="194" width="62" height="24" rx="5"/>
+      <text class="keynum" x="792" y="210" text-anchor="middle">4</text></g>
+    <g class="ctl" data-pick="control" data-name="5" tabindex="0">
+      <rect x="851" y="194" width="62" height="24" rx="5"/>
+      <text class="keynum" x="882" y="210" text-anchor="middle">5</text></g>
+    <!-- One shared line above them: five separate callouts in that strip would
+         collide, and there is nothing else up there. -->
+    <text class="fn free" x="702" y="176" text-anchor="middle"
+          id="fn-keys">five extra buttons, all free &mdash; not on a real Switch</text>
+
+    <!-- ===================== what the screen shows ====================== -->
+    <!-- The whole interface is three numbers. Putting them where the screen
+         would be is the point of the drawing: the sticks make these. -->
+    <!-- Centred in the panel, which is now 252..512 rather than 283..481. -->
+    <g class="screentext">
+      <text class="brow" x="700" y="304" text-anchor="middle">WHAT FULL STICK IS WORTH</text>
+      <text class="fn"   x="690" y="352" text-anchor="end">forward</text>
+      <text class="num"  x="710" y="352" id="num-fwd">—</text>
+      <text class="fn"   x="690" y="388" text-anchor="end">sideways</text>
+      <text class="num"  x="710" y="388" id="num-side">—</text>
+      <text class="fn"   x="690" y="424" text-anchor="end">turn</text>
+      <text class="num"  x="710" y="424" id="num-turn">—</text>
+      <text class="cap"  x="700" y="466" text-anchor="middle" id="num-note">—</text>
+    </g>
+
+    <!-- ========================= left-hand side ========================= -->
+    <!-- L and ZL, drawn as what they are rather than as two identical pills.
+         On the object, L is the bumper across the top face and ZL is the trigger
+         BEHIND it - so ZL is narrower and set back, L is wider and its bottom
+         edge is square where it meets the body. Two pills of equal width, both
+         floating clear of the shell, said neither of those things. -->
+    <!-- Everything on the left Joy-Con moved with its body: the centre went from
+         420 to 393 and the width from 160 to 107, so each control sits at
+         393 + (old - 420) x 0.669 and its radius scales with it. A 34-unit stick
+         on a 107-unit Joy-Con would be two thirds of the whole thing. -->
+    <path class="ctl" id="ctl-ZL" d="M 365,186 H 422 A 8,8 0 0 1 430,194
+          V 207 H 357 V 194 A 8,8 0 0 1 365,186 Z"
+          data-pick="button" data-name="ZL" tabindex="0"/>
+    <path class="ctl" id="ctl-L" d="M 355,210 H 432 A 10,10 0 0 1 442,220
+          V 231 H 345 V 220 A 10,10 0 0 1 355,210 Z"
+          data-pick="button" data-name="L" tabindex="0"/>
+    <circle class="ctl" cx="424" cy="264" r="8"
+            data-pick="unmeasured" data-name="minus" tabindex="0"/>
+    <circle class="ctl on" cx="391" cy="322" r="30"
+            data-pick="stick" data-name="left" tabindex="0"/>
+    <circle class="ctl on" cx="391" cy="322" r="16"/>
+    <!-- Four separate controls, not one. On the Joy-Con they are four discrete
+         round buttons rather than a rocker, and each direction is somewhere a
+         different thing can be planned - so each gets its own menu and its own
+         ring. -->
+    <circle class="ctl" cx="391" cy="402" r="11"
+            data-pick="unmeasured" data-name="dpad-up"    data-label="d-pad up"    tabindex="0"/>
+    <circle class="ctl" cx="391" cy="452" r="11"
+            data-pick="unmeasured" data-name="dpad-down"  data-label="d-pad down"  tabindex="0"/>
+    <circle class="ctl" cx="366" cy="427" r="11"
+            data-pick="unmeasured" data-name="dpad-left"  data-label="d-pad left"  tabindex="0"/>
+    <circle class="ctl" cx="416" cy="427" r="11"
+            data-pick="unmeasured" data-name="dpad-right" data-label="d-pad right" tabindex="0"/>
+    <rect class="ctl" x="416" y="480" width="16" height="16" rx="4"
+          data-pick="unmeasured" data-name="capture" tabindex="0"/>
+
+    <path class="lead" d="M 300,172 L 356,196"/>
+    <text class="name" x="294" y="168" text-anchor="end" id="lab-ZL">ZL</text>
+    <text class="fn"   x="294" y="185" text-anchor="end" id="fn-ZL">—</text>
+
+    <path class="lead" d="M 300,226 L 352,221"/>
+    <text class="name" x="294" y="222" text-anchor="end" id="lab-L">L</text>
+    <text class="fn"   x="294" y="239" text-anchor="end" id="fn-L">—</text>
+
+    <path class="lead" d="M 300,322 L 358,322"/>
+    <text class="name" x="294" y="306" text-anchor="end">LEFT STICK</text>
+    <text class="fn"   x="294" y="323" text-anchor="end">walk — forward, back,</text>
+    <text class="fn"   x="294" y="340" text-anchor="end">and crab sideways</text>
+    <!-- data-pre keeps the control's own name on the line when the job text is
+         swapped in, so this never reads as a bare "stop" floating under a stick. -->
+    <text class="fn free" x="294" y="357" text-anchor="end"
+          id="fn-L3" data-pre="click (L3) — ">click (L3) — free</text>
+
+    <path class="lead" d="M 300,428 L 352,427"/>
+    <text class="name free" x="294" y="424" text-anchor="end" id="lab-dpad">D-PAD</text>
+    <text class="fn free"   x="294" y="441" text-anchor="end" id="fn-dpad">four ways, all free</text>
+    <text class="fn free"   x="294" y="458" text-anchor="end">click each one on its own</text>
+
+    <!-- minus and capture sit on the inboard edge, so their callouts leave
+         through the top and the bottom rather than crossing the whole grip. -->
+    <path class="lead" d="M 424,254 V 170"/>
+    <text class="name free" x="424" y="158" text-anchor="middle" id="lab-minus">MINUS
+      <tspan class="fn free" dx="10" id="fn-minus">free</tspan></text>
+
+    <path class="lead" d="M 424,498 V 596"/>
+    <text class="name free" x="424" y="612" text-anchor="middle" id="lab-capture">CAPTURE
+      <tspan class="fn free" dx="10" id="fn-capture">free</tspan></text>
+
+    <!-- ======================== right-hand side ======================== -->
+    <!-- R and ZR, mirrored. Same reading: ZR is the trigger behind, R is the
+         bumper across the top face with a square bottom edge on the shell. -->
+    <!-- Mirrored: centre 980 -> 1007, width 160 -> 107, same 0.669. -->
+    <path class="ctl" id="ctl-ZR" d="M 978,186 H 1035 A 8,8 0 0 1 1043,194
+          V 207 H 970 V 194 A 8,8 0 0 1 978,186 Z"
+          data-pick="button" data-name="ZR" tabindex="0"/>
+    <path class="ctl" id="ctl-R" d="M 968,210 H 1045 A 10,10 0 0 1 1055,220
+          V 231 H 958 V 220 A 10,10 0 0 1 968,210 Z"
+          data-pick="button" data-name="R" tabindex="0"/>
+    <circle class="ctl" cx="976" cy="264" r="8"
+            data-pick="unmeasured" data-name="plus" tabindex="0"/>
+    <circle class="ctl" id="ctl-X" cx="1007" cy="296" r="12"
+            data-pick="button" data-name="X" tabindex="0"/>
+    <circle class="ctl" id="ctl-Y" cx="982"  cy="322" r="12"
+            data-pick="button" data-name="Y" tabindex="0"/>
+    <circle class="ctl" id="ctl-A" cx="1032" cy="322" r="12"
+            data-pick="button" data-name="A" tabindex="0"/>
+    <circle class="ctl" id="ctl-B" cx="1007" cy="348" r="12"
+            data-pick="button" data-name="B" tabindex="0"/>
+    <circle class="ctl on" cx="1007" cy="424" r="30"
+            data-pick="stick" data-name="right" tabindex="0"/>
+    <circle class="ctl on" cx="1007" cy="424" r="16"/>
+    <g data-pick="unmeasured" data-name="home" tabindex="0">
+      <circle class="ctl" cx="976" cy="482" r="10"/>
+      <circle class="ctl" cx="976" cy="482" r="4"/>
+    </g>
+
+    <path class="lead" d="M 1043,196 L 1075,172"/>
+    <text class="name" x="1082" y="168" id="lab-ZR">ZR
+      <tspan class="fn" dx="10" id="fn-ZR">—</tspan></text>
+
+    <path class="lead" d="M 1048,221 L 1075,226"/>
+    <text class="name" x="1082" y="222" id="lab-R">R
+      <tspan class="fn" dx="10" id="fn-R">—</tspan></text>
+
+    <!-- Y is the innermost face button. Its leader climbs to a clear lane just
+         above X, then runs out to the right column with the others. -->
+    <path class="lead" d="M 982,310 V 272 H 1075"/>
+    <text class="name" x="1082" y="272" id="lab-Y">Y
+      <tspan class="fn" dx="10" id="fn-Y">—</tspan></text>
+
+    <path class="lead" d="M 1019,296 L 1075,300"/>
+    <text class="name" x="1082" y="300" id="lab-X">X
+      <tspan class="fn" dx="10" id="fn-X">—</tspan></text>
+
+    <path class="lead" d="M 1044,322 L 1075,330"/>
+    <text class="name" x="1082" y="330" id="lab-A">A
+      <tspan class="fn" dx="10" id="fn-A">—</tspan></text>
+
+    <path class="lead" d="M 1017,354 L 1075,362"/>
+    <text class="name" x="1082" y="366" id="lab-B">B
+      <tspan class="fn" dx="10" id="fn-B">—</tspan></text>
+
+    <path class="lead" d="M 1040,424 L 1075,428"/>
+    <text class="name" x="1082" y="424">RIGHT STICK</text>
+    <text class="fn"   x="1082" y="441">turn on the spot</text>
+    <text class="fn free" x="1082" y="458"
+          id="fn-R3" data-pre="click (R3) — ">click (R3) — free</text>
+
+    <path class="lead" d="M 976,254 V 170"/>
+    <text class="name free" x="976" y="158" text-anchor="middle" id="lab-plus">PLUS
+      <tspan class="fn free" dx="10" id="fn-plus">free</tspan></text>
+
+    <path class="lead" d="M 976,494 V 596"/>
+    <text class="name free" x="976" y="612" text-anchor="middle" id="lab-home">HOME
+      <tspan class="fn free" dx="10" id="fn-home">free</tspan></text>
+
+    <!-- Filled in by drawPlanned(): a ring round every control something is
+         planned for, and the list of those plans. Empty in the markup because
+         the plans live in Playground/wanted.json, not here. -->
+    <g id="plans"></g>
+
+    <!-- ============================= legend ============================ -->
+    <line class="ctl on" x1="392" y1="688" x2="432" y2="688"/>
+    <text class="fn" x="444" y="692">does something now</text>
+    <line class="ctl" x1="616" y1="688" x2="656" y2="688"/>
+    <text class="fn free" x="668" y="692">free</text>
+    <line class="planring" x1="820" y1="688" x2="860" y2="688"/>
+    <text class="plantxt" x="872" y="692">planned — cannot perform yet</text>
+
+  </svg>
+  </div>
+  <p class="scrollhint faint small" style="margin:6px 0 0;">Drag the drawing
+  sideways to see the rest of it.</p>
+
+  <!-- The deadzone belongs to every stick at once, so it is the one setting
+       that has no control to be clicked on. -->
+  <div class="checks" style="margin-top:12px;">
+    <span class="faint small">Deadzone, both sticks</span>
+    <input class="filter amt" id="dz" type="number" step="0.01" min="0">
+    <span class="faint small" id="dzmax"></span>
+    <span class="small" id="saystate" style="color:var(--good);"></span>
+  </div>
+
+  <p class="note" style="margin-top:14px;">Saved to
+  <code>Playground\settings.json</code> the moment you pick something. Takes
+  effect the next time <code>pilot.bat</code> runs. <b>Not while the tkinter
+  settings window is open</b> — it writes the same file when it closes, so
+  whichever goes last wins.</p>
+
+  <p class="note">SL and SR are left off on purpose: they only exist when a
+  Joy-Con is detached, and this is one piece.</p>
+
+  <div class="facts" id="facts" style="margin-top:16px;"></div>
+
+  <div class="facts" id="facts" style="display:none"></div>
+
+  <!-- ==================== what it does, and what is only wanted ==========
+       ONE table used to hold both, sixteen rows deep, with a `can perform?`
+       column doing the separating. That column was the most important thing on
+       the page and it was the third one along - so the list read as sixteen
+       things the pad does, six of which happened to be ticked.
+
+       It is two blocks now. Six things it does, and ten notes to whoever writes
+       the code. A row that is only wanted must never sit in the same list as a
+       row that works. ===================================================== -->
+  <div class="grid wide" style="margin-top:var(--sp-5)">
+    <div class="blk">
+      <h2><b>What it can do now</b><span class="n" id="canN"></span></h2>
+      <table class="t">
+        <thead><tr><th>command</th><th>kind</th><th>what it does</th>
+          <th>on</th><th>built in</th></tr></thead>
+        <tbody id="issuerows"></tbody>
+      </table>
+      <div class="note key" style="margin:11px">Three numbers and three actions.
+        That is the whole interface &mdash; everything else the robot works out
+        for itself.</div>
+    </div>
+
+    <div class="blk">
+      <h2><b>Wanted, and not built</b><span class="n" id="wantN"></span></h2>
+      <table class="t">
+        <thead><tr><th>name</th><th>kind</th><th>what it should do</th>
+          <th>should go on</th><th></th></tr></thead>
+        <tbody id="wantrows"></tbody>
+      </table>
+      <div class="note bad" style="margin:11px"><b>Nothing here works.</b> A new
+        action needs code in <code>PadPilot.poll</code>; a new number needs the
+        policy retrained to take it. Nothing reads this list but this page, so a
+        row cannot be put on a button until somebody builds it.</div>
+      <details id="addwanted">
+        <summary>add something you want it to do<span class="grow"></span></summary>
+        <div style="padding:0 11px 11px">
+          <div class="form">
+            <div class="f">
+              <label for="w_name">Name</label>
+              <input class="filter" id="w_name" maxlength="40" placeholder="slow mode">
+            </div>
+            <div class="f">
+              <label for="w_kind">Kind</label>
+              <select class="filter" id="w_kind">
+                <option value="action">a button does it</option>
+                <option value="number">a stick makes it</option>
+              </select>
+            </div>
+            <div class="f">
+              <label for="w_where">Should go on</label>
+              <select class="filter" id="w_where"></select>
+            </div>
+            <div class="f wide">
+              <label for="w_does">What it should do</label>
+              <input class="filter" id="w_does" maxlength="140"
+                     placeholder="halve every number while it is held, for tight spaces">
+            </div>
+          </div>
+          <div class="checks" style="margin-top:var(--sp-3)">
+            <button class="btn" id="w_add">Add to the list</button>
+          </div>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <!-- ==================== every control, and the numpad ==================
+       The control list is FOLDED. It is the third listing of the same controls
+       on one page - the drawing shows them, the two tables above say what they
+       do, and this says what number Windows reports. That number only matters
+       when you are wiring one up, which is not why you opened the page. ==== -->
+  <div class="grid wide" style="margin-top:var(--sp-4)">
+    <div class="blk">
+      <h2><b>Every control, and the number Windows reports</b></h2>
+      <details id="everyctl">
+        <summary>the wiring numbers<span class="grow"></span>needed only when
+          wiring one up</summary>
+        <table class="t">
+          <thead><tr><th>control</th><th></th><th>does</th>
+            <th>Windows sees it as</th></tr></thead>
+          <tbody id="allrows"></tbody>
+          <tbody>
+            <tr><td class="k">d-pad &mdash; up, down, left, right</td>
+                <td><span class="chip">free</span></td>
+                <td class="why">&mdash;</td>
+                <td class="why">all four come back as one POV hat angle, not as
+                  four button numbers</td></tr>
+            <tr><td class="k">L3, R3 &mdash; stick clicks</td>
+                <td><span class="chip">free</span></td>
+                <td class="why">&mdash;</td>
+                <td class="why">not in the measured 0&ndash;7 block; probe it</td></tr>
+            <tr><td class="k">minus, plus</td><td><span class="chip">free</span></td>
+                <td class="why">&mdash;</td>
+                <td class="why">not in the measured 0&ndash;7 block; probe it</td></tr>
+            <tr><td class="k">home, capture</td><td><span class="chip">free</span></td>
+                <td class="why">&mdash;</td>
+                <td class="why">a console usually swallows these; probe it</td></tr>
+          </tbody>
+        </table>
+        <div class="note key" style="margin:11px"><b>Probe it</b> means run
+          <code>Playground\pad.bat</code>, press the control, and read the number
+          it prints. Buttons 0&ndash;7 were measured that way on a PowerA Switch
+          pad; the rest have never been pressed on this machine, so this page does
+          not guess them.</div>
+      </details>
+    </div>
+
+  <div class="twocol">
+    <div class="numpad">
+      <div class="key"><b>7</b><span>crab left</span></div>
+      <div class="key"><b>8</b><span>faster</span></div>
+      <div class="key"><b>9</b><span>crab right</span></div>
+      <div class="key"><b>4</b><span>turn left</span></div>
+      <div class="key"><b>5</b><span>STOP</span></div>
+      <div class="key"><b>6</b><span>turn right</span></div>
+      <div class="key hole"></div>
+      <div class="key"><b>2</b><span>slower</span></div>
+      <div class="key hole"></div>
+      <div class="key wide"><b>0</b><span>straight ahead at the usual speed</span></div>
+    </div>
+    <div>
+      <div class="kv"><span>forward</span><b class="mono">± 0.05 m/s</b><span class="faint">per press</span></div>
+      <div class="kv"><span>sideways</span><b class="mono">± 0.05 m/s</b><span class="faint">per press</span></div>
+      <div class="kv"><span>turn</span><b class="mono">± 0.10 rad/s</b><span class="faint">per press</span></div>
+      <p class="note" style="margin-top:14px;">Speeds are <b>sticky</b>: a press
+      changes the speed and it stays there, like a throttle. The window only
+      reports keys going down, never coming up, so hold-to-walk cannot be
+      written against it.</p>
+      <p class="note">Not the letter keys. MuJoCo binds every letter A–Z to one
+      of its own view toggles inside its C++ window, before Python sees the key
+      — WASD steered the robot and scrambled the picture at the same time. The
+      numpad is the one block it leaves alone.</p>
+    </div>
+  </div>
+  </div>
+
+  <p class="note" style="margin-top:var(--sp-5)">The map on this page is
+  <code>Playground\settings.json</code>, read live &mdash; not a copy. The numpad
+  steps come from <code>Playground\control.py</code> and the trained ranges from
+  <code>gray\tasks\walk_env_cfg.py</code>; those two are still copied here, so
+  change them and change this page in the same edit.</p>
+
+</div>
+</main>
+
+<script src="/page.js"></script>
+<script>
+/* The eight buttons that have been pressed on a real pad, in drawing order.
+   Everything else on the controller has no measured number, so it cannot be
+   assigned and its menu says why. */
+const NAMED = ["ZL", "L", "ZR", "R", "Y", "X", "A", "B"];
+/* Which of the three numbers each stick makes. */
+const STICKS = {left: {label: "Left stick", keys: ["fwd", "side"], click: "L3"},
+                right: {label: "Right stick", keys: ["turn"], click: "R3"}};
+
+let MAP = null;
+const el = (id) => document.getElementById(id);
+const num = (v) => "±" + v.toFixed(2);
+
+/* ------------------------------------------------------------------ draw --- */
+
+function drawDiagram(s) {
+  s.commands.forEach(c => {
+    el("num-" + c.key).textContent = num(c.full) + " " + c.unit;
+  });
+  el("num-note").textContent = s.commands.some(c => c.past_trained)
+    ? "past what it trained on — see the note above"
+    : "inside the range it trained on";
+
+  /* Driven by every control, not by a list in here. Give `home` button 9 and
+     put `stop` on it and HOME lights up - no change to this function. */
+  (s.controls || []).forEach(c => {
+    const shape = document.querySelector(
+      `.diagram [data-pick][data-name="${c.name}"]`);
+    if (shape) shape.classList.toggle("on", !!c.action);
+    const lab = el("lab-" + c.name);
+    if (lab) lab.classList.toggle("free", !c.action);
+    const fn = el("fn-" + c.name);
+    if (!fn) return;
+    fn.classList.toggle("free", !c.action);
+    fn.textContent = (fn.getAttribute("data-pre") || "")
+      + (c.action ? c.says : "free");
+  });
+
+  /* Two groups share one callout each, because four ways and five buttons in a
+     row cannot each have their own without the labels colliding. Summarise
+     rather than naming one and quietly hiding the rest. */
+  const shared = (node, members, strip, empty) => {
+    const busy = members.filter(x => x.action);
+    node.classList.toggle("free", !busy.length);
+    node.textContent = busy.length
+      ? busy.map(x => `${x.label.replace(strip, "")}: ${x.says}`).join(" · ")
+      : empty;
+    return busy.length;
+  };
+  const ways = (s.controls || []).filter(x => x.name.startsWith("dpad-"));
+  const dpBusy = shared(el("fn-dpad"), ways, "d-pad ", "four ways, all free");
+  el("lab-dpad").classList.toggle("free", !dpBusy);
+
+  const keys = (s.controls || []).filter(x => /^[1-5]$/.test(x.name));
+  shared(el("fn-keys"), keys, "", "five extra buttons, all free");
+}
+
+const SVGNS = "http://www.w3.org/2000/svg";
+const svgEl = (tag, attrs) => {
+  const n = document.createElementNS(SVGNS, tag);
+  Object.entries(attrs).forEach(([k, v]) => n.setAttribute(k, v));
+  return n;
+};
+
+/* Planned things, on the drawing: a ring round the control each one is meant
+   for, and the list of them in the empty strip under the console.
+
+   The ring is measured with getBBox() rather than from a second table of
+   coordinates, so moving a control in the markup moves its ring with it. */
+function drawPlanned(s) {
+  const box = el("plans");
+  box.textContent = "";
+  const rows = (s.wanted || []).filter(w => w.where_control);
+  if (!rows.length) return;
+
+  const seen = new Set();
+  rows.forEach(w => {
+    if (seen.has(w.where_control)) return;
+    seen.add(w.where_control);
+    const target = document.querySelector(
+      `.diagram [data-pick][data-name="${w.where_control}"]`);
+    if (!target) return;
+    const b = target.getBBox();
+    box.appendChild(svgEl("rect", {
+      class: "planring", x: b.x - 7, y: b.y - 7,
+      width: b.width + 14, height: b.height + 14,
+      rx: Math.min(14, (b.height + 14) / 2),
+    }));
+  });
+
+  /* The strip between the grips, under the console, is the only clear space
+     big enough - and it is in the middle, where the eye already is. */
+  box.appendChild(svgEl("text", {
+    class: "planlab", x: 512, y: 556,
+  })).textContent = "PLANNED — CANNOT PERFORM YET";
+
+  const SHOW = 4;
+  rows.slice(0, SHOW).forEach((w, i) => {
+    const y = 578 + i * 19;
+    box.appendChild(svgEl("text", {
+      class: "plantxt", x: 512, y,
+    })).textContent = w.where_label;
+    const name = svgEl("text", {class: "fn", x: 700, y});
+    name.textContent = w.name;
+    box.appendChild(name);
+  });
+  if (rows.length > SHOW) {
+    box.appendChild(svgEl("text", {
+      class: "cap", x: 512, y: 578 + SHOW * 19,
+    })).textContent = `and ${rows.length - SHOW} more, in the table below`;
+  }
+}
+
+function drawFacts(s) {
+  const fwd = s.commands.find(c => c.key === "fwd");
+  el("facts").innerHTML = [
+    ["Full stick", `${fwd.full.toFixed(2)} m/s`,
+     "What pushing the left stick all the way forward asks for. Push half way, "
+     + "walk half speed."],
+    ["Trained on", `±${fwd.trained_hi.toFixed(2)} m/s`,
+     `Read from ${fwd.const} in the task config. Outside this, what the robot `
+     + "does says nothing about the policy."],
+    ["Deadzone", s.deadzone.toFixed(2),
+     "Less throw than this counts as centred, so it does not creep when nobody "
+     + "is touching it."],
+    ["Stick curve", "squared",
+     "Throw is squared past the deadzone. Linear makes it lurch: the first "
+     + "millimetre is already a tenth of full speed."],
+  ].map(([k, v, n]) =>
+    `<div class="fact"><div class="k">${esc(k)}</div>
+       <div class="v">${esc(v)}</div><div class="n">${esc(n)}</div></div>`).join("");
+}
+
+/* Warnings, sorted into the two things they actually are.
+
+   They were four identical full-width amber banners stacked down the page, and
+   three of them were the SAME SENTENCE with a different noun: "full stick on
+   forward is 0.9 m/s, past the 0.35 it trained on", then sideways, then turn.
+   Three repetitions of one fact, each dressed as an alarm, above the drawing
+   they are about - so the page opened with a wall of amber that said one thing.
+
+   A banner is for something that is wrong and can be fixed. Full stick reaching
+   past the trained range is not wrong; it is a deliberate setting with a
+   consequence, and a consequence belongs in a table beside the number that
+   causes it. So: anything naming a control that has no button is a fault and
+   keeps its banner. Everything else becomes one block, one row each.
+
+   Told apart by shape, not by matching words: `commands` already carries
+   `past_trained` per stick, so the split is read off the payload rather than
+   guessed from the sentence. */
+function drawWarnings(s) {
+  const bits = [];
+  if (!s.saved) {
+    bits.push(`<div class="banner"><b>No settings file yet.</b> These are what
+      <code>pad.py</code> starts with. Picking anything creates
+      <code>${esc(s.path)}</code>.</div>`);
+  }
+
+  const past = (s.commands || []).filter(c => c.past_trained);
+  /* A warning about full stick is one of `past` and is shown in the block; a
+     warning about anything else is a fault and gets a banner. */
+  const faults = (s.warnings || []).filter(w => !/full stick/i.test(w));
+  faults.forEach(w => bits.push(`<div class="banner bad">${esc(w)}</div>`));
+
+  if (past.length) {
+    bits.push(`<div class="blk" style="margin-bottom:var(--sp-3)">
+      <h2><b>Full stick reaches past what it trained on</b>
+        <span class="n">${past.length} of ${(s.commands || []).length}</span></h2>
+      <table class="t">
+        <tr><th>command</th><th class="n">full stick</th><th class="n">trained to</th>
+            <th class="n">past by</th><th>on</th></tr>
+        ${past.map(c => `<tr>
+          <td class="k">${esc(c.label)}</td>
+          <td class="n">±${c.full.toFixed(2)} ${esc(c.unit)}</td>
+          <td class="n faint">±${c.trained_hi.toFixed(2)} ${esc(c.unit)}</td>
+          <td class="n" style="color:var(--warn)">${
+            (c.full / c.trained_hi).toFixed(1)}×</td>
+          <td class="why">${esc({fwd: "left stick, away from you",
+            side: "left stick, sideways", turn: "right stick"}[c.key] || "")}</td>
+          </tr>`).join("")}
+      </table>
+      <div class="note" style="margin:11px"><b>Not a fault.</b> Past the trained
+        range the robot has never been asked for this, so what it does there tells
+        you nothing about the policy. That is sometimes exactly what you want
+        &mdash; it is how you find where the policy stops coping. It is on the
+        page so the reading is never a surprise.</div>
+    </div>`);
+  }
+  el("warn").innerHTML = bits.join("");
+}
+
+function drawTable(s) {
+  const byControl = {};
+  s.actions.forEach(a => { if (a.control) byControl[a.control] = a; });
+  const number = {};
+  s.buttons.forEach(b => { number[b.name] = b.n; });
+
+  const stick = (label, does, c) => `
+    <tr><td><b>${esc(label)}</b></td>
+        <td><span class="chip now">mapped</span></td>
+        <td>${esc(does)}</td>
+        <td class="dim">axis <code>${esc(c)}</code></td></tr>`;
+
+  const by = {};
+  s.commands.forEach(c => { by[c.key] = c; });
+  const rows = [
+    stick("left stick", "Walk. Away from you is forward, sideways is a crab step.",
+          `${by.fwd.axis} forward, ${by.side.axis} sideways`
+          + (by.fwd.invert || by.side.invert ? " — flipped" : "")),
+    stick("right stick", "Turn on the spot.",
+          by.turn.axis + (by.turn.invert ? " — flipped" : "")),
+  ];
+  NAMED.forEach(name => {
+    const act = byControl[name];
+    rows.push(act
+      ? `<tr><td><b>${esc(name)}</b></td>
+             <td><span class="chip now">mapped</span></td>
+             <td>${esc(act.says)}</td>
+             <td class="dim">button ${number[name]}</td></tr>`
+      : `<tr><td class="dim">${esc(name)}</td>
+             <td><span class="chip">free</span></td>
+             <td class="dim">—</td>
+             <td class="dim">button ${number[name]}</td></tr>`);
+  });
+  el("allrows").innerHTML = rows.join("");
+}
+
+/* Every command the controller can issue: the three numbers a stick makes, the
+   three actions a button does, then anything on the wish list - which is kept
+   visibly apart, because a row that is only wanted must never read like a row
+   that works. */
+/* Two tables, not one with a `can perform?` column.
+
+   The column was doing the work of a heading: it was the most important thing on
+   the page and it sat third from the left, so sixteen rows read as one list of
+   things the pad does, six of which happened to carry a tick. What it CAN do and
+   what somebody merely WROTE DOWN are not two states of one thing.
+
+   So the tick is gone with the column. The split says it, the second block's
+   heading says it, and its note says nothing in it works. */
+function drawIssue(s) {
+  const stickFor = {fwd: "left stick", side: "left stick", turn: "right stick"};
+
+  const numbers = s.commands.filter(c => c.built).map(c => `
+    <tr>
+      <td class="k">${esc(c.label)}</td>
+      <td><span class="chip">number</span></td>
+      <td class="why">${esc({fwd: "Walk forwards, or backwards.",
+                 side: "Crab step, without turning.",
+                 turn: "Turn on the spot."}[c.key])}</td>
+      <td>${esc(stickFor[c.key])}
+        <div class="sub mono">axis ${esc(c.axis)} · ±${c.full.toFixed(2)}
+          ${esc(c.unit)} · trained ±${c.trained_hi.toFixed(2)}</div></td>
+      <td class="why"><code>${esc(c.const)}</code></td>
+    </tr>`);
+
+  const actions = s.actions.filter(a => a.built).map(a => `
+    <tr>
+      <td class="k">${esc(a.key)}</td>
+      <td><span class="chip">action</span></td>
+      <td class="why">${esc(a.does || a.says)}</td>
+      <td>${a.control ? esc(a.control)
+            : "<span class=\"chip warn\">no control</span>"}
+        <div class="sub mono">button ${a.button}</div></td>
+      <td class="why"><code>PadPilot.poll</code></td>
+    </tr>`);
+
+  /* Where a planned thing should live once somebody builds it. Choosing marks
+     the spot on the drawing too, so the finished layout can be seen whole. */
+  const places = (sel) => (s.places || []).map(p => {
+    const busy = p.taken_by && p.id !== sel && p.id
+      ? ` (${p.taken_by})` : "";
+    return `<option value="${esc(p.id)}"${p.id === sel ? " selected" : ""}
+            >${esc(p.label)}${esc(busy)}</option>`;
+  }).join("");
+
+  /* Anything the payload says is not built lands here, wherever it came from -
+     a wish, or a command the task config no longer carries. One rule, one list. */
+  const want = (s.wanted || []).concat(
+    s.commands.filter(c => !c.built).map(c => ({
+      id: "", name: c.label, kind: "number", does: "", where: "" })),
+    s.actions.filter(a => !a.built).map(a => ({
+      id: "", name: a.key, kind: "action", does: a.does || a.says, where: "" })));
+
+  const wantRows = want.map(w => `
+    <tr>
+      <td class="k">${esc(w.name)}</td>
+      <td><span class="chip">${esc(w.kind === "number" ? "number" : "action")}</span></td>
+      <td class="why">${esc(w.does)}</td>
+      <td>${w.id ? `<select class="filter pick" data-where="${esc(w.id)}"
+            >${places(w.where)}</select>` : `<span class="faint">&mdash;</span>`}</td>
+      <td>${w.id ? `<button class="btn tiny" data-drop="${esc(w.id)}">remove</button>`
+            : ""}</td>
+    </tr>`);
+
+  const can = numbers.length + actions.length;
+  el("issuerows").innerHTML = numbers.concat(actions).join("");
+  el("wantrows").innerHTML = wantRows.join("")
+    || `<tr><td colspan="5" class="why">Nothing on the list. Everything the pad
+        can issue, it can perform.</td></tr>`;
+  el("canN").textContent = can;
+  el("wantN").textContent = want.length;
+  el("w_where").innerHTML = places("");
+}
+
+/* The sheet's title block. Same six-cell strip as every other page, and its last
+   cell names the file this page writes - which matters more here than anywhere
+   else, because the tkinter panel writes that same file and whoever saves last
+   wins. */
+function drawTitleblock(s) {
+  const wired = (s.actions || []).filter(a => a.control).length;
+  el("titleblock").outerHTML = titleblock([
+    { k: "sheet", v: "What each control does" },
+    { k: "subject", v: "the pad that drives the sim" },
+    { k: "sticks / buttons", v: `2 / ${(s.buttons || []).length}` },
+    { k: "jobs wired", v: `${wired} of ${(s.actions || []).length}` },
+    { k: "wanted, not built", v: String((s.wanted || []).length) },
+    { k: "reads / writes", html: `<span class="mono">${
+        esc((s.path || "").split(/[\\/]/).pop() || "settings.json")}</span>` },
+  ]).replace("<div class=\"titleblock\">", "<div class=\"titleblock\" id=\"titleblock\">");
+}
+
+function draw(s) {
+  MAP = s;
+  drawTitleblock(s);
+  drawWarnings(s);
+  drawDiagram(s);
+  drawPlanned(s);
+  drawFacts(s);
+  drawIssue(s);
+  drawTable(s);
+  el("dz").value = s.deadzone;
+  el("dz").max = s.deadzone_max;
+  el("dzmax").textContent = `0 to ${s.deadzone_max} — above that most of the `
+    + "stick's travel does nothing";
+}
+
+/* ------------------------------------------------------------------ save --- */
+
+/* The whole map every time, with `over` replacing whichever part changed. The
+   server validates all five fields and refuses the lot, so sending a partial
+   map would just be a way to fail its checks. */
+function bodyWith(over) {
+  const axis = {}, invert = {}, full = {}, button = {};
+  MAP.commands.forEach(c => {
+    axis[c.key] = c.axis; invert[c.key] = c.invert; full[c.key] = c.full;
+  });
+  MAP.actions.forEach(a => { button[a.key] = a.button; });
+  return Object.assign(
+    {axis, invert, full, button, deadzone: MAP.deadzone}, over);
+}
+
+let FLASH = null;
+function put(over) {
+  return post("/api/controls", bodyWith(over)).then(out => {
+    if (!out || out.error) return;
+    draw(out);
+    el("saystate").textContent = "Saved";
+    clearTimeout(FLASH);
+    FLASH = setTimeout(() => { el("saystate").textContent = ""; }, 2200);
+  });
+}
+
+/* Assigning an action to a button never leaves one homeless. All three always
+   exist in the code, so there is no such thing as "no stop button" - moving
+   `stop` onto a button that already had `reset` makes the two TRADE places. */
+/* Take a job off the pad without giving it to something else.
+
+   There is no such thing as "stop is unset" - PadPilot always reads
+   button["stop"], so the job has to hold SOME number. Parking it on a number no
+   control sends leaves it defined and unreachable, which is exactly what
+   "nothing does this" means in hardware. The page then warns that the job has
+   nowhere to be pressed, so it can never be quietly lost. */
+function clearAction(action) {
+  const used = new Set((MAP.controls || [])
+    .map(c => c.button).filter(n => n >= 0));
+  MAP.actions.forEach(a => { if (a.key !== action) used.add(a.button); });
+
+  let park = -1;
+  for (let n = (MAP.button_max || 15); n >= 0; n--) {
+    if (!used.has(n)) { park = n; break; }
+  }
+  if (park < 0) {
+    alert("Every button number is spoken for, so there is nowhere to park this "
+          + "job. Unwire a control first, then try again.");
+    return closePop();
+  }
+  const button = {};
+  MAP.actions.forEach(a => { button[a.key] = a.button; });
+  button[action] = park;
+  closePop();
+  return put({button});
+}
+
+function assign(action, buttonNumber) {
+  const button = {};
+  MAP.actions.forEach(a => { button[a.key] = a.button; });
+  if (button[action] === buttonNumber) return closePop();
+  const from = button[action];
+  const displaced = Object.keys(button)
+    .find(k => k !== action && button[k] === buttonNumber);
+  button[action] = buttonNumber;
+  if (displaced) button[displaced] = from;
+  closePop();
+  put({button});
+}
+
+/* ------------------------------------------------------------------- pop --- */
+
+let POP = null;
+function closePop() {
+  if (POP) { POP.remove(); POP = null; }
+}
+
+function openPop(target, html) {
+  closePop();
+  const box = document.createElement("div");
+  box.className = "pop";
+  box.innerHTML = html;
+  document.body.appendChild(box);
+  POP = box;
+
+  /* Anchor under the control, then pull it back inside the window. A menu half
+     off the right edge is the usual way this kind of thing breaks. */
+  const at = target.getBoundingClientRect();
+  const w = box.offsetWidth, h = box.offsetHeight;
+  let x = at.left + at.width / 2 - w / 2;
+  let y = at.bottom + 8;
+  x = Math.max(8, Math.min(x, window.innerWidth - w - 8));
+  if (y + h > window.innerHeight - 8) y = Math.max(8, at.top - h - 8);
+  box.style.left = x + "px";
+  box.style.top = y + "px";
+}
+
+/* What is PLANNED for this control, under whatever it does today. Without this
+   the menu answers "what does this do" with only half the story: the drawing
+   rings a control in amber and then clicking it said nothing about why. */
+function plannedFor(control) {
+  const rows = (MAP.wanted || []).filter(w => w.where_control === control);
+  if (!rows.length) return "";
+  return `<div class="pk" style="margin-top:12px;">Planned here</div>`
+    + rows.map(w => `<div class="prow">
+        <span class="pl plannedlab">${esc(w.where_short || "planned")}</span>
+        <span style="font-size:12.5px;color:var(--ink2);flex:1;">${esc(w.name)}</span>
+        <span class="chip warn">✗ cannot perform yet</span>
+      </div>`).join("")
+    + `<p class="why">Nothing is built for these. They are on the list further
+       down the page — this is only where they should go.</p>`;
+}
+
+/* One menu for every control, whether or not it has a number yet.
+
+   It used to be two: a real menu for the eight buttons somebody had measured,
+   and an apology for everything else. That was wrong. The pad can be probed,
+   and this controller is being built - so which control sends which number is
+   the owner's decision, not a fact to be discovered. Every control gets the
+   number picker; having a number is what unlocks the three jobs. */
+function popControl(target, name) {
+  const c = (MAP.controls || []).find(x => x.name === name);
+  if (!c) return;
+  const wired = c.button >= 0;
+
+  const nums = [`<option value="">not wired to a button</option>`]
+    .concat(Array.from({length: (MAP.button_max || 15) + 1}, (_v, n) => {
+      const owner = (MAP.controls || []).find(x => x.button === n && x.name !== name);
+      return `<option value="${n}"${n === c.button ? " selected" : ""}
+        ${owner ? " disabled" : ""}>button ${n}${
+        owner ? ` — taken by ${esc(owner.label)}` : ""}</option>`;
+    })).join("");
+
+  const jobs = MAP.actions.map(a =>
+    `<button class="row${a.key === c.action ? " on" : ""}"
+             data-act="${a.key}"${wired ? "" : " disabled"}
+      >${esc(a.says)}</button>`).join("")
+    + (c.action
+       ? `<button class="row clear" data-clear="${esc(c.action)}"
+           >nothing — leave this control free</button>` : "");
+
+  /* The d-pad is not four buttons as far as Windows is concerned, so it needs
+     saying - but it no longer blocks anything. Wire it as four and it works. */
+  const hat = name.startsWith("dpad-")
+    ? `<p class="why">Windows reports the whole d-pad as one angle — the POV hat
+       — so a stock pad will not send a number for this. On a controller you
+       build yourself, wire it as an ordinary button and it will.</p>` : "";
+
+  openPop(target, `
+    <div class="pk">${esc(c.label)}${
+      wired ? ` — button ${c.button}` : ""}${
+      c.source === "yours" ? " · you set this" : ""}</div>
+    <div class="prow">
+      <span class="pl">sends</span>
+      <select class="filter" data-button="${esc(name)}" style="flex:1;">${nums}</select>
+    </div>
+    ${hat}
+    <div class="pk" style="margin-top:12px;">What it does${
+      wired ? "" : ` — <span style="color:var(--warn)">pick a number first</span>`}</div>
+    ${wired ? "" : `<p class="why" style="margin:0 0 6px;">These are greyed
+      because nothing can be bound to a control that sends no number. Press it
+      in <code>Playground\\pad.bat</code> to see what it sends — or just decide,
+      if you are wiring it yourself.</p>`}
+    ${jobs}
+    ${wired ? `<p class="why">${c.action
+      ? "Picking another swaps this control with whichever one has it now. "
+        + "Leaving it free parks the job on a spare number, so nothing on the "
+        + "pad does it until you put it somewhere."
+      : "Picking one moves it here, and frees the control it was on."}</p>` : ""}
+    ${plannedFor(name)}`);
+  // Which button the job rows in this menu act on. Read back on click.
+  POP.dataset.button = String(c.button);
+}
+
+function popStick(which) {
+  /* `stick`, not `s`. On every page in this dashboard `s` is the payload the
+     server sent, and tools/api_contract_check.py reads that convention to check
+     each page against its endpoint. A second meaning for the name made the
+     checker report this function's three fields as missing from /api/controls.
+     (Naming them here would put them back in the report - it scrapes the file,
+     comments and all.) */
+  const stick = STICKS[which];
+  const rows = stick.keys.map(key => {
+    const c = MAP.commands.find(x => x.key === key);
+    const opts = MAP.axes.map(a =>
+      `<option value="${a}"${a === c.axis ? " selected" : ""}>${a}</option>`).join("");
+    return `<div class="prow">
+      <span class="pl">${esc(c.label)}</span>
+      <select class="filter pick" data-f="axis" data-k="${key}">${opts}</select>
+      <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--ink2);">
+        <input type="checkbox" data-f="invert" data-k="${key}"
+               ${c.invert ? "checked" : ""}> flip</label>
+      <input class="filter amt" type="number" data-f="full" data-k="${key}"
+             step="0.01" min="0" max="${c.ceiling}" value="${c.full}">
+      <span class="faint small">${esc(c.unit)}</span>
+    </div>`;
+  }).join("");
+  const anchor = document.querySelector(`[data-pick="stick"][data-name="${which}"]`);
+  openPop(anchor, `
+    <div class="pk">${esc(stick.label)}</div>
+    ${rows}
+    <p class="why">The axis is Windows' name for it, not the pad's. Push the
+    stick in <code>pad.bat</code> to see which one moves. The number is what
+    full deflection asks for.</p>
+    <p class="why" style="margin-top:8px;">Pressing the stick in is
+    <b>${esc(stick.click)}</b> — a button, not an axis.
+    <button class="btn tiny" data-open="${esc(stick.click)}">set what it does</button></p>
+    ${plannedFor(which)}`);
+  POP.dataset.anchor = which;
+}
+
+
+/* ----------------------------------------------------------------- wiring --- */
+
+function load() {
+  return get("/api/controls").then(s => {
+    mountNav("/controller", navState(s.nav));
+    draw(s);
+  });
+}
+
+load().catch(err => {
+  /* Mount the bar anyway. A page that will not draw at all because one fetch
+     failed is worse than a page saying what failed. */
+  mountNav("/controller");
+  fail(err, "controller");
+});
+
+function pick(node) {
+  const hit = node.closest("[data-pick]");
+  if (!hit || !MAP) return false;
+  const name = hit.getAttribute("data-name");
+  /* Two kinds of menu now, not three: a stick, or a control. Whether a control
+     has a measured number is no longer a different sort of thing - it is one
+     field inside the same menu. */
+  if (hit.getAttribute("data-pick") === "stick") popStick(name);
+  else popControl(hit, name);
+  return true;
+}
+
+/* The wish list posts to its own routes, and both answer with the whole state,
+   so the page redraws from the server rather than from a guess. */
+function said(out) {
+  if (!out || out.error) return;
+  draw(out);
+  el("saystate").textContent = "Saved";
+  clearTimeout(FLASH);
+  FLASH = setTimeout(() => { el("saystate").textContent = ""; }, 2200);
+}
+
+document.addEventListener("click", (e) => {
+  const off = e.target.closest(".pop [data-clear]");
+  if (off) return clearAction(off.getAttribute("data-clear"));
+  const row = e.target.closest(".pop [data-act]");
+  if (row) return assign(row.getAttribute("data-act"),
+                         Number(POP.dataset.button));
+  /* L3 and R3 have no shape of their own - they are the sticks pressed in - so
+     the stick's menu hands off to theirs, anchored on the stick. */
+  const open = e.target.closest(".pop [data-open]");
+  if (open) {
+    const name = open.getAttribute("data-open");
+    const anchor = POP.dataset.anchor;
+    return popControl(document.querySelector(
+      `.diagram [data-pick][data-name="${anchor}"]`), name);
+  }
+  if (e.target.closest(".pop")) return;      // a select or a box inside it
+
+  const drop = e.target.closest("[data-drop]");
+  if (drop) {
+    return post("/api/controls/wanted/remove",
+                {id: drop.getAttribute("data-drop")}).then(said);
+  }
+  if (e.target.id === "w_add") {
+    return post("/api/controls/wanted/add", {
+      name: el("w_name").value,
+      does: el("w_does").value,
+      kind: el("w_kind").value,
+      where: el("w_where").value,
+    }).then(out => {
+      if (out && !out.error) { el("w_name").value = ""; el("w_does").value = ""; }
+      said(out);
+    });
+  }
+
+  if (pick(e.target)) return;
+  closePop();
+});
+
+/* Same menu from the keyboard, since every control is focusable. */
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") return closePop();
+  if (e.key !== "Enter" && e.key !== " ") return;
+  if (document.activeElement && pick(document.activeElement)) e.preventDefault();
+});
+
+/* Changing a field inside a stick menu, or the deadzone, saves at once. */
+document.addEventListener("change", (e) => {
+  const ctl = e.target.getAttribute && e.target.getAttribute("data-button");
+  if (ctl) {
+    /* Reopen the same menu afterwards: setting a number is normally the step
+       before choosing a job, and closing would make that two trips. */
+    return post("/api/controls/button",
+                {control: ctl, number: e.target.value === "" ? null
+                                                            : Number(e.target.value)})
+      .then(out => {
+        if (!out || out.error) return;
+        said(out);
+        const shape = document.querySelector(
+          `.diagram [data-pick][data-name="${ctl}"]`);
+        if (shape) popControl(shape, ctl);
+      });
+  }
+  const where = e.target.getAttribute && e.target.getAttribute("data-where");
+  if (where) {
+    return post("/api/controls/wanted/where",
+                {id: where, where: e.target.value}).then(said);
+  }
+  if (e.target.id === "dz") {
+    return put({deadzone: parseFloat(e.target.value)});
+  }
+  const field = e.target.getAttribute && e.target.getAttribute("data-f");
+  if (!field || !MAP) return;
+  const key = e.target.getAttribute("data-k");
+  const over = {};
+  const from = {axis: "axis", invert: "invert", full: "full"}[field];
+  const built = {};
+  MAP.commands.forEach(c => { built[c.key] = c[from]; });
+  built[key] = field === "invert" ? e.target.checked
+             : field === "full" ? parseFloat(e.target.value)
+             : e.target.value;
+  over[from] = built;
+  // The menu stays open: changing an axis and then its full-stick value is one
+  // job, and closing after the first would make it two.
+  put(over);
+});
+
+window.addEventListener("resize", closePop);
+</script>
+</body>
+</html>

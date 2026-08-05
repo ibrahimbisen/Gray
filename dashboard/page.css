@@ -1,35 +1,58 @@
 /* The one stylesheet. Every page loads this and nothing else.
 
-   It used to be one of three. `page.css` dressed the summary and the stage pages,
-   `overview.html` carried 117 lines of its own, `monitor.html` 209, `pose.html`
-   73, `index.html` 219, `plan.html` 65 - about 680 lines, of which roughly 380
-   restated something already in here under a different name.
+   ===========================================================================
+   THE RULE: a page does not set a size.
+   ===========================================================================
+
+   Not a font size, not a padding, not a radius, not a width. It picks a token
+   from the block below, or it uses a component that already picked one. There
+   were 31 different font sizes across eight pages, 18 paddings doing the one job
+   of "pad a card", and 14 border radii. Nobody chose that; it accumulated, one
+   reasonable local decision at a time, and the result is a dashboard where the
+   same table is three sizes on three pages.
+
+   The scale is /carry's, because that is the density this is for: you arrive
+   knowing which number you want, and the job is to have it on screen already
+   rather than a scroll away. 11.5px tables, 12.5px prose, a 23px title, and
+   blocks that flow into as many columns as fit.
+
+   ---------------------------------------------------------------------------
+
+   It used to be one of three stylesheets. `page.css` dressed the summary and the
+   stage pages, `overview.html` carried 117 lines of its own, `monitor.html` 209,
+   `pose.html` 73, `index.html` 219, `plan.html` 65 - about 680 lines, of which
+   roughly 380 restated something already in here under a different name.
 
    That was survivable right up until the two vocabularies collided. Both defined
    `--line`, `--ink`, `--warn` and `--accent`; both gave them DIFFERENT values. So
    a component copied from one page to another silently changed shade, and the
    same number printed three ways on three pages.
 
-   One set of values now. The names below are canonical. The old `page.css` names
-   are kept at the bottom of :root as aliases pointing at the same values, so
-   existing markup keeps working and cannot drift again - there is nothing left
-   for it to drift to.
+   One set of values now. The names below are canonical. The old names are kept
+   at the bottom of :root as aliases pointing at the same values, so existing
+   markup keeps working and cannot drift again - there is nothing left for it to
+   drift to.
 
    Colour is never the only carrier of meaning anywhere on these pages. Every
    swatch has its count and its label in text beside it. */
 
 :root {
-  /* ---- surfaces ---- */
-  --plane:#0d0f13;        /* the page */
-  --surface:#16181d;      /* cards, chart surfaces, table headers */
-  --surface2:#1b1e25;     /* inputs, code, the recessed step */
-  --line:#252932;         /* borders, baselines, axes */
-  --grid:#1f232b;         /* hairline gridlines, one shade off the surface */
+  /* ---- surfaces: drafting film ----
+     Blue-black rather than neutral graphite. This robot was drawn in SolidWorks,
+     and the whole rebuild exists because that drawing was wrong at the source -
+     so the dashboard is the drawing set for the machine, and the ground it is
+     drawn on is film, not paper. The shift is small on purpose: it changes what
+     the page feels like without touching a single measured colour. */
+  --plane:#0a0d12;        /* the sheet */
+  --surface:#11151c;      /* blocks, chart surfaces, table headers */
+  --surface2:#171d26;     /* inputs, code, the recessed step */
+  --line:#242c38;         /* borders, baselines, axes - the drafting rule */
+  --grid:#171c25;         /* hairline gridlines, one shade off the surface */
 
-  /* ---- ink ---- */
-  --ink:#f2f3f5;          /* body text */
-  --ink2:#a8adb8;         /* secondary text */
-  --muted:#787f8c;        /* labels, ticks, captions */
+  /* ---- ink: silk-screen white ---- */
+  --ink:#eef2f7;          /* body text */
+  --ink2:#a3aebd;         /* secondary text */
+  --muted:#6b7889;        /* labels, ticks, captions */
 
   /* ---- categorical slots, dark steps ----
      Validated on this surface: lightness band, chroma floor, CVD separation,
@@ -49,7 +72,59 @@
   --pilot:#a78bfa;
 
   --accent:var(--s1);
-  --side:250px; --sidebar:264px; --top:52px;
+
+  /* ======================================================== the type scale ===
+     Six sizes. If a thing on a page is not one of these six, it is wrong.
+
+     Two faces and no more. Words are set in the sans face, and EVERY number and
+     every identifier is set in the mono face with tabular figures - so a
+     measurement is told from a name without reading either. That is the one
+     typographic idea in this dashboard and it is worth keeping absolute.
+
+     No web font. The server is Python's standard library with no build step and
+     it must work with the network off, so these are the faces the machine
+     already has. */
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  --t-page:23px;    /* the page title. Once per page. */
+  --t-head:15px;    /* a section title */
+  --t-body:12.5px;  /* prose, buttons, inputs, form labels - the base size */
+  --t-data:11.5px;  /* table cells, second lines, dense rows */
+  --t-mark:10.5px;  /* chips, captions, hints */
+  --t-cap:9.5px;    /* table headers and eyebrows - always uppercase with these */
+  --t-lead:19px;    /* the one big number on a stat tile */
+  /* ONE size above the scale, for a page's thesis. `/summary` opens with the
+     contract that defines this machine - 45 numbers in, 12 joint angles out,
+     50 times a second - and that is the one thing a reader must leave with.
+     A hero exists where a page has a thesis. It is not a licence for a big
+     number: `.huge` was deleted for printing "3 of 6" at 40px, which is a
+     sentence wearing a display size. */
+  --t-hero:38px;
+
+  /* Weight 600 is the heaviest thing here, titles included. 700 on a display
+     line is the single most reliable tell of a page nobody designed. */
+  --w-bold:600;
+
+  /* ============================================================== spacing ===
+     Six steps. Everything picks one. Named -sp so they cannot be confused with
+     --s1..--s5, which are the series colours. */
+  --sp-1:4px; --sp-2:6px; --sp-3:9px; --sp-4:12px; --sp-5:16px; --sp-6:22px;
+
+  /* ================================================================ shape ===
+     One radius for every block, input and button. A second, smaller one for the
+     things that are nearly square. A pill for meters. That is all three. */
+  --r:8px; --r-sm:4px; --r-pill:99px;
+
+  /* ================================================================= page ===
+     ONE content width, on every page. It was 1500 on three pages, 1180 on four
+     and 1120 on one, which is why four pages were a single long column: 1180px
+     of paper cannot hold two 560px blocks side by side. */
+  --sheet:1500px;
+  --gut:20px;         /* the sheet's own side padding */
+  --col:370px;        /* a block grid flows into as many of these as fit */
+  --col-wide:560px;   /* the same, for blocks that hold a wide table */
+  --sidebar:264px; --top:46px;
 
   /* ---- deprecated names, kept so old markup resolves to the new values ---- */
   --bg:var(--plane); --panel:var(--surface); --panel2:var(--surface2);
@@ -59,9 +134,11 @@
 
 @media (prefers-color-scheme: light) {
   :root {
-    --plane:#f7f8fa; --surface:#fff; --surface2:#f2f4f7;
-    --line:#e3e6ec; --grid:#eef0f4;
-    --ink:#141821; --ink2:#5b6472; --muted:#8b94a3;
+    /* Blueprint paper: a cool sheet with blue-grey rules, not office white.
+       Same idea as the film above, the other way up. */
+    --plane:#eaeef4; --surface:#fff; --surface2:#e7ecf3;
+    --line:#c7d1de; --grid:#dfe6ef;
+    --ink:#0f1620; --ink2:#4a5666; --muted:#78849a;
     /* Light steps from the same ramps, chosen against the white surface rather
        than flipped from the dark ones. A flipped dark step fails contrast here. */
     --s1:#1d4ed8; --s2:#b8431a; --s3:#0f7a55; --s4:#8a5b00; --s5:#a83358;
@@ -71,128 +148,256 @@
 }
 
 * { box-sizing:border-box; }
-html, body { height:100%; margin:0; }
+/* min-height, NOT height. A sticky element only sticks within its containing
+   block, and `height:100%` makes the body exactly one viewport tall with the
+   content spilling out of it - so the nav bar held for the first screen of
+   scrolling and then slid away with everything else. Nothing about the rule
+   looked wrong; `position:sticky` was there the whole time. */
+html, body { min-height:100%; margin:0; }
+/* The sheet carries a drafting grid, 24px, at the very edge of visible. It does
+   two things: it says what kind of document this is before a word is read, and
+   it gives the eye a ruler, so a block that is out of line looks out of line.
+   Two percent opacity - if you can see the lines without looking for them, it is
+   too strong and it has become decoration. */
 body { background:var(--plane); color:var(--ink);
-       font:14px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+       font:var(--t-body)/1.5 var(--sans);
+       background-image:
+         repeating-linear-gradient(0deg, color-mix(in srgb,var(--ink) 2%,transparent) 0 1px,
+                                   transparent 1px 24px),
+         repeating-linear-gradient(90deg, color-mix(in srgb,var(--ink) 2%,transparent) 0 1px,
+                                   transparent 1px 24px);
+       background-attachment:fixed; }
 a { color:inherit; text-decoration:none; }
-.tnum, td.n, th.n, .v { font-variant-numeric:tabular-nums; }
+
+/* Every number, everywhere, in one declaration. `.tnum` stays as an opt-in for
+   markup that is a number without being in one of these slots. */
+.tnum, td.n, th.n, .v, .n, .k, code, .mono
+  { font-variant-numeric:tabular-nums; }
+
+/* The quality floor, stated once. A dashboard driven from the keyboard has to
+   show where the keyboard is, and an animation is decoration that some people
+   cannot look at. */
+:focus-visible { outline:2px solid var(--s1); outline-offset:2px; border-radius:2px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration:.001ms !important;
+                           animation-iteration-count:1 !important;
+                           transition-duration:.001ms !important; }
+}
 
 /* ===================================================================== nav === */
 /* One bar, on every page, from one function. The right-hand slot is the single
-   live status string, computed server-side once so all six pages agree. */
-.top { display:flex; align-items:center; gap:4px; padding:0 18px; height:var(--top);
-       border-bottom:1px solid var(--line); background:var(--surface);
-       overflow-x:auto; position:sticky; top:0; z-index:20; }
-.top .brand { font-weight:700; font-size:16px; letter-spacing:-.01em; margin-right:16px;
-              white-space:nowrap; }
-.top a { color:var(--ink2); font-size:13px; padding:6px 12px; border-radius:7px;
-         white-space:nowrap; }
+   live status string, computed server-side once so all the pages agree. */
+.top { display:flex; align-items:center; gap:2px; padding:0 var(--gut);
+       height:var(--top); border-bottom:1px solid var(--line);
+       background:var(--surface); overflow-x:auto; position:sticky; top:0;
+       z-index:20; }
+.top .brand { font-weight:var(--w-bold); font-size:var(--t-head);
+              letter-spacing:-.01em; margin-right:var(--sp-4); white-space:nowrap; }
+.top a { color:var(--ink2); font-size:var(--t-body); padding:var(--sp-1) var(--sp-3);
+         border-radius:var(--r-sm); white-space:nowrap; }
 .top a:hover { color:var(--ink); background:var(--surface2); }
-.top a.on { color:var(--ink); background:var(--surface2); font-weight:600; }
+.top a.on { color:var(--ink); background:var(--surface2); font-weight:var(--w-bold); }
 .top .sp { flex:1; }
-.top .state { font-size:11.5px; color:var(--muted); white-space:nowrap;
-              display:flex; gap:10px; align-items:center; }
+.top .state { font-size:var(--t-data); color:var(--muted); white-space:nowrap;
+              display:flex; gap:var(--sp-3); align-items:center; }
 
 /* ================================================================== layout === */
 /* Two shapes, and only two. `.app` is a sidebar beside a scrolling main, for the
-   pages that select something. `.paper` is one continuous column, for the pages
-   that are read end to end. The old one-panel-at-a-time shell is gone: it made
-   holding two tables against each other impossible, which is exactly what the
-   plan pages are for. */
+   pages that select something. `.sheet` is one wide well of blocks, for the
+   pages that are read. `.paper` is `.sheet` under its old name.
+
+   `.paper` used to be 1180px and `.sheet` 1120px, and both were centred columns
+   of prose. That is what made four of the eight pages a single long scroll: at
+   1180px a two-column grid of blocks does not fit, so it silently collapsed to
+   one and nobody noticed it had. */
 .app { display:grid; grid-template-columns:var(--sidebar) minmax(0,1fr);
        min-height:calc(100vh - var(--top)); }
 .app > aside { border-right:1px solid var(--line); background:var(--surface);
                position:sticky; top:var(--top); height:calc(100vh - var(--top));
-               overflow-y:auto; padding:16px 13px 40px; }
-main { padding:22px 26px 80px; max-width:1500px; min-width:0; }
-.paper { max-width:1180px; margin:0 auto; padding:26px 26px 80px; }
-.paper section { padding-bottom:44px; scroll-margin-top:calc(var(--top) + 4px); }
-.paper section + section { border-top:1px solid var(--line); padding-top:34px; }
-.paper section.lead { padding-bottom:32px; }
-.paper h2 { display:flex; gap:12px; align-items:baseline; margin:0 0 16px; }
-.paper section > .tw, .paper section > .cols,
-.paper section > .facts, .paper section > .tiles { margin-bottom:16px; }
+               overflow-y:auto; padding:var(--sp-4) var(--sp-3) var(--sp-6); }
+main { padding:var(--sp-5) var(--gut) 60px; max-width:var(--sheet); min-width:0; }
+.sheet, .paper { max-width:var(--sheet); margin:0 auto;
+                 padding:var(--sp-5) var(--gut) 60px; }
+/* Inside an `.app`, main IS the well - a second centred column inside it would
+   pad the page twice. */
+.app main .sheet, .app main .paper { padding:0; max-width:none; }
+
+.paper section, .sheet section { padding-bottom:var(--sp-6);
+                                 scroll-margin-top:calc(var(--top) + 4px); }
+.paper section + section, .sheet section + section
+  { border-top:1px solid var(--line); padding-top:var(--sp-6); }
+/* The opening section of a page. It carries the title and the lede and has no
+   rule above it, so it needs less room under it than a numbered section does. */
+.paper section.lead, .sheet section.lead { padding-bottom:var(--sp-5); }
+.paper h2, .sheet h2 { display:flex; gap:var(--sp-3); align-items:baseline;
+                       margin:0 0 var(--sp-4); }
+.paper section > .tw, .paper section > .cols, .paper section > .grid,
+.paper section > .facts, .paper section > .tiles { margin-bottom:var(--sp-4); }
 .paper section > :last-child { margin-bottom:0; }
-.hidden, .hide { display:none !important; }
+section { margin-top:0; }
+main > section { margin-top:var(--sp-6); }
+.hidden { display:none !important; }
 .grow { flex:1; }
 
-/* the contents rail beside a .paper, and the section list beside an .app */
-.side { padding:16px 12px 40px; overflow-y:auto; }
-.side h4 { font-size:10px; text-transform:uppercase; letter-spacing:.14em;
-           color:var(--muted); margin:20px 6px 8px; font-weight:600; }
+/* the contents rail beside a `.paper`, and the section list beside an `.app` */
+.side { padding:var(--sp-4) var(--sp-3) var(--sp-6); overflow-y:auto; }
+.side h4, .side-h { font-size:var(--t-cap); text-transform:uppercase;
+                    letter-spacing:.12em; color:var(--muted); font-weight:var(--w-bold);
+                    margin:var(--sp-5) var(--sp-2) var(--sp-2); }
 .side h4:first-child { margin-top:0; }
+.side-h { display:flex; justify-content:space-between; margin:var(--sp-5) 0 var(--sp-2); }
 .side button { display:block; width:100%; text-align:left; background:none; border:0;
-               color:var(--ink2); font:inherit; font-size:13px; padding:7px 10px;
-               border-radius:7px; cursor:pointer; line-height:1.35; }
+               color:var(--ink2); font:inherit; font-size:var(--t-body);
+               padding:var(--sp-2) var(--sp-3); border-radius:var(--r-sm);
+               cursor:pointer; line-height:1.35; }
 .side button:hover { background:var(--surface2); color:var(--ink); }
-.side button.on { background:var(--surface2); color:var(--ink); font-weight:600;
+.side button.on { background:var(--surface2); color:var(--ink); font-weight:var(--w-bold);
                   box-shadow:inset 2px 0 0 var(--s1); }
-.side button .n { float:right; color:var(--muted); font-variant-numeric:tabular-nums;
-                  font-weight:400; font-size:11.5px; }
-.side button .id { font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-                   color:var(--s1); font-size:11.5px; margin-right:6px; }
+.side button .n { float:right; color:var(--muted); font-weight:400;
+                  font-size:var(--t-data); }
+.side button .id { font-family:var(--mono); color:var(--s1);
+                   font-size:var(--t-data); margin-right:var(--sp-2); }
 
 /* ================================================================ headings === */
-h1 { margin:0 0 6px; font-size:26px; letter-spacing:-.02em; line-height:1.15; }
-h2 { margin:0 0 6px; font-size:20px; letter-spacing:-.015em; }
-h3 { margin:0 0 6px; font-size:14px; font-weight:600; }
-p  { margin:0 0 12px; }
-.eyebrow { color:var(--s1); font-size:10.5px; text-transform:uppercase;
-           letter-spacing:.14em; font-weight:700; margin-bottom:7px; }
-.lede { font-size:15.5px; line-height:1.55; color:var(--ink2); margin-bottom:20px;
-        max-width:74ch; }
-.body { max-width:74ch; }
+h1 { margin:0 0 var(--sp-1); font-size:var(--t-page); font-weight:var(--w-bold);
+     letter-spacing:-.02em; line-height:1.15; }
+h2 { margin:0 0 var(--sp-1); font-size:var(--t-head); font-weight:var(--w-bold);
+     letter-spacing:-.01em; }
+h3 { margin:0 0 var(--sp-1); font-size:var(--t-body); font-weight:var(--w-bold); }
+p  { margin:0 0 var(--sp-3); }
+.eyebrow { color:var(--s1); font-size:var(--t-cap); text-transform:uppercase;
+           letter-spacing:.12em; font-weight:var(--w-bold); margin-bottom:var(--sp-2); }
+/* The opening line of a page. It is prose, at prose size - it was 15.5px, which
+   is 3px larger than the body text underneath it and read as a subheading. */
+.lede { font-size:var(--t-body); line-height:1.55; color:var(--ink2);
+        margin-bottom:var(--sp-4); max-width:80ch; }
+.body { max-width:80ch; }
 .why, .muted, .purpose { color:var(--ink2); }
 .faint { color:var(--muted); }
-.small { font-size:12.5px; }
-.sub { color:var(--ink2); font-size:11.5px; margin-top:2px; }
-.sech { display:flex; align-items:center; gap:10px; margin:0 0 12px; }
-.sech h2 { margin:0; font-size:10.5px; text-transform:uppercase; letter-spacing:.14em;
-           color:var(--muted); font-weight:600; }
-.sech .note { margin:0; border:0; padding:0; font-size:11.5px; }
-.secnum { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px;
-          font-weight:700; color:var(--s1); border:1px solid var(--line);
-          border-radius:7px; padding:1px 9px; flex:0 0 auto; }
-section { margin-top:0; }
-main > section { margin-top:30px; }
+.small { font-size:var(--t-data); }
+.sub { color:var(--ink2); font-size:var(--t-data); margin-top:2px; }
+.sech { display:flex; align-items:center; gap:var(--sp-3); margin:0 0 var(--sp-3); }
+.sech h2 { margin:0; font-size:var(--t-cap); text-transform:uppercase;
+           letter-spacing:.12em; color:var(--muted); font-weight:var(--w-bold); }
+.sech .note { margin:0; border:0; padding:0; font-size:var(--t-data); }
+.secnum { font-family:var(--mono); font-size:var(--t-data); font-weight:var(--w-bold);
+          color:var(--s1); border:1px solid var(--line); border-radius:var(--r-sm);
+          padding:1px var(--sp-2); flex:0 0 auto; }
 a.plain { color:var(--s1); }
 a.plain:hover { text-decoration:underline; }
 
-/* =================================================================== cards === */
-.cols { display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr));
-        gap:14px; align-items:start; }
+/* ============================================================= title block === */
+/* THE SIGNATURE. Every engineering drawing carries a title block: a boxed grid
+   in the corner that states what the sheet is, what it was drawn from, and when.
+   Every page here opens with one, and it answers the question this repo exists
+   to answer - WHERE DID THIS NUMBER COME FROM.
+
+   That is not decoration. The rule in CLAUDE.md is that a stale dashboard is
+   worse than no dashboard, because it is trusted. A sheet that names its own
+   source, on every page, is that rule made visible: `read live from
+   gray/tasks/`, `written by scripts/train.py`, `hand-written, moves when the
+   plan moves`. If a page cannot fill this in, it should not be showing numbers.
+
+   Monospaced throughout, because everything ON a drawing is monospaced and
+   everything ABOUT one is not. */
+.titleblock { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+              border:1px solid var(--line); border-radius:var(--r);
+              background:var(--surface); overflow:hidden; margin-bottom:var(--sp-5);
+              font-family:var(--mono); }
+.titleblock > div { padding:var(--sp-2) 11px; border-left:1px solid var(--line);
+                    min-width:0; }
+.titleblock > div:first-child { border-left:0; }
+/* The first cell is the sheet's name, and it spans as much as it needs. */
+.titleblock > div.name { grid-column:span 2; }
+.titleblock .k { font-size:var(--t-cap); text-transform:uppercase;
+                 letter-spacing:.12em; color:var(--muted); }
+.titleblock .v { font-size:var(--t-data); color:var(--ink); margin-top:2px;
+                 overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.titleblock .v.big { font-size:var(--t-head); font-weight:var(--w-bold);
+                     letter-spacing:-.01em; font-family:var(--sans); }
+.titleblock .v a { color:var(--s1); }
+
+/* ================================================== blocks, and grids of them === */
+/* THE block. One border, one radius, one surface, and a caption bar that names
+   it and counts what is in it. Promoted out of carry.html, which is the page
+   this whole scale comes from.
+
+   There were eight cards before this: `.card`, summary's `.blk`, summary's
+   `.file`, controller's `.pop`, controller's `.numpad .key`, carry's `.blk`,
+   plan's `.gate` and plan's `.carry`. Same border, same radius, eight paddings,
+   eight names. `.card` is kept as the padded variant because five pages say it. */
+.blk { border:1px solid var(--line); border-radius:var(--r);
+       background:var(--surface); overflow:hidden; }
+.blk > h2 { font-family:var(--mono); font-size:var(--t-cap); letter-spacing:.11em;
+            text-transform:uppercase; color:var(--muted); margin:0;
+            padding:var(--sp-2) 11px; border-bottom:1px solid var(--line);
+            background:var(--surface2); display:flex; gap:var(--sp-2);
+            align-items:baseline; font-weight:var(--w-bold); }
+.blk > h2 b { color:var(--ink); font-weight:var(--w-bold); letter-spacing:0;
+              text-transform:none; font-size:var(--t-data); font-family:var(--sans); }
+.blk > h2 .n { margin-left:auto; color:var(--muted); font-weight:400; }
+.blk > :last-child { margin-bottom:0; }
+
+/* A block whose body folds. The summary is a strip across the FOOT of the block
+   rather than a bordered box of its own, so a folded block still reads as one
+   thing. Used where a block's table is long enough to bury what is under it -
+   the gap-closing panels carry one row per verified run, which is forty-three
+   rows each, three across. The shape and the headline are the answer; the rows
+   are the working, and the working folds. */
+.blk details > summary { list-style:none; cursor:pointer;
+  padding:var(--sp-2) 11px; font-size:var(--t-mark); color:var(--muted);
+  display:flex; gap:var(--sp-2); align-items:center;
+  border-top:1px solid var(--line); font-family:var(--mono); }
+.blk details > summary::-webkit-details-marker { display:none; }
+.blk details > summary::before { content:"\25B8"; font-size:9px;
+  transition:transform .12s; }
+.blk details[open] > summary::before { transform:rotate(90deg); }
+.blk details > summary:hover { color:var(--ink); }
+.blk details > summary b { color:var(--ink2); font-weight:var(--w-bold); }
+
+/* Blocks flow into as many columns as fit rather than a fixed two or three: the
+   reward table is 24 rows and the tolerance table is 6, and a fixed grid leaves
+   the short one padding out a column the tall one needed. */
+.grid, .cols { display:grid; gap:var(--sp-4); align-items:start;
+               grid-template-columns:repeat(auto-fit,minmax(var(--col),1fr)); }
+.grid.wide { grid-template-columns:repeat(auto-fit,minmax(var(--col-wide),1fr)); }
 .cols.tight { grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); }
-.cols3 { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px;
-         align-items:start; }
-.twocol { display:grid; gap:12px; grid-template-columns:1fr 1fr; align-items:start; }
+.twocol { display:grid; gap:var(--sp-4); grid-template-columns:1fr 1fr;
+          align-items:start; }
 @media (max-width:900px) { .twocol { grid-template-columns:1fr; } }
 
-.card { background:var(--surface); border:1px solid var(--line); border-radius:10px;
-        padding:14px 16px; }
-.card.pad { padding:16px 18px 18px; }
-.card.plot { padding:12px 12px 6px; }
-.card h3 { margin:0 0 8px; display:flex; align-items:center; gap:7px; }
+.card { background:var(--surface); border:1px solid var(--line);
+        border-radius:var(--r); padding:var(--sp-3) 11px; }
+.card.pad { padding:var(--sp-4) var(--sp-5); }
+.card.plot { padding:var(--sp-3) var(--sp-3) var(--sp-1); }
+.card h3 { margin:0 0 var(--sp-2); display:flex; align-items:center; gap:var(--sp-2); }
 .card h3 .swatch { width:8px; height:8px; border-radius:2px; flex:0 0 auto; }
-.card h3 .now { margin-left:auto; font-size:15px; font-weight:600; letter-spacing:-.01em; }
-.card .rng { font-size:10.5px; color:var(--muted); margin:2px 0 4px 15px; }
+.card h3 .now { margin-left:auto; font-size:var(--t-head); font-weight:var(--w-bold);
+                letter-spacing:-.01em; }
+.card .rng { font-size:var(--t-mark); color:var(--muted); margin:2px 0 var(--sp-1) 15px; }
 .card > :last-child { margin-bottom:0; }
 
 /* ================================================= facts, tiles, hero number === */
 /* One family. `.facts`/`.fact` and `.tiles`/`.tile` were the same component with
    different padding on two pages; they are the same component now. */
 .facts, .tiles { display:grid; gap:1px; background:var(--line);
-                 border:1px solid var(--line); border-radius:10px; overflow:hidden;
-                 margin-bottom:16px;
+                 border:1px solid var(--line); border-radius:var(--r);
+                 overflow:hidden; margin-bottom:var(--sp-4);
                  grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
-.fact, .tile { background:var(--surface); padding:12px 14px 13px; }
-.fact .k, .tile .k { font-size:10.5px; text-transform:uppercase; letter-spacing:.08em;
-                     color:var(--muted); display:flex; align-items:center; gap:6px; }
-.fact .v, .tile .v { font-size:22px; font-weight:600; line-height:1.15; margin-top:4px;
-                     letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
-.fact .n, .tile .d { font-size:11.5px; color:var(--muted); margin-top:2px; line-height:1.4; }
+.fact, .tile { background:var(--surface); padding:var(--sp-2) 11px var(--sp-3); }
+.fact .k, .tile .k { font-size:var(--t-cap); text-transform:uppercase;
+                     letter-spacing:.08em; color:var(--muted); display:flex;
+                     align-items:center; gap:var(--sp-2); font-family:var(--sans); }
+.fact .v, .tile .v { font-size:var(--t-lead); font-weight:var(--w-bold);
+                     line-height:1.15; margin-top:3px; letter-spacing:-.02em; }
+.fact .n, .tile .d { font-size:var(--t-mark); color:var(--muted); margin-top:2px;
+                     line-height:1.4; }
 .tile .swatch, .fact .swatch { width:7px; height:7px; border-radius:2px; flex:0 0 auto; }
-.huge { font-size:40px; font-weight:650; letter-spacing:-.03em; line-height:1;
-        font-variant-numeric:tabular-nums; }
+/* `.huge` stood here: a 40px hero figure, used by control.html and nothing else.
+   It went with that page. A 40px number costs four rows of facts, and the thing
+   it was printing - "3 of 6 criteria met" - is a sentence, not a display
+   figure. If a page ever needs one big number again, `.fact .v` is the size the
+   scale has for it. */
 
 /* ================================================================== status === */
 .dot { width:6px; height:6px; border-radius:50%; flex:0 0 auto; background:var(--muted);
@@ -200,15 +405,15 @@ a.plain:hover { text-decoration:underline; }
 .dot.live { background:var(--live); animation:pulse 1.8s ease-in-out infinite; }
 .dot.ok { background:var(--good); } .dot.bad { background:var(--crit); }
 .dot.warn { background:var(--warn); }
-@keyframes pulse { 0%,100% { box-shadow:0 0 0 0 rgba(57,135,229,.5); }
-                   50% { box-shadow:0 0 0 4px rgba(57,135,229,0); } }
+@keyframes pulse { 0%,100% { box-shadow:0 0 0 0 color-mix(in srgb,var(--live) 50%,transparent); }
+                   50% { box-shadow:0 0 0 4px transparent; } }
 
 /* One pill component. `.chip`, `.badge`, `.pill` and `.st` were four spellings of
    it with three sizes. `.chip` is the one; the others alias to it. */
-.chip, .badge, .pill { font-size:10.5px; padding:2px 8px; border-radius:99px;
-       border:1px solid var(--line); color:var(--muted); white-space:nowrap;
-       display:inline-block; }
-.badge, .pill { text-transform:uppercase; letter-spacing:.08em; font-size:9.5px; }
+.chip, .badge, .pill { font-size:var(--t-mark); padding:1px var(--sp-2);
+       border-radius:var(--r-pill); border:1px solid var(--line); color:var(--muted);
+       white-space:nowrap; display:inline-block; }
+.badge, .pill { text-transform:uppercase; letter-spacing:.08em; font-size:var(--t-cap); }
 .chip.ok, .badge.ok, .pill.ok, .pill.done, .chip.pos
   { color:var(--good); border-color:color-mix(in srgb,var(--good) 45%,transparent); }
 .chip.bad, .badge.bad, .pill.bad, .pill.failed, .chip.neg
@@ -221,64 +426,173 @@ a.plain:hover { text-decoration:underline; }
 .chip.now, .badge.now, .badge.live, .pill.running, .pill.now
   { color:var(--live); border-color:color-mix(in srgb,var(--live) 50%,transparent); }
 .dot.now { background:var(--live); animation:pulse 1.8s ease-in-out infinite; }
-.st { font-size:11px; }
+.st { font-size:var(--t-data); }
 .st.done { color:var(--good); } .st.now, .st.doing { color:var(--live); }
 .st.bad, .st.failed { color:var(--crit); } .st.warn { color:var(--warn); }
+/* A row of bare mono labels - what the policy reads, which controls are free.
+   Square-ish, because they are names rather than states. */
+.chips span { display:inline-block; font-family:var(--mono); font-size:var(--t-mark);
+              border:1px solid var(--line); border-radius:var(--r-sm);
+              padding:1px 5px; margin:2px 3px 2px 0; color:var(--ink2); }
 
-.prog { margin:14px 0 4px; height:6px; background:var(--line); border-radius:99px;
-        overflow:hidden; }
+.prog { margin:var(--sp-3) 0 var(--sp-1); height:6px; background:var(--line);
+        border-radius:var(--r-pill); overflow:hidden; }
 .prog i { display:block; height:100%; background:var(--s1); transition:width .5s; }
-.proglab { display:flex; justify-content:space-between; font-size:11.5px; color:var(--muted); }
-.bar { flex:1; min-width:140px; height:6px; background:var(--line); border-radius:99px;
-       overflow:hidden; }
+.proglab { display:flex; justify-content:space-between; font-size:var(--t-data);
+           color:var(--muted); }
+.bar { flex:1; min-width:140px; height:6px; background:var(--line);
+       border-radius:var(--r-pill); overflow:hidden; }
 .bar i { display:block; height:100%; background:var(--good); }
 
-.empty { font-size:12px; color:var(--muted); border:1px dashed var(--line);
-         border-radius:8px; padding:12px; }
+.empty { font-size:var(--t-data); color:var(--muted); border:1px dashed var(--line);
+         border-radius:var(--r); padding:var(--sp-4); }
 .banner { border:1px solid var(--line); border-left:3px solid var(--warn);
-          border-radius:8px; padding:11px 14px; margin-bottom:14px; font-size:12.5px;
-          color:var(--ink2); background:var(--surface); display:flex;
-          align-items:center; gap:12px; }
+          border-radius:var(--r); padding:var(--sp-3) 11px; margin-bottom:var(--sp-3);
+          font-size:var(--t-body); color:var(--ink2); background:var(--surface);
+          display:flex; align-items:center; gap:var(--sp-3); }
 .banner.bad { border-left-color:var(--crit); }
 .banner.ok, .banner.go { border-left-color:var(--good); }
 .banner.stop { border-left-color:var(--crit); }
 .banner b { color:var(--ink); }
 
 /* ================================================================== tables === */
+/* Carry's table, made the only table. It was 12.5px with 8px cells everywhere
+   else, which is the single biggest reason the other pages felt twice as big as
+   the one page that was liked. */
 .tw, .wrapx { overflow-x:auto; }
-table { border-collapse:collapse; width:100%; font-size:12.5px; }
-th { text-align:left; font-weight:600; color:var(--muted); font-size:10px;
-     text-transform:uppercase; letter-spacing:.09em; padding:0 10px 8px;
-     border-bottom:1px solid var(--line); white-space:nowrap;
-     position:sticky; top:0; background:var(--surface); z-index:1; }
-td { padding:8px 10px; border-bottom:1px solid var(--grid); vertical-align:top; }
+table, table.t { border-collapse:collapse; width:100%; font-size:var(--t-data); }
+th { text-align:left; font-family:var(--mono); font-weight:var(--w-bold);
+     color:var(--muted); font-size:var(--t-cap); text-transform:uppercase;
+     letter-spacing:.08em; padding:5px 11px; border-bottom:1px solid var(--line);
+     white-space:nowrap; position:sticky; top:0; background:var(--surface); z-index:1; }
+td { padding:var(--sp-1) 11px; border-bottom:1px solid var(--grid);
+     vertical-align:top; line-height:1.4; }
 tr:last-child td { border-bottom:0; }
 tr.now td { background:color-mix(in srgb,var(--live) 8%,transparent); }
 tr.click { cursor:pointer; }
 tr.click:hover td { background:color-mix(in srgb,var(--ink) 4%,transparent); }
-td.n, th.n { text-align:right; padding-right:14px; white-space:nowrap; }
-td.dim { color:var(--ink2); }
+/* Every number in a table is mono, right aligned and tabular, so a column of
+   them lines up on the decimal point without any per-page help. */
+td.n, th.n { text-align:right; white-space:nowrap; font-family:var(--mono); }
+td.dim, td.why, .why { color:var(--ink2); }
+td.k, .k { font-family:var(--mono); }
 /* A table fills what is left of the screen rather than a fixed slice of it. */
-.scroller { max-height:calc(100vh - 310px); min-height:180px; overflow-y:auto; }
+.scroller { max-height:calc(100vh - 260px); min-height:180px; overflow-y:auto; }
 
 /* ================================================================== charts === */
-.charts { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); }
+.charts { display:grid; gap:var(--sp-4);
+          grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); }
 .plot { position:relative; }
 .plot svg { display:block; width:100%; height:132px; overflow:visible; }
 .plot.big svg { height:260px; }
 .tip { position:absolute; pointer-events:none; background:var(--plane);
-       border:1px solid var(--line); border-radius:6px; padding:5px 8px;
-       font-size:11.5px; white-space:nowrap; opacity:0; transition:opacity .1s;
+       border:1px solid var(--line); border-radius:var(--r-sm); padding:var(--sp-1) var(--sp-2);
+       font-size:var(--t-data); white-space:nowrap; opacity:0; transition:opacity .1s;
        z-index:3; transform:translate(-50%,-130%); }
-.tip b { font-weight:600; }
+.tip b { font-weight:var(--w-bold); }
 /* Identity is never colour alone: swatch AND name, always present for 2+ series. */
-.legend { display:flex; flex-wrap:wrap; gap:12px; margin:10px 0 2px; font-size:11.5px; }
-.legend span { display:flex; align-items:center; gap:6px; color:var(--ink2); }
+.legend { display:flex; flex-wrap:wrap; gap:var(--sp-4); margin:var(--sp-3) 0 2px;
+          font-size:var(--t-data); }
+.legend span { display:flex; align-items:center; gap:var(--sp-2); color:var(--ink2); }
 .legend i { width:11px; height:3px; border-radius:2px; display:block; }
+/* A legend of MARKS rather than colours - a tick, a cross, a lamp, a ring. Same
+   row as `.legend`, smaller, because these sit above a table rather than beside
+   a chart. `.legend` says which series; this says what a symbol means. */
+.legend.marks { font-size:var(--t-mark); gap:var(--sp-4); margin:0 0 var(--sp-1); }
+.legend.marks span { color:var(--muted); gap:var(--sp-1); }
+.legend.marks b { color:var(--ink2); font-weight:var(--w-bold); width:9px;
+                  text-align:center; }
+/* The hollow-ring key, matching `.track .ghost` - which is positioned absolutely
+   and so cannot be dropped into a legend as it stands. Same ring, standing still. */
+.legend.marks .ghostkey { width:8px; height:8px; border-radius:50%; display:block;
+                          border:1.5px solid var(--muted); flex:0 0 auto; }
+/* Distance to bar. Log scale, fixed 0.1x - 100x domain, so the bar tick sits at
+   the same x in every row and rows are comparable at a glance. A linear "percent
+   of bar" would put something at 4% of target near a full-looking bar's left
+   edge, which is the lie this exists to avoid.
 
-/* the five coverage words, as a stacked bar and as a swatch */
-.cov { display:flex; height:8px; min-width:110px; border-radius:99px; overflow:hidden;
-       background:var(--line); }
+   Deliberately NOT `.bar` or `.prog`: both of those are linear 0-100% meters,
+   which is the exact thing this was built to replace. Sharing a name with either
+   would invite someone to swap them. */
+.track { position:relative; height:15px; min-width:120px; }
+/* the baseline the marker sits on - `.bar` is a filled meter, not an axis */
+.track .ax { position:absolute; left:0; right:0; top:7px; height:1px;
+             background:var(--line); }
+/* the 1.0x gridline. Nothing else here marks a single point on a scale. */
+.track .tick { position:absolute; top:1px; width:1px; height:13px;
+               background:var(--s1); }
+/* The marker is a status lamp - met or failing - so it is a CIRCLE and it is
+   `.dot`, taking its colour from `.dot.ok` / `.dot.bad` above. Only its size and
+   its position on the axis are set here. */
+.track .dot { position:absolute; top:2.5px; width:10px; height:10px;
+              border-radius:50%; margin-left:-5px; }
+/* scored against a task that changed after it trained */
+.track .dot.drift { outline:1.5px dashed var(--warn); outline-offset:1.5px; }
+/* the second reading of the same criterion, behind the first. Nothing else here
+   shows two values of one metric in one slot. */
+.track .ghost { position:absolute; top:3.5px; width:8px; height:8px;
+                border-radius:50%; margin-left:-4px; border:1.5px solid var(--muted); }
+
+/* ---------- a dimension line ------------------------------------------------
+   How a measured extent is drawn on a drawing, and what a range actually IS.
+   Two witness lines at the ends, a line between them with an arrowhead at each
+   end, and the value in a gap in the middle, over a ruled ground.
+
+   It replaced a filled bar, which was the wrong claim. A bar means "how much",
+   measured from zero. A command range is an INTERVAL - a low end and a high end
+   - and what matters is which part of the scale it covers and which part it does
+   not. `forward` is the whole finding: its span does not contain zero. A bar
+   cannot say that; a dimension line says it by looking wrong.
+
+   Here rather than on a page because /summary and /dials both draw one, and a
+   component written twice is a component that ends up looking two ways.
+
+   `.dim.world` is the second kind: a dial the robot is never told. Green, so the
+   two kinds differ by colour as well as by which block they are in - and never
+   by colour alone. */
+.dim { position:relative; height:44px; }
+.dim .ground { position:absolute; left:0; right:0; top:26px; height:1px;
+  background:repeating-linear-gradient(90deg,var(--line) 0 1px,transparent 1px 8px); }
+.dim .wit { position:absolute; top:12px; height:22px; width:1px; background:var(--ink2); }
+.dim .ext { position:absolute; top:26px; height:1px; background:var(--s1); }
+.dim .ext::before, .dim .ext::after { content:""; position:absolute; top:-3px;
+  width:0; height:0; border-top:3.5px solid transparent;
+  border-bottom:3.5px solid transparent; }
+.dim .ext::before { left:0; border-right:7px solid var(--s1); }
+.dim .ext::after { right:0; border-left:7px solid var(--s1); }
+.dim.world .ext { background:var(--s3); }
+.dim.world .ext::before { border-right-color:var(--s3); }
+.dim.world .ext::after { border-left-color:var(--s3); }
+.dim .val { position:absolute; top:14px; transform:translateX(-50%);
+  background:var(--surface); padding:0 var(--sp-2); font-family:var(--mono);
+  font-size:var(--t-mark); color:var(--ink); white-space:nowrap; }
+.dim .zero { position:absolute; top:8px; bottom:2px; width:1px; background:var(--muted); }
+.dim .zero b { position:absolute; top:-1px; left:3px; font-family:var(--mono);
+  font-size:var(--t-cap); color:var(--muted); font-weight:400; }
+/* A value that was asked for, or that the real world has, sitting OUTSIDE the
+   swept span. Red, on the line, because that is where the claim fails. */
+.dim .pin { position:absolute; top:22px; width:9px; height:9px; margin-left:-4.5px;
+  border-radius:50%; background:var(--crit); box-shadow:0 0 0 3px var(--surface); }
+.dim .pin.inside { background:var(--muted); }
+.dim .ends { position:absolute; left:0; right:0; top:32px; display:flex;
+  justify-content:space-between; font-family:var(--mono); font-size:var(--t-cap);
+  color:var(--muted); }
+
+/* The ends and middle of a scale, written under its axis: `0.1x - bar - 100x`,
+   `-0.17 - points per second - +2.00`. Three spans, the outer two numeric.
+   Promoted out of control.html's local styles, where it was defined for the bar
+   board's table header - and then written a second time, in this file, as
+   `.bhead`, for the reward budget's axis. Two names for one component in two
+   files is the thing this stylesheet exists to stop, so there is one now.
+   The resets are for the `th` it started in and are no-ops anywhere else. */
+.scalerow { display:flex; justify-content:space-between; font-size:var(--t-cap);
+            color:var(--muted); font-weight:400; text-transform:none;
+            letter-spacing:0; font-family:var(--mono); }
+.scalerow .at { color:var(--s1); }
+
+/* the coverage words, as a stacked bar and as a swatch */
+.cov { display:flex; height:8px; min-width:110px; border-radius:var(--r-pill);
+       overflow:hidden; background:var(--line); }
 .cov i { display:block; height:100%; }
 .cov i + i { box-shadow:inset 2px 0 0 var(--surface); }
 .cov i.command,   .sw.command   { background:var(--good); }
@@ -289,161 +603,342 @@ td.dim { color:var(--ink2); }
 .cov i.blocked,   .sw.blocked   { background:var(--crit); }
 /* The coverage swatch is a SQUARE and the status lamp is a CIRCLE. Both used to
    be called `.dot`, which is why a coverage colour once appeared as a run state. */
-.sw { width:9px; height:9px; border-radius:2px; display:inline-block; margin-right:7px; }
+.sw { width:9px; height:9px; border-radius:2px; display:inline-block;
+      margin-right:var(--sp-2); }
 .dot.command, .dot.condition, .dot.emerges, .dot.pilot, .dot.measured, .dot.blocked
-  { width:9px; height:9px; border-radius:2px; margin-right:7px; }
+  { width:9px; height:9px; border-radius:2px; margin-right:var(--sp-2); }
 .dot.command { background:var(--good); }   .dot.condition { background:var(--s1); }
 .dot.emerges { background:var(--warn); }   .dot.pilot { background:var(--pilot); }
 .dot.measured { background:var(--muted); } .dot.blocked { background:var(--crit); }
 
 /* ================================================================ controls === */
-.btn { font-size:12px; color:var(--ink2); border:1px solid var(--line); border-radius:7px;
-       padding:6px 11px; background:var(--surface); cursor:pointer; white-space:nowrap;
+.btn { font-size:var(--t-body); color:var(--ink2); border:1px solid var(--line);
+       border-radius:var(--r-sm); padding:var(--sp-1) var(--sp-3);
+       background:var(--surface); cursor:pointer; white-space:nowrap;
        font-family:inherit; }
 .btn:hover { color:var(--ink); border-color:var(--ink2); }
 .btn.on { color:var(--ink); border-color:var(--s1); }
 .btn.go { color:var(--good); border-color:color-mix(in srgb,var(--good) 45%,transparent); }
 .btn.stop { color:var(--crit); border-color:color-mix(in srgb,var(--crit) 45%,transparent); }
-.btn.tiny { padding:3px 7px; font-size:11px; }
+.btn.tiny { padding:2px var(--sp-2); font-size:var(--t-mark); }
 .btn:disabled { opacity:.4; cursor:not-allowed; }
 /* A segmented dial: two or three exclusive settings, shown together so the
    choice is visible without opening anything. Not tabs - tabs switch what you
    are looking at, this switches how much of it there is. */
-.seg { display:inline-flex; border:1px solid var(--line); border-radius:8px;
+.seg { display:inline-flex; border:1px solid var(--line); border-radius:var(--r-sm);
        overflow:hidden; background:var(--surface); }
-.seg button { font:inherit; font-size:12px; color:var(--ink2); background:none;
-              border:0; padding:5px 14px; cursor:pointer; white-space:nowrap; }
+.seg button { font:inherit; font-size:var(--t-body); color:var(--ink2);
+              background:none; border:0; padding:var(--sp-1) var(--sp-4);
+              cursor:pointer; white-space:nowrap; }
 .seg button + button { border-left:1px solid var(--line); }
 .seg button:hover { color:var(--ink); background:var(--surface2); }
-.seg button.on { color:var(--ink); background:var(--surface2); font-weight:600;
+.seg button.on { color:var(--ink); background:var(--surface2); font-weight:var(--w-bold);
                  box-shadow:inset 0 -2px 0 var(--s1); }
-.segbar { display:flex; align-items:center; gap:14px; padding:9px 26px;
-          border-bottom:1px solid var(--line); background:var(--surface);
-          flex-wrap:wrap; }
-.segbar .lbl { font-size:10px; text-transform:uppercase; letter-spacing:.14em;
-               color:var(--muted); font-weight:600; }
-.segbar .say { font-size:12px; color:var(--muted); }
+.segbar { display:flex; align-items:center; gap:var(--sp-4);
+          padding:var(--sp-2) var(--gut); border-bottom:1px solid var(--line);
+          background:var(--surface); flex-wrap:wrap; }
+.segbar .lbl { font-size:var(--t-cap); text-transform:uppercase; letter-spacing:.12em;
+               color:var(--muted); font-weight:var(--w-bold); }
+.segbar .say { font-size:var(--t-data); color:var(--muted); }
 
-.tabs { display:flex; gap:4px; flex-wrap:wrap; margin:0 0 18px;
+.tabs { display:flex; gap:2px; flex-wrap:wrap; margin:0 0 var(--sp-4);
         border-bottom:1px solid var(--line); }
-.tab { font:inherit; font-size:12.5px; color:var(--ink2); background:none; border:0;
-       border-bottom:2px solid transparent; padding:9px 13px; cursor:pointer; }
+.tab { font:inherit; font-size:var(--t-body); color:var(--ink2); background:none;
+       border:0; border-bottom:2px solid transparent; padding:var(--sp-2) var(--sp-3);
+       cursor:pointer; }
 .tab:hover { color:var(--ink); }
 .tab.on { color:var(--ink); border-bottom-color:var(--s1); }
-.tab .n { font-size:10.5px; color:var(--muted); margin-left:6px; }
+.tab .n { font-size:var(--t-mark); color:var(--muted); margin-left:var(--sp-1); }
 .filter, .f input, .f select, .f textarea {
-       background:var(--surface2); border:1px solid var(--line); border-radius:7px;
-       color:var(--ink); font:inherit; font-size:12.5px; padding:7px 9px; }
+       background:var(--surface2); border:1px solid var(--line);
+       border-radius:var(--r-sm); color:var(--ink); font:inherit;
+       font-size:var(--t-body); padding:var(--sp-1) var(--sp-2); }
 .filter:focus, .f input:focus, .f select:focus, .f textarea:focus {
        outline:none; border-color:var(--s1); }
-.form { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
-.f label { display:block; font-size:10.5px; text-transform:uppercase; letter-spacing:.08em;
-           color:var(--muted); margin-bottom:5px; }
+.form { display:grid; gap:var(--sp-3);
+        grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
+.f label { display:block; font-size:var(--t-cap); text-transform:uppercase;
+           letter-spacing:.08em; color:var(--muted); margin-bottom:var(--sp-1); }
 .f input, .f select, .f textarea { width:100%; }
-.f .hint { font-size:11px; color:var(--muted); margin-top:4px; }
+.f .hint { font-size:var(--t-mark); color:var(--muted); margin-top:3px; }
 .f.wide { grid-column:1/-1; }
-.checks { display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
-.checks label { display:flex; gap:7px; align-items:center; font-size:12.5px;
-                color:var(--ink2); text-transform:none; letter-spacing:0; margin:0; }
+.checks { display:flex; gap:var(--sp-5); align-items:center; flex-wrap:wrap; }
+.checks label { display:flex; gap:var(--sp-2); align-items:center;
+                font-size:var(--t-body); color:var(--ink2); text-transform:none;
+                letter-spacing:0; margin:0; }
 .checks input { width:auto; }
 
 /* ============================================================ notes, risks === */
-.note { border-left:2px solid var(--line); padding:2px 0 2px 13px; margin:0 0 12px;
-        color:var(--ink2); font-size:12.5px; }
+/* One left-rule callout. There were three - `.note`, `.barline` and summary's
+   `.callout` - at three paddings and three border colours. `.barline` is gone;
+   `.note.key` is what it was for. */
+.note { border-left:2px solid var(--line); padding:1px 0 1px var(--sp-4);
+        margin:0 0 var(--sp-3); color:var(--ink2); font-size:var(--t-body); }
 .note b { color:var(--ink); }
 .note.key { border-color:var(--s1); }
-.barline { border-left:2px solid var(--s1); padding:2px 0 2px 13px; margin:14px 0 0;
-           color:var(--ink2); font-size:12.5px; }
-.barline b { color:var(--ink); display:block; font-size:10.5px; text-transform:uppercase;
-             letter-spacing:.09em; margin-bottom:3px; }
-.risk { border-top:1px solid var(--line); padding:12px 0; color:var(--ink2);
-        font-size:12.5px; }
+.risk { border-top:1px solid var(--line); padding:var(--sp-3) 0; color:var(--ink2);
+        font-size:var(--t-body); }
 .risk:first-child { border-top:0; padding-top:0; }
 .risk b { color:var(--ink); }
-.lv { font-size:10px; text-transform:uppercase; letter-spacing:.09em; padding:2px 8px;
-      border-radius:99px; margin-left:8px; vertical-align:2px; }
-.lv.high { background:color-mix(in srgb,var(--crit) 20%,transparent); color:var(--crit); }
-.lv.medium { background:color-mix(in srgb,var(--warn) 20%,transparent); color:var(--warn); }
-.kv { display:flex; align-items:baseline; gap:8px; font-size:12px; color:var(--ink2);
-      padding:3px 0; }
+.kv { display:flex; align-items:baseline; gap:var(--sp-2); font-size:var(--t-data);
+      color:var(--ink2); padding:2px 0; }
 
 /* =========================================================== model checks === */
-.status { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
-.score { font-size:28px; font-weight:600; font-variant-numeric:tabular-nums; }
-.check { display:flex; gap:12px; padding:10px 0; border-top:1px solid var(--line); }
+.status { display:flex; align-items:center; gap:var(--sp-4); flex-wrap:wrap;
+          margin-bottom:var(--sp-3); }
+.score { font-size:var(--t-lead); font-weight:var(--w-bold); font-family:var(--mono); }
+.check { display:flex; gap:var(--sp-3); padding:var(--sp-2) 0;
+         border-top:1px solid var(--line); }
 .check:first-child { border-top:0; }
-.mark { flex:0 0 auto; width:18px; height:18px; border-radius:50%; margin-top:3px;
-        display:grid; place-items:center; font-size:11px; font-weight:700;
-        color:var(--plane); }
+.mark { flex:0 0 auto; width:16px; height:16px; border-radius:50%; margin-top:2px;
+        display:grid; place-items:center; font-size:var(--t-mark);
+        font-weight:var(--w-bold); color:var(--plane); }
 .mark.y { background:var(--good); } .mark.n { background:var(--crit); }
-.check .detail { color:var(--ink2); font-size:12px; font-variant-numeric:tabular-nums; }
-.check ul { margin:6px 0 0; padding-left:18px; font-size:12.5px; color:var(--crit); }
+.check .detail { color:var(--ink2); font-size:var(--t-data); font-family:var(--mono); }
+.check ul { margin:var(--sp-1) 0 0; padding-left:var(--sp-5); font-size:var(--t-data);
+            color:var(--crit); }
 
 /* ================================================================== video === */
-.vwrap { display:grid; gap:12px; grid-template-columns:minmax(0,2.1fr) minmax(190px,1fr); }
+.vwrap { display:grid; gap:var(--sp-4);
+         grid-template-columns:minmax(0,2.1fr) minmax(190px,1fr); }
 @media (max-width:820px) { .vwrap { grid-template-columns:1fr; } }
-.stage { background:#000; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+.stage { background:#000; border:1px solid var(--line); border-radius:var(--r);
+         overflow:hidden; }
 .stage video { width:100%; display:block; aspect-ratio:16/9; background:#000;
                object-fit:contain; }
-.stage .cap { padding:8px 12px; background:var(--surface); font-size:12px;
-              color:var(--ink2); display:flex; justify-content:space-between;
-              align-items:center; }
-.strip { display:flex; flex-direction:column; gap:6px; max-height:340px; overflow-y:auto;
-         padding-right:2px; }
-.thumb { display:flex; align-items:center; gap:9px; background:var(--surface);
-         border:1px solid var(--line); border-radius:8px; padding:7px 9px;
-         cursor:pointer; font-size:12px; }
+.stage .cap { padding:var(--sp-2) var(--sp-3); background:var(--surface);
+              font-size:var(--t-data); color:var(--ink2); display:flex;
+              justify-content:space-between; align-items:center; }
+.strip { display:flex; flex-direction:column; gap:var(--sp-1); max-height:340px;
+         overflow-y:auto; padding-right:2px; }
+.thumb { display:flex; align-items:center; gap:var(--sp-3); background:var(--surface);
+         border:1px solid var(--line); border-radius:var(--r-sm);
+         padding:var(--sp-1) var(--sp-2); cursor:pointer; font-size:var(--t-data); }
 .thumb:hover { border-color:var(--ink2); }
-.thumb.sel { border-color:var(--s1); background:color-mix(in srgb,var(--s1) 14%,var(--surface)); }
+.thumb.sel { border-color:var(--s1);
+             background:color-mix(in srgb,var(--s1) 14%,var(--surface)); }
 /* Clips driven by hand rather than filmed at a checkpoint. They sit at the top of
    the strip and need to look different, or they read as broken checkpoint films. */
 .thumb.driven { border-left:2px solid var(--pilot); }
 .thumb.driven .n { color:var(--pilot); }
-.thumb .n { color:var(--muted); width:34px; font-size:11px; }
+.thumb .n { color:var(--muted); width:34px; font-size:var(--t-mark); }
 
 /* =========================================================== run selector === */
 .rc { display:block; background:var(--surface2); border:1px solid var(--line);
-      border-radius:8px; padding:9px 10px; margin-bottom:6px; cursor:pointer; }
+      border-radius:var(--r-sm); padding:var(--sp-2) var(--sp-3);
+      margin-bottom:var(--sp-1); cursor:pointer; }
 .rc:hover { border-color:var(--ink2); }
-.rc.sel { border-color:var(--s1); background:color-mix(in srgb,var(--s1) 14%,var(--surface2)); }
-.rc .r1 { display:flex; align-items:center; gap:6px; }
-.rc .nm { font-weight:600; font-size:13px; flex:1; overflow:hidden;
+.rc.sel { border-color:var(--s1);
+          background:color-mix(in srgb,var(--s1) 14%,var(--surface2)); }
+.rc .r1 { display:flex; align-items:center; gap:var(--sp-2); }
+.rc .nm { font-weight:var(--w-bold); font-size:var(--t-body); flex:1; overflow:hidden;
           text-overflow:ellipsis; white-space:nowrap; }
-.rc .pp { font-size:11.5px; color:var(--ink2); line-height:1.35; margin-top:3px;
+.rc .pp { font-size:var(--t-mark); color:var(--ink2); line-height:1.35; margin-top:2px;
           display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
           overflow:hidden; }
-.rc .r3 { display:flex; justify-content:space-between; font-size:10.5px;
-          color:var(--muted); margin-top:6px; }
-.rc .mini { height:3px; background:var(--line); border-radius:99px; margin-top:7px;
-            overflow:hidden; }
+.rc .r3 { display:flex; justify-content:space-between; font-size:var(--t-mark);
+          color:var(--muted); margin-top:var(--sp-1); }
+.rc .mini { height:3px; background:var(--line); border-radius:var(--r-pill);
+            margin-top:var(--sp-2); overflow:hidden; }
 .rc .mini i { display:block; height:100%; background:var(--s1); }
 /* `.brand` is the nav's wordmark inside `.top`, and the run selector's header
    outside it. Both want the same weight, so it is set here rather than only in
    the nav rule - which is why the sidebar title used to render at body size. */
-.brand { font-size:16px; font-weight:600; letter-spacing:-.01em; }
-.brand small { display:block; font-size:10px; color:var(--muted); font-weight:500;
-               letter-spacing:.14em; text-transform:uppercase; margin-top:4px; }
-.side-h { font-size:10px; text-transform:uppercase; letter-spacing:.14em;
-          color:var(--muted); margin:20px 0 8px; font-weight:600;
-          display:flex; justify-content:space-between; }
+.brand { font-size:var(--t-head); font-weight:var(--w-bold); letter-spacing:-.01em; }
+.brand small { display:block; font-size:var(--t-cap); color:var(--muted);
+               font-weight:500; letter-spacing:.12em; text-transform:uppercase;
+               margin-top:3px; }
+
+/* ============================================================ the live read === */
+/* The distilled view of the run in front of you. Everything here is built for
+   DENSITY: the whole answer has to fit one screen, because a fact below the fold
+   during a two-hour run is a fact nobody reads.
+
+   No new colours. Every state here MEANS good or bad - passing a bar, tipping
+   over, leaking points - so it wears the reserved status tokens rather than a
+   series hue, and never wears one alone: each row carries its mark, its word and
+   its number as text.
+
+   Called `.readout` and NOT `.live`, which is what it was called for about an
+   hour. `live` is already a status MODIFIER in this file - `.dot.live` is the
+   pulsing lamp and `.badge.live` is the "training" pill - so a block of the same
+   name matched every one of them and gave each a surface, a border, a radius and
+   padding. It broke three things at once and only one was visible. A block name
+   must not be a word already spent on a state. */
+/* `overflow:hidden`, not `auto`: nothing inside a readout may draw outside it,
+   whatever a row's columns add up to. `auto` would answer an overflow with a
+   scrollbar, which hides the fault instead of containing it. */
+.readout { background:var(--surface); border:1px solid var(--line);
+           border-radius:var(--r); padding:var(--sp-3) var(--sp-4);
+           margin-bottom:var(--sp-3); overflow:hidden; }
+.readout > h3 { margin:0 0 var(--sp-2); font-size:var(--t-cap); text-transform:uppercase;
+                letter-spacing:.1em; color:var(--muted); font-weight:var(--w-bold);
+                display:flex; align-items:center; gap:var(--sp-3);
+                font-family:var(--mono); }
+.readout > h3 .grow { flex:1; }
+.readout > h3 .say { text-transform:none; letter-spacing:0; font-weight:400;
+                     font-size:var(--t-mark); font-family:var(--sans); }
+/* Which run this block is about. The one thing in the header worth reading
+   twice, so it is the one thing at ink weight - the status, the duration and
+   the counts beside it stay muted. */
+.readout > h3 .who { text-transform:none; letter-spacing:0; font-weight:var(--w-bold);
+                     font-size:var(--t-body); color:var(--ink); font-family:var(--sans); }
+.readout > h3 .who a { color:inherit; }
+.readout > h3 .who a:hover { text-decoration:underline; }
+
+/* A block that opens. The heavy blocks start shut behind their own one-line
+   summary, so the ones that ARE the answer are what you land on. */
+.fold { border:1px solid var(--line); border-radius:var(--r); background:var(--surface);
+        margin-bottom:var(--sp-3); }
+.fold > summary { list-style:none; cursor:pointer; padding:var(--sp-3) var(--sp-4);
+                  font-size:var(--t-cap); text-transform:uppercase; letter-spacing:.1em;
+                  color:var(--muted); font-weight:var(--w-bold); display:flex;
+                  gap:var(--sp-3); align-items:center; font-family:var(--mono); }
+.fold > summary::-webkit-details-marker { display:none; }
+.fold > summary::before { content:"\25B8"; color:var(--muted); font-size:9px;
+                          transition:transform .12s; }
+.fold[open] > summary::before { transform:rotate(90deg); }
+.fold > summary:hover { color:var(--ink); }
+.fold > summary .say { text-transform:none; letter-spacing:0; font-weight:400;
+                       font-size:var(--t-mark); color:var(--muted);
+                       font-family:var(--sans); }
+.fold > summary .grow { flex:1; }
+.fold .in { padding:0 var(--sp-4) var(--sp-3); }
+
+/* --- the bar board row.
+       mark | name | value | where it came from | track | distance | note
+
+   The name column is CAPPED. It was `minmax(96px,1.1fr)`, which on a 1450px page
+   handed 465px to the words "stayed up" and left the value floating three
+   hundred pixels away from the thing it belongs to.
+
+   And the TRACK is capped too, with the leftover going to a note column. The
+   track was taking every spare pixel - 900px of axis for a dot - while the
+   caveat that explains the row sat on a line of its own UNDERNEATH it, breaking
+   the gates into separate huddles. The gates are the block. They read as one
+   group or they do not read at all, so the prose moved sideways into the space
+   the track was wasting. */
+/* Every flexible column is `minmax(0, …)`. A grid column's default minimum is
+   `auto`, which is "as wide as its content", so the note column would not shrink
+   below its text and the row spilled straight out of the block - across the gap
+   and under the block beside it. The notes clip with an ellipsis and carry their
+   full text on `title`, so shrinking them loses nothing. */
+.lrow { display:grid; align-items:center; gap:var(--sp-3); min-height:24px;
+        grid-template-columns:13px minmax(0,168px) 84px 96px
+                              minmax(0,320px) 84px minmax(0,1fr);
+        font-size:var(--t-data); }
+/* Hover, not zebra. A handful of rows do not need banding, but following one
+   across seven columns does want the row to answer. The negative margin cancels
+   `.readout`'s padding, so the wash runs to the block's edge instead of stopping
+   short of it in a way that reads as a rendering fault. */
+.lrow, .readrow { margin:0 calc(-1 * var(--sp-4)); padding:0 var(--sp-4); }
+.lrow:hover, .readrow:hover
+  { background:color-mix(in srgb,var(--ink) 3.5%,transparent); }
+/* The legend row: same grid, so the scale labels sit over the track column by
+   construction rather than by a guessed margin. */
+.lrow.head { min-height:0; margin-bottom:1px; border-bottom:1px solid var(--grid);
+             padding-bottom:2px; }
+.lrow.head:hover { background:none; }
+.lrow .mk { font-size:var(--t-data); font-weight:var(--w-bold); text-align:center;
+            color:var(--muted); }
+/* The caveat that used to be a `.lsub` line of its own. Muted, one line, clipped
+   with the full text on the element's title - it is worth having beside the
+   number and is never the thing you came to read.
+   `.lnote` and not `.note`: `.note` is the left-bordered callout used on five
+   pages. Same lesson as `.readout`. */
+.lrow .lnote { color:var(--muted); font-size:var(--t-mark); line-height:1.35;
+               overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lrow .lnote a { color:var(--ink2); }
+.lrow .lnote b { color:var(--ink2); font-weight:var(--w-bold); }
+.lrow.pass .mk { color:var(--good); }
+.lrow.fail .mk { color:var(--crit); }
+.lrow .nm { color:var(--ink); overflow:hidden; text-overflow:ellipsis;
+            white-space:nowrap; }
+.lrow .v { text-align:right; font-family:var(--mono); color:var(--ink); }
+.lrow .v.none { color:var(--muted); }
+.lrow .gap { text-align:right; font-family:var(--mono); font-size:var(--t-mark);
+             color:var(--muted); }
+.lrow.fail .gap { color:var(--crit); }
+.lrow.pass .gap { color:var(--good); }
+/* Where the number came from, as a word rather than a shade: `from training` is
+   read off metrics.csv as the run goes, `verified` is scripts/verify.py's own
+   measurement on a checkpoint, `not logged` is nothing measures it. The
+   distinction is the whole point of the row and it is never carried by colour.
+
+   A MODIFIER OF `.badge`, not a component. `.badge` is already exactly this -
+   uppercase, letter-spaced, muted - and four spellings of one pill were merged
+   into it once already. All this needs is the border off, because six bordered
+   words down one column read as a fence. */
+.badge.src { border-color:transparent; padding:2px 0; letter-spacing:.07em; }
+.badge.src.verified { color:var(--ink2); }
+.badge.src.unlogged { opacity:.6; }
+/* The sub-line under a row: the caveat, or what was last verified. Indented to
+   the name column so it reads as belonging to the row above it. */
+.lsub { font-size:var(--t-mark); color:var(--muted); padding:0 0 var(--sp-1) 23px;
+        line-height:1.4; margin-top:-2px; }
+.lsub b { color:var(--ink2); font-weight:var(--w-bold); }
+
+/* --- a plain-English reading: lamp, claim, then the numbers behind it.
+   The evidence is on the SAME line, never a second one - eight readings with a
+   sub-line each is a screenful, and then the bar board is below the fold. */
+.readrow { display:flex; align-items:baseline; gap:var(--sp-3); min-height:20px;
+           font-size:var(--t-data); border-top:1px solid var(--grid); padding:2px 0; }
+.readrow:first-of-type { border-top:0; }
+.readrow .ttl { color:var(--ink); min-width:132px; }
+.readrow .says { color:var(--ink2); flex:1; }
+.readrow .ev { color:var(--muted); font-size:var(--t-mark); text-align:right;
+               font-family:var(--mono); white-space:nowrap;
+               overflow:hidden; text-overflow:ellipsis; max-width:46%; }
+.readrow.warn .says { color:var(--warn); }
+.readrow.bad .says { color:var(--crit); }
+
+/* --- where the points go. One axis, points per second, zero down the middle:
+   rewards run right, penalties left. Not two charts side by side - the whole
+   question is which side is bigger, and that only reads on a shared scale.
+
+   `.cap` is the ghost showing what the term COULD have earned (its weight, since
+   every reward is capped at 1.0 first). Headroom is the useful number: a term at
+   0.50 of 0.50 has nothing left to give and a term at 0.22 of 1.0 does. */
+.brow { display:grid; align-items:center; gap:var(--sp-3); min-height:19px;
+        font-size:var(--t-data);
+        grid-template-columns:minmax(84px,1fr) minmax(150px,2.4fr) 92px; }
+.brow .nm { color:var(--ink2); overflow:hidden; text-overflow:ellipsis;
+            white-space:nowrap; }
+.brow .n { text-align:right; font-family:var(--mono); font-size:var(--t-mark);
+           color:var(--muted); }
+.brow .n b { color:var(--ink); font-weight:var(--w-bold); }
+.bax { position:relative; height:11px; }
+/* The zero rule. A solid hairline, one shade off the surface - a dashed one
+   reads as a threshold, and this is an origin. */
+.bax .zero { position:absolute; top:-2px; bottom:-2px; width:1px;
+             background:var(--line); }
+.bax i { position:absolute; top:2px; height:7px; border-radius:2px; }
+.bax i.earn { background:var(--good); }
+.bax i.lose { background:var(--crit); }
+.bax .cap { position:absolute; top:2px; height:7px; border-radius:2px;
+            background:color-mix(in srgb,var(--good) 22%,transparent); }
+.brule { border-top:1px solid var(--grid); margin:var(--sp-1) 0; }
+
+/* --- the reference hairline on a chart, where the metric has a bar worth
+   drawing. Solid, one shade off the surface, with its label at the right end. */
+.barref { stroke:var(--muted); stroke-width:1; opacity:.55; }
 
 /* =================================================================== code === */
-code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.88em;
-       color:var(--ink2); background:var(--surface2); border:1px solid var(--line);
-       border-radius:4px; padding:1px 5px; }
-.mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
-pre.log { background:var(--plane); border:1px solid var(--line); border-radius:8px;
-          padding:12px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-          font-size:11px; color:var(--ink2); max-height:420px; overflow:auto;
+code { font-family:var(--mono); font-size:.9em; color:var(--ink2);
+       background:var(--surface2); border:1px solid var(--line);
+       border-radius:var(--r-sm); padding:1px 4px; }
+.mono { font-family:var(--mono); }
+pre.log { background:var(--plane); border:1px solid var(--line); border-radius:var(--r);
+          padding:var(--sp-4); font-family:var(--mono); font-size:var(--t-mark);
+          color:var(--ink2); max-height:420px; overflow:auto;
           white-space:pre-wrap; word-break:break-word; margin:0; }
 
 /* ================================================================= narrow === */
 @media (max-width:900px) {
-  :root { --sidebar:0px; --side:0px; }
+  :root { --sidebar:0px; }
   .app { grid-template-columns:1fr; grid-template-rows:auto minmax(0,1fr); }
   .app > aside { position:static; height:auto; border-right:0;
                  border-bottom:1px solid var(--line); }
-  main { padding:18px 16px 60px; }
-  .paper { padding:18px 16px 60px; }
-  h1 { font-size:22px; } h2 { font-size:18px; }
+  main, .sheet, .paper { padding:var(--sp-4) var(--sp-4) 48px; }
+  h1 { font-size:19px; }
 }

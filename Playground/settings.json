@@ -10,14 +10,14 @@
     "turn": true
   },
   "button": {
-    "stop": 2,
+    "stop": 15,
     "reset": 1,
     "unlock": 6
   },
   "full": {
-    "fwd": 1.0,
-    "side": 0.1,
-    "turn": 0.5
+    "fwd": 0.9,
+    "side": 0.5,
+    "turn": 2.0
   },
   "deadzone": 0.12
 }

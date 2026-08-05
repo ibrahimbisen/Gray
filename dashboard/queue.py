@@ -100,10 +100,18 @@ TASKS = ("Gray-Stand", "Gray-Push", "Gray-Walk")
 #
 # So the trade is: more robots means a less noisy gradient, fewer robots means a
 # faster experiment loop. While the reward function is still being debugged - and
-# sideways drift is currently 21x its bar, which is a reward-alignment problem
-# and not a gradient-noise one - turnaround is worth more than batch size.
+# straightness is currently about 20 deg off against a 5 deg bar, which is a
+# problem of what the policy can SENSE and not one of gradient noise - turnaround
+# is worth more than batch size.
 # 4500 is comfortably past the ~4096 that legged-robot RL usually needs.
-CARD_ENV_CEILING = 4500
+#
+# Raised to 5000 on 4 Aug 2026 on the owner's call, alongside dropping the run
+# length from 2000 iterations to 500. Those two go together: a bigger batch is a
+# less noisy gradient per iteration, which is what buys the right to take fewer
+# of them. Watch the first run of the night - 5000 is 11% more memory on a 12 GB
+# card than the 4500 every run so far has used, and the failure mode is an
+# out-of-memory abort in the first minute rather than anything subtle.
+CARD_ENV_CEILING = 5000
 FILMING_ENV_CEILING = CARD_ENV_CEILING
 
 # A job, with every field defaulted. Anything the UI does not send falls back to
@@ -119,6 +127,12 @@ DEFAULTS: dict[str, Any] = {
     "no_video": False,
     "rewards": {},          # term -> weight, overriding the task
     "ramps": {},            # ramped term -> [w0, w1, w2, w3] for its curriculum
+    "turn_std": None,       # track_turn's tolerance in rad/s; None keeps 0.80
+    "upright_std": None,    # upright's tilt tolerance in rad; None keeps 0.45
+    "gyro_noise": None,     # (bias, wander) rad on the heading the policy READS
+    "no_heading_obs": False,  # train blind, the pre-4-Aug 48-input policy
+    "with_off_track": False,  # ADD the cross-track input; off by default, it lost ground
+    "crab_share": None,       # share of draws that are a PURE sideways step
     "push_speed": None,     # [min, max] m/s, or None to leave alone
     "push_spin": None,      # [min, max] rad/s
     "film": True,           # film checkpoints alongside training
@@ -319,9 +333,22 @@ def runner_status() -> dict:
 def load() -> dict:
     """The queue, with counts the pages would otherwise all compute themselves."""
     state = _read()
+
     # The exact command each job will run, shown on the page. Queueing something
     # you cannot read back is just hoping.
-    jobs = [{**j, "command": command_line(j)} for j in state["jobs"]]
+    #
+    # Caught, not raised. train_argv refuses a job whose settings it cannot pass
+    # on - the right call there, and fatal here: load() runs over EVERY job on
+    # every API request and on every runner poll, so one bad job would 500 the
+    # whole page and stop the queue. The refusal is carried on the job instead,
+    # where the page can show it and the runner can skip that one job.
+    def described(job: dict) -> dict:
+        try:
+            return {**job, "command": command_line(job), "cannot_run": ""}
+        except ValueError as exc:
+            return {**job, "command": "", "cannot_run": str(exc)}
+
+    jobs = [described(j) for j in state["jobs"]]
     state = {**state, "jobs": jobs}
     return {
         **state,
@@ -331,6 +358,10 @@ def load() -> dict:
         "history": [j for j in jobs if j.get("state") in FINISHED][::-1],
         "tasks": list(TASKS),
         "defaults": DEFAULTS,
+        # The card's ceiling, so the Add-a-job form can cap its own box and print
+        # the real number in the hint beside it. It used to say 4096 in the HTML,
+        # which was wrong from the moment this was raised to 5000.
+        "env_ceiling": CARD_ENV_CEILING,
         "runner": runner_status(),
     }
 
@@ -446,7 +477,7 @@ def _clean(spec: dict) -> dict:
     for key in ("task", "name", "note"):
         if spec.get(key) is not None:
             job[key] = str(spec[key])
-    for key in ("no_video", "film", "verify"):
+    for key in ("no_video", "film", "verify", "no_heading_obs", "with_off_track"):
         if spec.get(key) is not None:
             job[key] = _as_bool(spec[key])
     for key in ("num_envs", "iterations", "seed"):
@@ -454,7 +485,15 @@ def _clean(spec: dict) -> dict:
             job[key] = _as_int(spec[key], DEFAULTS[key])
     if spec.get("stop_at") is not None:
         job["stop_at"] = _as_float(spec["stop_at"], DEFAULTS["stop_at"])
-    for key in ("push_speed", "push_spin"):
+    for key in ("turn_std", "upright_std", "crab_share"):
+        if spec.get(key) is not None:
+            job[key] = _as_float(spec[key], 0.0)
+    # NOTE the pair fields are listed here AND in train_argv, and they have to
+    # match. A field added to one and not the other is a job that shows the
+    # setting on the page and does not pass it to the trainer - which is
+    # indistinguishable from a setting that did not work, and cost a whole
+    # 13-run queue being built with every knob silently dropped on 4 Aug 2026.
+    for key in ("push_speed", "push_spin", "gyro_noise"):
         if spec.get(key) is not None:
             job[key] = _as_pair(spec[key])
 
@@ -505,11 +544,32 @@ def _clean(spec: dict) -> dict:
 
 
 def add(spec: dict, position: str = "end") -> dict:
-    """Add a job. `position` is "end" or "next" (jump the queue)."""
+    """Add a job. `position` is "end" or "next" (jump the queue).
+
+    REFUSES A SPEC IT WOULD SILENTLY NARROW. `_clean` rebuilds every job from
+    DEFAULTS and copies across only the keys it knows, which is what keeps one
+    bad POST from poisoning the queue file - and it means a key it has never
+    heard of vanishes without a word.
+
+    That is how `upright_std` was lost on 4 Aug 2026. It was added to DEFAULTS,
+    to train_argv and to train_argv's own guard, and not to `_clean` - so the
+    value died here, the job carried the default of None, and the guard "job
+    asks for X but the command line has no X" saw a job asking for nothing.
+    A check that reads the job cannot catch a field the job never received; the
+    only place that still knows what was WANTED is right here, before _clean.
+    """
     made: dict = {}
 
     def apply(state: dict) -> None:
         job = _clean(spec)
+        lost = [k for k, v in spec.items()
+                if v not in (None, "", {}, [], False) and k not in ("position",)
+                and job.get(k) in (None, "", {}, [], False)]
+        if lost:
+            raise ValueError(
+                f"queue.py does not know how to carry {', '.join(sorted(lost))} - "
+                f"the value was dropped. Add it to _clean() AND to train_argv(), "
+                f"or the job will train the default while claiming otherwise.")
         job.update({
             "id": f"j{state['next_id']:04d}",
             "state": "queued",
@@ -700,10 +760,62 @@ def train_argv(job: dict) -> list[str]:
         for term, stages in ramps.items():
             if isinstance(stages, (list, tuple)) and stages:
                 argv += ["--ramp", f"{term}=" + ",".join(str(w) for w in stages)]
-    for flag in ("push_speed", "push_spin"):
+    for flag in ("push_speed", "push_spin", "gyro_noise"):
         pair = _as_pair(job.get(flag))
         if pair:
             argv += [f"--{flag.replace('_', '-')}", *(str(v) for v in pair)]
+    # A tolerance, not a weight - it sets how sharply `track_turn` scores yaw
+    # rate, which --reward cannot reach. Kept out of `rewards` deliberately: a
+    # std in a dict of weights is the kind of thing that gets applied as one.
+    if job.get("turn_std"):
+        argv += ["--turn-std", str(_as_float(job["turn_std"], 0.0))]
+    if job.get("upright_std"):
+        argv += ["--upright-std", str(_as_float(job["upright_std"], 0.0))]
+    if job.get("no_heading_obs"):
+        argv += ["--no-heading-obs"]
+    if job.get("with_off_track"):
+        argv += ["--with-off-track"]
+    # `is not None`, NOT truthiness, and that distinction is the whole point of
+    # this field. Zero is the setting that matters most - it switches the pure
+    # sideways share off and gives the draw mix as it was before 5 Aug 2026, so
+    # the share can be measured against its own absence. Written like the two
+    # lines above it, `crab_share: 0.0` would be falsy, the flag would never be
+    # added, and the run would train at 0.15 under a name saying 0.
+    if job.get("crab_share") is not None:
+        argv += ["--crab-share", str(_as_float(job["crab_share"], 0.0))]
+
+    # Every knob that is set must have produced a flag. This is not paranoia: on
+    # 4 Aug 2026 six runs - five hours of card time - trained the identical
+    # config while the dashboard showed six different ones, because the RUNNER
+    # PROCESS had been started before turn_std, gyro_noise and no_heading_obs
+    # were added here. A long-running Python process holds the module it
+    # imported; editing this file does nothing until the runner is restarted.
+    #
+    # Nothing above can detect its own absence, so the check is written against
+    # the job instead: if the job asks for something and the argv does not carry
+    # it, refuse the job rather than run a mislabelled experiment. A job that
+    # will not start is a five-minute fix. Six that quietly agree are a day.
+    text = " ".join(argv)
+    # `zero_means_something` names the fields where 0 is a real setting rather
+    # than "unset", so the check below tests them with `is not None`. Get this
+    # wrong and the guard is blind to exactly the run it exists to protect.
+    zero_means_something = ("crab_share",)
+    for key, flag in (("turn_std", "--turn-std"),
+                      ("upright_std", "--upright-std"),
+                      ("gyro_noise", "--gyro-noise"),
+                      ("no_heading_obs", "--no-heading-obs"),
+                      ("with_off_track", "--with-off-track"),
+                      ("crab_share", "--crab-share"),
+                      ("push_speed", "--push-speed"),
+                      ("push_spin", "--push-spin")):
+        asked = (job.get(key) is not None if key in zero_means_something
+                 else bool(job.get(key)))
+        if asked and flag not in text:
+            raise ValueError(
+                f"job {job.get('id', '?')} sets {key}={job[key]!r} but the "
+                f"command line has no {flag}. The runner is running an older "
+                f"copy of dashboard/queue.py than the queue was written with - "
+                f"restart the runner.")
     return argv
 
 

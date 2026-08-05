@@ -114,9 +114,9 @@ PROJECT = [
                "the next largest is the range that run is sampled over, and the rest "
                "are checked or measured rather than trained. Live counts are on the "
                "stage 2 page - they are read from the CSV, never written down here.",
-        "headline": "At PLAN.md 1.1.2 - round 0, the noise floor. R2 getting up not "
-                    "started. R3 foot-on-object, jumping and seeing are shelved, each "
-                    "with the thing that un-shelves it.",
+        "headline": "At PLAN.md 1.2.2 - it walks straight and turns at half the rate "
+                    "it is told. R2 getting up not started. R3 foot-on-object, jumping "
+                    "and seeing are shelved, each with the thing that un-shelves it.",
         "page": "/stage2",
     },
     {
@@ -374,10 +374,10 @@ STAGE2 = {
         "each of those is cheap in a way a run is not.",
     ],
     "bars": {
-        "walk": "Walks 5 m without falling, holds commanded speed within 0.05 m/s, "
-                "drifts under 100 mm sideways over 20 s - and holds any commanded "
-                "height and attitude at zero speed for 30 s, trunk within 5 mm of "
-                "target, uprightness above 0.99.",
+        "walk": "Walks 5 m without falling, forwards AND backwards, holds commanded "
+                "speed within 0.05 m/s, stays within 4 deg of the line it was sent "
+                "along - and holds any commanded height and attitude at zero speed "
+                "for 30 s, trunk within 5 mm of target, uprightness above 0.99.",
         "recover": "Stands up from 9 of 10 random ground poses in under 3 s, and "
                    "hands control back to R1 upright and stable.",
         "tool": "Shelved. It would be: moves the target object by the commanded "
@@ -459,11 +459,11 @@ STAGE3 = {
     ],
     "software_first": [
         "One observation builder, shared by the simulator and the robot. The policy "
-        "reads about 45 numbers every 20 ms; if one joint is in a different order, or "
+        "reads 49 numbers every 20 ms; if one joint is in a different order, or "
         "a sign is flipped, the robot thrashes and nothing says why. Two "
         "implementations that agree today will not agree in a month.",
         "The observation normaliser ships with the network. The policy learned a "
-        "running mean and standard deviation for those 45 numbers - export the network "
+        "running mean and standard deviation for those 49 numbers - export the network "
         "without it and the robot does nothing sensible.",
         "A safety layer before first power-on: angle and rate limits, a watchdog, a "
         "soft start, a kill switch.",
@@ -661,9 +661,11 @@ PHASES = [
         "n": 2, "name": "Train", "state": "next",
         "one_line": "Five steps, two training runs, not 200 skills.",
         "detail": "PLAN.md: locomotion, getting up, join them up, then the sensors "
-                  "twice. At 1.1.2 today - round 0, the noise floor. R2 getting up is "
-                  "not started. R3 foot-on-object, jumping and seeing are shelved, "
-                  "each with the thing that un-shelves it.",
+                  "twice. At 1.2.2 today - 1.1 passed on three unseen seeds, and the "
+                  "first measurement of the rest of the command box says it turns at "
+                  "half the rate it is told. R2 getting up is not started. R3 "
+                  "foot-on-object, jumping and seeing are shelved, each with the thing "
+                  "that un-shelves it.",
         "needs_robot": False,
     },
     {
@@ -676,28 +678,41 @@ PHASES = [
 ]
 
 NEXT_UP = {
-    "title": "PLAN.md 1.1.2  Round 0, the noise floor",
-    "why": "Step 1.1 is make it walk, and 1.1.2 is where the project is. Three "
-           "identical configs on three seeds. Whatever those three disagree by is "
-           "the noise floor, and every later difference has to beat it before it "
-           "means anything. It looks like the least of the four rounds and it is the "
-           "one everything after it is read against.",
+    "title": "PLAN.md 1.2.2  Make it turn at the rate it is told",
+    "why": "1.1 passed on 4 Aug on three seeds it had never seen, so the robot "
+           "walks straight, forward and backward. The same day verify learned to "
+           "test the other half of the command box - crabbing sideways and turning "
+           "on the spot - which the policy had been TRAINED on since 3 Aug and which "
+           "nothing had ever graded. Those three passing seeds turn at about half the "
+           "rate they are told to: 0.44 to 0.51 rad/s of error against a 1.0 rad/s "
+           "command, against a new 0.20 bar. That is what this step closes.",
     "before": [
-        {"task": "1.1.2  Run round 0", "who": "code",
-         "note": "3 runs, one config, three seeds. Nothing varies but the random "
-                 "number stream."},
-        {"task": "1.1.3 to 1.1.5  Rounds 1 to 3", "who": "code",
-         "note": "8 runs on the straightness terms, 4 on the speed terms, then 3 long "
-                 "runs of the winner on seeds it has not seen. Each round is designed "
-                 "after the one before it is read."},
-        {"task": "1.1.6  Handover-shaped resets", "who": "code",
-         "note": "Add R2-like start states to R1's reset mix. This is preparation for "
-                 "step 3 and it has to happen inside step 1 - a runtime rule cannot "
-                 "fix a state R1 never trained on."},
-        {"task": "Close step 1.1's gate", "who": "code",
-         "note": "All six R1 criteria pass. 4 of 6 today: sideways drift is 21x its "
-                 "bar and speed tracking is 1.4x its bar. Only then does 1.2 widen "
-                 "the command box."},
+        {"task": "1.2.1  Grade sideways and turning - DONE 4 Aug", "who": "code",
+         "note": "Verify runs four passes now, not two, and carries five new bars. It "
+                 "cost nothing to find because it needs no training: the three "
+                 "finished 1.1 policies were re-scored in minutes, with --no-record so "
+                 "the measurement could not overwrite the verdicts that closed 1.1."},
+        {"task": "1.2.2  Batch 1, the turn band and weight", "who": "code",
+         "note": "4 runs, 5000 robots, 550 iterations. turn_std 0.80 or 0.40 crossed "
+                 "with track_turn 1.0 or 3.0. At std 0.80 the 0.5 rad/s error the "
+                 "robot actually makes still pays 0.68 of 1.0, so turning correctly is "
+                 "worth 0.32 against terms that all charge more for turning harder - "
+                 "under-turning is simply cheaper. This is the same trap as TRACK_STD, "
+                 "in the other direction, for the second time."},
+        {"task": "1.2.3  Score the path on a sideways command", "who": "code",
+         "note": "Crab comes in 20 to 34 deg off the line. `wandering`, `veering` and "
+                 "the `off_line` input are all gated on `_straight_now()`, so on a "
+                 "crab command the policy is asked to hold a line it is neither shown "
+                 "nor charged for missing - exactly what forward walking was doing "
+                 "before it could sense its heading. Needs a code change and a wider "
+                 "observation, so it is its own batch."},
+        {"task": "Close step 1.2's gate", "who": "code",
+         "note": "All eleven criteria pass, on unseen seeds. NINE of eleven today - "
+                 "the six straight-line ones, crab distance, crab speed and turn "
+                 "wander. The two that fail are crab drift, at 19.9 to 34.1 deg "
+                 "against 4.0, and turn rate, at 0.44 to 0.51 rad/s against 0.20. Two "
+                 "faults, two different fixes, one batch each. Only then does 1.3 turn "
+                 "the dials up."},
         {"task": "Sit down and list the parts", "who": "owner",
          "note": "Slicer grams per printed part, plus the exact battery, Pi, boards, "
                  "pots and fasteners. Closes the largest guess in stage 1 and needs no "
@@ -761,7 +776,7 @@ FEASIBILITY = {
                    "run, not after it. Every new reward gets the same treatment.",
          "level": "medium"},
         {"risk": "The observation contract is one shared list, or it is nothing.",
-         "detail": "The policy reads about 45 numbers every 20 ms, and the simulator "
+         "detail": "The policy reads 49 numbers every 20 ms, and the simulator "
                    "and the robot must build that list identically - same order, same "
                    "units, same scaling. One flipped sign and the robot thrashes with "
                    "nothing in the logs to say why. Write it once and share it; two "
@@ -998,7 +1013,9 @@ def sensors() -> dict:
             # a partial fix is the kind of number that gets believed.
             "unblocks_rows": (need or {}).get("count", 0) if need else 0,
         })
-    out.sort(key=lambda s: (_STATUS_ORDER.get(s["status"], 9), -s["unblocks_rows"]))
+    # .get, not [key]: sensors.yaml is hand-written, and a sensor added without a
+    # status used to raise here and 500 both /api/stage/2 and /api/state.
+    out.sort(key=lambda s: (_STATUS_ORDER.get(s.get("status"), 9), -s["unblocks_rows"]))
 
     # What the input list becomes if everything already decided goes in. This is
     # the number that decides WHEN they go in: they all land in one batch,
@@ -1015,11 +1032,11 @@ def sensors() -> dict:
     rank = {"critical": 0, "moderate": 1, "low": 2, "none": 3}
     by_key = {x["key"]: x for x in out}
     fitting = sorted(
-        ({**m, "name": by_key.get(m["key"], {}).get("name", m["key"]),
-          "count": by_key.get(m["key"], {}).get("count", 1),
-          "status": by_key.get(m["key"], {}).get("status", "")}
+        ({**m, "name": by_key.get(m.get("key"), {}).get("name", m.get("key", "")),
+          "count": by_key.get(m.get("key"), {}).get("count", 1),
+          "status": by_key.get(m.get("key"), {}).get("status", "")}
          for m in raw.get("mounting", [])),
-        key=lambda m: rank.get(m["matters"], 9))
+        key=lambda m: rank.get(m.get("matters"), 9))
 
     return {"error": "", "sensors": out,
             "fitting": fitting,
@@ -1073,8 +1090,15 @@ def driven() -> dict:
 
     cases = []
     for c in data.get("cases", []):
-        told, got = c["commanded"], c["walked"]
-        moved = abs(got["along_m"]) + abs(got["across_m"])
+        # drive.json is written by a separate script and read here. A case that
+        # is missing a half is skipped, not raised on: this function feeds
+        # /api/stage/2 and /api/state, so one short case used to take out the
+        # Train page and the Summary page together.
+        told = c.get("commanded")
+        got = c.get("walked")
+        if not isinstance(told, dict) or not isinstance(got, dict):
+            continue
+        moved = abs(got.get("along_m") or 0) + abs(got.get("across_m") or 0)
         cases.append({
             **c,
             "number": number,
@@ -1082,8 +1106,8 @@ def driven() -> dict:
             # "walked" would be reporting the direction of its own noise.
             "moved": moved,
             "went_nowhere": moved < 0.10,
-            "asked_deg": told["angle_deg"],
-            "got_deg": got["angle_deg"],
+            "asked_deg": told.get("angle_deg"),
+            "got_deg": got.get("angle_deg"),
             "sd_deg": got.get("angle_sd_deg"),
             "lo_deg": got.get("angle_min_deg"),
             "hi_deg": got.get("angle_max_deg"),
@@ -1142,17 +1166,18 @@ SHELVED = {
 # duration nobody knows. Two substeps measure rather than train, and those two
 # carry no gate at all rather than an invented one.
 #
-# `here` is where the project is. It is 1.1.2 and it is stated once, at the top
+# `here` is where the project is. It is 1.2.2 and it is stated once, at the top
 # and on the step, so the page cannot show two different answers.
 # ---------------------------------------------------------------------------
 
 FORWARD = {
     "one_line": "Five steps, each ending on a number rather than a date.",
-    "here": "1.1.2",
+    "here": "1.2.7",
     "lede": "One pattern, applied twice: train it, harden it, measure it. "
             "Locomotion first, then getting up. Then join them. Then the "
             "sensors, twice - once to keep what you had, once to use them. "
-            "Where we are: 1.1.2, round 0.",
+            "Where we are: 1.2.2 - it walks straight, and it turns at half "
+            "the rate it is told to.",
     "shape": [
         "Two things get tuned, and they fight each other. The REWARD says what "
         "good means. The RANGE says where it has to be good. Widening the range "
@@ -1168,35 +1193,50 @@ FORWARD = {
         "is nothing for them to pass.",
     ],
     "phases": [
-        {"id": "1", "name": "Locomotion", "state": "now", "here": "1.1.2",
-         "gate": "Three gates, one per substep, all the same six R1 criteria: "
-                 "first on today's command range (1.1), then across the whole "
-                 "command box (1.2), then with the dials at full (1.3). 1.4 has "
-                 "no gate - it measures.",
+        {"id": "1", "name": "Locomotion", "state": "now", "here": "1.2",
+         "gate": "Three gates, one per substep. 1.1 was six criteria on a "
+                 "straight line. 1.2 is ELEVEN - the same six, plus three for "
+                 "crabbing sideways and two for turning on the spot, added "
+                 "4 Aug 2026 once the test could measure them at all. 1.3 is "
+                 "those eleven again with the dials at full. 1.4 has no gate - "
+                 "it measures.",
          "what": "One policy for everything the robot does on its feet. Train it "
                  "until it walks, widen what it can be told to do, turn the "
                  "world's dials up, then measure it.",
          "steps": [
-             "1.1  Make it walk. Gate: all six R1 criteria pass. 4 of 6 today - "
-             "sideways drift is 21x its bar, speed tracking 1.4x its bar",
+             "1.1  Make it walk. PASSED 4 Aug on three unused seeds - DONE",
              "1.1.1  Fix `wandering` to measure the line it was sent along "
              "- done, 3 Aug",
-             "1.1.2  Round 0, the noise floor. 3 seeds, one config. WHERE WE ARE",
-             "1.1.3  Round 1, the straightness factorial. 8 runs",
+             "1.1.2  Round 0, the noise floor. 3 seeds, one config - done 4 Aug. "
+             "Reward noise 0.7 points. Drift noise is 0.72 deg sd, so two "
+             "configs under about 2 deg apart read the same on one run each",
+             "1.1.3  Round 1, straightness. WAS an 8-run factorial over the "
+             "straightness weights; became 6 runs plus 6 once the cause was "
+             "measured rather than guessed - done 4 Aug",
              "1.1.4  Round 2, the speed terms. 4 runs",
              "1.1.5  Round 3, the winner, long, on unseen seeds. 3 runs",
              "1.1.6  Add handover-shaped resets to R1's mix. Preparation for "
              "step 3",
-             "1.2  The whole command box. Gate: the same six criteria, across "
-             "the full range",
-             "1.2.1  Fix `_going_straight` to gate on abs(vx). It gates on "
-             "`command[:, 0] > MOVING` today, which is positive-only, so "
-             "`veering` and `wandering` switch off entirely for a backward "
-             "command. This one comes first",
-             "1.2.2  Widen WALK_SPEED through zero to negative",
-             "1.2.3  Let vy be sampled without vx",
-             "1.2.4  Retune",
-             "1.3  Turn the dials up. Gate: the same six criteria, dials at full",
+             "1.2  The whole command box. Gate: eleven criteria, across the "
+             "full range",
+             "1.2.0  Widen the box and fix `_going_straight` to gate on "
+             "abs(vx) - done, 3 Aug. WALK_SPEED went to (-0.35, 0.35), "
+             "sideways to +/-0.20, turn to +/-1.0",
+             "1.2.1  Grade sideways and turning at all - done, 4 Aug. Verify "
+             "ran two passes, forward and backward, with sideways and turn "
+             "pinned to zero, so half of what the policy is commanded to do "
+             "was measured by nothing. Four passes now, and five new bars",
+             "1.2.2  Make it turn at the rate it is told. Measured 0.44-0.51 "
+             "rad/s of error against a 1.0 rad/s command, on all three of the "
+             "seeds that PASSED 1.1 - about half rate. WHERE WE ARE",
+             "1.2.3  Score the path on a sideways command. `wandering`, "
+             "`veering` and the `off_line` input are all gated on "
+             "`_straight_now()`, so a crab command is asked to hold a line it "
+             "is neither shown nor charged for missing - and it comes in 20 to "
+             "34 deg off",
+             "1.2.4  Retune, and close the box on unseen seeds",
+             "1.3  Turn the dials up. Gate: the same eleven criteria as 1.2, "
+             "dials at full",
              "1.3.1  Widen what is already on - friction, mass, centre of mass, "
              "servo gains, joint friction",
              "1.3.2  Terrain. Slopes first, then uneven ground",
@@ -1210,92 +1250,318 @@ FORWARD = {
          "cost": "18 runs in 1.1 alone. 1.2 needs more than 1.1, because the "
                  "range is wider and the number of draws is fixed at 864,000.",
          "blocked_by": "",
-         "note": "1.2.1 must come first. Widening the range without it trains "
-                 "backward walking with no straightness penalty at all. Measured "
-                 "on run #25: backward walked 0.00 m in 8 seconds and pure "
-                 "sideways walked 3 cm, because WALK_SPEED is (0.15, 0.35), so "
-                 "vx is never zero and never negative. 1.3 turns the dials UP, "
+         "note": "The box was widened on 3 Aug and 1.1 closed on it on 4 Aug, "
+                 "so the policy has been TRAINED on backward, sideways and "
+                 "turning since then. What had never happened was measuring "
+                 "any of it: verify pinned sideways and turn to zero and ran "
+                 "forward and backward only. It measures all four since 4 Aug, "
+                 "and the first reading says the straight-line half is done and "
+                 "the other half is not - turning at half the commanded rate, "
+                 "crabbing 20 to 34 deg off the line. 1.3 turns the dials UP, "
                  "it does not switch them on - foot friction is already "
                  "randomised 0.4 to 1.2 on every attempt, alongside +/-20% mass, "
                  "+/-15 mm centre of mass and +/-30% servo stiffness. None of it "
                  "is a new skill: the policy never sees the word gravel, it sees "
-                 "the same 45 numbers in a different pattern, and that is also "
+                 "the same 49 numbers in a different pattern, and that is also "
                  "where sim-to-real robustness comes from. 1.4 trains nothing - "
                  "'find top speed' has no reward term, you raise the command "
                  "until it fails and write down where.",
          "subs": [
              {"id": "1.1", "name": "Make it walk",
-              "gate": "All six R1 criteria pass. 4 of 6 today - sideways drift "
-                      "is 21x its bar and speed tracking is 1.4x its bar.",
+              "goal": "Get the config right, so a policy can move at all.",
+              # Only a CLOSED step has anything to carry, so this is set per-sub
+              # rather than being a page in the nav. A global link would sit
+              # there being wrong for the eight steps that have not finished.
+              "carry": "/carry",
+              "gate": "PASSED 4 Aug 2026. All six criteria, three unused seeds "
+                      "(99, 314, 2718), one config, no flags: 100% stayed up, "
+                      "trunk 8.9-14.0 mm of 40, uprightness 0.998+, 6.55-6.72 m "
+                      "of 5, speed error 0.032-0.034 of 0.05, and 3.24-3.82 deg "
+                      "off the line against a 4 deg bar.",
               "why": "Round 0 looks like the least and matters the most. Three "
                      "identical configs on three seeds; whatever they disagree "
                      "by is the noise floor, and every later difference has to "
                      "beat it before it means anything.",
               "items": [
                   {"id": "1.1.1", "state": "done",
-                   "what": "Fix `wandering` to measure the line it was sent "
-                           "along - done, 3 Aug"},
-                  {"id": "1.1.2", "state": "now",
-                   "what": "Round 0, the noise floor. 3 seeds, one config"},
-                  {"id": "1.1.3", "state": "next",
-                   "what": "Round 1, the straightness factorial. 8 runs"},
-                  {"id": "1.1.4", "state": "next",
-                   "what": "Round 2, the speed terms. 4 runs"},
-                  {"id": "1.1.5", "state": "next",
-                   "what": "Round 3, the winner, long, on unseen seeds. 3 runs"},
-                  {"id": "1.1.6", "state": "next",
-                   "what": "Add handover-shaped resets to R1's mix. Preparation "
-                           "for step 3 - R1 has to have seen a state like the "
-                           "one R2 will hand it, and no runtime rule can add "
-                           "that afterwards"},
+                   "what": "Fix `wandering` to measure the line it was sent along",
+                   "goal": "Score drift against the line it was given, not world Y.",
+                   "gets": "A drift penalty that stops fighting `veering`."},
+                  {"id": "1.1.2", "state": "done",
+                   "what": "Round 0, the noise floor. 3 seeds, one config",
+                   "goal": "Find how much two identical runs disagree.",
+                   "gets": "0.72 deg drift, 0.7 reward points. Nothing smaller "
+                           "than that counts as a result."},
+                  {"id": "1.1.3", "state": "done",
+                   "what": "Round 1, straightness - done 4 Aug",
+                   "goal": "Find why it will not walk straight, and fix it.",
+                   "gets": "A 49th input - heading error. Drift 19.5 -> 3.6 deg. "
+                           "Blind it again and drift is 23-27, so the trunk "
+                           "gyros are now required hardware."},
+                  {"id": "1.1.4", "state": "done",
+                   "what": "Round 2, smoothness - done 4 Aug",
+                   "goal": "Stop the twitching and the trunk shake.",
+                   "gets": "Final weights for twitching, jitter, rocking, "
+                           "shaking, and the tilt tolerance."},
+                  {"id": "1.1.5", "state": "done",
+                   "what": "Round 3, the winner, on unseen seeds - done 4 Aug",
+                   "goal": "Prove the config, not one lucky run.",
+                   "gets": "One config passing all six bars on 3 seeds. This is "
+                           "what closes 1.1."},
+                  {"id": "1.1.6", "state": "done",
+                   "what": "Add handover-shaped resets to R1's mix - done 4 Aug",
+                   "goal": "Let R1 start from the pose R2 will hand it.",
+                   "gets": "A reset mix step 3 can hand over into. No runtime "
+                           "rule can add this later."},
               ]},
              {"id": "1.2", "name": "The whole command box",
-              "gate": "The same six criteria, across the full range.",
-              "why": "Measured on run #25: backward walked 0.00 m in 8 seconds "
-                     "and pure sideways walked 3 cm. Neither was ever sampled - "
-                     "WALK_SPEED is (0.15, 0.35), so vx is never zero and never "
-                     "negative. Four library rows filed as commands are not. "
-                     "1.2.1 must come first: widening the range without it "
-                     "trains backward walking with no straightness penalty at "
-                     "all.",
+              "goal": "Make it obey every command, not just straight ahead.",
+              "gate": "Eleven criteria, across the full range: the six that "
+                      "closed 1.1, three for crabbing sideways, two for turning "
+                      "on the spot.",
+              "why": "The box was widened on 3 Aug 2026 and 1.1 closed on it on "
+                     "4 Aug, so the policy has trained on backward, sideways "
+                     "and turning for two days. None of it was ever MEASURED: "
+                     "verify pinned sideways and turn to zero and ran forward "
+                     "and backward only. It runs four passes since 4 Aug, and "
+                     "the first reading on the three seeds that PASSED 1.1 says "
+                     "the straight-line half is genuinely done and the other "
+                     "half is not - 0.44 to 0.51 rad/s of turn error against a "
+                     "1.0 rad/s command, and 20 to 34 deg off the line while "
+                     "crabbing.",
               "items": [
-                  {"id": "1.2.1", "state": "next",
-                   "what": "Fix `_going_straight` to gate on abs(vx). It gates "
-                           "on `command[:, 0] > MOVING` today, which is "
-                           "positive-only, so `veering` and `wandering` - the "
-                           "two penalties that hold a line - switch off entirely "
-                           "for a backward command"},
-                  {"id": "1.2.2", "state": "next",
-                   "what": "Widen WALK_SPEED through zero to negative"},
-                  {"id": "1.2.3", "state": "next",
-                   "what": "Let vy be sampled without vx"},
-                  {"id": "1.2.4", "state": "next", "what": "Retune"},
+                  {"id": "1.2.0", "state": "done",
+                   "what": "Widen the box, and gate straightness on abs(vx) "
+                           "- done 3 Aug",
+                   "goal": "Put backward, sideways and turning inside the "
+                           "range at all.",
+                   "gets": "WALK_SPEED (-0.35, 0.35), sideways +/-0.20, turn "
+                           "+/-1.0, with the straightness terms still on for a "
+                           "backward command."},
+                  {"id": "1.2.1", "state": "done",
+                   "what": "Grade sideways and turning at all - done 4 Aug",
+                   "goal": "Stop half the command box being scored by nothing.",
+                   "gets": "Four verify passes instead of two, and five new "
+                           "bars: crab distance 3.75 m, crab speed 0.05 m/s, "
+                           "crab drift 4.0 deg, turn rate 0.20 rad/s, turn "
+                           "wander 0.10 m."},
+                  {"id": "1.2.2", "state": "done",
+                   "what": "Make it turn at the rate it is told - done 4 Aug",
+                   "goal": "Close a 0.5 rad/s gap on a 1.0 rad/s command.",
+                   "gets": "track_turn raised from 1.0 to 5.0, the best-paid "
+                           "term in the task. 0.476 -> 0.141 rad/s of error "
+                           "against a 0.20 bar, confirmed at 0.135 on a second "
+                           "seed. 8 runs. The BAND was not the problem: 0.40 "
+                           "was worse at both weights and 1.20 was worse than "
+                           "0.80, so 0.80 is a measured optimum in both "
+                           "directions rather than an untested default."},
+                  {"id": "1.2.3", "state": "done",
+                   "what": "Score the path on a sideways command - done 4 Aug",
+                   "goal": "Stop straightness scoring switching off for crab "
+                           "steps and turns.",
+                   "gets": "`_on_a_line` replaced `_straight_now`: it asks for "
+                           "travel in ANY direction, not a forward component, "
+                           "so `veering`, `wandering` and the `off_line` input "
+                           "apply to a crab command. `wandering` measures "
+                           "perpendicular to the pinned COURSE, not the facing "
+                           "- 90 degrees apart on a crab step, so the old "
+                           "version charged a perfect crab for the whole "
+                           "distance it was told to cover. Crab drift 19.5 -> "
+                           "3.7 deg on the stock weights alone. Then wandering "
+                           "-1.0 -> -3.0, the best of four corners on crab "
+                           "drift, forward drift and turn at once; heavier "
+                           "`veering` made all three worse."},
+                  {"id": "1.2.4", "state": "done",
+                   "what": "Three attempts at crab drift, all reverted "
+                           "- 5 Aug",
+                   "goal": "Close a 4.3 to 5.0 deg crab drift against a 4.0 "
+                           "bar, with the other ten criteria passing.",
+                   "gets": "A measured dead end, and the config that was "
+                           "already best. Tried, one change per row, all on "
+                           "seed 1301: a pure-sideways share of the draws "
+                           "(turn 0.140 -> 0.277, crab 4.33 -> 4.37); taking "
+                           "that share out of the straight draws instead (crab "
+                           "-> 5.06); and `off_track`, a 50th input reporting "
+                           "cross-track distance (crab -> 5.56, turn -> 0.249, "
+                           "and unbounded it nearly stopped the robot - 6.47 m "
+                           "of ground covered down to 2.65). Every step away "
+                           "from the original config lost ground on BOTH "
+                           "numbers. Both are kept in the code, off by default, "
+                           "with what they measured written beside them."},
+                  {"id": "1.2.5", "state": "done",
+                   "what": "Find out whether crab drift is measurable at all "
+                           "- done 5 Aug",
+                   "goal": "Stop comparing configs on a number that moves more "
+                           "than the differences between them.",
+                   "gets": "THE FINDING THAT UNDOES A NIGHT OF COMPARISONS. The "
+                           "reverted config was re-run on the same three gate "
+                           "seeds. Turn reproduced - 0.140, 0.134, 0.123 came "
+                           "back 0.125, 0.152, 0.120. Crab drift did not: 4.33, "
+                           "4.79, 4.95 came back 4.86, 2.69, 9.06. Same config, "
+                           "same seed, up to 4.1 deg apart against a 4.0 bar, "
+                           "because training is not bit-reproducible on this "
+                           "card. It is NOT the test - the 64 per-robot "
+                           "readings give standard errors of 0.37, 0.27 and "
+                           "1.04. So every crab comparison made on a single run "
+                           "means nothing, the sideways share and the "
+                           "cross-track input included; only the TURN result "
+                           "survives, and it survives comfortably. THE FIX WAS "
+                           "RUN LENGTH, the one dial never turned in the whole "
+                           "of 1.2: at 1500 iterations the same three seeds "
+                           "give 4.60, 4.82 and 5.42 - a spread of 0.82 against "
+                           "6.37 - and turn tightens to 0.099. The MEAN barely "
+                           "moves, 5.11 to 4.95. Length did not make the robot "
+                           "better at crabbing; it made the number trustworthy. "
+                           "Note what that says about the 500-iteration cap: it "
+                           "was set from the REWARD curve going flat, and a "
+                           "flat reward does not mean every criterion has "
+                           "settled."},
+                  {"id": "1.2.6", "state": "done",
+                   "what": "Decide the crab bar - done 5 Aug, bar moved to 5.0",
+                   "goal": "Close 1.2, or say plainly what it cannot pass.",
+                   "gets": "The reverted config fails exactly one criterion, "
+                           "reliably: crab drift 4.60 to 5.42 against 4.0, with "
+                           "the other ten passing and turn at 0.099 of 0.20. "
+                           "One batch left to try - the sideways share at 1500 "
+                           "iterations, where it can finally be judged; it was "
+                           "dropped on a gap of 0.04 measured inside a spread "
+                           "of 6.37. If that does not close it, the bar is what "
+                           "is left. At 0.20 m/s a 4 deg error is 0.014 m/s of "
+                           "unwanted fore-aft speed while the speed bar beside "
+                           "it allows 0.05, so the sideways direction is held "
+                           "3.5x tighter than the direction the robot is asked "
+                           "to travel in - and lateral steps come from one hip "
+                           "servo a leg against two for fore-aft. Re-cutting it "
+                           "in the speed bar's units is the honest option. It "
+                           "is the owner's call, not the agent's."},
+                  {"id": "1.2.7", "state": "now",
+                   "what": "Close the box - NOT closed, reopened 5 Aug",
+                   "goal": "Make the wider range pass all eleven, as a "
+                           "property and not one result.",
+                   "gets": "NOT YET A CLOSED GATE, and it was marked closed for "
+                           "about an hour on two seeds of three. The third had "
+                           "not finished. It came in at crab drift 7.68 deg "
+                           "against 5.0, turn 0.279 against 0.20 and forward "
+                           "drift 5.45 against 4.0 - three criteria failing, "
+                           "not one, where the other two seeds scored 3.74 and "
+                           "4.25 with everything passing. So the config is 3.74, "
+                           "4.25, 7.68: a spread of 3.94 deg, and no bar drawn "
+                           "above the mean covers it. Seed 8821 is the same seed "
+                           "that gave 9.06 at 550 iterations and 5.42 without "
+                           "the sideways share, so it is consistently the worst "
+                           "of the three rather than a one-off. THE OPEN "
+                           "QUESTION is whether that seed is an unlucky draw or "
+                           "whether this config fails about one time in three. "
+                           "Three fresh seeds are running against the wider "
+                           "1.3.1 dials and will answer it either way."},
               ]},
              {"id": "1.3", "name": "Turn the dials up",
-              "gate": "The same six criteria, dials at full.",
-              "why": "The dials are not off. Foot friction is randomised 0.4 to "
-                     "1.2 on every attempt right now, along with +/-20% mass, "
-                     "+/-15 mm centre of mass and +/-30% servo stiffness. This "
-                     "step turns them UP, it does not switch them on. None of it "
-                     "is a new skill - the policy never sees the word gravel, it "
-                     "sees the same 45 numbers in a different pattern. It is "
-                     "also where sim-to-real robustness comes from: a policy "
-                     "that survives the range survives the real value, which is "
-                     "the correct answer to three numbers nobody can measure "
-                     "yet.",
+              "goal": "Make it survive every number we guessed being wrong.",
+              "gate": "The same eleven criteria as 1.2, dials at full.",
+              # Written in Simplified Technical English, per CLAUDE.md. Short
+              # sentences, active voice, one word for one thing.
+              "why": "The dials are already on. Every attempt draws foot grip "
+                     "from 0.4 to 1.2, mass to +/-20%, the centre of mass to "
+                     "+/-15 mm, and servo strength to +/-30%. This step makes "
+                     "those ranges wider. It does not add a new skill. The "
+                     "policy never reads the word gravel. It reads the same 49 "
+                     "numbers in a different pattern. This step is also where "
+                     "sim-to-real strength comes from. A policy that walks "
+                     "across the whole range also walks at the real value, and "
+                     "nobody can measure that value yet.",
               "items": [
-                  {"id": "1.3.1", "state": "later",
-                   "what": "Widen what is already on - friction, mass, centre of "
-                           "mass, servo gains, joint friction"},
+                  {"id": "1.3.1", "state": "now",
+                   "what": "Make the five dials wider",
+                   "goal": "Cover the real robot, not our estimate of it.",
+                   "gets": "Foot grip, mass, where the weight sits, servo "
+                           "strength and gearbox drag, each over a range wide "
+                           "enough to hold whatever the built machine is."},
                   {"id": "1.3.2", "state": "later",
-                   "what": "Terrain. Slopes first, then uneven ground"},
+                   "what": "Terrain. Slopes first, then rough ground",
+                   "goal": "Get the robot off a flat floor.",
+                   "gets": "A slope angle it can walk, and a roughness it can "
+                           "walk. Low grip and rough ground together are what "
+                           "gravel is; the policy is never told the word."},
                   {"id": "1.3.3", "state": "later",
-                   "what": "Payload, to +2 kg, off-centre"},
+                   "what": "Payload, up to 2 kg, off centre",
+                   "goal": "Find what the robot can carry.",
+                   "gets": "A weight limit, and how far off centre that weight "
+                           "may sit."},
                   {"id": "1.3.4", "state": "later",
-                   "what": "Degraded hardware - weak servo, dead servo, low "
-                           "battery"},
-              ]},
-             {"id": "1.4", "name": "Measure", "gate": "", "no_gate": True,
+                   "what": "Damaged hardware. A weak servo, a dead servo, a "
+                           "flat battery",
+                   "goal": "Know what the robot does when a part fails.",
+                   "gets": "The behaviour on a failed joint, written down "
+                           "before it happens on the bench. This substep has no "
+                           "gate. The robot is not asked to survive a dead "
+                           "servo; we only record what it does."},
+              ],
+              # The batch plan. `stop` marks a row where a person must read a
+              # number and choose - they are listed as rows because a plan that
+              # shows only the work reads as if it runs itself.
+              #
+              # Two lengths, on purpose. Use 550 iterations to find where
+              # something BREAKS: a robot that falls over says so in 17 minutes.
+              # Use 1500 only to confirm it PASSES, because crab drift does not
+              # settle below that - see 1.2.5. That split halves the cost of the
+              # whole step.
+              "batches": [
+                  {"n": "1", "stage": "1.3.1", "runs": "3 x 1500",
+                   "code": "make the five dials wider",
+                   "asks": "does the 1.2 config still pass in a wider world"},
+                  {"stop": "did it hold, or which dial broke it"},
+                  {"n": "2", "stage": "1.3.1", "runs": "4 x 550",
+                   "code": "only if batch 1 failed - retune",
+                   "asks": "which dial broke it"},
+                  {"stop": "retune again, or make that one dial narrower"},
+                  {"n": "3", "stage": "1.3.2", "runs": "4 x 550",
+                   "code": "ground that tilts",
+                   "asks": "at what slope does it stop walking"},
+                  {"stop": "which angle to hold for the confirming runs"},
+                  {"n": "4", "stage": "1.3.2", "runs": "3 x 1500",
+                   "code": "slope held at that angle",
+                   "asks": "all eleven criteria, on a slope"},
+                  {"n": "5", "stage": "1.3.2", "runs": "4 x 550, 3 x 1500",
+                   "code": "the height under each foot varies",
+                   "asks": "how rough before it fails, then confirm"},
+                  {"stop": "which roughness to keep"},
+                  {"n": "6", "stage": "1.3.3", "runs": "4 x 550",
+                   "code": "mass hung off the trunk, off centre",
+                   "asks": "the weight limit, and how far off centre"},
+                  {"stop": "the payload limit to write down"},
+                  {"n": "7", "stage": "1.3.4", "runs": "3 x 550",
+                   "code": "a joint weakened, then killed, mid-attempt",
+                   "asks": "what it does with a failed servo. No gate"},
+                  {"n": "8", "stage": "gate", "runs": "3 x 1500",
+                   "code": "nothing - the task as it stands",
+                   "asks": "all eleven criteria, every dial at full"},
+                  {"stop": "1.3 closes, or one dial needs another pass"},
+                  {"n": "9", "stage": "sweep", "runs": "64 x 550",
+                   "code": "nothing",
+                   "asks": "cut 6 reward numbers down to a shortlist"},
+                  {"stop": "which settings go through - a script can pick"},
+                  {"n": "10", "stage": "sweep", "runs": "18 x 1500",
+                   "code": "nothing",
+                   "asks": "6 survivors on 3 seeds each - the real ranking"},
+                  {"stop": "which two or three get the long build"},
+                  {"n": "11", "stage": "final", "runs": "3 x long",
+                   "code": "stop_at switched off",
+                   "asks": "the policy that goes on the robot"},
+              ],
+              "batches_note":
+                  "About 116 runs and 53 hours of card time. Batches 1 to 8 are "
+                  "about 15 hours and end with a robot that PASSES. Batches 9 "
+                  "to 11 are about 38 hours and end with the BEST one; they are "
+                  "optional, and they only pay if you want margin rather than a "
+                  "pass. Batch 9 cannot pick a winner - at 550 iterations crab "
+                  "drift is not measurable, so it only throws away the clearly "
+                  "bad half. Batches 3, 5 and 6 are ladders: raise one number "
+                  "until it fails, write down where, and no decision is needed "
+                  "inside them. Batch 2 may never happen.",
+              },
+             {"id": "1.4", "name": "Measure",
+              "goal": "Write down what it can actually do. Nothing is trained.",
+              "gate": "", "no_gate": True,
               "why": "No gate. Numbers written down, nothing trained. 'Find top "
                      "speed' has no reward term - you raise the command until it "
                      "fails and write down where. The trained half of smoothness "
@@ -1303,11 +1569,19 @@ FORWARD = {
                      "- is already ramping in during 1.1.",
               "items": [
                   {"id": "1.4.1", "state": "later",
-                   "what": "Top speed, and the speed ladder"},
+                   "what": "Top speed, and the speed ladder",
+                   "goal": "Find where it stops keeping up.",
+                   "gets": "A top speed, and how well it holds each one below."},
                   {"id": "1.4.2", "state": "later",
-                   "what": "Acceleration, sustained run"},
+                   "what": "Acceleration, sustained run",
+                   "goal": "Find how fast it can change speed, and for how long.",
+                   "gets": "An acceleration figure and a battery-realistic "
+                           "endurance."},
                   {"id": "1.4.3", "state": "later",
-                   "what": "Smoothness, read off the trained policy"},
+                   "what": "Smoothness, read off the trained policy",
+                   "goal": "Measure the gait rather than the reward.",
+                   "gets": "The operating envelope - the sheet the real robot is "
+                           "driven by."},
               ]},
          ]},
 
@@ -1340,6 +1614,8 @@ FORWARD = {
                  "to be able to start from.",
          "subs": [
              {"id": "2.1", "name": "Make it stand up",
+              "goal": "Get it off the floor. Needs its own policy - no walking "
+                      "reward means anything on its back.",
               "gate": "Up from 9 of 10 random ground poses, in under 3 s.",
               "why": "The one group that genuinely needs its own policy file. "
                      "There is no commanded velocity to track when the robot is "
@@ -1348,25 +1624,36 @@ FORWARD = {
               "items": [
                   {"id": "2.1.1", "state": "later",
                    "what": "Write the recover task - start poses, reward, "
-                           "terminations"},
+                           "terminations",
+                   "goal": "Define what getting up means.",
+                   "gets": "The recover task file."},
                   {"id": "2.1.2", "state": "later",
-                   "what": "Reward it for ENDING WHERE R1 STARTS: stable, at "
-                           "ride height, low joint velocity. Preparation for "
-                           "step 3"},
-                  {"id": "2.1.3", "state": "later", "what": "Train it"},
+                   "what": "Reward it for ending where R1 starts",
+                   "goal": "Finish upright, at ride height, joints slow.",
+                   "gets": "A handover state step 3 can use."},
+                  {"id": "2.1.3", "state": "later", "what": "Train it",
+                   "goal": "Get it standing from 9 of 10 poses.",
+                   "gets": "The second policy file."},
               ]},
              {"id": "2.2", "name": "Turn the dials up",
+              "goal": "Make getting up survive the same wrong guesses as 1.3.",
               "gate": "Still 9 of 10, dials at full.",
               "why": "",
               "items": [
                   {"id": "2.2.1", "state": "later",
-                   "what": "The same dials as 1.3, applied to R2"},
+                   "what": "The same dials as 1.3, applied to R2",
+                   "goal": "Get up on any robot, on any ground.",
+                   "gets": "Getting up, still working at full randomisation."},
               ]},
-             {"id": "2.3", "name": "Measure", "gate": "", "no_gate": True,
+             {"id": "2.3", "name": "Measure",
+              "goal": "Write down how long it takes to stand. Nothing trained.",
+              "gate": "", "no_gate": True,
               "why": "No gate. A number written down.",
               "items": [
                   {"id": "2.3.1", "state": "later",
-                   "what": "Time to stand, per start pose"},
+                   "what": "Time to stand, per start pose",
+                   "goal": "Know the worst case.",
+                   "gets": "Seconds to stand, per pose."},
               ]},
          ]},
 
@@ -1397,23 +1684,29 @@ FORWARD = {
                  "preparation happens during training, in the two steps above. "
                  "Skip it and this step is where you find out.",
          "subs": [
-             {"id": "3.1", "name": "The switch rule", "gate": "", "why": "",
+             {"id": "3.1", "name": "The switch rule",
+              "goal": "Decide when control passes between the two policies.",
+              "gate": "", "why": "",
               "items": [
                   {"id": "3.1", "state": "later",
-                   "what": "Hysteresis and a settle time, so control cannot "
-                           "chatter at the boundary"},
+                   "what": "Hysteresis and a settle time",
+                   "goal": "Stop control chattering at the boundary.",
+                   "gets": "The handover rule and its thresholds."},
               ]},
-             {"id": "3.2", "name": "The test", "gate": "", "why": "",
+             {"id": "3.2", "name": "The test",
+              "goal": "Prove the two work as one robot, not two that each work.",
+              "gate": "", "why": "",
               "items": [
                   {"id": "3.2", "state": "later",
-                   "what": "100 drops: R2 stands it up, hands over, R1 walks "
-                           "5 m"},
+                   "what": "100 drops: stand up, hand over, walk 5 m",
+                   "goal": "Catch the fall-loop before the hardware does.",
+                   "gets": "A pass rate for the whole sequence, end to end."},
               ]},
          ]},
 
         {"id": "4", "name": "Sensors - keep what you had", "state": "later",
-         "gate": "Every bar that passed before still passes, with 95 inputs.",
-         "what": "Ten sensors decided; seven add inputs. 45 numbers become 95. "
+         "gate": "Every bar that passed before still passes, with 99 inputs.",
+         "what": "Ten sensors decided; seven add inputs. 49 numbers become 99. "
                  "They go in as one batch because each one alone costs the same "
                  "full retrain as all of them together.",
          "steps": [
@@ -1439,25 +1732,34 @@ FORWARD = {
                  "exists.",
          "subs": [
              {"id": "4", "name": "Keep what you had",
-              "gate": "Every bar that passed before still passes, with 95 "
+              "goal": "Fit the sensors and prove nothing broke. No new ability "
+                      "on purpose.",
+              "gate": "Every bar that passed before still passes, with 99 "
                       "inputs. A regression check - it proves nothing broke, not "
                       "that the sensors were worth fitting.",
-              "why": "Ten sensors decided; seven add inputs. 45 to 95 numbers, "
+              "why": "Ten sensors decided; seven add inputs. 49 to 99 numbers, "
                      "which is why they go in as one batch: each one alone costs "
                      "the same full retrain as all of them together.",
               "items": [
                   {"id": "4.1", "state": "later",
-                   "what": "Fit them. CAD positions needed for the three where "
-                           "the mounting is in the maths"},
+                   "what": "Fit them",
+                   "goal": "Get the sensors on the robot.",
+                   "gets": "CAD positions for the three where the mounting is "
+                           "in the maths."},
                   {"id": "4.2", "state": "later",
-                   "what": "Model each one in the simulator, including how it "
-                           "fails"},
+                   "what": "Model each one, including how it fails",
+                   "goal": "Simulate a broken sensor, not just a working one.",
+                   "gets": "Seven sensor models the policy can be trained "
+                           "against."},
                   {"id": "4.3", "state": "later",
-                   "what": "Warm-start - grow the network, copy the old weights "
-                           "across, initialise the new input columns to zero so "
-                           "day one behaves identically to the best policy"},
+                   "what": "Warm-start from the current weights",
+                   "goal": "Do not throw away a working policy to add inputs.",
+                   "gets": "A 99-input network that behaves identically on day "
+                           "one."},
                   {"id": "4.4", "state": "later",
-                   "what": "Retrain R1 and R2 from that warm start"},
+                   "what": "Retrain R1 and R2 from that warm start",
+                   "goal": "Prove the wider policy still passes.",
+                   "gets": "Every old bar, met again."},
               ]},
          ]},
 
@@ -1491,6 +1793,8 @@ FORWARD = {
                  "finders instead, which is the cheap half of seeing.",
          "subs": [
              {"id": "5", "name": "Use them",
+              "goal": "Spend the sensors. Every bar so far was set for a blind "
+                      "robot.",
               "gate": "Numbers that were out of reach before now pass.",
               "why": "The policy currently cannot measure its own speed - "
                      "base_lin_vel sits in the critic group, thrown away after "
@@ -1498,18 +1802,27 @@ FORWARD = {
                      "Optical flow measures it directly.",
               "items": [
                   {"id": "5.1", "state": "later",
-                   "what": "Tighten the bars. They were set for a blind policy"},
-                  {"id": "5.2", "state": "later",
-                   "what": "slip - five flow units against the IMU's yaw rate. "
-                           "Nothing else on the robot can see a slip"},
-                  {"id": "5.2", "state": "later",
-                   "what": "landing - load cells turn 'did it slam' from a guess "
-                           "into a number"},
-                  {"id": "5.2", "state": "later",
-                   "what": "anticipation - range finders make stepping over "
-                           "something before touching it reachable at all"},
+                   "what": "Tighten the bars",
+                   "goal": "Ask for what a sighted robot can do.",
+                   "gets": "New pass numbers, set against the sensors."},
+                  {"id": "5.2a", "state": "later",
+                   "what": "slip - optical flow against the IMU's yaw rate",
+                   "goal": "Notice a foot sliding.",
+                   "gets": "A slip term. Nothing on the robot can see one "
+                           "today."},
+                  {"id": "5.2b", "state": "later",
+                   "what": "landing - load cells",
+                   "goal": "Measure the slam instead of inferring it.",
+                   "gets": "Landing force as a number."},
+                  {"id": "5.2c", "state": "later",
+                   "what": "anticipation - range finders",
+                   "goal": "See an obstacle before touching it.",
+                   "gets": "Stepping over things, reachable for the first "
+                           "time."},
                   {"id": "5.3", "state": "later",
-                   "what": "Retune against the tighter bars"},
+                   "what": "Retune against the tighter bars",
+                   "goal": "Make the new numbers pass.",
+                   "gets": "The policy that goes on the robot."},
               ]},
          ]},
     ],
@@ -1666,7 +1979,7 @@ WEEK = {
         {"what": "The CAD rebuild and the sensor mounts",
          "why": "PLAN.md step 4, and nothing in step 1 waits on it. The sensors "
                 "are decided and recorded, and they go into the observation as "
-                "one batch of 45 to 95 numbers when the mechanical work "
+                "one batch of 49 to 99 numbers when the mechanical work "
                 "happens."},
         {"what": "Widening the command range to backward and sideways",
          "why": "PLAN.md 1.2, and it comes after 1.1 for a reason. Drift is "
@@ -1732,7 +2045,13 @@ _REACH = {
     "POSE_HEIGHT": (0.12, 0.27,
                     "measured: it holds anywhere from 120 to 270 mm, at 1.59x "
                     "the servo's stall torque at the lowest"),
-    "POSE_PITCH": (-0.35, 0.17,
+    # (-0.17, 0.35), not (-0.35, 0.17). NOSE DOWN IS NEGATIVE - measured in the
+    # sim on 5 Aug 2026, and the opposite of what three comments in the task
+    # claimed. So the 10 deg of nose-down travel is the NEGATIVE bound and the
+    # 20 deg of nose-up is the positive one. Swapped, this page showed the
+    # commanded range using half the reach in the direction the robot has most
+    # of, and overrunning it in the direction it has least.
+    "POSE_PITCH": (-0.17, 0.35,
                    "measured: nose up 20 deg, nose down only 10, because the "
                    "stance rakes the legs forward and spends the travel "
                    "nose-down would need"),
@@ -1829,22 +2148,35 @@ def dials() -> dict:
         # to 0 because it forced the speed positive and clamped it up to 0.3.
         # See gray/tasks/walk_command.py.
         ("forward_only", r"rel_straight_envs\s*=\s*([\d.]+)"),
+        # The pure-sideways share, added 5 Aug 2026. It belongs on this page for
+        # the same reason the other two do: the draw mix is WHY a command works
+        # or does not. Crab failed its bar on three seeds while forward passed,
+        # and the whole explanation was that a pure crab turned up about once in
+        # 350 draws. A share the page does not show is a share nobody checks.
+        ("crab", r"rel_crab_envs\s*=\s*([\d.]+)"),
     ):
         hit = re.search(pattern, wsrc)
-        if hit:
-            mix[key] = float(hit.group(1))
-        else:
+        mix[key] = float(hit.group(1)) if hit else None
+        if not hit:
             missing.append(f"{key} in gray/tasks/walk_env_cfg.py")
     hold = _read_pair(wsrc, r"resampling_time_range\s*=\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)")
-    if hold:
-        mix["hold_lo"], mix["hold_hi"] = hold
-    else:
+    mix["hold_lo"], mix["hold_hi"] = hold if hold else (None, None)
+    if not hold:
         missing.append("resampling_time_range in gray/tasks/walk_env_cfg.py")
 
     # ---- the ones the world has ----
     world = []
     for key, name, unit, what, pattern in _WORLD_DIALS:
-        pair = _read_pair(psrc, pattern)
+        # THE WALK TASK FIRST, then push. All five are DEFINED in push_env_cfg,
+        # and since PLAN.md 1.3.1 the walk task overrides them with wider ones -
+        # widening them at the source would silently re-score Gray-Push, which
+        # has its own bar and its own passing runs.
+        #
+        # Reading only push was this page showing 0.4 to 1.2 for foot grip while
+        # every walk run was training on 0.25 to 1.4. A dial page that reports
+        # the range the robot is NOT being trained on is worse than no dial page,
+        # because the whole point of it is to say what the policy has seen.
+        pair = _read_pair(wsrc, pattern) or _read_pair(psrc, pattern)
         if pair is None:
             missing.append(f"{key} in gray/tasks/push_env_cfg.py")
             continue
@@ -1876,7 +2208,13 @@ def dials() -> dict:
         })
 
     # ---- the shove, which is an event rather than a dial ----
-    shove = {}
+    #
+    # Every key is always present, and a read that failed says so in `missing`.
+    # A key that simply vanished from the payload reached the page as
+    # `undefined[0]` and killed the whole of /dials - beside a banner that was
+    # ready to name the cause but never got drawn. The rule for this whole
+    # function: the shape never changes, only the values and `missing`.
+    shove: dict = {}
     for key, const in (("speed", "PUSH_MS"), ("spin", "PUSH_SPIN"),
                        ("every", "PUSH_EVERY_S")):
         # No `^` anchor: _read_pair searches with re.S, where `^` only matches
@@ -1885,6 +2223,9 @@ def dials() -> dict:
         pair = _read_pair(psrc, rf"{const}\s*=\s*\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)")
         if pair:
             shove[key] = list(pair)
+        else:
+            shove[key] = None
+            missing.append(f"{const} in gray/tasks/push_env_cfg.py")
     shove["on_in_walk"] = 'cfg.events.pop("shove"' not in wsrc
 
     return {
@@ -1894,3 +2235,231 @@ def dials() -> dict:
         "shove": shove,
         "missing": missing,
     }
+
+
+# =========================================================== what 1.1 left ===
+#
+# WHAT THIS IS FOR. A step's runs are thrown away. Its policy is thrown away.
+# What survives is a configuration and a short list of things that turned out to
+# be true, and until this existed both were recoverable only by reading the code
+# and the run history together.
+#
+# The split is deliberate. Anything with a NUMBER in it that the code also holds
+# - weights, ramps, tolerances, bars, inputs - is read live in carry_over() and
+# is NOT written here. What is written here is the part no file holds: what was
+# measured, what was tried and rejected, and what any of it means. That is the
+# half that goes stale, so it is the half that carries a date.
+CARRY = {
+    "step": "1.1  Make it walk",
+    "closed": "4 Aug 2026",
+    "verdict": "All six criteria, three seeds never used before (99, 314, 2718), "
+               "one config, no command-line overrides.",
+    "lede": [
+        "The robot walked 19.5 degrees off a straight line in the morning and "
+        "3.2-3.8 in the evening, forwards and backwards, on seeds it had never "
+        "trained against. It never falls, holds its ride height inside a quarter "
+        "of the allowance, and tracks the commanded speed with a third to spare.",
+        "The cause was not a reward weight. The policy could feel how fast it was "
+        "turning and never which way it was POINTING, so it was being fined for a "
+        "quantity it could not sense. No weight fixes that. A 49th input did.",
+    ],
+
+    # Measured, not argued. Every row cost at least one run.
+    "learned": [
+        {"fact": "The trunk gyros are required hardware",
+         "number": "3.6 deg sighted, 23-27 blind",
+         "why": "Three runs with the heading input removed and nothing else "
+                "changed. The robot cannot hold a line without integrated gyro "
+                "yaw, so that signal and its calibration are part of the build, "
+                "not an accuracy improvement."},
+        {"fact": "Run-to-run noise on drift",
+         "number": "0.72 deg sd",
+         "why": "Five runs, identical config AND identical seed. Two configs "
+                "closer than about 2 deg apart cannot be told apart by one run "
+                "each. Found by accident, from six runs a stale runner turned "
+                "into six replicates."},
+        {"fact": "Run-to-run noise on reward",
+         "number": "0.7 points",
+         "why": "Round 0, three seeds. The floor every later comparison is read "
+                "against."},
+        {"fact": "500 iterations is a whole run",
+         "number": "99.1% of best",
+         "why": "Measured across three runs; on two of them 500 beat the number "
+                "250 iterations later. Everything past it buys less than the "
+                "noise, for a third of the wall clock."},
+        {"fact": "Drift is a curve, not a slide",
+         "number": "R2 0.98, slope 1.0",
+         "why": "Cross-track offset is explained almost entirely by the heading "
+                "turning: 19-31 deg of curve against 2-4 deg of crabwise slip. "
+                "That is what said a heading sensor would fix it."},
+        {"fact": "The randomised body causes the scatter, not the lean",
+         "number": "spread 23 deg -> 1 deg",
+         "why": "With friction, mass, centre of mass and servo gains held fixed, "
+                "the spread across 64 robots collapses and a systematic lean "
+                "remains. Two different problems; the heading input fixes both."},
+        {"fact": "A term under ~1% of earned reward cannot change a gait",
+         "number": "3.86 points earned per episode",
+         "why": "twitching at 0.037 would have been traded away entirely for 2% "
+                "more speed reward, and was. Same shape as effort, track_turn's "
+                "tolerance and hard_landing. Measure a term's share before "
+                "arguing about its weight."},
+    ],
+
+    # Tried, measured, NOT kept. Worth more than the successes: each one is a run
+    # nobody has to spend again.
+    "rejected": [
+        {"what": "Sharpen track_turn, 0.80 -> 0.15 rad/s",
+         "result": "3.49 deg vs 3.64 - inside the noise",
+         "verdict": "No effect. The turning error was unobservable, and no price "
+                    "fixes an error the policy cannot sense."},
+        {"what": "Sharpen upright, 0.45 -> 0.15 rad",
+         "result": "tilt 2.1 -> 1.25 deg, drift 3.42 -> 4.37",
+         "verdict": "Rejected. It does halve the wobble, and it costs 0.9 deg of "
+                    "straightness on both seeds - enough to fail the bar. Level "
+                    "and straight spend the same budget. Revisit inside 1.2."},
+        {"what": "Smoothness at 15x instead of 5x",
+         "result": "roughness -78%, speed error 0.045 of a 0.05 bar",
+         "verdict": "Rejected. Smoother, and one seed from failing speed. 5x is "
+                    "the setting that costs nothing measurable."},
+        {"what": "The 8-run straightness factorial",
+         "result": "never run",
+         "verdict": "Cancelled. Guess-and-check over the straightness weights, "
+                    "designed before the cause was known. Diagnosis turned it "
+                    "into 8 hours that would have confirmed nothing."},
+    ],
+
+    # Process, not physics. Each cost real time to learn.
+    "rules": [
+        {"rule": "Restart the runner after editing dashboard/queue.py",
+         "cost": "6 runs, 5 hours",
+         "detail": "A running Python process holds the module it imported. The "
+                   "runner stripped every experimental flag and trained one "
+                   "config six times under six different names. train_argv now "
+                   "refuses a job whose settings it cannot pass on, and add() "
+                   "refuses a spec it would silently narrow."},
+        {"rule": "Check the LIVE process, not the queue file",
+         "cost": "the same 6 runs",
+         "detail": "command_line() read from a fresh interpreter showed the "
+                   "flags. The runner never saw that interpreter. The only "
+                   "honest check is the command line of the process actually "
+                   "running."},
+        {"rule": "A bar in the wrong unit is not a bar",
+         "cost": "about a day",
+         "detail": "'under 100 mm sideways' is 0.94 deg of heading held for 25 "
+                   "seconds over the distance walked. Nothing could pass it, and "
+                   "the failure was read as a tuning problem for weeks."},
+        {"rule": "Keep confirmation runs independent of the experiment",
+         "cost": "saved 3 runs",
+         "detail": "The three final seeds deliberately did NOT carry the tilt "
+                   "change being tested alongside them. The tilt change failed; "
+                   "the finals passed. Bundled, all three would have failed and "
+                   "the step would not have closed."},
+        {"rule": "Training-only events must be gated on `play`",
+         "cost": "caught before it ran",
+         "detail": "The handover resets would otherwise have fired during "
+                   "verification, putting 15% of test robots into a wobble and "
+                   "moving every bar for a reason invisible on the page."},
+    ],
+}
+
+
+def carry_over() -> dict:
+    """CARRY, joined with the numbers read live from the code.
+
+    Everything with a number the code also holds - weights, ramps, tolerances,
+    the observation, the command box - comes from gray/tasks/ on every call,
+    never from the dict above. Same rule the per-run tables follow, for the same
+    reason: a hand-written copy of a weight is a weight that will be wrong within
+    a week.
+    """
+    out = {**CARRY, "terms": [], "ramps": [], "tolerances": [], "observes": [],
+           "commands": [], "training": [], "error": ""}
+    try:
+        import importlib  # noqa: PLC0415
+
+        stand = importlib.import_module("gray.tasks.stand_env_cfg")
+        push = importlib.import_module("gray.tasks.push_env_cfg")
+        walk = importlib.import_module("gray.tasks.walk_env_cfg")
+        for module in (stand, push, walk):
+            importlib.reload(module)
+        notes = {**stand.REWARD_NOTES, **push.PUSH_NOTES, **walk.WALK_NOTES}
+        cfg = walk.walk_env_cfg()
+        agent = walk.walk_ppo_cfg()
+    except Exception as exc:  # noqa: BLE001
+        out["error"] = (f"Could not read gray/tasks/ ({type(exc).__name__}: {exc}). "
+                        f"Nothing is shown rather than something out of date.")
+        return out
+
+    ramp = {c.params["reward_name"]: [s["weight"] for s in c.params["stages"]]
+            for c in (cfg.curriculum or {}).values() if c.params.get("reward_name")}
+    for name, term in cfg.rewards.items():
+        end = ramp[name][-1] if name in ramp else term.weight
+        out["terms"].append({"name": name, "start": term.weight, "end": end,
+                             "ramped": name in ramp,
+                             "sign": "+" if end > 0 else "-",
+                             "note": notes.get(name, "")})
+    out["terms"].sort(key=lambda t: -abs(t["end"]))
+    out["ramps"] = [{"name": k, "stages": v} for k, v in sorted(ramp.items())]
+
+    walk_cmd = cfg.commands.get("walk")
+    posture = cfg.commands.get("posture")
+    if walk_cmd is not None:
+        r = walk_cmd.ranges
+        out["commands"] = [
+            {"name": "forward", "range": f"{r.lin_vel_x[0]} to {r.lin_vel_x[1]}",
+             "unit": "m/s"},
+            {"name": "sideways", "range": f"{r.lin_vel_y[0]} to {r.lin_vel_y[1]}",
+             "unit": "m/s"},
+            {"name": "turn", "range": f"{r.ang_vel_z[0]} to {r.ang_vel_z[1]}",
+             "unit": "rad/s"},
+            {"name": "told to stand still",
+             "range": f"{walk_cmd.rel_standing_envs:.0%}", "unit": "of draws"},
+            {"name": "drawn as a straight line",
+             "range": f"{walk_cmd.rel_straight_envs:.0%}", "unit": "of the rest"},
+        ]
+    if posture is not None:
+        out["commands"] += [
+            {"name": "ride height",
+             "range": f"{posture.ranges.height[0]} to {posture.ranges.height[1]}",
+             "unit": "m"},
+            {"name": "pitch",
+             "range": f"{posture.ranges.pitch[0]} to {posture.ranges.pitch[1]}",
+             "unit": "rad"},
+            {"name": "roll",
+             "range": f"{posture.ranges.roll[0]} to {posture.ranges.roll[1]}",
+             "unit": "rad"},
+        ]
+
+    for term, unit, why in (
+            ("track_turn", "rad/s", "how sharply yaw rate is scored"),
+            ("upright", "rad", "how sharply trunk tilt is scored. 0.45 rad is 26 deg"),
+            ("track_speed", "m/s", "how sharply speed is scored"),
+            ("ride_height", "m", "how sharply ride height is scored")):
+        t = cfg.rewards.get(term)
+        if t is not None and "std" in (t.params or {}):
+            out["tolerances"].append({"term": term, "value": t.params["std"],
+                                      "unit": unit, "why": why})
+    if walk_cmd is not None:
+        for attr, unit, why in (
+                ("gyro_bias_rad", "rad",
+                 "fixed error on the heading the POLICY reads, per episode"),
+                ("gyro_walk_rad_per_s", "rad/rt-s",
+                 "how far that reading wanders. 0 is a gyro the robot has not got")):
+            if hasattr(walk_cmd, attr):
+                out["tolerances"].append({"term": "heading sensor",
+                                          "value": getattr(walk_cmd, attr),
+                                          "unit": unit, "why": why})
+
+    group = cfg.observations.get("actor")
+    out["observes"] = sorted(getattr(group, "terms", {}) or {})
+    out["training"] = [
+        {"name": "iterations", "value": str(agent.max_iterations),
+         "why": "99.1% of best reward; past it buys less than the noise"},
+        {"name": "robots at once", "value": str(cfg.scene.num_envs),
+         "why": "the card's measured ceiling"},
+        {"name": "episode length", "value": f"{cfg.episode_length_s} s",
+         "why": "1000 control steps at 50 Hz"},
+        {"name": "control rate", "value": "50 Hz",
+         "why": "the servo's PWM period. Not negotiable"},
+    ]
+    return out

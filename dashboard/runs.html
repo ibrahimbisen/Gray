@@ -159,147 +159,44 @@ function renderTabs(){
 }
 
 /* ---------------- charts ----------------
-   One chart per metric. Never two y-scales on one plot: the alignment would be
-   arbitrary and would invent a correlation that is not in the data. */
+   The chart itself now lives in page.js: GEO, scales(), axes(), chartCard() and
+   wireHover() were all defined here, and the control page needed the same four
+   at a smaller size with a reference line on one of them. Two copies of a line
+   chart is exactly the shape of bug this project already paid for once - the
+   same number printing three ways on three pages - so it moved rather than got
+   copied.
 
-const GEO = {W:480, H:132, L:44, R:10, T:8, B:22};
+   What is left here is the two names the compare chart still uses under their
+   old spelling, and the composition of the Metrics section. Never two y-scales
+   on one plot: the alignment would be arbitrary and would invent a correlation
+   that is not in the data. */
 
-function scales(xs, ys, geo){
-  const x0 = Math.min(...xs), x1 = Math.max(...xs) || 1;
-  let lo = Math.min(...ys), hi = Math.max(...ys);
-  if(hi === lo){ hi = lo + 1; lo -= 1; }
-  const pad = (hi - lo) * 0.12; lo -= pad; hi += pad;
-  return {
-    x0, x1, lo, hi,
-    px: v => geo.L + (geo.W - geo.L - geo.R) * ((v - x0) / ((x1 - x0) || 1)),
-    py: v => geo.T + (geo.H - geo.T - geo.B) * (1 - (v - lo) / ((hi - lo) || 1)),
-  };
-}
+const GEO = CHART;
+const scales = chartScales;
+const axes = chartAxes;
 
-function axes(sc, geo){
-  const ticksY = [sc.lo + (sc.hi - sc.lo) * 0.08, (sc.lo + sc.hi) / 2,
-                  sc.hi - (sc.hi - sc.lo) * 0.08];
-  const ticksX = [sc.x0, (sc.x0 + sc.x1) / 2, sc.x1];
-  return `
-    ${ticksY.map(t => `<line x1="${geo.L}" x2="${geo.W - geo.R}" y1="${sc.py(t).toFixed(1)}"
-       y2="${sc.py(t).toFixed(1)}" stroke="var(--grid)" stroke-width="1"
-       vector-effect="non-scaling-stroke"/>`).join("")}
-    <line x1="${geo.L}" x2="${geo.L}" y1="${geo.T}" y2="${geo.H - geo.B}" stroke="var(--line)"
-          stroke-width="1" vector-effect="non-scaling-stroke"/>
-    <line x1="${geo.L}" x2="${geo.W - geo.R}" y1="${geo.H - geo.B}" y2="${geo.H - geo.B}"
-          stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>
-    ${ticksY.map(t => `<text x="${geo.L - 6}" y="${(sc.py(t) + 3.5).toFixed(1)}" text-anchor="end"
-       font-size="9" fill="var(--muted)" class="tnum">${fmt(t)}</text>`).join("")}
-    ${ticksX.map((t, i) => `<text x="${sc.px(t).toFixed(1)}" y="${geo.H - geo.B + 13}"
-       text-anchor="${i === 0 ? "start" : i === 2 ? "end" : "middle"}"
-       font-size="9" fill="var(--muted)" class="tnum">${Math.round(t)}</text>`).join("")}`;
-}
+/* FOLDED SHUT, for the same reason the tiles are. Forty-three charts is the
+   complete record of what the trainer logged and it is a reference you go to
+   with a question, not a thing to read top to bottom. The on-track card answers
+   the question you actually arrived with.
 
-function chartCard(rows, key, colour){
-  // Only rows that actually HAVE this metric. `+null` and `+""` are both 0, so
-  // mapping every row plotted a fabricated zero wherever a value was missing:
-  // a metric that starts logging at iteration 50 drew a flat zero line before
-  // it, dragging the y-axis down and squashing the real curve. Worse, a NaN
-  // reward showed as "0.00" on the chart while the tile and the table both said
-  // "—" - three numbers for one cell, and the chart's was the invented one.
-  const pts = [];
-  for(const r of rows){
-    const v = r[key];
-    if(typeof v === "number" && isFinite(v))
-      pts.push({x: r.iteration ?? pts.length, y: v});
-  }
-  if(pts.length < 2) return `<div class="card">
-    <h3><span class="swatch" style="background:${colour}"></span>${esc(label(key))}
-      <span class="now" style="color:var(--muted)">—</span></h3>
-    <div class="rng">only ${pts.length} usable sample${pts.length === 1 ? "" : "s"}
-      out of ${rows.length} rows</div></div>`;
-
-  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
-  const sc = scales(xs, ys, GEO);
-  const d = pts.map((p, i) =>
-    `${i ? "L" : "M"}${sc.px(p.x).toFixed(1)},${sc.py(p.y).toFixed(1)}`).join("");
-  const endX = sc.px(xs[xs.length - 1]), endY = sc.py(ys[ys.length - 1]);
-  const gaps = rows.length - pts.length;
-
-  return `<div class="card" data-key="${esc(key)}">
-    <h3><span class="swatch" style="background:${colour}"></span>${esc(label(key))}
-      <span class="now" style="color:${colour}">${fmt(ys[ys.length - 1])}</span></h3>
-    <div class="rng tnum">${fmt(Math.min(...ys))} to ${fmt(Math.max(...ys))} over
-      ${pts.length} samples${gaps ? ` &middot; ${gaps} row(s) had no value` : ""}</div>
-    <div class="plot">
-      <svg viewBox="0 0 ${GEO.W} ${GEO.H}" preserveAspectRatio="none" role="img"
-           aria-label="${esc(label(key))} against training iteration">
-        ${axes(sc, GEO)}
-        <path d="${d}" fill="none" stroke="${colour}" stroke-width="2"
-              stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
-        <circle cx="${endX.toFixed(1)}" cy="${endY.toFixed(1)}" r="3.2" fill="${colour}"
-                stroke="var(--surface)" stroke-width="2"/>
-        <g class="cross" opacity="0">
-          <line y1="${GEO.T}" y2="${GEO.H - GEO.B}" stroke="var(--muted)" stroke-width="1"
-                vector-effect="non-scaling-stroke"/>
-          <circle r="4" fill="${colour}" stroke="var(--surface)" stroke-width="2"/>
-        </g>
-        <rect x="${GEO.L}" y="0" width="${GEO.W - GEO.L - GEO.R}" height="${GEO.H}"
-              fill="transparent" class="hit"/>
-      </svg>
-      <div class="tip"></div>
-    </div>
-  </div>`;
-}
-
-function wireHover(rows){
-  document.querySelectorAll(".card[data-key]").forEach(card => {
-    const key = card.dataset.key, svg = card.querySelector("svg");
-    const hit = card.querySelector(".hit"), g = card.querySelector(".cross");
-    if(!hit || !g) return;
-    const line = g.querySelector("line"), dotEl = g.querySelector("circle");
-    const tip = card.querySelector(".tip");
-    // Filtered exactly as chartCard filters. If these disagree the crosshair
-    // lands on a different sample than the line it is tracking, and reports a
-    // number that is not the one under the cursor.
-    const pts = [];
-    for(const r of rows){
-      const v = r[key];
-      if(typeof v === "number" && isFinite(v))
-        pts.push({x: r.iteration ?? pts.length, y: v});
-    }
-    if(pts.length < 2) return;
-    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
-    const sc = scales(xs, ys, GEO);
-
-    hit.addEventListener("mousemove", ev => {
-      const b = svg.getBoundingClientRect();
-      const vx = ((ev.clientX - b.left) / b.width) * GEO.W;
-      let best = 0, bd = Infinity;
-      xs.forEach((x, i) => { const dd = Math.abs(sc.px(x) - vx); if(dd < bd){ bd = dd; best = i; } });
-      const cx = sc.px(xs[best]), cy = sc.py(ys[best]);
-      g.setAttribute("opacity", "1");
-      line.setAttribute("x1", cx); line.setAttribute("x2", cx);
-      dotEl.setAttribute("cx", cx); dotEl.setAttribute("cy", cy);
-      tip.style.opacity = "1";
-      tip.style.left = (cx / GEO.W * 100) + "%";
-      tip.style.top = (cy / GEO.H * b.height) + "px";
-      tip.innerHTML = `<b>${fmt(ys[best])}</b> &middot; iteration
-        <span class="tnum">${xs[best]}</span>`;
-    });
-    hit.addEventListener("mouseleave", () => {
-      g.setAttribute("opacity", "0"); tip.style.opacity = "0";
-    });
-  });
-}
-
+   Safe to build inside a closed fold: every chart is an SVG with a viewBox, so
+   it lays out from its own coordinates rather than from the box it sits in, and
+   wireCharts only reads getBoundingClientRect on mousemove - which cannot happen
+   while the fold is shut. A canvas would have needed redrawing on toggle. */
 function charts(run){
   const keys = (run.metric_columns || []).filter(k => k !== "iteration");
   const rows = run.metrics || [];
   if(!keys.length || rows.length < 2) return "";
-  return `<section>
-    <div class="sech"><h2>Metrics</h2><div class="grow"></div>
+  return `<details class="fold" id="chartfold">
+    <summary>Metrics over the run<span class="grow"></span>
+      <span class="sub" style="margin-right:10px">${keys.length} charts</span>
       <button class="btn ${TABLE ? "on" : ""}" id="tbtn">${TABLE ? "Charts" : "Table"}</button>
-    </div>
-    <div class="charts ${TABLE ? "hide" : ""}">${
-      keys.map(k => chartCard(rows, k, METRIC_INK)).join("")}</div>
+    </summary>
+    <div class="charts ${TABLE ? "hidden" : ""}">${
+      keys.map(k => chartCard(rows, k, {colour: METRIC_INK})).join("")}</div>
     ${TABLE ? metricTable(run, keys) : ""}
-  </section>`;
+  </details>`;
 }
 
 /* Every chart has a table twin - a value is never reachable only by hovering. */
@@ -449,6 +346,13 @@ function jobRow(j, i, n){
 
 function queuePanel(){
   const q = STATE.queue;
+  /* The form's defaults come from queue.py, not from this file. They were typed
+     in here - 3072 robots, "4096 is this card's ceiling" - while queue.py said
+     4500 and 5000. So queueing a job from the dashboard silently trained it with
+     a third of the batch the runner would have used from the command line, and
+     the hint beside the box named a ceiling that had been raised on 4 Aug. */
+  const d = q.defaults || {};
+  const cap = q.env_ceiling || 8192;
   const active = q.jobs.filter(j => j.state === "queued" || j.state === "running");
   return `<section style="margin-top:0">
     <div class="sech"><h2>Queue</h2><div class="grow"></div>
@@ -470,13 +374,13 @@ function queuePanel(){
         <div class="f"><label>Name</label><input id="j_name" placeholder="walk_v5">
           <div class="hint">blank = the task's own name</div></div>
         <div class="f"><label>Robots at once</label>
-          <input id="j_envs" type="number" value="3072" min="1" max="8192">
-          <div class="hint">4096 is this card's ceiling</div></div>
+          <input id="j_envs" type="number" value="${d.num_envs}" min="1" max="${cap}">
+          <div class="hint">${cap} is this card's ceiling</div></div>
         <div class="f"><label>Iterations</label>
-          <input id="j_iters" type="number" value="0" min="0">
+          <input id="j_iters" type="number" value="${d.iterations}" min="0">
           <div class="hint">0 = the task default</div></div>
         <div class="f"><label>Stop at</label>
-          <input id="j_stop" type="number" value="0.965" step="0.005" min="0" max="1">
+          <input id="j_stop" type="number" value="${d.stop_at}" step="0.005" min="0" max="1">
           <div class="hint">fraction of the reward ceiling &mdash; RULES.md rule 1</div></div>
         <div class="f wide"><label>Why this run exists</label>
           <input id="j_note" placeholder="what this one is testing"></div>
@@ -553,20 +457,35 @@ function wireQueue(){
 
 /* Named metricTiles, not tiles: page.js exports a `tiles` builder of its own and
    two top-level declarations of one name is a syntax error, not a shadowing. */
+/* FOLDED SHUT. Forty-four tiles is every scalar the trainer logs, and it is a
+   reference, not a reading: `Episode_Reward/joint_shock` at -0.02 answers no
+   question anyone arrives with. The card above it does - it says whether the run
+   is on track against the bars - and a wall of correct numbers underneath
+   competes with it for the eye and wins on sheer area.
+
+   Shut by default rather than deleted, because the numbers ARE the evidence when
+   something looks wrong and there is nowhere else to read most of them. The
+   count sits in the summary so it is obvious what is behind it. Uses the same
+   `.fold` as the Control page, for the same reason. */
 function metricTiles(run){
   const keys = (run.metric_columns || []).filter(k => k !== "iteration");
   if(!keys.length) return "";
   const rows = run.metrics || [], last = rows[rows.length - 1] || {}, first = rows[0] || {};
-  return `<div class="tiles">${keys.map((k, i) => {
-    const c = METRIC_INK, now = last[k], was = first[k];
-    const d = (typeof now === "number" && typeof was === "number") ? now - was : null;
-    return `<div class="tile">
-      <div class="k"><span class="swatch" style="background:${c}"></span>${esc(label(k))}</div>
-      <div class="v">${fmt(now)}</div>
-      <div class="d">${d === null ? "&nbsp;" :
-        `<b>${d >= 0 ? "+" : ""}${fmt(d)}</b> since start`}</div>
-    </div>`;
-  }).join("")}</div>`;
+  return `<details class="fold" id="metricfold">
+    <summary>Every metric this run logged<span class="grow"></span>
+      <span class="sub">${keys.length} numbers &middot; reference, not a verdict</span>
+    </summary>
+    <div class="tiles">${keys.map((k, i) => {
+      const c = METRIC_INK, now = last[k], was = first[k];
+      const d = (typeof now === "number" && typeof was === "number") ? now - was : null;
+      return `<div class="tile">
+        <div class="k"><span class="swatch" style="background:${c}"></span>${esc(label(k))}</div>
+        <div class="v">${fmt(now)}</div>
+        <div class="d">${d === null ? "&nbsp;" :
+          `<b>${d >= 0 ? "+" : ""}${fmt(d)}</b> since start`}</div>
+      </div>`;
+    }).join("")}</div>
+  </details>`;
 }
 
 /* Seconds per iteration, and what is left, from the clock rather than from
@@ -704,37 +623,113 @@ function films(run){
 function scoring(run){
   const terms = run.scoring || [];
   if(!terms.length) return "";
-  const earns = terms.filter(t => t.weight > 0);
-  const loses = terms.filter(t => t.weight < 0);
+
+  /* A ramped term's weight CLIMBS during the run, and `scoring` holds only where
+     it started. Printing that alone showed twitching at -0.05 for a run that
+     trained it to -0.25, and veering at -0.2 against the -2.0 it reached by
+     iteration 500 - a penalty five and ten times weaker than the real one,
+     stated as fact on the page the run is read from. Show both ends. */
+  const ramp = {};
+  for(const r of (run.ramps || [])){
+    const w = (r.stages || []).map(s => s.weight);
+    if(w.length) ramp[r.name] = w;
+  }
+  const finalW = (t) => ramp[t.name] ? ramp[t.name][ramp[t.name].length - 1] : t.weight;
+  const earns = terms.filter(t => finalW(t) > 0);
+  const loses = terms.filter(t => finalW(t) < 0);
+  const weightCell = (t) => {
+    const w = ramp[t.name];
+    if(!w) return `${Math.abs(t.weight)}`;
+    return `${Math.abs(w[0])} <span class="faint">&rarr;</span> `
+         + `<b>${Math.abs(w[w.length - 1])}</b>`;
+  };
+  /* One line of `why` per term, not the whole note. Twenty-four terms with a
+     paragraph each is an essay in a table, and this page is where you come to
+     read a NUMBER. The full note is on the row's title, and /summary explains
+     every term at length - which is what that page is for. */
   const table = (rows, positive) => `
-    <div class="card wrapx">
-      <table>
-        <tr><th>${positive ? "Rewards" : "Penalties"}
-              <span style="text-transform:none;letter-spacing:0;font-weight:400">
-                &mdash; ${positive ? "earn" : "lose"} points</span></th>
-            <th style="text-align:right">weight</th></tr>
-        ${rows.map(t => `<tr>
-          <td><b style="color:${positive ? "var(--good)" : "var(--crit)"}">${
-              positive ? "+" : "−"}</b> ${esc(t.name.replace(/_/g, " "))}
-            ${t.what ? `<div class="sub">${esc(t.what)}</div>` : ""}</td>
-          <td class="tnum" style="text-align:right;white-space:nowrap">${
-            Math.abs(t.weight)}</td></tr>`).join("")}
-      </table>
-    </div>`;
-  const perSec = earns.reduce((a, t) => a + t.weight, 0);
+    <table class="t">
+      <tr><th>${positive ? "earns" : "costs"}</th><th class="n">weight</th>
+          <th>what it charges</th></tr>
+      ${rows.map(t => `<tr title="${esc(t.what || "")}">
+        <td class="k"><span class="${positive ? "chip pos" : "chip neg"}"
+              style="border:0;padding:0 4px 0 0">${positive ? "+" : "−"}</span>${
+            esc(t.name.replace(/_/g, " "))}${
+            ramp[t.name] ? `<span class="chip" style="margin-left:5px">ramp</span>` : ""}</td>
+        <td class="n">${weightCell(t)}</td>
+        <td class="why">${esc(firstSentence(t.what))}</td></tr>`).join("")}
+    </table>`;
+  /* The numbers that decide what a term MEANS rather than what it is worth. A
+     weights table cannot show these and they are not decoration: track_turn at
+     std 0.80 paid 99.95% of full marks for the yaw bias that was the whole of
+     round 0's straightness failure. Absent from a run before 4 Aug 2026, so the
+     block simply does not appear on those. */
+  const TOL = {
+    track_turn_std:     ["track_turn tolerance", "rad/s",
+      "how sharply yaw rate is scored. Smaller is stricter"],
+    upright_std:        ["upright tolerance", "rad",
+      "how sharply trunk tilt is scored. 0.45 rad is 26 degrees"],
+    gyro_bias_rad:      ["heading sensor offset", "rad",
+      "a fixed error on the heading the POLICY reads, per episode"],
+    gyro_walk_rad_per_s:["heading sensor drift", "rad/rt-s",
+      "how far that reading wanders. 0 is a perfect gyro, which the robot has not got"],
+  };
+  const tol = run.tolerances || {};
+  const tolRows = Object.keys(TOL).filter(k => tol[k] !== null && tol[k] !== undefined);
+  const obs = run.observes || [];
+
+  /* The ceiling sums the weight each term ENDS on, not the one it starts on.
+     `reduce` over `t.weight` counted a term that ramps 0 -> 2.0 as nothing, and
+     the whole point of the four lines above is that the two are different. The
+     stated ceiling was lower than the real one on every run with a ramp. */
+  const perSec = earns.reduce((a, t) => a + finalW(t), 0);
+  const ramped = Object.keys(ramp).length;
+
   return `<section>
     <div class="sech"><h2>Reward function</h2>
-      <span style="font-size:11.5px;color:var(--muted)">what this run was scored on,
-        recorded when it launched</span>
+      <span class="note">what this run was scored on, recorded when it launched
+        &middot; each reward is capped at 1.0, so an episode scores at most
+        <b>${perSec.toFixed(1)} per second</b>, and training stops at 96.5% of
+        that${ramped ? ` &middot; ${ramped} terms ramp, so the weight column
+        shows where the run started and where it finished` : ""}</span>
       <div class="grow"></div>
-      <a class="btn" href="/summary#scoring">Why each term exists &rarr;</a></div>
-    <div class="twocol">${table(earns, true)}${table(loses, false)}</div>
-    <div class="sub" style="margin-top:8px">
-      The rewards are capped at 1.0 each, so the most an episode can score is
-      <b>${perSec.toFixed(1)} per second</b>. Training stops at 96.5% of that
-      &mdash; past there only the penalties have any room left to move.
+      <a class="btn tiny" href="/summary#scoring">Why each term exists &rarr;</a></div>
+    <div class="grid">
+      ${blk("Earns points", earns.length, table(earns, true))}
+      ${blk("Costs points", loses.length, table(loses, false))}
+      ${tolRows.length ? blk("Tolerances", tolRows.length, `
+        <table class="t">
+          <tr><th>term</th><th class="n">value</th><th>what it decides</th></tr>
+          ${tolRows.map(k => `<tr>
+            <td class="k">${esc(TOL[k][0])}</td>
+            <td class="n">${tol[k]} <span class="faint">${esc(TOL[k][1])}</span></td>
+            <td class="why">${esc(TOL[k][2])}</td></tr>`).join("")}
+        </table>`) : ""}
+      ${obs.length ? blk("What the policy read", obs.length, `
+        <table class="t"><tr><td class="chips">${obs.map(o =>
+          `<span>${esc(o.replace(/_/g, " "))}</span>`).join("")}
+          <div class="why" style="margin-top:5px">A saved policy is a fixed-size
+          mapping. Two runs whose lists differ cannot load each other's
+          checkpoints.</div></td></tr></table>`) : ""}
     </div>
   </section>`;
+}
+
+/* The on-track card, for whichever run is open.
+
+   Above the forty-four tiles on purpose. Those are what the run MEASURED; this
+   is whether it did the job, and it is the question you came to the page with.
+   Built by `onTrackCard()` in page.js, from the `readout` the server attaches to
+   /api/run/<id> - the identical component the Control page leads with, so the
+   run you are reading and the run that is training are read the same way.
+
+   It updates on the same five-second poll as everything else here, because it
+   rides on the detail fetch rather than asking for anything of its own. */
+function board(run){
+  const r = run.readout;
+  if(!r || !r.board) return "";
+  return `<section style="margin-top:22px">${
+    onTrackCard(r.board, run, {training: r.training})}</section>`;
 }
 
 function livePanel(){
@@ -743,7 +738,8 @@ function livePanel(){
     return `<div class="empty">Nothing has trained yet. Queue a job and the runner
       picks it up within a few seconds.</div>`;
   if(!run) return `<div class="empty">Loading run…</div>`;
-  return runHeader(run) + metricTiles(run) + charts(run) + films(run) + scoring(run);
+  return runHeader(run) + board(run) + metricTiles(run)
+       + charts(run) + films(run) + scoring(run);
 }
 
 /* ---------------- history ---------------- */
@@ -896,9 +892,16 @@ function bodySignature(){
    without carrying the video's position across, it restarts from zero and can
    never be watched, which is precisely the case worth watching. */
 function saveInputs(){
-  const out = {focus: null, start: null, end: null, values: {}, video: null};
+  const out = {focus: null, start: null, end: null, values: {}, video: null, open: {}};
   document.querySelectorAll("#body input,#body select,#body textarea").forEach(el => {
     if(el.id) out.values[el.id] = el.type === "checkbox" ? el.checked : el.value;
+  });
+  // Folded blocks. A live run writes a metric row every few seconds, which moves
+  // the body signature, which rebuilds the panel - so without this the metric
+  // fold slams shut seconds after it is opened, on the one page you would sit
+  // and watch. Same fix, and same reason, as the queue form beside it.
+  document.querySelectorAll("#body details[id]").forEach(el => {
+    out.open[el.id] = el.open;
   });
   const a = document.activeElement;
   if(a && a.id && out.values.hasOwnProperty(a.id)){
@@ -911,6 +914,9 @@ function saveInputs(){
 }
 
 function restoreInputs(saved){
+  document.querySelectorAll("#body details[id]").forEach(el => {
+    if((saved.open || {}).hasOwnProperty(el.id)) el.open = saved.open[el.id];
+  });
   document.querySelectorAll("#body input,#body select,#body textarea").forEach(el => {
     if(!el.id || !saved.values.hasOwnProperty(el.id)) return;
     if(el.type === "checkbox") el.checked = saved.values[el.id];
@@ -954,12 +960,20 @@ function draw(){
   $("#body").innerHTML = (panels[TAB] || livePanel)();
   restoreInputs(saved);
 
-  if(TAB === "live" && DETAIL && !TABLE) wireHover(DETAIL.metrics || []);
+  if(TAB === "live" && DETAIL && !TABLE) wireCharts(document, DETAIL.metrics || []);
   const tb = $("#tbtn");
   // Switching to the table needs the rows the chart fetch thinned away, so it
   // refetches. Otherwise the table would silently show 500 of 3000 iterations
   // while claiming to be the complete twin of the chart.
-  if(tb) tb.onclick = () => { TABLE = !TABLE; draw(); fetchDetail(); };
+  //
+  // stopPropagation because the button now lives inside a <summary>: without it
+  // every click would ALSO toggle the fold, so asking for the table would shut
+  // the block that contains it.
+  if(tb) tb.onclick = (ev) => {
+    ev.preventDefault(); ev.stopPropagation();
+    TABLE = !TABLE; draw(); fetchDetail();
+    const f = $("#chartfold"); if(f) f.open = true;
+  };
   document.querySelectorAll(".thumb").forEach(el =>
     el.onclick = () => { VIDEO = +el.dataset.i; draw(); });
 

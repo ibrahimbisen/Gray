@@ -157,7 +157,10 @@ class PadPilot(Pilot):
         self.invert = {"fwd": True, "side": True, "turn": True}
         self.deadzone = DEADZONE
         # Switch button order, confirmed the same way: Y=0, B=1, A=2, X=3, L=4,
-        # R=5, ZL=6, ZR=7.
+        # R=5, ZL=6, ZR=7. That order is also held as DATA in
+        # dashboard/controls.py, because the /controller page has to name the
+        # button a number lands on and a comment is not readable by anything.
+        # Different pad, two places to change.
         self.button = {"stop": 2, "reset": 1, "unlock": 6}
         # What full deflection is worth. The fastest the policy was ever trained
         # on, so a stick at its stop still asks for something meaningful.

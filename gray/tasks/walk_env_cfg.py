@@ -54,7 +54,12 @@ from __future__ import annotations
 import torch
 
 from mjlab.envs import ManagerBasedRlEnvCfg, mdp
-from mjlab.managers import CurriculumTermCfg, ObservationTermCfg, RewardTermCfg
+from mjlab.managers import (
+    CurriculumTermCfg,
+    EventTermCfg,
+    ObservationTermCfg,
+    RewardTermCfg,
+)
 from mjlab.tasks.velocity import mdp as vmdp
 
 from mjlab.managers import SceneEntityCfg
@@ -114,7 +119,29 @@ WALK_TURN = (-1.00, 1.00)     # rad/s about the vertical
 # the legs forward, which spends travel that nose-down needs. Squaring it off to
 # +/-10 would throw away half the nose-up travel for tidiness.
 POSE_HEIGHT = (0.15, 0.25)    # m, trunk off the ground
-POSE_PITCH = (-0.26, 0.14)    # rad, nose down positive: 15 deg up, 8 deg down
+# THE SIGN HERE WAS BACKWARDS UNTIL 5 AUG 2026, and it is worth stating plainly
+# because the comment on this line asserted the opposite of what the code does.
+#
+# NOSE DOWN IS NEGATIVE. Measured in the sim, not derived: set the trunk to a
+# known 10 deg nose-down and `trunk_pitch_roll` reports -0.175 rad. It reads
+# pitch as atan2(-g_x, down) off the IMU's gravity vector, and tipping forward
+# swings gravity toward +x.
+#
+# So (-0.26, 0.14) was asking for 15 deg nose-DOWN and 8 deg nose-UP - the exact
+# opposite of the travel the geometry sweep found, which is nose up 20 and nose
+# DOWN only 10. The magnitudes were right and only the signs were swapped, so
+# the range was inside the limits in the wrong direction: 15 deg of nose-down
+# commanded into 10 deg of available travel, while 12 of the 20 deg of nose-up
+# was never asked for at all.
+#
+# It also put the AVERAGE draw 3.4 deg nose-down, which is what the owner spotted
+# in the checkpoint films: the robot walks with its nose down a little, always.
+# Nothing measured it - `error_pitch` is an absolute value, so the sign was
+# thrown away before any metric or chart could show it, and `upright` scores the
+# commanded lean, so holding a nose-down attitude it had been TOLD to hold cost
+# nothing. A bias no term charges for and no metric records is invisible until
+# somebody watches the video.
+POSE_PITCH = (-0.14, 0.26)    # rad, nose down NEGATIVE: 8 deg down, 15 deg up
 POSE_ROLL = (-0.35, 0.35)     # rad, right side down positive: +/- 20 deg
 
 # The band the tracking reward falls off over. See the module docstring - this is
@@ -174,12 +201,22 @@ SWING_SPREAD = 0.15
 # drifted about 140 mm, which is the failure this exists to price.
 DRIFT_FREE_M = 0.05
 
+# How far off the line the `off_track` INPUT is allowed to report, in metres.
+# Ten times DRIFT_FREE_M. A heading error cannot leave +/-pi on its own; a
+# distance grows without limit, and handed in raw it nearly stopped the robot
+# walking - see off_track_obs.
+OFF_TRACK_CLIP_M = 0.5
+
 WALK_NOTES = {
     "track_speed": "Moving at the speed it was told to, measured on a trunk speed "
                    "averaged over about half a stride rather than the raw one. This "
                    "is the term that pays for walking at all.",
     "track_turn": "Turning at the rate it was told to, and not turning when it was "
-                  "not asked to.",
+                  "not asked to. The best-paid term in the task since 4 Aug 2026 - "
+                  "more than walking at the right speed - because at anything less "
+                  "the robot turned at about half the rate it was told to. Turning "
+                  "costs effort, shaking and joint shock, so it has to be worth "
+                  "more than all of them put together before it happens.",
     "stepping": "Feet spending a sensible time in the air - long enough to be a "
                 "step, short enough not to be a hop. This is what turns 'move "
                 "forwards' into 'walk' rather than 'shuffle'. Pays nothing when "
@@ -240,13 +277,14 @@ WALK_NOTES = {
                  "average. This is what makes the walk look like a dog rather than "
                  "a table sliding along - without it the cheapest gait is stiff "
                  "legs and tiny steps. Capped, so it buys a stride and not a flail.",
-    "wandering": "Drifting sideways off the line it was sent along. Only charged "
-                 "when it was told to go straight, and measured on where the robot "
-                 "has actually ended up rather than which way it is pointing. "
-                 "Measured PERPENDICULAR TO THE HEADING IT WAS GIVEN, not against "
-                 "world Y - the world-Y version charged a robot spawned at 0.1 rad "
-                 "for 499 mm of drift it never committed, and fought 'veering' for "
-                 "it.",
+    "wandering": "Drifting off the line it was sent along. Charged whenever it was "
+                 "given a direction to travel in and not told to turn - which since "
+                 "4 Aug 2026 includes crabbing sideways and diagonals, not just "
+                 "straight ahead. Measured on where the robot has actually ended up "
+                 "rather than which way it is pointing, and PERPENDICULAR TO THE "
+                 "COURSE IT WAS GIVEN, not against world Y - the world-Y version "
+                 "charged a robot spawned at 0.1 rad for 499 mm of drift it never "
+                 "committed, and fought 'veering' for it.",
     "shaking": "How hard the trunk is being jolted about, measured as its own "
                "acceleration. Smooth joints can still add up to a trunk that "
                "hammers, and the trunk is where the IMU and the electronics live.",
@@ -258,7 +296,10 @@ WALK_NOTES = {
                "slowly rotating to face sideways, and this is the term that "
                "catches that. Yaw RATE is already scored - this catches the drift "
                "that a near-zero rate hides, because a tenth of a degree per step "
-               "is invisible in the rate and 20 degrees off after twenty seconds.",
+               "is invisible in the rate and 20 degrees off after twenty seconds. "
+               "Charged on crab steps too since 4 Aug 2026: keeping still facing "
+               "forwards while stepping sideways is most of what crabbing IS, and "
+               "it was the one command where nothing asked for it.",
 }
 
 
@@ -414,11 +455,15 @@ def _going_straight(env, command_name: str = "walk") -> torch.Tensor:
     would have switched off entirely for every backward command. Backward walking
     would have trained with no straightness penalty at all, and nothing would have
     reported it: the terms return zero, which looks exactly like passing.
+
+    Since 4 Aug 2026 the test itself lives on the command term, which is also
+    where the line it defines is kept. Later the same day it stopped requiring
+    the line to point FORWARD: a crab step has a direction of travel like any
+    other, and demanding a forward component switched every line-holding term
+    off for it - which is why sideways came in 19 to 41 degrees off its line.
+    Two conditions now, not three: travelling, and not told to turn.
     """
-    command = env.command_manager.get_command(command_name)
-    return ((torch.abs(command[:, 0]) > MOVING)
-            & (torch.abs(command[:, 2]) < 0.05)
-            & (torch.abs(command[:, 1]) < 0.05))
+    return env.command_manager.get_term(command_name)._on_a_line()
 
 
 def commanded_height(env, std: float, command_name: str = "posture",
@@ -570,17 +615,13 @@ def veering(env, command_name: str = "walk"):
 
     The reference heading follows the robot while it is being told to turn, and
     locks the moment a straight command starts - so a legitimate turn is never
-    charged as drift.
+    charged as drift. That reference is the command term's, not this term's:
+    see StraightLineVelocityCommand. Charged on the TRUE heading error, while
+    the policy is shown a gyro-corrupted one - the robot is priced on what it
+    actually did, and reads what its hardware could actually tell it.
     """
-    h = env.scene["robot"].data.heading_w
-    straight = _going_straight(env, command_name)
-    ref = getattr(env, "_gray_heading_ref", None)
-    if ref is None or ref.shape != h.shape:
-        ref = h.clone()
-    hold = straight & (env.episode_length_buf > 1)
-    ref = torch.where(hold, ref, h)
-    env._gray_heading_ref = ref.detach()
-    return torch.square(vmdp.wrap_to_pi(h - ref)) * straight.float()
+    cmd = env.command_manager.get_term(command_name)
+    return torch.square(cmd.heading_error) * cmd._on_a_line().float()
 
 
 def wandering(env, free: float, command_name: str = "walk"):
@@ -609,29 +650,200 @@ def wandering(env, free: float, command_name: str = "walk"):
 
     The line is locked the moment a straight command begins: where the robot was
     AND which way it pointed. A heading with no origin does not define a line.
+    Since 4 Aug 2026 the command term owns that line - see
+    StraightLineVelocityCommand - so this term, `veering` and the heading
+    observation cannot be measuring against three different ones.
+
+    KNOWN LIMIT, and the reason this weight is small once heading is observed:
+    the robot cannot measure where it IS, only which way it points. Once it has
+    accrued an offset, this term charges for something it can neither see nor
+    steer to. `veering` is the learnable half of straightness; this is the half
+    that keeps a robot from calling a parallel line good enough.
     """
     robot = env.scene["robot"]
-    heading = robot.data.heading_w
     pos = robot.data.root_link_pos_w[:, :2] - env.scene.env_origins[:, :2]
-    straight = _going_straight(env, command_name)
-
-    ref_pos = getattr(env, "_gray_line_pos", None)
-    ref_head = getattr(env, "_gray_line_head", None)
-    if ref_pos is None or ref_pos.shape != pos.shape:
-        ref_pos = pos.clone()
-    if ref_head is None or ref_head.shape != heading.shape:
-        ref_head = heading.clone()
-    hold = straight & (env.episode_length_buf > 1)
-    ref_pos = torch.where(hold.unsqueeze(-1), ref_pos, pos)
-    ref_head = torch.where(hold, ref_head, heading)
-    env._gray_line_pos = ref_pos.detach()
-    env._gray_line_head = ref_head.detach()
+    cmd = env.command_manager.get_term(command_name)
 
     # Cross-track distance, the same rotation verify.py scores drift with.
-    moved = pos - ref_pos
-    off = torch.abs(-moved[:, 0] * torch.sin(ref_head)
-                    + moved[:, 1] * torch.cos(ref_head))
-    return torch.clamp(off - free, min=0.0) * straight.float()
+    #
+    # Rotated by the COURSE, not the facing, since 4 Aug 2026. They are the same
+    # number for a forward command and 90 degrees apart for a crab step, so
+    # using the facing measured a sideways robot's drift along the very axis it
+    # had been told to travel down - charging it, at up to -1.0 a step, for the
+    # whole distance it was asked to cover. See StraightLineVelocityCommand.
+    moved = pos - cmd.line_pos
+    off = torch.abs(-moved[:, 0] * torch.sin(cmd.line_course)
+                    + moved[:, 1] * torch.cos(cmd.line_course))
+    return torch.clamp(off - free, min=0.0) * cmd._on_a_line().float()
+
+
+def handover_start(env, env_ids, share: float = 0.15,
+                   tilt: float = 0.25, spin: float = 0.8,
+                   speed: float = 0.30, joint_speed: float = 2.0):
+    """Start a share of attempts the way the getting-up policy will hand over.
+
+    THE FAILURE THIS EXISTS TO PREVENT, which costs a full retrain to fix later
+    and nothing to prevent now:
+
+    R2 stands the robot up and says "upright, take it". R1 receives a robot
+    mid-wobble - trunk still rotating, joints still moving, height not settled.
+    R1 has never seen that. Every one of its resets starts it clean: the trunk
+    within a centimetre and a tenth of a radian of nominal, joint velocities
+    inside +/-0.05 rad/s. That is a robot standing still, and it is the only
+    thing R1 has ever begun from.
+
+    Hand an out-of-distribution state to a policy and it falls. R2 picks it up,
+    hands over, it falls again. That loop cannot be fixed by a runtime rule,
+    a settle time, or a better switch threshold - the walking policy simply does
+    not know what to do from there, and the only way it learns is to have
+    started there. Which has to happen during training, which is here.
+
+    Deliberately a SHARE and not all of them. A robot that only ever starts
+    wobbling never learns the clean case well, and the clean case is what it is
+    in for the other 99% of its life. 15% is enough to be in the distribution.
+    """
+    robot = env.scene["robot"]
+    if len(env_ids) == 0:
+        return
+    pick = torch.rand(len(env_ids), device=env.device) < share
+    ids = env_ids[pick]
+    if len(ids) == 0:
+        return
+
+    def band(n, hi):
+        return torch.empty(len(ids), n, device=env.device).uniform_(-hi, hi)
+
+    # Trunk: tilted, drifting, and turning. Position is left where the reset put
+    # it - what R2 hands over is an ATTITUDE and a set of rates, not a place.
+    #
+    # There is no `root_state_w` on EntityData; the 13-vector is assembled from
+    # the four parts write_root_state_to_sim expects, in its order:
+    # position (3), quaternion wxyz (4), linear velocity (3), angular (3).
+    pos = robot.data.root_link_pos_w[ids]
+    quat = robot.data.root_link_quat_w[ids]
+
+    # The tilt is COMPOSED onto the spawn attitude rather than replacing it.
+    # Writing an absolute roll/pitch/yaw here would silently throw away the
+    # +/-0.1 rad spawn yaw the reset just drew, and that yaw is the whole reason
+    # drift is measured in each robot's own start frame.
+    roll, pitch = band(1, tilt).squeeze(-1), band(1, tilt).squeeze(-1)
+    cr, sr = torch.cos(roll * 0.5), torch.sin(roll * 0.5)
+    cp, sp = torch.cos(pitch * 0.5), torch.sin(pitch * 0.5)
+    t = torch.stack((cr * cp, sr * cp, cr * sp, -sr * sp), dim=-1)
+    w1, x1, y1, z1 = quat.unbind(-1)
+    w2, x2, y2, z2 = t.unbind(-1)
+    tilted = torch.stack((
+        w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+        w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+        w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+        w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2), dim=-1)
+
+    robot.write_root_state_to_sim(
+        torch.cat((pos, tilted, band(3, speed), band(3, spin)), dim=-1), ids)
+
+    # Joints: where the reset left them, but still moving. env_ids by KEYWORD -
+    # the second positional argument of write_joint_velocity_to_sim is joint_ids,
+    # not env_ids, and passing the env list there fails on a shape mismatch that
+    # names neither.
+    robot.write_joint_velocity_to_sim(
+        band(robot.data.default_joint_vel.shape[-1], joint_speed), env_ids=ids)
+
+
+def heading_error_obs(env, command_name: str = "walk"):
+    """How far off the line it was sent along the robot is now POINTING.
+
+    The 49th input, added 4 Aug 2026, and the reason every earlier checkpoint is
+    unreadable by this task.
+
+    WHY IT EXISTS. Measured on round 0: with the world's randomisation switched
+    off, all 64 robots given the identical command turned the same way by 12.6
+    degrees; with it on, they scattered by 23 degrees. The scatter is the point.
+    Every reset redraws servo gains by +/-30%, mass by +/-20% and the centre of
+    mass by +/-15 mm, and a lopsided draw is a steady turning torque for that
+    whole episode. The policy was told its turn RATE and never which way it had
+    ended up pointing, so it damped the wobble and let the steady part integrate
+    for 25 seconds. `veering` charged it -2.0 for the result from iteration 500
+    onward and the penalty never went to zero, because no weight can teach a
+    policy to correct an error it cannot observe.
+
+    ZERO WHEN THERE IS NO LINE TO HOLD, because the line is re-pinned to the
+    robot every step there is not - so a turning command or a stop reads 0 here
+    rather than a number that means nothing.
+
+    IT IS NOT ZERO ON A CRAB COMMAND ANY MORE, since 4 Aug 2026. It was, and
+    that is why sideways drifted 19 to 41 degrees off its line while forward
+    held 3.6: the policy was shown its heading error for exactly the commands it
+    was already good at, and shown nothing for the ones it was not. Same number,
+    same meaning - a crab step is asked to keep FACING one way while travelling
+    another, so the facing error is if anything more useful there than it is
+    walking forwards.
+
+    The input count does not change. This was always one number and still is;
+    it is now non-zero on more of the draws. Checkpoints trained before today
+    load fine.
+
+    ON THE REAL ROBOT this is integrated trunk gyro yaw, from the three IMUs,
+    re-zeroed whenever a straight command begins. That bounded window is what
+    makes it deployable: drift over seconds is small, over minutes it is not.
+    What the policy reads here is deliberately corrupted to match - see
+    `gyro_bias_rad` and `gyro_walk_rad_per_s` on the command config. The rewards
+    still charge the true error.
+    """
+    cmd = env.command_manager.get_term(command_name)
+    return (cmd.heading_error_sensed * cmd._on_a_line().float()).unsqueeze(-1)
+
+
+def off_track_obs(env, command_name: str = "walk"):
+    """How far off the line it was sent along the robot HAS ENDED UP, and which side.
+
+    The 50th input, added 5 Aug 2026. Every checkpoint before today is 49 wide
+    and cannot be loaded into this task.
+
+    WHY IT EXISTS, and why `heading_error_obs` above was not enough. Those two
+    are the same problem when the robot walks FORWARD: it is off the line because
+    it is pointing wrong, so steering fixes both, and one input covers them. They
+    come apart the moment it CRABS. There the robot is asked to hold its heading
+    and travel sideways, so the heading input reads near zero while the robot
+    drifts fore and aft - and `wandering` charges up to -3.0 a step for exactly
+    that distance. It was being fined for an error nothing told it about.
+
+    THE MEASUREMENT THAT SAYS SO, rather than the argument. Two changes, both
+    about how much practice the robot gets:
+
+        turn draws   CUT 41%    turn error 0.13 -> 0.27 rad/s, all three seeds
+        crab draws   RAISED 50x crab drift 4.69 -> 4.32 deg, spread over 2 deg
+
+    Exposure moves what the robot can already sense, hard and reliably - the turn
+    row is not subtle. Fifty times the practice at crabbing bought almost
+    nothing. That is the shape of a missing input, not a missing rehearsal.
+
+    ZERO WHEN THERE IS NO LINE TO HOLD, like the heading input, and for the same
+    reason: the line is re-pinned to the robot every step there is not, so the
+    number would mean nothing on a turn or a stop.
+
+    ON THE REAL ROBOT this is body-frame velocity integrated over the seconds
+    since the line was pinned, from the IMU and the joint feedback. The same
+    bounded window that makes the heading input deployable makes this one
+    deployable - and it is why the line re-pins on every command change rather
+    than at the start of an episode. What the policy reads is corrupted to match:
+    see `track_walk_m_per_s`. The rewards still charge the true error.
+
+    BOUNDED, unlike the heading input beside it, and that is not tidiness. A
+    heading error cannot leave +/-pi; a distance grows without limit. The first
+    attempt handed it in raw and the policy nearly STOPPED WALKING - 6.47 m of
+    ground covered became 2.65, and speed error went 0.036 to 0.209 m/s. The
+    drift numbers that run reported, 26 and 32 degrees, are what an angle does
+    when the distance under it collapses; the robot was not steering badly, it
+    was barely moving.
+
+    +/-0.5 m, which is ten times the 0.05 m `wandering` gives away free. Past
+    half a metre the robot is off the line by more than any run has recovered
+    from, so the extra magnitude carries no information the policy can act on -
+    only a bigger number to destabilise the value function with.
+    """
+    cmd = env.command_manager.get_term(command_name)
+    seen = torch.clamp(cmd.off_track_sensed, -OFF_TRACK_CLIP_M, OFF_TRACK_CLIP_M)
+    return (seen * cmd._on_a_line().float()).unsqueeze(-1)
 
 
 # ---------------------------------------------------------------------------
@@ -643,6 +855,69 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # A first walk has enough to deal with. The randomised ground, mass and servo
     # gains stay; only the shoving stops.
     cfg.events.pop("shove", None)
+
+    # PLAN.md 1.3.1 - the five dials, made wider. 5 Aug 2026.
+    #
+    # These are set HERE and not in push_env_cfg, where they are defined, on
+    # purpose. Gray-Push has its own bar and its own passing runs, all measured
+    # against the narrower ranges; widening them at the source would silently
+    # re-score a task nobody is working on. Walking is the task being hardened.
+    #
+    # WHAT THIS STEP IS FOR. Every one of these five is a number nobody knows
+    # about the real robot - it is not built, weighed or wired yet. The policy
+    # must not depend on any particular value, so it trains across a band. This
+    # step makes the bands wide enough to contain whatever the built machine
+    # turns out to be. It adds no new skill: the policy reads the same 49
+    # numbers, in a different pattern.
+    #
+    # THE NUMBERS ARE JUDGEMENT, and they are the only part of this that is.
+    # Nothing has been measured on a machine that does not exist. Each is one
+    # step out from the range 1.1 and 1.2 trained on, with the reason beside it.
+    # Batch 1 of 1.3 asks the only question that matters here - does the config
+    # that closed 1.2 still pass with all five at these values - and if it does
+    # not, batch 2 finds which one broke it.
+    for name, params in {
+        # 0.25, not 0.4. Below 0.3 the robot had no answer to a smooth wet floor
+        # at all, because it had never seen one. 1.4 is rubber on dry concrete.
+        "ground_grip": {"ranges": (0.25, 1.4)},
+        # +/-30%, not +/-20%. The mass is a CAD number. Fasteners, glue, wiring
+        # and a battery that is not yet chosen all land on top of it.
+        "how_heavy": {"alpha_range": (-0.3, 0.3)},
+        # +/-25 mm, not +/-15. Where the battery and the boards actually end up
+        # once the robot is wired is the largest single unknown in the model.
+        "where_the_weight_is": {"ranges": (-0.025, 0.025)},
+        # +/-40%, not +/-30%. A hobby servo's internal gains are sealed and
+        # unpublished, so the values in robot.yaml are a guess about a guess.
+        "servo_strength": {"kp_range": (0.6, 1.4), "kd_range": (0.6, 1.4)},
+        # Wider both ways. A fresh gearbox and a worn one are not the same
+        # machine, and Gray will be both.
+        "gearbox_drag": {"ranges": (0.003, 0.05)},
+    }.items():
+        term = cfg.events.get(name)
+        if term is None:
+            raise RuntimeError(
+                f"PLAN 1.3.1 widens '{name}', and the walk task has no such "
+                f"event. It is defined in gray/tasks/push_env_cfg.py - if it "
+                f"was renamed there, this loop silently widens nothing and the "
+                f"whole step measures the old world under a new name.")
+        term.params.update(params)
+
+    # 1.1.6 - the handover. Added 4 Aug 2026, DURING step 1 and not during step
+    # 3, because it is a training-set change and no runtime rule can add one
+    # afterwards. See handover_start for the fall-loop this prevents.
+    #
+    # Ordered after the nudges deliberately: mjlab applies reset events in
+    # insertion order, so this one overwrites the clean pose they just set, for
+    # the share of robots it picks.
+    #
+    # TRAINING ONLY. Under play - which is what verify.py and drive.py use - it
+    # is off. The bar tests one held command from a standing start, and 15% of
+    # the test robots beginning mid-wobble would move every number on it while
+    # measuring something nobody asked for. It would also make today's runs
+    # incomparable with every earlier one for a reason invisible on the page.
+    if not play:
+        cfg.events["handover_start"] = EventTermCfg(
+            func=handover_start, mode="reset", params={"share": 0.15})
 
     cfg.commands = {
         "walk": StraightLineVelocityCommandCfg(
@@ -664,7 +939,65 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
             # gray/tasks/walk_command.py. Half, not four fifths, because the
             # other half now has a much bigger box to cover.
             rel_forward_envs=0.0,
+            # 0.50 and 0.0. BOTH WERE MOVED ON 5 AUG 2026 AND BOTH ARE BACK.
+            #
+            # The story is worth keeping, because it cost a night and because
+            # the reasoning was sound and still wrong. Crab drift was failing at
+            # 4.33 to 4.95 deg against a 4.0 bar while forward walking passed at
+            # 2.9 to 3.4, and a pure crab command - sideways, no forward, no turn
+            # - turns up about once in 350 draws, because the three velocities
+            # are drawn independently. Being graded on a command the robot almost
+            # never gets is a real fault, so it got its own 15% share.
+            #
+            # Measured on ONE SEED, 1301, one change per row:
+            #
+            #     straight  crab  extra          turn    crab drift
+            #     0.50      0.00  -              0.140      4.33
+            #     0.50      0.15  -              0.277      4.37
+            #     0.35      0.15  -              0.260      5.06
+            #     0.35      0.00  -              0.190      5.22
+            #     0.35      0.00  off_track      0.249      5.56
+            #
+            # The crab share DOUBLED turn error and moved crab drift by 0.04 deg
+            # - nothing, against a seed spread of over 1 deg. Taking its 15% out
+            # of the straight share instead of the general pool did not help
+            # either, and made crab worse. Every step away from the first row
+            # lost ground on both numbers.
+            #
+            # WHY THE CRAB SHARE COSTS TURNING, most likely: a quadruped steps
+            # sideways by placing its feet asymmetric, which is the same thing it
+            # does to turn. Fifteen percent of commands demanding sideways travel
+            # with the yaw pinned at zero teaches it to suppress exactly what a
+            # turn command needs. That is a guess at the mechanism; the numbers
+            # above are not.
+            #
+            # THEN THE SHARE CAME BACK, on 5 Aug, and the table above is the
+            # reason it was ever dropped rather than a reason to keep it out.
+            # Every row of it was measured at 550 iterations, and 550 turned out
+            # to be too short to measure crab drift at all - the same config on
+            # the same seed gave 2.69 deg one run and 9.06 the next. The share
+            # was judged on a gap of 0.04 inside a spread of 6.37.
+            #
+            # Re-run at 1500 iterations, paired on the same seeds:
+            #
+            #     seed    without share   with share
+            #     1301        4.60           3.74     passes 4.0
+            #     4507        4.82           4.25
+            #     turn        0.100          0.083    bar 0.20
+            #
+            # It helps on every seed, by 0.6 to 0.9 deg. And the reason it was
+            # rejected - that it doubled turn error - does not happen at this
+            # length: turn came in at 0.083 and 0.136 against a 0.20 bar, where
+            # at 550 the same share pushed it to 0.27. The policy had not
+            # settled, so it was trading turning away to learn crabbing. Given
+            # long enough it does both.
+            #
+            # `off_track` stays out. It was tried at 550 as well, but it lost
+            # ground on every criterion AND nearly stopped the robot walking,
+            # which is not a subtle effect that a longer run would reverse. The
+            # code and the flag are kept for a future attempt.
             rel_straight_envs=0.5,
+            rel_crab_envs=0.15,
             straight_min_speed=0.10,
             ranges=vmdp.UniformVelocityCommandCfg.Ranges(
                 lin_vel_x=WALK_SPEED, lin_vel_y=WALK_SIDE, ang_vel_z=WALK_TURN),
@@ -690,6 +1023,27 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         # this task - a saved file is a fixed-size mapping, and the size changed.
         cfg.observations[group].terms["posture"] = ObservationTermCfg(
             func=vmdp.generated_commands, params={"command_name": "posture"})
+        # And which way it has drifted off the line it was sent along. One more
+        # number, 48 -> 49, so every policy trained before 4 Aug 2026 is
+        # unreadable by this task for the second time in two days. See
+        # heading_error_obs for why it is worth doing twice.
+        cfg.observations[group].terms["off_line"] = ObservationTermCfg(
+            func=heading_error_obs, params={"command_name": "walk"})
+        # `off_track` - how far off that line the robot has ENDED UP - is NOT
+        # here, and that is a result rather than an omission. It was the 50th
+        # input for four runs on 5 Aug 2026 and lost ground on every criterion
+        # it was meant to help: on seed 1301 it took crab drift from 5.22 to
+        # 5.56 deg and turn from 0.190 to 0.249. Handed in unbounded it was
+        # worse still - the robot nearly stopped walking, 6.47 m of ground
+        # covered down to 2.65.
+        #
+        # `off_track_obs` and the machinery behind it are kept, and
+        # `--with-off-track` puts it back. The reasoning that produced it is
+        # still the best account of why crab drift is hard - the robot holds its
+        # heading and drifts fore and aft, so the heading input reads near zero
+        # while `wandering` charges for the distance - and the next attempt at
+        # it should start from a measurement of WHY the input did not help,
+        # rather than from the idea again.
 
     # Terms that were the whole point of standing still and are now in the way.
     #   still        - it is being asked to move
@@ -708,8 +1062,32 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # --- the task itself ---
     cfg.rewards["track_speed"] = RewardTermCfg(
         func=track_speed, weight=2.0, params={"std": TRACK_STD})
+    # 5.0, not 1.0, since 4 Aug 2026 - and yes, that is more than track_speed is
+    # paid. It was measured, over eight runs of PLAN.md 1.2.2, on the mean
+    # turn-rate error against a 1.0 rad/s command. The bar is 0.20:
+    #
+    #     weight   1.0    3.0    5.0    8.0      all at TURN_STD 0.80
+    #     error   0.476  0.251  0.141  0.162
+    #
+    # Flat by 8.0, so 5.0 is where the lever runs out rather than a corner of
+    # the grid. Confirmed on a second seed at 0.135 against 0.141 - the two
+    # differ by 0.006, so this is not one lucky run.
+    #
+    # WHY IT NEEDED SO MUCH. At weight 1.0 the robot turned at about HALF the
+    # rate it was told to, on every seed that passed 1.1. Turning costs `effort`,
+    # `shaking`, `joint_shock` and `rocking`, all of which charge more the harder
+    # it turns, and getting the rate right was worth 0.32 of one term against
+    # all of that. Under-turning was simply the cheaper answer.
+    #
+    # THE BAND WAS NOT THE PROBLEM, which is worth recording because it is what
+    # the batch was designed to test. TURN_STD 0.40 made turning WORSE at both
+    # weights (0.736 against 0.476, and 0.323 against 0.251) and 1.20 was worse
+    # than 0.80 as well - so 0.80 is a genuine optimum with both directions
+    # measured, not an untested default. The weight sets how much the term is
+    # worth in total; the band only sets where its slope sits. A steep slope
+    # with no money on it changes nothing.
     cfg.rewards["track_turn"] = RewardTermCfg(
-        func=vmdp.track_angular_velocity, weight=1.0,
+        func=vmdp.track_angular_velocity, weight=5.0,
         params={"std": TURN_STD, "command_name": "walk"})
     # Ground actually covered, which velocity tracking alone does not guarantee.
     cfg.rewards["ground_covered"] = RewardTermCfg(func=ground_covered, weight=1.0)
@@ -717,8 +1095,27 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # ending up off the line, 'veering' is turning off it. A robot can do either
     # without the other - slide sideways while pointing straight ahead, or hold a
     # perfect line while slowly rotating to face the wrong way.
+    # -3.0, not -1.0, since 4 Aug 2026. Measured over PLAN.md 1.2 batch 3, the
+    # first batch where these terms applied to a crab command at all:
+    #
+    #                          crab drift   fwd drift   turn err
+    #     stock                    3.73        3.23      0.159    passed
+    #     wandering -3.0           3.53        2.96      0.106    passed
+    #     veering ramp x2          4.66        3.98      0.169    NOT passed
+    #     both up                  4.73        4.33      0.144    NOT passed
+    #
+    # Two seeds of the stock corner came in at 3.73 and 3.66, so crab drift's
+    # run-to-run noise is about 0.07 and every gap above is real.
+    #
+    # WHAT THE VEERING ROWS SAY, because it is the more interesting half. Making
+    # `veering` harder made straightness WORSE, in both pairs, and that is not a
+    # bad draw at this noise level. The two terms measure different failures -
+    # `veering` charges for which way the robot POINTS, `wandering` for where it
+    # ENDS UP - and the cheapest way to stop paying a heavy veering bill is to
+    # hold a heading while sliding off the line, which is the exact thing
+    # `wandering` exists to catch. They have pulled against each other before.
     cfg.rewards["wandering"] = RewardTermCfg(
-        func=wandering, weight=-1.0, params={"free": DRIFT_FREE_M})
+        func=wandering, weight=-3.0, params={"free": DRIFT_FREE_M})
     cfg.rewards["veering"] = RewardTermCfg(func=veering, weight=-0.2)
 
     # --- staying up while doing it ---
@@ -762,12 +1159,22 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # term that pays for the thighs and calves actually swinging through a stride.
     cfg.rewards["leg_swing"] = RewardTermCfg(
         func=leg_swing, weight=1.0, params={"target": SWING_SPREAD})
+    # Buzzing, raised from -0.01 with the rest of the smoothness set. It was
+    # 0.0125 points, a third of one percent of what the robot earns.
+    cfg.rewards["jitter"] = RewardTermCfg(func=mdp.action_acc_l2, weight=-0.05)
+
     cfg.rewards["dragging"] = RewardTermCfg(
         func=foot_clearance, weight=-2.0, params={"target": SWING_TARGET})
     cfg.rewards["swing_height"] = RewardTermCfg(
         func=swing_height, weight=-0.25, params={"target": SWING_TARGET})
+    # -0.05, up from -1e-4 on 4 Aug 2026. At the old weight it contributed
+    # 0.0001 points per episode against 3.86 earned - one part in forty thousand.
+    # That is not a weak penalty, it is a decorative one: no gait it could ever
+    # prefer differs by enough for it to matter, so it was a line of config that
+    # looked like a constraint and was not. Either delete it or make it worth
+    # something; this is worth something.
     cfg.rewards["hard_landing"] = RewardTermCfg(
-        func=vmdp.soft_landing, weight=-1e-4,
+        func=vmdp.soft_landing, weight=-0.05,
         params={"sensor_name": "feet", "command_name": "walk",
                 "command_threshold": MOVING})
 
@@ -815,13 +1222,30 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
                     "stages": [{"step": s, "weight": w} for s, w in
                                zip((0, 2400, 6000, 12000), weights)]})
 
+    # THE SMOOTHNESS SET, raised 4 Aug 2026 after being measured rather than
+    # guessed. On r1a the whole set - twitching, jitter, rocking, shaking,
+    # landing, swing, skid, joint_shock - came to 0.30 points against 3.86 the
+    # robot earned. `twitching` alone was 0.037, which is one percent: the policy
+    # would have traded away ALL of its smoothness for two percent more speed
+    # reward, and did. Present in the sum, absent from the decision - the same
+    # thing that was wrong with `effort` and with `track_turn`'s tolerance.
+    #
+    # Measured on r3a_smooth, which is where these numbers come from:
+    #     twitching -37%   jitter -41%   rocking -34%   shaking -35%
+    # raw, with the weight divided out, so that is the robot moving less roughly
+    # rather than simply being charged more for the same movement. Every one of
+    # the six bars held: drift 3.42 deg, distance 6.62 m, uprightness 0.9993.
+    #
+    # NOT raised further. r3b_smooth_hard took the same terms 3x beyond this to
+    # find the cliff; this is the setting that was chosen, on the owner's call,
+    # because it buys a third of the roughness back for nothing measurable.
     cfg.curriculum = {
         # commanded angles jumping about
-        "ease_in_smoothness": _ramp("twitching", (-0.01, -0.025, -0.05, -0.05)),
+        "ease_in_smoothness": _ramp("twitching", (-0.05, -0.125, -0.25, -0.25)),
         # trunk rolling and pitching
-        "ease_in_steadiness": _ramp("rocking", (-0.02, -0.05, -0.12, -0.2)),
+        "ease_in_steadiness": _ramp("rocking", (-0.06, -0.15, -0.36, -0.6)),
         # trunk being hammered by its own footfalls
-        "ease_in_shake": _ramp("shaking", (-0.001, -0.003, -0.006, -0.01)),
+        "ease_in_shake": _ramp("shaking", (-0.002, -0.006, -0.012, -0.02)),
         # heading drifting off the line. Last and slowest: it is meaningless until
         # the robot can actually hold a direction, and charging for it early just
         # fines a robot for falling over in a way that happens to rotate it.
@@ -866,23 +1290,49 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 def walk_ppo_cfg():
     cfg = push_ppo_cfg()
     cfg.experiment_name = "gray_walk"
-    # 2000, down from 3000 on 4 Aug 2026. Measured off three finished runs rather
-    # than guessed - reward at iteration 2000, as a fraction of the best that run
-    # ever reached:
+    # 500, on the owner's call, 4 Aug 2026. It was 3000, then 2000, then 1500.
     #
-    #     w01_seedfloor   97.4%      walk_m3100_c   97.5%      walk_m3100_g   96.8%
+    # Reward at each iteration as a fraction of the best that run ever reached,
+    # measured across the three smoothness runs:
     #
-    # and what the last thousand iterations then bought: +1.2, -0.0, +0.8. Under
-    # one percent, against a seed-to-seed noise floor of about two - so those
-    # iterations produce a difference nobody can tell apart from luck, for a third
-    # of the run's wall clock.
+    #                      it300   it400   it500   it600   it749
+    #     r3a_smooth       95.5%   98.9%   99.1%   98.3%   99.3%
+    #     r3b_smooth_hard  94.6%   97.5%   99.1%   97.1%   97.7%
+    #     r3c_smooth_s7    95.4%   98.3%   99.2%   96.5%   97.1%
     #
-    # Not 1500, though the curve looks flat there: walk_m3100_g gained +3.3
-    # between 1500 and 2000. Flat-looking and finished are different things, and
-    # 2000 is where they actually meet.
+    # 500 is inside one percent of the best on all three, and on two of them it
+    # is HIGHER than the number 250 iterations later - which is the curve being
+    # flat and noisy rather than still climbing. Everything past 500 buys a
+    # difference smaller than the run-to-run noise, at a third of the wall clock.
+    #
+    # What that buys instead: a comparison costs 25 minutes rather than 50, so a
+    # question gets four runs where it used to get two, and the answer beats the
+    # noise floor instead of sitting inside it. That trade is the whole reason
+    # for the number.
     #
     # This is a CAP, not a target. RULES.md rule 1 stops a run early the moment
     # reward reaches 96.5% of its ceiling - it has never fired on a walk run,
     # because the ceiling is 190 and the best so far is 136.
-    cfg.max_iterations = 2000
+    #
+    # A FLAT REWARD CURVE DOES NOT MEAN EVERY CRITERION HAS SETTLED, and the
+    # table above measures the reward. Found 5 Aug 2026, the hard way. Crab drift
+    # at this length is not a measurement at all: the SAME config on the SAME
+    # seed produced 2.69 deg one run and 9.06 the next, because training is not
+    # bit-reproducible on this card and 550 iterations is not long enough for the
+    # policy to settle on a way of stepping sideways.
+    #
+    #     iterations   crab drift mean   spread    turn
+    #           550          5.11         6.37     0.132
+    #          1500          4.95         0.82     0.099
+    #
+    # The mean barely moved. Length did not make the robot better at crabbing -
+    # it made the number trustworthy, which is a different and equally necessary
+    # thing. Two days of single-run comparisons of crab drift were made inside
+    # that 6.37 spread and none of them meant anything.
+    #
+    # So the number stays at 500 for questions about REWARD and about turning,
+    # which converge here and reproduce. Any question about crab drift needs
+    # 1500, and a batch that mixes the two is comparing a settled number against
+    # an unsettled one.
+    cfg.max_iterations = 500
     return cfg

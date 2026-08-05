@@ -9,15 +9,15 @@ in its own file, importing lightly.
 **Three rules, and they are the whole design.**
 
 1. **No percentages. Anywhere.** Ten of twelve criteria met reads as "83% done"
-   for a robot whose sideways drift is 24 times its bar. The page reports three
+   for a robot that will not walk in a straight line. The page reports three
    separate numbers - met, failing, never measured - and the worst criterion by
    how far over it is. There is no project score, no health index, no gauge.
 
 2. **Distance to bar is a multiple, not a fraction.** `ratio` is normalised so
    1.0 is exactly at the bar and above 1.0 passes, whichever direction the
    criterion runs. A failing criterion is reported as `1 / ratio` times over. It
-   makes drift (24x) and speed (1.5x) comparable on one axis, and it does not
-   let 4% of the way there look nearly finished.
+   makes straightness (4x over) and speed comparable on one axis, and it does
+   not let a quarter of the way there look nearly finished.
 
 3. **A measurement is a fact; a verdict is a comparison.** Measurements never
    expire. Verdicts expire the moment the bar moves - which has already happened
@@ -32,6 +32,7 @@ things that a single number would merge.
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 from dashboard import plan, runs, skills
@@ -54,9 +55,45 @@ CRITERIA = {
                    "better": "higher", "bar_field": "bar_distance_m"},
     "speed_err":  {"name": "speed tracking",   "unit": "m/s",
                    "better": "lower",  "bar_field": "bar_speed_err"},
-    "drift":      {"name": "sideways drift",   "unit": "mm",
-                   "better": "lower",  "bar_field": "bar_drift_mm"},
+    # Degrees since 4 Aug 2026, millimetres before it. The key stays "drift" so
+    # the two are still the same criterion on one chart, but the UNIT changed, so
+    # old runs and new ones cannot be plotted on one axis - a 2115 next to a 19.2
+    # is the same policy twice. Anything reading this must use the unit recorded
+    # on the run's own row, not this one.
+    "drift":      {"name": "off the line",     "unit": "deg",
+                   "better": "lower",  "bar_field": "bar_drift_deg"},
+
+    # The other half of the command box, added 4 Aug 2026 with PLAN.md 1.2.
+    #
+    # THIS LIST BEING SHORT WAS ITS OWN BUG, and a bad one. verify.py started
+    # scoring eleven criteria; this dict still named six. Everything that counts
+    # met and failing counts them from HERE, so a run failing crab drift and turn
+    # rate reported "6 met, 0 failing" beside a NOT PASSED badge, on the same
+    # screen. The verdict was right and the panel above it said the opposite.
+    #
+    # That is exactly the failure CLAUDE.md's dashboard rule exists to stop: a
+    # stale panel is worse than no panel, because it is trusted. Anything adding
+    # a bar to verify.TASKS adds its row here in the same edit.
+    #
+    # Crab keeps its own keys rather than sharing the straight-line ones. They
+    # are different asks - 3.75 m at 0.20 m/s sideways against 5 m at 0.25 m/s
+    # forward - so one row covering both could only ever report the harder one.
+    "side_distance":  {"name": "crabbed sideways", "unit": "m",
+                       "better": "higher", "bar_field": "bar_side_distance_m"},
+    "side_speed_err": {"name": "crab speed",       "unit": "m/s",
+                       "better": "lower",  "bar_field": "bar_side_speed_err"},
+    "side_drift":     {"name": "off the crab line", "unit": "deg",
+                       "better": "lower",  "bar_field": "bar_side_drift_deg"},
+    # A spin has no line to hold, so it has no distance, speed or drift row at
+    # all. What is asked is the rate, and that it stays on the spot.
+    "turn_err":       {"name": "turn rate",        "unit": "rad/s",
+                       "better": "lower",  "bar_field": "bar_turn_err"},
+    "turn_wander":    {"name": "stayed on the spot", "unit": "m",
+                       "better": "lower",  "bar_field": "bar_turn_wander_m"},
 }
+
+
+_VERIFY_MTIME: float | None = None
 
 
 def _verify_tasks() -> tuple[dict, str]:
@@ -65,7 +102,21 @@ def _verify_tasks() -> tuple[dict, str]:
     Imported inside the function: scripts/verify.py pulls in torch at call time
     and this module must stay importable when the training environment is
     broken - which is exactly when someone opens the dashboard.
+
+    RELOADED when the file on disk moves. `import_module` returns the module
+    cached at first call and never looks at the file again, so a dashboard
+    started before a bar changed went on serving the old one for as long as it
+    ran. server.py hot-reloads this module; this module has to do the same for
+    the one it reads the bars out of, or the reload stops one file short.
+
+    That is not a theoretical staleness. On 4 Aug 2026 the walk drift bar moved
+    from 100 mm to 5.0 degrees - `bar_drift_mm` became `bar_drift_deg` - and the
+    running dashboard, holding the old TASKS, found no `bar_drift_mm`, dropped
+    the criterion, and showed FIVE gates where the verifier scores six. A missing
+    row reads as "there is no such bar", which is worse than a wrong number
+    because nothing about it looks wrong.
     """
+    global _VERIFY_MTIME
     try:
         import importlib  # noqa: PLC0415
         import sys  # noqa: PLC0415
@@ -73,6 +124,14 @@ def _verify_tasks() -> tuple[dict, str]:
         if str(ROOT) not in sys.path:
             sys.path.insert(0, str(ROOT))
         mod = importlib.import_module("scripts.verify")
+        try:
+            stamp = (ROOT / "scripts" / "verify.py").stat().st_mtime
+        except OSError:
+            stamp = None
+        if stamp is not None and _VERIFY_MTIME is not None and stamp != _VERIFY_MTIME:
+            mod = importlib.reload(mod)
+        if stamp is not None:
+            _VERIFY_MTIME = stamp
         return dict(mod.TASKS), ""
     except Exception as exc:  # noqa: BLE001
         return {}, f"could not read the bars from scripts/verify.py: {exc}"
@@ -121,10 +180,19 @@ def best_for_task(task: str, summaries: list[dict] | None = None) -> dict:
 
     criteria = []
     for key, meta in CRITERIA.items():
-        points = []
+        points, wrong_unit = [], 0
         for run in mine:
             for check in run.get("verdict_checks") or []:
                 if check.get("key") != key:
+                    continue
+                # Same criterion, different unit, is not the same measurement.
+                # Drift went from millimetres to degrees on 4 Aug 2026, and the
+                # SAME policy reads 2115 in one and 19.2 in the other - so a
+                # min() over both picks the degrees every time and calls it a
+                # record. Counted rather than dropped silently: "three older runs
+                # measured this in mm" is a fact the page should be able to say.
+                if check.get("unit") and check["unit"] != meta["unit"]:
+                    wrong_unit += 1
                     continue
                 points.append({
                     "run": run["id"],
@@ -142,11 +210,16 @@ def best_for_task(task: str, summaries: list[dict] | None = None) -> dict:
         if not points:
             continue
 
-        values = [p["value"] for p in points if isinstance(p["value"], (int, float))]
+        # isfinite, not isinstance: json.loads accepts a bare NaN, and NaN is a
+        # float. max()/min() can then return it, and NaN == NaN is false, so the
+        # search for the point that holds it found nothing and raised
+        # StopIteration - a 500 on every page that reads a bar.
+        values = [p["value"] for p in points
+                  if isinstance(p["value"], (int, float)) and math.isfinite(p["value"])]
         if not values:
             continue
         best = max(values) if meta["better"] == "higher" else min(values)
-        best_point = next(p for p in points if p["value"] == best)
+        best_point = next((p for p in points if p["value"] == best), points[-1])
         latest = points[-1]
         bar = bars.get(key)
         bars_seen = sorted({p["bar"] for p in points if p["bar"] is not None})
@@ -181,6 +254,8 @@ def best_for_task(task: str, summaries: list[dict] | None = None) -> dict:
             # even though their measurements are.
             "stale": bar is not None and any(b != bar for b in bars_seen),
             "drifted_runs": sum(1 for p in points if p["drifted"]),
+            # Runs that measured this criterion in a unit it no longer uses.
+            "other_unit_runs": wrong_unit,
         })
 
     measured = {c["key"] for c in criteria}
@@ -248,7 +323,6 @@ def subsection_progress(key: str, summaries: list[dict] | None = None) -> dict:
         # The blocked rows grouped by the one capability each waits on. A count
         # of blocked rows is only useful once it says blocked on WHAT.
         "blocked_needs": live.get("needs", []),
-        "trains_with": trains_with(key),
         "bar_prose": plan.STAGE2["bars"].get(key, ""),
         "trigger": sub.get("trigger", ""),
         "gap": sub.get("gap", ""),
@@ -316,52 +390,15 @@ def startable() -> list[dict]:
     return out
 
 
-def trains_with(key: str) -> dict:
-    """What a subsection is actually AUTHORED against, as opposed to filed under.
-
-    A run has one reward function and a handful of command sliders. Its skill
-    rows are the checklist, not the thing being optimised - so the page shows
-    both, side by side, because conflating them is what makes 69 rows look like
-    69 pieces of work.
-
-    Imported lazily: this pulls in torch. Degrades to "not written yet", which
-    is also the honest answer for R2 and R3 - their tasks do not exist.
-    """
-    task_for = {"walk": "Gray-Walk"}      # only R1 has a task today
-    task = task_for.get(key)
-    if not task:
-        return {"exists": False, "terms": [], "commands": [],
-                "note": "no task has been written for this yet"}
-    try:
-        import importlib  # noqa: PLC0415
-        import sys  # noqa: PLC0415
-
-        if str(ROOT) not in sys.path:
-            sys.path.insert(0, str(ROOT))
-        mod = importlib.import_module("gray.tasks.walk_env_cfg")
-        cfg = mod.walk_env_cfg()
-    except Exception as exc:  # noqa: BLE001
-        return {"exists": False, "terms": [], "commands": [],
-                "note": f"could not read the task: {exc}"}
-
-    terms = sorted(
-        ({"name": n, "weight": float(t.weight),
-          "sign": "+" if t.weight > 0 else "-"} for n, t in cfg.rewards.items()),
-        key=lambda t: (t["sign"] != "+", -abs(t["weight"])))
-    cmd = cfg.commands.get("walk")
-    commands = []
-    if cmd is not None:
-        commands = [
-            {"name": "forward", "range": list(cmd.ranges.lin_vel_x), "unit": "m/s"},
-            {"name": "sideways", "range": list(cmd.ranges.lin_vel_y), "unit": "m/s"},
-            {"name": "turn", "range": list(cmd.ranges.ang_vel_z), "unit": "rad/s"},
-        ]
-    return {
-        "exists": True, "task": task, "terms": terms, "commands": commands,
-        "paid": sum(1 for t in terms if t["sign"] == "+"),
-        "fined": sum(1 for t in terms if t["sign"] == "-"),
-        "note": "",
-    }
+# `trains_with()` stood here. It imported torch and built the whole walk env
+# config to list the reward terms, once per subsection, so nine times per
+# overview() call - and overview() is called by nav_state(), on every request.
+# The only page that ever read the field is in dashboard/archive/.
+#
+# Nothing is lost. plan.rewards() and plan.dials() read the same weights and the
+# same command ranges out of gray/tasks/ by parsing the source, with no torch and
+# no env build. A second process importing torch while a run trains is also the
+# thing that has crashed this machine before.
 
 
 def overview(summaries: list[dict] | None = None) -> dict:
