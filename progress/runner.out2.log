@@ -1,0 +1,136 @@
+[16:44:07] runner 14816@164407 up. interpreter: C:\Users\Bisen\Desktop\Gray\.venv\Scripts\python.exe
+[16:44:07] queue: progress\queue.json
+[16:44:07] j0116  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r4a_tilt --seed 42 --stop-at 0.965 --upright-std 0.15
+[16:44:12] j0116  -> progress/runs/2026-08-04_16-44-12_r4a_tilt
+[17:01:39] j0116  verify exited 1 - training kept, the bar was not met or could not be read
+[17:01:39] j0116  done
+[17:01:39] j0117  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r4b_tilt_s7 --seed 7 --stop-at 0.965 --upright-std 0.15
+[17:01:44] j0117  -> progress/runs/2026-08-04_17-01-44_r4b_tilt_s7
+[17:19:10] j0117  verify exited 1 - training kept, the bar was not met or could not be read
+[17:19:10] j0117  done
+[17:19:10] j0118  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r5a_final_s99 --seed 99 --stop-at 0.965
+[17:19:16] j0118  -> progress/runs/2026-08-04_17-19-15_r5a_final_s99
+[17:36:25] j0118  done
+[17:36:25] j0119  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r5b_final_s314 --seed 314 --stop-at 0.965
+[17:36:30] j0119  -> progress/runs/2026-08-04_17-36-30_r5b_final_s314
+[17:53:35] j0119  done
+[17:53:35] j0120  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r5c_final_s2718 --seed 2718 --stop-at 0.965
+[17:53:40] j0120  -> progress/runs/2026-08-04_17-53-40_r5c_final_s2718
+[18:10:26] j0120  done
+[18:10:26] idle - 0 queued
+[19:47:36] j0121  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t1_stock --stop-at 0.965 --reward track_turn=1.0 --turn-std 0.8
+[19:47:41] j0121  -> progress/runs/2026-08-04_19-47-41_t1_stock
+[20:07:08] j0121  verify exited 1 - training kept, the bar was not met or could not be read
+[20:07:08] j0121  done
+[20:07:08] j0122  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t2_band --stop-at 0.965 --reward track_turn=1.0 --turn-std 0.4
+[20:07:13] j0122  -> progress/runs/2026-08-04_20-07-13_t2_band
+[20:26:20] j0122  verify exited 1 - training kept, the bar was not met or could not be read
+[20:26:20] j0122  done
+[20:26:20] j0123  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t3_pay --stop-at 0.965 --reward track_turn=3.0 --turn-std 0.8
+[20:26:25] j0123  -> progress/runs/2026-08-04_20-26-25_t3_pay
+[20:45:37] j0123  verify exited 1 - training kept, the bar was not met or could not be read
+[20:45:37] j0123  done
+[20:45:37] j0124  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t4_band_pay --stop-at 0.965 --reward track_turn=3.0 --turn-std 0.4
+[20:45:43] j0124  -> progress/runs/2026-08-04_20-45-42_t4_band_pay
+[21:04:50] j0124  verify exited 1 - training kept, the bar was not met or could not be read
+[21:04:50] j0124  done
+[21:04:50] idle - 0 queued
+[21:10:40] j0125  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t5_pay5 --stop-at 0.965 --reward track_turn=5.0 --turn-std 0.8
+[21:10:45] j0125  -> progress/runs/2026-08-04_21-10-45_t5_pay5
+[21:29:53] j0125  verify exited 1 - training kept, the bar was not met or could not be read
+[21:29:53] j0125  done
+[21:29:53] j0126  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t6_pay8 --stop-at 0.965 --reward track_turn=8.0 --turn-std 0.8
+[21:29:58] j0126  -> progress/runs/2026-08-04_21-29-58_t6_pay8
+[21:49:28] j0126  verify exited 1 - training kept, the bar was not met or could not be read
+[21:49:28] j0126  done
+[21:49:28] j0127  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t7_wide5 --stop-at 0.965 --reward track_turn=5.0 --turn-std 1.2
+[21:49:33] j0127  -> progress/runs/2026-08-04_21-49-33_t7_wide5
+[22:08:45] j0127  verify exited 1 - training kept, the bar was not met or could not be read
+[22:08:45] j0127  done
+[22:08:45] j0128  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t8_pay5_s7 --seed 7 --stop-at 0.965 --reward track_turn=5.0 --turn-std 0.8
+[22:08:50] j0128  -> progress/runs/2026-08-04_22-08-50_t8_pay5_s7
+[22:27:56] j0128  verify exited 1 - training kept, the bar was not met or could not be read
+[22:27:56] j0128  done
+[22:27:56] idle - 0 queued
+[22:34:37] j0129  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 512 --iterations 3 --name c00_smoke --stop-at 0.965
+[22:34:42] j0129  -> progress/runs/2026-08-04_22-34-42_c00_smoke
+[22:34:53] j0129  done
+[22:34:53] j0130  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c1_fix --stop-at 0.965 --reward veering=-0.2 --reward wandering=-1.0
+[22:39:53] j0130  no run directory appeared - the job runs, but unlinked
+[22:39:53] j0130  training never reported an iteration - not filming
+[22:39:53] j0130  FAILED (exit 1)
+[22:39:53] j0131  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c2_veer --stop-at 0.965 --reward veering=-0.6 --reward wandering=-1.0
+[22:44:54] j0131  no run directory appeared - the job runs, but unlinked
+[22:44:54] j0131  training never reported an iteration - not filming
+[22:44:54] j0131  FAILED (exit 1)
+[22:44:54] j0132  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c3_wander --stop-at 0.965 --reward veering=-0.2 --reward wandering=-3.0
+[22:49:55] j0132  no run directory appeared - the job runs, but unlinked
+[22:49:55] j0132  training never reported an iteration - not filming
+[22:49:55] j0132  FAILED (exit 1)
+[22:49:55] j0133  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c4_both --stop-at 0.965 --reward veering=-0.6 --reward wandering=-3.0
+[22:54:55] j0133  no run directory appeared - the job runs, but unlinked
+[22:54:55] j0133  training never reported an iteration - not filming
+[22:54:55] j0133  FAILED (exit 1)
+[22:54:55] j0134  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c5_fix_s7 --seed 7 --stop-at 0.965 --reward veering=-0.2 --reward wandering=-1.0
+[22:59:56] j0134  no run directory appeared - the job runs, but unlinked
+[22:59:56] j0134  training never reported an iteration - not filming
+[22:59:56] j0134  FAILED (exit 1)
+[22:59:56] idle - 0 queued
+[23:01:45] j0135  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c1_fix --stop-at 0.965 --reward wandering=-1.0 --ramp veering=-0.2,-0.5,-1.2,-2.0
+[23:01:51] j0135  -> progress/runs/2026-08-04_23-01-50_c1_fix
+[23:19:57] j0135  done
+[23:19:57] j0136  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c2_veer --stop-at 0.965 --reward wandering=-1.0 --ramp veering=-0.4,-1.0,-2.4,-4.0
+[23:20:03] j0136  -> progress/runs/2026-08-04_23-20-02_c2_veer
+[23:39:09] j0136  verify exited 1 - training kept, the bar was not met or could not be read
+[23:39:09] j0136  done
+[23:39:09] j0137  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c3_wander --stop-at 0.965 --reward wandering=-3.0 --ramp veering=-0.2,-0.5,-1.2,-2.0
+[23:39:15] j0137  -> progress/runs/2026-08-04_23-39-14_c3_wander
+[23:58:22] j0137  done
+[23:58:22] j0138  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c4_both --stop-at 0.965 --reward wandering=-3.0 --ramp veering=-0.4,-1.0,-2.4,-4.0
+[23:58:27] j0138  -> progress/runs/2026-08-04_23-58-27_c4_both
+[00:17:37] j0138  verify exited 1 - training kept, the bar was not met or could not be read
+[00:17:37] j0138  done
+[00:17:37] j0139  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c5_fix_s7 --seed 7 --stop-at 0.965 --reward wandering=-1.0 --ramp veering=-0.2,-0.5,-1.2,-2.0
+[00:17:43] j0139  -> progress/runs/2026-08-05_00-17-42_c5_fix_s7
+[00:36:57] j0139  done
+[00:36:57] idle - 0 queued
+[00:38:43] j0140  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g1_close_s1301 --seed 1301 --stop-at 0.965
+[00:38:48] j0140  -> progress/runs/2026-08-05_00-38-48_g1_close_s1301
+[01:00:16] j0140  done
+[01:00:16] j0141  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g2_close_s4507 --seed 4507 --stop-at 0.965
+[01:00:22] j0141  -> progress/runs/2026-08-05_01-00-21_g2_close_s4507
+[01:19:23] verify: cancelled from the dashboard
+[01:19:53] child did not stop when asked - killing it
+[01:19:53] j0141  verify exited 1 - training kept, the bar was not met or could not be read
+[01:19:53] j0141  cancelled during verify
+[01:19:53] idle - 0 queued
+[01:24:43] j0144  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g1_close_s1301 --seed 1301 --stop-at 0.965
+[01:24:49] j0144  -> progress/runs/2026-08-05_01-24-48_g1_close_s1301
+[01:44:23] j0144  verify exited 1 - training kept, the bar was not met or could not be read
+[01:44:23] j0144  done
+[01:44:23] j0145  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g2_close_s4507 --seed 4507 --stop-at 0.965
+[01:44:29] j0145  -> progress/runs/2026-08-05_01-44-28_g2_close_s4507
+[02:04:03] j0145  verify exited 1 - training kept, the bar was not met or could not be read
+[02:04:03] j0145  done
+[02:04:03] j0146  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g3_close_s8821 --seed 8821 --stop-at 0.965
+[02:04:09] j0146  -> progress/runs/2026-08-05_02-04-08_g3_close_s8821
+[02:23:41] j0146  verify exited 1 - training kept, the bar was not met or could not be read
+[02:23:41] j0146  done
+[02:23:41] j0147  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g4_wander6 --stop-at 0.965 --reward wandering=-6.0
+[02:23:47] j0147  -> progress/runs/2026-08-05_02-23-46_g4_wander6
+[02:43:16] j0147  verify exited 1 - training kept, the bar was not met or could not be read
+[02:43:16] j0147  done
+[02:43:16] idle - 0 queued
+[02:47:35] j0148  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name h1_gate_s1301 --seed 1301 --stop-at 0.965
+[02:47:41] j0148  -> progress/runs/2026-08-05_02-47-40_h1_gate_s1301
+[03:06:53] j0148  verify exited 1 - training kept, the bar was not met or could not be read
+[03:06:53] j0148  done
+[03:06:53] j0149  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name h2_gate_s4507 --seed 4507 --stop-at 0.965
+[03:06:59] j0149  -> progress/runs/2026-08-05_03-06-58_h2_gate_s4507
+[03:26:28] j0149  verify exited 1 - training kept, the bar was not met or could not be read
+[03:26:28] j0149  done
+[03:26:28] j0150  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name h3_gate_s8821 --seed 8821 --stop-at 0.965
+[03:26:33] j0150  -> progress/runs/2026-08-05_03-26-33_h3_gate_s8821
+[03:45:43] j0150  verify exited 1 - training kept, the bar was not met or could not be read
+[03:45:43] j0150  done
+[03:45:43] idle - 0 queued
