@@ -53,9 +53,3 @@ MUJOCO_LOG.TXT
 /progress/queue.json.tmp
 /progress/jobs/
 
-# Claude Code ships a pile of generic plugin skills into .claude/skills.
-# They are tooling, not this project, and they change whenever a plugin
-# updates. The two that ARE the project are force-added: settings.json, and
-# ste/, which CLAUDE.md requires be loaded at the start of every session.
-/.claude/skills/*
-!/.claude/skills/ste/
