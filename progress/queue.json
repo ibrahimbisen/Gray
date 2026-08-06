@@ -1,6 +1,6 @@
 {
   "paused": false,
-  "next_id": 192,
+  "next_id": 193,
   "jobs": [
     {
       "task": "Gray-Push",
@@ -6491,16 +6491,25 @@
       "verify": true,
       "clamped": "",
       "id": "j0188",
-      "state": "queued",
+      "state": "running",
       "created": "2026-08-06T09:26:27",
-      "started": null,
+      "started": "2026-08-06T09:39:58",
       "finished": null,
-      "run_id": null,
+      "run_id": "2026-08-06_09-40-04_s4_14deg_s2207",
       "exit_code": null,
       "error": "",
-      "steps": [],
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 536.2,
+          "exit_code": 4294967295,
+          "at": "2026-08-06T09:48:55"
+        }
+      ],
       "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 14.0",
-      "cannot_run": ""
+      "cannot_run": "",
+      "owner": "9836@092619",
+      "log": "progress/jobs/j0188.log"
     },
     {
       "task": "Gray-Walk",
@@ -6618,17 +6627,7 @@
       "steps": [],
       "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 10.0",
       "cannot_run": ""
-    }
-  ],
-  "counts": {
-    "queued": 4,
-    "running": 0,
-    "done": 86,
-    "failed": 12,
-    "cancelled": 53,
-    "skipped": 0
-  },
-  "queued": [
+    },
     {
       "task": "Gray-Walk",
       "name": "s4_14deg_s2207",
@@ -6656,9 +6655,9 @@
       "film": true,
       "verify": true,
       "clamped": "",
-      "id": "j0188",
+      "id": "j0192",
       "state": "queued",
-      "created": "2026-08-06T09:26:27",
+      "created": "2026-08-06T09:49:23",
       "started": null,
       "finished": null,
       "run_id": null,
@@ -6667,7 +6666,17 @@
       "steps": [],
       "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 14.0",
       "cannot_run": ""
-    },
+    }
+  ],
+  "counts": {
+    "queued": 4,
+    "running": 1,
+    "done": 86,
+    "failed": 12,
+    "cancelled": 53,
+    "skipped": 0
+  },
+  "queued": [
     {
       "task": "Gray-Walk",
       "name": "s1_4deg_s2207",
@@ -6784,9 +6793,95 @@
       "steps": [],
       "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 10.0",
       "cannot_run": ""
+    },
+    {
+      "task": "Gray-Walk",
+      "name": "s4_14deg_s2207",
+      "note": "Rung 4 of 4: a 14 degree slope, about 24% grade. PLAN 1.3.2 batch 3, the slope ladder: one angle per run, everything else the task as it stands with the gait winners landed. Read falls and ground_covered at 550, then verify --gait-diag --slope-deg on the checkpoint. The stop row picks the angle batch 4 holds at 1500 x 3 seeds.",
+      "num_envs": 5000,
+      "seed": 2207,
+      "iterations": 550,
+      "stop_at": 0.0,
+      "no_video": false,
+      "rewards": {},
+      "ramps": {},
+      "turn_std": null,
+      "upright_std": null,
+      "gyro_noise": null,
+      "no_heading_obs": false,
+      "with_off_track": false,
+      "crab_share": null,
+      "spin_share": null,
+      "dive_ends": false,
+      "swing_target": null,
+      "slope_deg": 14.0,
+      "narrow_dials": "",
+      "push_speed": null,
+      "push_spin": null,
+      "film": true,
+      "verify": true,
+      "clamped": "",
+      "id": "j0192",
+      "state": "queued",
+      "created": "2026-08-06T09:49:23",
+      "started": null,
+      "finished": null,
+      "run_id": null,
+      "exit_code": null,
+      "error": "",
+      "steps": [],
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 14.0",
+      "cannot_run": ""
     }
   ],
-  "running": null,
+  "running": {
+    "task": "Gray-Walk",
+    "name": "s4_14deg_s2207",
+    "note": "Rung 4 of 4: a 14 degree slope, about 24% grade. PLAN 1.3.2 batch 3, the slope ladder: one angle per run, everything else the task as it stands with the gait winners landed. Read falls and ground_covered at 550, then verify --gait-diag --slope-deg on the checkpoint. The stop row picks the angle batch 4 holds at 1500 x 3 seeds.",
+    "num_envs": 5000,
+    "seed": 2207,
+    "iterations": 550,
+    "stop_at": 0.0,
+    "no_video": false,
+    "rewards": {},
+    "ramps": {},
+    "turn_std": null,
+    "upright_std": null,
+    "gyro_noise": null,
+    "no_heading_obs": false,
+    "with_off_track": false,
+    "crab_share": null,
+    "spin_share": null,
+    "dive_ends": false,
+    "swing_target": null,
+    "slope_deg": 14.0,
+    "narrow_dials": "",
+    "push_speed": null,
+    "push_spin": null,
+    "film": true,
+    "verify": true,
+    "clamped": "",
+    "id": "j0188",
+    "state": "running",
+    "created": "2026-08-06T09:26:27",
+    "started": "2026-08-06T09:39:58",
+    "finished": null,
+    "run_id": "2026-08-06_09-40-04_s4_14deg_s2207",
+    "exit_code": null,
+    "error": "",
+    "steps": [
+      {
+        "name": "train",
+        "seconds": 536.2,
+        "exit_code": 4294967295,
+        "at": "2026-08-06T09:48:55"
+      }
+    ],
+    "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 14.0",
+    "cannot_run": "",
+    "owner": "9836@092619",
+    "log": "progress/jobs/j0188.log"
+  },
   "history": [
     {
       "task": "Gray-Walk",
@@ -13285,9 +13380,9 @@
   "env_ceiling": 5000,
   "runner": {
     "alive": true,
-    "age_s": 0.6,
+    "age_s": 0.1,
     "pid": 9836,
-    "at": "2026-08-06T09:39:55",
+    "at": "2026-08-06T09:49:23",
     "hint": ""
   }
 }

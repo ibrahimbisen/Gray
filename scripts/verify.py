@@ -938,9 +938,9 @@ def main() -> int:
     env_cfg.scene.num_envs = args.robots
     env_cfg.episode_length_s = seconds + 5.0
     if args.slope_deg:
-        from gray.tasks.walk_env_cfg import slope_terrain  # noqa: PLC0415
+        from gray.tasks.walk_env_cfg import apply_slope  # noqa: PLC0415
 
-        env_cfg.scene.terrain = slope_terrain(args.slope_deg)
+        apply_slope(env_cfg, args.slope_deg)
 
     # Give the policy the observation it was TRAINED with, not today's.
     #

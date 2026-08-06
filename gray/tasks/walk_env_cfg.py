@@ -1012,6 +1012,23 @@ def slope_terrain(deg: float) -> TerrainEntityCfg:
     )
 
 
+def apply_slope(cfg: ManagerBasedRlEnvCfg, deg: float) -> None:
+    """Put the walk task on the hill: the terrain swap plus its house rules.
+
+    One entry point for train.py and verify.py both, so the slope world is
+    the same world wherever it is built. Beside the terrain itself: a robot
+    that slides off the hill is truncated rather than left grinding at the
+    rim - it is not learning the hill any more, and a tumbled robot against
+    the patch edge is also the most expensive contact state the solver can
+    be handed. Truncated (time_out=True), not failed: sliding out of a 16 m
+    world is the world ending, not the robot falling.
+    """
+    cfg.scene.terrain = slope_terrain(deg)
+    cfg.terminations["out_of_bounds"] = TerminationTermCfg(
+        func=vmdp.out_of_terrain_bounds, params={"margin": 0.3},
+        time_out=True)
+
+
 def dive_termination() -> TerminationTermCfg:
     """The nose-dive, made terminal: the trunk touching anything ends the attempt.
 

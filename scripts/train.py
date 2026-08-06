@@ -554,9 +554,9 @@ def main() -> int:
             term.params["target"] = args.swing_target
         print(f"tolerance     swing target: {was} -> {args.swing_target} m")
     if args.slope_deg:
-        from gray.tasks.walk_env_cfg import slope_terrain  # noqa: PLC0415
+        from gray.tasks.walk_env_cfg import apply_slope  # noqa: PLC0415
 
-        cfg.env.scene.terrain = slope_terrain(args.slope_deg)
+        apply_slope(cfg.env, args.slope_deg)
         print(f"terrain       a {args.slope_deg:g} deg slope instead of the "
               f"flat floor")
     if args.narrow_dials:
