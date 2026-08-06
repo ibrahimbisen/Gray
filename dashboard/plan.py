@@ -1591,7 +1591,15 @@ FORWARD = {
                            "pass. HELD - landed 6 Aug, morning."},
                   {"n": "3", "stage": "1.3.2", "runs": "4 x 550",
                    "code": "queue_13e.py - ground that tilts, one angle "
-                           "per run via --slope-deg: 4, 7, 10, 14 deg",
+                           "per run via --slope-deg: 4, 7, 10, 14 deg. "
+                           "FILMS OFF on this batch alone - the first "
+                           "exception to the films rule, measured not "
+                           "guessed: a heightfield frame renders in about "
+                           "1.4 s against the floor's microseconds, and "
+                           "with film on the recorder renders every step - "
+                           "35 s an iteration, 14x the physics. The ladder "
+                           "reads numbers; whether the slope CONFIRM pays "
+                           "the render price is its stop row's question",
                    "asks": "at what slope does it stop walking"},
                   {"stop": "which angle to hold for the confirming runs"},
                   {"n": "4", "stage": "1.3.2", "runs": "3 x 1500",

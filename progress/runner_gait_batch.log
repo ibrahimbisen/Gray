@@ -52,3 +52,9 @@ operable program or batch file.
 [09:39:28] paused - not taking new jobs
 [09:39:58] j0188  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 14.0
 [09:40:04] j0188  -> progress/runs/2026-08-06_09-40-04_s4_14deg_s2207
+[09:49:29] j0188  FAILED (exit 4294967295)
+[09:49:29] j0189  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 4.0
+[09:49:34] j0189  -> progress/runs/2026-08-06_09-49-34_s1_4deg_s2207
+[09:58:56] j0189  FAILED (exit 4294967295)
+[09:58:56] j0193  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 4.0
+[09:59:01] j0193  -> progress/runs/2026-08-06_09-59-01_s1_4deg_s2207

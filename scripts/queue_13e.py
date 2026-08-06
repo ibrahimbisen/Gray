@@ -78,7 +78,15 @@ def main() -> None:
           f"angles {', '.join(f'{a:g}' for a in ANGLES)} deg.\n")
 
     for job in BATCH:
-        spec = {"task": "Gray-Walk", "film": True, "verify": True,
+        # film is OFF on the slope ladder, and it is the first batch ever to
+        # turn it off - measured, not guessed: with film on, the recorder
+        # renders every step, and a heightfield frame costs about 1.4 s
+        # against the flat floor's microseconds. That is 35 s an iteration,
+        # 14x the physics, at ANY angle - s1_4deg and s4_14deg both showed
+        # it before the cause was found. The ladder reads numbers, not
+        # films; whether the slope CONFIRM pays the render price for its
+        # three runs is the stop row's question.
+        spec = {"task": "Gray-Walk", "film": False, "verify": True,
                 "num_envs": ROBOTS, "iterations": ITERATIONS, "seed": SEED,
                 # Off for the same reason every ladder turns it off: an early
                 # stop would make run length a second variable between rungs.
