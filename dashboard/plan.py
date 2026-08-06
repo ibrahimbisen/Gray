@@ -1574,10 +1574,24 @@ FORWARD = {
                    "code": "the winning levers together",
                    "asks": "all eleven criteria plus the gait numbers, on "
                            "three fresh seeds - then the winners land in "
-                           "the task as defaults"},
-                  {"stop": "the gait holds, or one lever needs another pass"},
+                           "the task as defaults",
+                   "done": "THE GAIT HOLDS. Zero dives and zero falls "
+                           "inside the box on all three seeds - the worst "
+                           "in-box nose excursion is 2.3 deg, against 33 "
+                           "deg locked for a minute before. The nose-down "
+                           "bias is gone: pitch means +1.4 to +2.7. Swing "
+                           "peaks 24-37 mm, up from 23-27. On the eleven, "
+                           "nothing got worse than the wide-dial baseline "
+                           "and sideways drift now passes on 2 of 3; the "
+                           "rows still failing are forward drift and the "
+                           "turn pair - the 1.2.7 question, unchanged. "
+                           "Landed as defaults: swing target 0.05, "
+                           "nose_dived, spin share 0.10."},
+                  {"stop": "the gait holds, or one lever needs another "
+                           "pass. HELD - landed 6 Aug, morning."},
                   {"n": "3", "stage": "1.3.2", "runs": "4 x 550",
-                   "code": "ground that tilts",
+                   "code": "queue_13e.py - ground that tilts, one angle "
+                           "per run via --slope-deg: 4, 7, 10, 14 deg",
                    "asks": "at what slope does it stop walking"},
                   {"stop": "which angle to hold for the confirming runs"},
                   {"n": "4", "stage": "1.3.2", "runs": "3 x 1500",

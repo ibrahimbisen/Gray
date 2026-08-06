@@ -25,3 +25,14 @@ operable program or batch file.
 [04:30:10] idle - 0 queued
 [04:42:55] j0182  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name gc_1301 --seed 1301 --stop-at 0.965 --spin-share 0.1 --dive-ends --swing-target 0.05
 [04:43:01] j0182  -> progress/runs/2026-08-06_04-43-00_gc_1301
+[05:34:20] j0182  verify exited 1 - training kept, the bar was not met or could not be read
+[05:34:20] j0182  done
+[05:34:20] j0183  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name gc_4507 --seed 4507 --stop-at 0.965 --spin-share 0.1 --dive-ends --swing-target 0.05
+[05:34:26] j0183  -> progress/runs/2026-08-06_05-34-25_gc_4507
+[06:28:27] j0183  verify exited 1 - training kept, the bar was not met or could not be read
+[06:28:27] j0183  done
+[06:28:27] j0184  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name gc_8821 --seed 8821 --stop-at 0.965 --spin-share 0.1 --dive-ends --swing-target 0.05
+[06:28:33] j0184  -> progress/runs/2026-08-06_06-28-32_gc_8821
+[07:21:07] j0184  verify exited 1 - training kept, the bar was not met or could not be read
+[07:21:07] j0184  done
+[07:21:07] idle - 0 queued

@@ -436,6 +436,13 @@ def main() -> int:
                          "chosen when 35 mm matched the stage 3 bar. The g3 "
                          "probe runs 0.05: a foot with 35 mm in hand has "
                          "nothing left for ground that is not a floor.")
+    ap.add_argument("--slope-deg", type=float, default=0.0, metavar="DEG",
+                    help="replace the flat floor with a 16 m pyramid at this "
+                         "angle, every robot on its own copy, spawned on the "
+                         "flat platform at its top. PLAN 1.3.2 batch 3, the "
+                         "slope ladder. 0 keeps the plane. The height terms "
+                         "and `collapsed` read the ground by raycast, so they "
+                         "mean the same thing on the hill as on the floor.")
     ap.add_argument("--narrow-dials", default="",
                     help="put named world dials back to their Gray-Push values, "
                          "comma separated, or 'all'. The walk task widens all "
@@ -546,6 +553,12 @@ def main() -> int:
             was = term.params["target"]
             term.params["target"] = args.swing_target
         print(f"tolerance     swing target: {was} -> {args.swing_target} m")
+    if args.slope_deg:
+        from gray.tasks.walk_env_cfg import slope_terrain  # noqa: PLC0415
+
+        cfg.env.scene.terrain = slope_terrain(args.slope_deg)
+        print(f"terrain       a {args.slope_deg:g} deg slope instead of the "
+              f"flat floor")
     if args.narrow_dials:
         # `narrow_dials` is set by walk_env_cfg while it widens them, so it holds
         # the value each dial actually had, not a second copy of the table.
@@ -715,6 +728,9 @@ def main() -> int:
             "swing_target_m": (
                 float(cfg.env.rewards["swing_height"].params["target"])
                 if "swing_height" in cfg.env.rewards else None),
+            # The ground's tilt. 0 is the flat floor; the slope ladder's
+            # rungs differ in nothing else.
+            "slope_deg": float(args.slope_deg) or None,
         },
         # The world the run trained in, read off the live config. Added 5 Aug
         # 2026, and it is not a nicety: /dials reads the SOURCE file, so it

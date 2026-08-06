@@ -798,6 +798,7 @@ def _dump_diagnostic(root, run_id, switched_off, per_robot, paths, ckpt,
         parts.append("measured")
     if "gait" in switched_off:
         parts.append("gait")
+    parts += [t for t in switched_off if t.startswith("slope")]
     path = out / f"{run_id}__{'_'.join(parts) or 'off'}.json"
     path.write_text(json.dumps({
         "run": run_id, "checkpoint": str(ckpt).replace("\\", "/"),
@@ -875,6 +876,11 @@ def main() -> int:
                          "- 0.15 / 0.25 / 0.35, plus 0.45 which is OUTSIDE "
                          "the trained box and labelled as such - to find the "
                          "speed the dive starts at. Implies --gait-diag.")
+    ap.add_argument("--slope-deg", type=float, default=0.0,
+                    help="measure on the slope world instead of the flat "
+                         "floor - the same 16 m pyramid train.py --slope-deg "
+                         "builds. Implies --no-record: the stage bar is a "
+                         "flat-floor bar until the plan says otherwise.")
     args = ap.parse_args()
 
     spec = dict(TASKS[args.task])
@@ -893,6 +899,9 @@ def main() -> int:
     if args.gait_diag:
         args.no_record = True
         print("gait diagnostic - measured, not judged, not recorded")
+    if args.slope_deg:
+        args.no_record = True
+        print(f"terrain      a {args.slope_deg:g} deg slope - not recorded")
     seconds = args.seconds or spec["seconds"]
     exp_root = LOG_ROOT / spec["experiment"]
     if not exp_root.is_dir():
@@ -921,6 +930,10 @@ def main() -> int:
     env_cfg = load_env_cfg(args.task, play=True)
     env_cfg.scene.num_envs = args.robots
     env_cfg.episode_length_s = seconds + 5.0
+    if args.slope_deg:
+        from gray.tasks.walk_env_cfg import slope_terrain  # noqa: PLC0415
+
+        env_cfg.scene.terrain = slope_terrain(args.slope_deg)
 
     # Give the policy the observation it was TRAINED with, not today's.
     #
@@ -1174,7 +1187,8 @@ def main() -> int:
                if switched_off else "--no-record: measured, not judged")
         print(f"\nnot recorded - {why}")
         tags = (switched_off or ["norecord"]) \
-            + (["gait"] if args.gait_diag else [])
+            + (["gait"] if args.gait_diag else []) \
+            + ([f"slope{args.slope_deg:g}"] if args.slope_deg else [])
         _dump_diagnostic(ROOT, log_dir.name, tags,
                          per_robot, paths, ckpt, args.robots, seconds)
         env.close()

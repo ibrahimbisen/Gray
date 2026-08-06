@@ -51,6 +51,8 @@ stopped being able to catch itself. RMA reports the same failure and the same fi
 
 from __future__ import annotations
 
+import math
+
 import torch
 
 from mjlab.envs import ManagerBasedRlEnvCfg, mdp
@@ -61,8 +63,18 @@ from mjlab.managers import (
     RewardTermCfg,
     TerminationTermCfg,
 )
-from mjlab.sensor import ContactSensorCfg
+from mjlab.sensor import (
+    ContactSensorCfg,
+    ObjRef,
+    RingPatternCfg,
+    TerrainHeightSensorCfg,
+)
 from mjlab.sensor.contact_sensor import ContactMatch
+from mjlab.terrains import (
+    HfPyramidSlopedTerrainCfg,
+    TerrainEntityCfg,
+    TerrainGeneratorCfg,
+)
 from mjlab.tasks.velocity import mdp as vmdp
 
 from mjlab.managers import SceneEntityCfg
@@ -185,8 +197,16 @@ MOVING = 0.05
 
 # How high a foot should be at the top of its swing. mjlab's default target is
 # 0.1 m, set for a Go1; Gray rides at 0.19 m, so a tenth of a metre is most of
-# its ride height. 35 mm matches the lift the stage 3 bar asks for.
-SWING_TARGET = 0.035
+# its ride height.
+#
+# 0.05, not 0.035, since 6 Aug 2026 - landed by the gait confirm (gc_1301,
+# gc_4507, gc_8821). At 35 mm the feet skimmed at 23-27 mm and a foot catching
+# the floor at 0.35 m/s pitched the trunk into a nose-down it could hold for a
+# minute; at 50 mm the g3 probe lifted the peaks to 38 mm and every dive
+# disappeared, at every speed, and the confirm held it on three seeds. 35 mm
+# was chosen when it matched the stage 3 bar; 1.3.2's slopes and rough ground
+# are what the extra 15 mm is for.
+SWING_TARGET = 0.05
 
 # How many control steps the trunk speed is averaged over before it is scored.
 # At 50 Hz, 12 steps is 0.24 s, about half a stride. Every footfall makes the
@@ -365,9 +385,40 @@ def stepping(env, sensor_name: str = "feet", lo: float = 0.10, hi: float = 0.45,
 
 
 def _foot_height(env, asset_cfg) -> torch.Tensor:
-    asset = env.scene[asset_cfg.name]
-    return (asset.data.site_pos_w[:, asset_cfg.site_ids, 2]
-            - env.scene.env_origins[:, 2].unsqueeze(1))
+    """Each foot's height above the LOCAL ground, from the raycast scan.
+
+    Until 6 Aug 2026 this was site z minus the env origin's z - identical on a
+    flat floor, and wrong by the full height of the hill on anything else. The
+    walk scene now carries a foot_height_scan (one ray ring under each foot
+    site), so the number is right on the slope batches too. The env-origin
+    subtraction stays as the fallback for an env built without the sensor.
+    """
+    try:
+        return env.scene["foot_height_scan"].data.heights
+    except KeyError:
+        asset = env.scene[asset_cfg.name]
+        return (asset.data.site_pos_w[:, asset_cfg.site_ids, 2]
+                - env.scene.env_origins[:, 2].unsqueeze(1))
+
+
+def _trunk_height(env, asset_cfg: SceneEntityCfg = ROBOT) -> torch.Tensor:
+    """The trunk's height above the LOCAL ground - same story as _foot_height."""
+    try:
+        return env.scene["trunk_height_scan"].data.heights[:, 0]
+    except KeyError:
+        asset = env.scene[asset_cfg.name]
+        return asset.data.root_link_pos_w[:, 2] - env.scene.env_origins[:, 2]
+
+
+def trunk_below_minimum(env, minimum_height: float) -> torch.Tensor:
+    """`collapsed`, measured above the local ground rather than the env origin.
+
+    On the slope batches the origin sits at the spawn platform's top, so the
+    stock root_height_below_minimum would fire on any robot that walked a
+    metre DOWNHILL - reading an obedient walk as a collapse. Height above the
+    ground under the trunk is what "collapsed" always meant.
+    """
+    return _trunk_height(env) < minimum_height
 
 
 def foot_clearance(env, target: float, command_name: str = "walk",
@@ -480,8 +531,7 @@ def commanded_height(env, std: float, command_name: str = "posture",
     only change is that the target now comes from the command instead of from
     stance.yaml, which is what makes "crouch" something you can ask for.
     """
-    asset = env.scene[asset_cfg.name]
-    height = asset.data.root_link_pos_w[:, 2] - env.scene.env_origins[:, 2]
+    height = _trunk_height(env, asset_cfg)
     want = env.command_manager.get_command(command_name)[:, 0]
     return torch.exp(-torch.square(height - want) / (std * std))
 
@@ -877,6 +927,39 @@ WIDE_DIALS = {
 }
 
 
+def slope_terrain(deg: float) -> TerrainEntityCfg:
+    """The world for PLAN 1.3.2 batch 3: ground that tilts, at one angle.
+
+    A single pyramid patch, every robot on its own copy. The robot spawns on
+    the flat 1.5 m platform at the top and walks down whichever face its
+    command points it at; commands resample every 5-10 s, so over an episode
+    it works uphill, downhill and across. 16 m of patch against a 7 m maximum
+    walk (0.35 m/s x 20 s) keeps everything on the hill.
+
+    One angle per RUN, not a curriculum - the ladder asks "at what angle does
+    it stop walking", and a mixed-angle world cannot answer that.
+    """
+    grade = math.tan(math.radians(deg))
+    return TerrainEntityCfg(
+        terrain_type="generator",
+        terrain_generator=TerrainGeneratorCfg(
+            # Seeded so every run of the ladder walks the same hill - the
+            # angle is the only thing allowed to differ between rungs.
+            seed=0,
+            size=(16.0, 16.0),
+            num_rows=1,
+            num_cols=1,
+            difficulty_range=(1.0, 1.0),
+            sub_terrains={"slope": HfPyramidSlopedTerrainCfg(
+                slope_range=(grade, grade),
+                platform_width=1.5,
+                horizontal_scale=0.1,
+                vertical_scale=0.005,
+            )},
+        ),
+    )
+
+
 def dive_termination() -> TerminationTermCfg:
     """The nose-dive, made terminal: the trunk touching anything ends the attempt.
 
@@ -911,12 +994,48 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # reads it until --dive-ends installs the termination above. base_link is
     # the trunk's one geom; the hips are their own geoms and stay out of it,
     # so a deep crouch does not read as a crash.
-    cfg.scene.sensors = tuple(cfg.scene.sensors) + (ContactSensorCfg(
-        name="trunk",
-        primary=ContactMatch(mode="geom", pattern=("base_link",),
-                             entity="robot"),
-        fields=("found",),
-    ),)
+    cfg.scene.sensors = tuple(cfg.scene.sensors) + (
+        ContactSensorCfg(
+            name="trunk",
+            primary=ContactMatch(mode="geom", pattern=("base_link",),
+                                 entity="robot"),
+            fields=("found",),
+        ),
+        # Height above the LOCAL ground, by raycast - one ring under each
+        # foot site and one under the trunk. On the flat floor these read
+        # the same numbers the env-origin subtraction always gave, so
+        # nothing trained before 6 Aug 2026 changes meaning; on the slope
+        # batches they are the difference between measuring the gait and
+        # measuring the hill. go1's rough config is the pattern.
+        TerrainHeightSensorCfg(
+            name="foot_height_scan",
+            frame=tuple(ObjRef(type="site", name=s, entity="robot")
+                        for s in ("fr_foot", "fl_foot", "br_foot", "bl_foot")),
+            pattern=RingPatternCfg.single_ring(radius=0.03, num_samples=4),
+            reduction="min",
+        ),
+        TerrainHeightSensorCfg(
+            name="trunk_height_scan",
+            frame=(ObjRef(type="body", name="base_link", entity="robot"),),
+            pattern=RingPatternCfg.single_ring(radius=0.05, num_samples=4),
+            reduction="min",
+        ),
+    )
+
+    # `collapsed` moves onto the trunk scan in the walk task: height above
+    # the ground under the robot, not above the env origin. Identical on the
+    # flat floor; on a slope the stock version reads walking downhill as
+    # collapsing. Same 55% of the ride height it always was.
+    cfg.terminations["collapsed"] = TerminationTermCfg(
+        func=trunk_below_minimum,
+        params={"minimum_height": _stance()[1] * 0.55})
+
+    # The dive ends the attempt - a DEFAULT since 6 Aug 2026, landed by the
+    # gait confirm. The g2 probe trained with it and turned the 29-second
+    # nose-down lock into an 11-step stumble at no cost on any bar; the
+    # confirm held zero dives in the box on three seeds. --dive-ends on
+    # train.py still exists and now re-installs what is already here.
+    cfg.terminations["nose_dived"] = dive_termination()
 
     # PLAN.md 1.3.1 - the five dials, made wider. 5 Aug 2026.
     #
@@ -1053,14 +1172,14 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
             # code and the flag are kept for a future attempt.
             rel_straight_envs=0.5,
             rel_crab_envs=0.15,
-            # The pure-spin share. 0.0 until the g1 probe reads well - an
-            # independent draw makes a pure spin about once in 80, which is
-            # why the turn bar (a spin on the spot at 1.00 rad/s) has never
-            # been passed by a robot that demonstrably turns when driven.
-            # Decided 6 Aug 2026: train the case rather than move the bar.
-            # The probe drives 0.10 through --spin-share; this stays the
-            # written-down default until the confirm runs land it.
-            rel_spin_envs=0.0,
+            # The pure-spin share, 0.10 since 6 Aug 2026 - landed by the gait
+            # confirm. An independent draw makes a pure spin about once in
+            # 80, which is why the turn bar (a spin on the spot at
+            # 1.00 rad/s) had never been practised. The g1 probe cut turn
+            # wander 0.218 -> 0.158 m and forward drift 5.63 -> 4.42 deg at
+            # no cost; the turn RATE stayed at three quarters of command,
+            # which is the open question 1.2.7 still owns.
+            rel_spin_envs=0.10,
             straight_min_speed=0.10,
             ranges=vmdp.UniformVelocityCommandCfg.Ranges(
                 lin_vel_x=WALK_SPEED, lin_vel_y=WALK_SIDE, ang_vel_z=WALK_TURN),

@@ -136,6 +136,7 @@ DEFAULTS: dict[str, Any] = {
     "spin_share": None,       # share of draws that are a PURE turn on the spot
     "dive_ends": False,       # trunk contact ends the attempt (nose_dived)
     "swing_target": None,     # metres a swing is scored against; None keeps 0.035
+    "slope_deg": None,        # tilt of the ground; None/0 is the flat floor
     "narrow_dials": "",       # world dials put back to the Gray-Push range, or "all"
     "push_speed": None,     # [min, max] m/s, or None to leave alone
     "push_spin": None,      # [min, max] rad/s
@@ -491,7 +492,7 @@ def _clean(spec: dict) -> dict:
     if spec.get("stop_at") is not None:
         job["stop_at"] = _as_float(spec["stop_at"], DEFAULTS["stop_at"])
     for key in ("turn_std", "upright_std", "crab_share", "spin_share",
-                "swing_target"):
+                "swing_target", "slope_deg"):
         if spec.get(key) is not None:
             job[key] = _as_float(spec[key], 0.0)
     # NOTE the pair fields are listed here AND in train_argv, and they have to
@@ -796,6 +797,8 @@ def train_argv(job: dict) -> list[str]:
         argv += ["--dive-ends"]
     if job.get("swing_target"):
         argv += ["--swing-target", str(_as_float(job["swing_target"], 0.0))]
+    if job.get("slope_deg"):
+        argv += ["--slope-deg", str(_as_float(job["slope_deg"], 0.0))]
     if job.get("narrow_dials"):
         argv += ["--narrow-dials", str(job["narrow_dials"])]
 
@@ -824,6 +827,7 @@ def train_argv(job: dict) -> list[str]:
                       ("spin_share", "--spin-share"),
                       ("dive_ends", "--dive-ends"),
                       ("swing_target", "--swing-target"),
+                      ("slope_deg", "--slope-deg"),
                       ("narrow_dials", "--narrow-dials"),
                       ("push_speed", "--push-speed"),
                       ("push_spin", "--push-spin")):

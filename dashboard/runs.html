@@ -682,6 +682,8 @@ function scoring(run){
       "how often a command is a pure turn on the spot. 0 before 6 Aug 2026"],
     swing_target_m:     ["swing height target", "m",
       "the height dragging and swing_height score a foot against. 0.035 before 6 Aug 2026"],
+    slope_deg:          ["ground tilt", "deg",
+      "the slope the run trained on. Absent or 0 is the flat floor"],
   };
   const tol = run.tolerances || {};
   const tolRows = Object.keys(TOL).filter(k => tol[k] !== null && tol[k] !== undefined);

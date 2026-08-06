@@ -5897,14 +5897,27 @@
       "verify": true,
       "clamped": "",
       "id": "j0182",
-      "state": "running",
+      "state": "done",
       "created": "2026-08-06T04:42:52",
       "started": "2026-08-06T04:42:55",
-      "finished": null,
+      "finished": "2026-08-06T05:34:20",
       "run_id": "2026-08-06_04-43-00_gc_1301",
-      "exit_code": null,
+      "exit_code": 0,
       "error": "",
-      "steps": [],
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 2950.5,
+          "exit_code": 0,
+          "at": "2026-08-06T05:32:05"
+        },
+        {
+          "name": "verify",
+          "seconds": 96.6,
+          "exit_code": 1,
+          "at": "2026-08-06T05:34:20"
+        }
+      ],
       "owner": "34400@025137",
       "log": "progress/jobs/j0182.log"
     },
@@ -5935,14 +5948,29 @@
       "verify": true,
       "clamped": "",
       "id": "j0183",
-      "state": "queued",
+      "state": "done",
       "created": "2026-08-06T04:42:52",
-      "started": null,
-      "finished": null,
-      "run_id": null,
-      "exit_code": null,
+      "started": "2026-08-06T05:34:20",
+      "finished": "2026-08-06T06:28:27",
+      "run_id": "2026-08-06_05-34-25_gc_4507",
+      "exit_code": 0,
       "error": "",
-      "steps": []
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 3109.0,
+          "exit_code": 0,
+          "at": "2026-08-06T06:26:09"
+        },
+        {
+          "name": "verify",
+          "seconds": 96.6,
+          "exit_code": 1,
+          "at": "2026-08-06T06:28:27"
+        }
+      ],
+      "owner": "34400@025137",
+      "log": "progress/jobs/j0183.log"
     },
     {
       "task": "Gray-Walk",
@@ -5971,14 +5999,29 @@
       "verify": true,
       "clamped": "",
       "id": "j0184",
-      "state": "queued",
+      "state": "done",
       "created": "2026-08-06T04:42:52",
-      "started": null,
-      "finished": null,
-      "run_id": null,
-      "exit_code": null,
+      "started": "2026-08-06T06:28:27",
+      "finished": "2026-08-06T07:21:07",
+      "run_id": "2026-08-06_06-28-32_gc_8821",
+      "exit_code": 0,
       "error": "",
-      "steps": []
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 3041.0,
+          "exit_code": 0,
+          "at": "2026-08-06T07:19:08"
+        },
+        {
+          "name": "verify",
+          "seconds": 90.5,
+          "exit_code": 1,
+          "at": "2026-08-06T07:21:07"
+        }
+      ],
+      "owner": "34400@025137",
+      "log": "progress/jobs/j0184.log"
     }
   ]
 }
