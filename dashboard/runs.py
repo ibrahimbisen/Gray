@@ -89,17 +89,30 @@ def _read_metrics(path: Path) -> tuple[list[str], list[dict]]:
 
 
 def _iterations_done(latest: dict, rows: list) -> int:
-    """How far the run got, from its last metrics row. The row count if it cannot say.
+    """How far the run got, counted from where IT started.
 
     `iteration` comes straight out of metrics.csv, and _read_metrics above turns
     a NaN into None and keeps an unparseable cell as a string. int() raises on
     both. all_summaries() is called by nav_state(), which every endpoint calls,
     so one torn last row in one run's csv answered EVERY request with a 500.
+
+    THE OFFSET IS SUBTRACTED, since 6 Aug 2026. A run started with
+    --init-from continues another run's checkpoint, and rsl_rl carries that
+    run's iteration counter across with it - so a 1500-iteration run
+    continuing a 1500-iteration one counts from 1500 to 3000 and the page
+    read "1742 / 1500, 116%, 0 left" while it was still training. Counting
+    from the run's own first row makes a warm start and a cold start say the
+    same thing about the same amount of work.
     """
     try:
-        return int(float(latest["iteration"]))
+        done = int(float(latest["iteration"]))
     except (KeyError, TypeError, ValueError, OverflowError):
         return len(rows)
+    try:
+        first = int(float(rows[0]["iteration"]))
+    except (IndexError, KeyError, TypeError, ValueError, OverflowError):
+        return done
+    return done - first + 1 if first > 0 else done
 
 
 def _newest_mtime(folder: Path) -> float:

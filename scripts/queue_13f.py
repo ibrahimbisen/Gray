@@ -31,12 +31,21 @@ hill, and whether the hill numbers themselves keep improving with three
 times the training. Three fresh seeds, 1500 iterations, warm-started from
 the flat winner exactly as the ladder was.
 
-FILMS BACK ON. The ladder ran film-free because a heightfield frame costs
-about 1.4 s and it only needed numbers. Three runs is a small enough
-render bill for the thing that closes a step, and nobody should land a
-terrain policy without watching it walk.
+FILMS STAY OFF, and the first attempt at this batch is why. It ran with
+film on, on the argument that three runs is a small render bill for the
+thing that closes a step - and it clocked 30.5 SECONDS an iteration, a
+12 hour run, because a heightfield frame costs about 1.4 s and the
+recorder renders every step. It was stopped at iteration 242.
 
-5000 robots, 1500 iterations, three runs. About 3 hours with film.
+The films still happen; they just do not happen DURING training. Film
+the finished checkpoint instead:
+
+    python run.py scripts/film_checkpoints.py --run <id>
+
+which pays the render cost once, for the frames anybody actually
+watches, rather than 1500 times for frames nobody opens.
+
+5000 robots, 1500 iterations, three runs. About 3.5 hours.
 """
 
 from __future__ import annotations
@@ -62,8 +71,9 @@ WHY = (f"PLAN 1.3.2 batch 4, the slope confirm at {SLOPE_DEG:g} deg - the "
        f"cleared 95%). Warm-started from the flat winner {INIT_FROM}, like "
        f"every rung. Read the eleven criteria on the FLAT, where the bar "
        f"lives, and the hill numbers with verify --gait-diag --slope-deg "
-       f"{SLOPE_DEG:g}. Films on: three runs is a small render bill for the "
-       f"thing that closes a step.")
+       f"{SLOPE_DEG:g}. Films OFF during training - on a heightfield the "
+       f"recorder costs 30.5 s an iteration, a 12 hour run - and taken "
+       f"from the finished checkpoint afterwards instead.")
 
 BATCH = [
     {"name": f"sc_{seed}", "slope_deg": SLOPE_DEG, "init_from": INIT_FROM,
@@ -83,7 +93,7 @@ def main() -> None:
           f"{', '.join(str(s) for s in SEEDS)}.\n")
 
     for job in BATCH:
-        spec = {"task": "Gray-Walk", "film": True, "verify": True,
+        spec = {"task": "Gray-Walk", "film": False, "verify": True,
                 "num_envs": ROBOTS, "iterations": ITERATIONS,
                 "seed": int(job["name"].split("_")[1]), **job}
         cleaned = queue._clean(dict(queue.DEFAULTS, **spec))

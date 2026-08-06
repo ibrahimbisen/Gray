@@ -85,3 +85,7 @@ operable program or batch file.
 [13:37:55] j0200  verify exited 1 - training kept, the bar was not met or could not be read
 [13:37:55] j0200  done
 [13:37:55] idle - 0 queued
+[13:49:49] j0201  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name sc_1301 --seed 1301 --stop-at 0.965 --slope-deg 10.0 --init-from 2026-08-06_04-43-00_gc_1301
+[13:49:54] j0201  -> progress/runs/2026-08-06_13-49-54_sc_1301
+[15:48:53] j0201  cancelled
+[15:48:53] paused - not taking new jobs

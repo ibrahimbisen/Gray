@@ -1,7 +1,9 @@
 """Drive a trained policy yourself, live, with the keyboard.
 
-    Playground\\pilot.bat                 the newest walk run
-    Playground\\pilot.bat --run 25        a run by number, name, or folder
+    Playground\\pilot.bat                    the newest walk run, flat floor
+    Playground\\pilot.bat --run 25           a run by number, name, or folder
+    Playground\\pilot.bat --playground       hills, a bowl, rough ground, waves
+    Playground\\pilot.bat --slope-deg 10     one uniform hill
 
 verify.py scores a policy against a bar. film_checkpoints.py films it. drive.py
 pins one command and writes an mp4. None of them let you STEER it, and steering
@@ -47,6 +49,18 @@ def main() -> None:
                     help="ignore the gamepad and drive from the numpad")
     ap.add_argument("--no-panel", action="store_true",
                     help="do not open the settings window beside the simulator")
+    # The ground. Added 6 Aug 2026, the day the slope work landed - the owner
+    # asked for somewhere to DRIVE it on hills, which no script offered.
+    ap.add_argument("--playground", action="store_true",
+                    help="drive on the mixed terrain field instead of a flat "
+                         "floor: flat, gentle and steep hills, a bowl, rough "
+                         "ground and waves, side by side, each in two "
+                         "difficulties. You spawn on the flat and find the "
+                         "rest by walking.")
+    ap.add_argument("--slope-deg", type=float, default=0.0, metavar="DEG",
+                    help="drive on one uniform slope of this angle instead - "
+                         "the same world the slope batches train on. Ignored "
+                         "when --playground is given.")
     args = ap.parse_args()
 
     log_dir = resolve_run(args.run)
@@ -76,6 +90,23 @@ def main() -> None:
 
     env_cfg = load_env_cfg(args.task, play=True)
     env_cfg.scene.num_envs = 1
+
+    ground = "the flat floor"
+    if args.playground or args.slope_deg:
+        from gray.tasks.walk_env_cfg import (  # noqa: PLC0415
+            apply_slope, playground_terrain)
+
+        if args.playground:
+            env_cfg.scene.terrain = playground_terrain()
+            ground = ("the terrain field - flat, two hills, a bowl, rough "
+                      "ground and waves")
+        else:
+            apply_slope(env_cfg, args.slope_deg)
+            # A driven robot is not being scored, and a truncation mid-drive
+            # looks like the robot vanishing. Walking off the hill onto the
+            # apron is allowed here; the terminations that catch a FALL stay.
+            env_cfg.terminations.pop("out_of_bounds", None)
+            ground = f"a {args.slope_deg:g} deg slope"
     # An hour. Long enough that the episode never quietly ends mid-drive; short
     # enough to stay a sane integer number of steps. Falling still resets, which
     # is wanted - it puts the robot back on its feet without touching anything.
@@ -133,6 +164,7 @@ def main() -> None:
 
     print(f"run         {log_dir.name}")
     print(f"checkpoint  {ckpt.name}")
+    print(f"ground      {ground}")
     print(f"driving     {found or 'no gamepad found - using the numpad'}")
     print(f"trained on  {trained['fwd'][0]:g} to {trained['fwd'][1]:g} m/s forward, "
           f"{trained['side'][0]:+g} to {trained['side'][1]:+g} sideways, "

@@ -66,7 +66,10 @@ from mjlab.managers import (
 from mjlab.sensor import ContactSensorCfg
 from mjlab.sensor.contact_sensor import ContactMatch
 from mjlab.terrains import (
+    BoxFlatTerrainCfg,
     HfPyramidSlopedTerrainCfg,
+    HfRandomUniformTerrainCfg,
+    HfWaveTerrainCfg,
     TerrainEntityCfg,
     TerrainGeneratorCfg,
 )
@@ -392,18 +395,15 @@ def ground_height_under(env, xy: torch.Tensor) -> torch.Tensor:
     719 launch failures at 5000 - s1_4deg_s2207 is the run it killed. A
     static world's height does not need rays.
     """
-    cache = getattr(env, "_gray_ground", None)
-    if cache is None:
+    patches = getattr(env, "_gray_ground", None)
+    if patches is None:
         import mujoco  # noqa: PLC0415
         import numpy as np  # noqa: PLC0415
 
         m = env.sim.mj_model
-        hf_geoms = np.flatnonzero(m.geom_type == mujoco.mjtGeom.mjGEOM_HFIELD)
-        if len(hf_geoms) == 0:
-            cache = None
-            env._gray_ground = (None,)
-        else:
-            gid = int(hf_geoms[0])
+        patches = []
+        for gid in np.flatnonzero(m.geom_type == mujoco.mjtGeom.mjGEOM_HFIELD):
+            gid = int(gid)
             hid = int(m.geom_dataid[gid])
             nrow = int(m.hfield_nrow[hid])
             ncol = int(m.hfield_ncol[hid])
@@ -413,28 +413,37 @@ def ground_height_under(env, xy: torch.Tensor) -> torch.Tensor:
                 m.hfield_data[adr:adr + nrow * ncol], device=env.device,
                 dtype=torch.float32).reshape(nrow, ncol) * z_top
             px, py, pz = (float(v) for v in m.geom_pos[gid])
-            cache = (grid, px - rx, py - ry, 2 * rx, 2 * ry, pz, nrow, ncol)
-            env._gray_ground = (cache,)
-    else:
-        cache = cache[0]
+            patches.append((grid, px - rx, py - ry, 2 * rx, 2 * ry, pz,
+                            nrow, ncol))
+        env._gray_ground = patches
 
-    if cache is None:
-        return torch.zeros(xy.shape[:-1], device=xy.device, dtype=xy.dtype)
-
-    grid, x0, y0, sx, sy, pz, nrow, ncol = cache
-    # MuJoCo heightfields: data is [nrow, ncol], rows along y, columns
-    # along x, spanning the size rectangle centred on the geom.
-    u = ((xy[..., 0] - x0) / sx * (ncol - 1)).clamp(0, ncol - 1)
-    v = ((xy[..., 1] - y0) / sy * (nrow - 1)).clamp(0, nrow - 1)
-    u0 = u.floor().long()
-    v0 = v.floor().long()
-    u1 = (u0 + 1).clamp(max=ncol - 1)
-    v1 = (v0 + 1).clamp(max=nrow - 1)
-    fu = (u - u0.float()).to(xy.dtype)
-    fv = (v - v0.float()).to(xy.dtype)
-    top = grid[v0, u0] * (1 - fu) + grid[v0, u1] * fu
-    bot = grid[v1, u0] * (1 - fu) + grid[v1, u1] * fu
-    return pz + top * (1 - fv) + bot * fv
+    # Flat everywhere the patches do not cover: the plane, and the flat apron
+    # the terrain border lays around the grid, are both at zero.
+    out = torch.zeros(xy.shape[:-1], device=xy.device, dtype=xy.dtype)
+    for grid, x0, y0, sx, sy, pz, nrow, ncol in patches:
+        # MuJoCo heightfields: data is [nrow, ncol], rows along y, columns
+        # along x, spanning the size rectangle centred on the geom.
+        fx = (xy[..., 0] - x0) / sx
+        fy = (xy[..., 1] - y0) / sy
+        # ONE PATCH AT A TIME, and only where it actually lies underneath.
+        # The playground world is a dozen patches side by side; reading the
+        # first one everywhere would put the robot's ground on a hill it is
+        # nowhere near, and `collapsed` would fire on a robot standing still.
+        inside = (fx >= 0) & (fx <= 1) & (fy >= 0) & (fy <= 1)
+        if not bool(inside.any()):
+            continue
+        u = (fx * (ncol - 1)).clamp(0, ncol - 1)
+        v = (fy * (nrow - 1)).clamp(0, nrow - 1)
+        u0 = u.floor().long()
+        v0 = v.floor().long()
+        u1 = (u0 + 1).clamp(max=ncol - 1)
+        v1 = (v0 + 1).clamp(max=nrow - 1)
+        fu = (u - u0.float()).to(xy.dtype)
+        fv = (v - v0.float()).to(xy.dtype)
+        top = grid[v0, u0] * (1 - fu) + grid[v0, u1] * fu
+        bot = grid[v1, u0] * (1 - fu) + grid[v1, u1] * fu
+        out = torch.where(inside, pz + top * (1 - fv) + bot * fv, out)
+    return out
 
 
 def _foot_height(env, asset_cfg) -> torch.Tensor:
@@ -1008,6 +1017,55 @@ def slope_terrain(deg: float) -> TerrainEntityCfg:
                 horizontal_scale=0.25,
                 vertical_scale=0.005,
             )},
+        ),
+    )
+
+
+def playground_terrain() -> TerrainEntityCfg:
+    """Every kind of ground at once, side by side, to be DRIVEN on.
+
+    Not for training - training asks one question per run, and a world that
+    mixes six grounds answers none of them. This is for the owner and a
+    gamepad: twelve patches, one type per column and two difficulties per
+    row, laid out as a field you can walk across. Flat has the largest
+    share, so a single robot spawns there and finds the rest by walking.
+
+    The patches meet at zero height (a pyramid's rim, a bowl's rim, the
+    apron the border lays around the grid), so crossing between them is a
+    step onto new ground rather than off a cliff.
+    """
+    return TerrainEntityCfg(
+        terrain_type="generator",
+        terrain_generator=TerrainGeneratorCfg(
+            seed=0,
+            size=(7.0, 7.0),
+            # One column per type, difficulty rising along the rows.
+            curriculum=True,
+            num_rows=2,
+            difficulty_range=(0.4, 1.0),
+            # A flat apron all the way round, at ground level - drive off
+            # the edge and you are on flat ground, not falling.
+            border_width=3.0,
+            sub_terrains={
+                # Highest share, so one robot spawns here.
+                "flat": BoxFlatTerrainCfg(proportion=4.0),
+                "gentle_slope": HfPyramidSlopedTerrainCfg(
+                    proportion=1.0, slope_range=(0.07, 0.12),
+                    platform_width=1.5, horizontal_scale=0.25),
+                "steep_slope": HfPyramidSlopedTerrainCfg(
+                    proportion=1.0, slope_range=(0.18, 0.25),
+                    platform_width=1.5, horizontal_scale=0.25),
+                "bowl": HfPyramidSlopedTerrainCfg(
+                    proportion=1.0, slope_range=(0.10, 0.18),
+                    platform_width=1.5, horizontal_scale=0.25, inverted=True),
+                "rough": HfRandomUniformTerrainCfg(
+                    proportion=1.0, noise_range=(0.0, 0.035),
+                    noise_step=0.005, downsampled_scale=0.4,
+                    horizontal_scale=0.1, scale_with_difficulty=True),
+                "waves": HfWaveTerrainCfg(
+                    proportion=1.0, amplitude_range=(0.02, 0.06),
+                    num_waves=2, horizontal_scale=0.1),
+            },
         ),
     )
 
