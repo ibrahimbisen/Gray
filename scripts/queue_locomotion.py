@@ -106,8 +106,11 @@ def main() -> None:
         # DURING training, and on a heightfield a frame costs about 1.4 s
         # against the flat floor's microseconds. Both off here. The films get
         # taken from the finished policy, where the render is paid once.
+        # film_after 20 = a clip every 500 iterations, taken from the
+        # checkpoints once the run is FINISHED and the card is free. The next
+        # job in the queue waits the few minutes it takes.
         spec = {"task": "Gray-Walk", "film": False, "no_video": True,
-                "verify": True,
+                "film_after": 20, "verify": True,
                 "num_envs": ROBOTS, "iterations": ITERATIONS,
                 "mixed_ground": True, "payload_kg": 1.0, **job}
         cleaned = queue._clean(dict(queue.DEFAULTS, **spec))

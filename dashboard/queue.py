@@ -136,6 +136,7 @@ DEFAULTS: dict[str, Any] = {
     "dive_ends": False,       # trunk contact ends the attempt (nose_dived)
     "swing_target": None,     # metres a swing is scored against; None keeps 0.035
     "slope_deg": None,        # tilt of the ground; None/0 is the flat floor
+    "film_after": 0,          # film 1 in N checkpoints AFTER training; 25 iters each
     "mixed_ground": False,    # every ground at once - flat, hills, rough, waves
     "payload_kg": None,       # extra load drawn on the trunk, 0 to this
     "init_from": "",          # run to continue from; "" starts from scratch
@@ -488,7 +489,9 @@ def _clean(spec: dict) -> dict:
                 "dive_ends", "mixed_ground"):
         if spec.get(key) is not None:
             job[key] = _as_bool(spec[key])
-    for key in ("num_envs", "iterations", "seed"):
+    # film_after is read by the RUNNER, not by train.py, so it is deliberately
+    # absent from train_argv and from the flag audit below it.
+    for key in ("num_envs", "iterations", "seed", "film_after"):
         if spec.get(key) is not None:
             job[key] = _as_int(spec[key], DEFAULTS[key])
     for key in ("turn_std", "upright_std", "crab_share", "spin_share",

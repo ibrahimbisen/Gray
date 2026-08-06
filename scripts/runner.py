@@ -364,6 +364,33 @@ def run_job(job: dict) -> None:
             _say(f"{job_id}  cancelled during verify")
             return
 
+        # FILMS AFTER TRAINING, not alongside it. `film` above starts the
+        # watcher while training runs, which was free on a flat floor and is
+        # not on terrain: a rendered frame costs about 1.4 s against a
+        # heightfield, and the first attempt at the locomotion batch ran at
+        # 30 s an iteration - a 46 hour run - before the recorder was found.
+        #
+        # This films the finished run instead, from its own checkpoints, on a
+        # card nothing else is using, and the NEXT job waits the few minutes
+        # it takes. Owner's call, 6 Aug 2026: record, then start the next.
+        #
+        # `film_after` is 1-in-N checkpoints. Training writes one every 25
+        # iterations, so 20 is a clip every 500.
+        every = int(job.get("film_after") or 0)
+        if every > 0:
+            at = time.time()
+            argv = ["scripts/film_checkpoints.py", "--every", str(every)]
+            if job.get("task"):
+                argv += ["--task", job["task"]]
+            fcode = _wait(_popen(argv, LOGS / f"{job_id}.film.log"),
+                          job_id, "film")
+            _step(job_id, "film", at, fcode)
+            if fcode != 0:
+                # The films are a nicety and the run is not. A broken renderer
+                # costs the clips, never the training or the verdict.
+                _say(f"{job_id}  filming exited {fcode} - "
+                     f"training and verdict kept")
+
         queue.update(job_id, state="done", finished=_now(), exit_code=0)
         _say(f"{job_id}  done")
     finally:
