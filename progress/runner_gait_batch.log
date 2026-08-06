@@ -89,3 +89,4 @@ operable program or batch file.
 [13:49:54] j0201  -> progress/runs/2026-08-06_13-49-54_sc_1301
 [15:48:53] j0201  cancelled
 [15:48:53] paused - not taking new jobs
+[17:33:55] j0207  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 5500 --name L1_1301 --seed 1301 --stop-at 0.965 --init-from 2026-08-06_04-43-00_gc_1301

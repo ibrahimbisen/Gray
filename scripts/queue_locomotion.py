@@ -99,7 +99,15 @@ def main() -> None:
     for n, job in enumerate(BATCH):
         job = dict(job)
         job["name"] = f"L{n + 1}_{job['seed']}"
-        spec = {"task": "Gray-Walk", "film": False, "verify": True,
+        # `no_video` AND `film` are two different switches, and only turning
+        # off the second one is what made the first attempt at this batch run
+        # at 30 s an iteration instead of 7.3. `film` stops the runner filming
+        # CHECKPOINTS afterwards; `no_video` stops the trainer rendering video
+        # DURING training, and on a heightfield a frame costs about 1.4 s
+        # against the flat floor's microseconds. Both off here. The films get
+        # taken from the finished policy, where the render is paid once.
+        spec = {"task": "Gray-Walk", "film": False, "no_video": True,
+                "verify": True,
                 "num_envs": ROBOTS, "iterations": ITERATIONS,
                 "mixed_ground": True, "payload_kg": 1.0, **job}
         cleaned = queue._clean(dict(queue.DEFAULTS, **spec))
