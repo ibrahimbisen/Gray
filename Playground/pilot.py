@@ -134,6 +134,26 @@ def main() -> None:
     cmd.rel_standing_envs = 0.0
     cmd.rel_world_envs = 0.0
 
+    # THE POSTURE COMMAND HAS TO BE PINNED TOO, and it was not until 6 Aug
+    # 2026. It is a second command stream - ride height, pitch, roll - drawn
+    # at random every 5 to 10 seconds, and the sticks do not write to it. So
+    # a driven robot was being ordered to crouch to 150 mm, lean 15 deg
+    # nose-up, then 8 deg nose-down, then roll 20 deg, on its own schedule,
+    # while the owner steered. It obeyed. From the outside that reads as a
+    # robot that cannot hold its body level - the owner reported exactly
+    # that, nose way up walking forward and way down walking backward.
+    #
+    # verify.py has pinned this since it was written, which is why the
+    # numbers never showed what the driving showed.
+    posture = env_cfg.commands.get("posture")
+    if posture is not None:
+        h = posture.nominal_height
+        posture.ranges.height = (h, h)
+        posture.ranges.pitch = (0.0, 0.0)
+        posture.ranges.roll = (0.0, 0.0)
+        posture.rel_nominal_envs = 1.0
+        posture.resampling_time_range = (1e6, 1e6)
+
     agent_cfg = load_rl_cfg(args.task)
     env = RslRlVecEnvWrapper(ManagerBasedRlEnv(env_cfg, device=device),
                              clip_actions=agent_cfg.clip_actions)
