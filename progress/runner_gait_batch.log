@@ -1,0 +1,27 @@
+'run.bat' is not recognized as an internal or external command,
+operable program or batch file.
+[02:51:37] runner 34400@025137 up. interpreter: C:\Users\Bisen\Desktop\Gray\.venv\Scripts\python.exe
+[02:51:37] queue: progress\queue.json
+[02:51:37] j0177  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g0_control_s2207 --seed 2207 --stop-at 0.0
+[02:51:43] j0177  -> progress/runs/2026-08-06_02-51-42_g0_control_s2207
+[03:11:16] j0177  verify exited 1 - training kept, the bar was not met or could not be read
+[03:11:16] j0177  done
+[03:11:16] j0178  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g1_spin_s2207 --seed 2207 --stop-at 0.0 --spin-share 0.1
+[03:11:22] j0178  -> progress/runs/2026-08-06_03-11-21_g1_spin_s2207
+[03:31:14] j0178  verify exited 1 - training kept, the bar was not met or could not be read
+[03:31:14] j0178  done
+[03:31:15] j0179  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g2_dive_s2207 --seed 2207 --stop-at 0.0 --dive-ends
+[03:31:21] j0179  -> progress/runs/2026-08-06_03-31-20_g2_dive_s2207
+[03:50:54] j0179  verify exited 1 - training kept, the bar was not met or could not be read
+[03:50:54] j0179  done
+[03:50:54] j0180  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g3_swing50_s2207 --seed 2207 --stop-at 0.0 --swing-target 0.05
+[03:51:00] j0180  -> progress/runs/2026-08-06_03-50-59_g3_swing50_s2207
+[04:10:33] j0180  verify exited 1 - training kept, the bar was not met or could not be read
+[04:10:34] j0180  done
+[04:10:34] j0181  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g4_swingw_s2207 --seed 2207 --stop-at 0.0 --reward swing_height=-1.0
+[04:10:40] j0181  -> progress/runs/2026-08-06_04-10-39_g4_swingw_s2207
+[04:30:10] j0181  verify exited 1 - training kept, the bar was not met or could not be read
+[04:30:10] j0181  done
+[04:30:10] idle - 0 queued
+[04:42:55] j0182  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name gc_1301 --seed 1301 --stop-at 0.965 --spin-share 0.1 --dive-ends --swing-target 0.05
+[04:43:01] j0182  -> progress/runs/2026-08-06_04-43-00_gc_1301

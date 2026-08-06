@@ -1557,9 +1557,19 @@ FORWARD = {
                            "touching ground ends the attempt, g3 swing "
                            "target 35 to 50 mm, g4 swing_height weight "
                            "-0.25 to -1.0, plus an all-default control at "
-                           "the same length"},
+                           "the same length",
+                   "done": "g3 is the lever that matters: swing peaks 26 -> "
+                           "38 mm and every dive gone, at every speed. g2 "
+                           "turned the 29-second dive-lock into an 11-step "
+                           "stumble at no cost anywhere. g1 cut turn wander "
+                           "0.218 -> 0.158 m and drift 5.63 -> 4.42 deg; "
+                           "the turn RATE did not move at 550. g4 lifted "
+                           "nothing and produced the only in-box fall of "
+                           "the batch."},
                   {"stop": "pick the winning combination, read with verify "
-                           "--gait-diag against g0_control"},
+                           "--gait-diag against g0_control. PICKED 6 Aug, "
+                           "over the owner's night shift: g1 + g2 + g3 in, "
+                           "g4 out - queue_13d.py carries the reads."},
                   {"n": "2c", "stage": "gait", "runs": "3 x 1500",
                    "code": "the winning levers together",
                    "asks": "all eleven criteria plus the gait numbers, on "

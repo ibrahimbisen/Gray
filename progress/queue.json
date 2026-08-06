@@ -1,6 +1,6 @@
 {
   "paused": false,
-  "next_id": 182,
+  "next_id": 185,
   "jobs": [
     {
       "task": "Gray-Push",
@@ -5640,14 +5640,29 @@
       "verify": true,
       "clamped": "",
       "id": "j0177",
-      "state": "queued",
+      "state": "done",
       "created": "2026-08-06T02:37:42",
-      "started": null,
-      "finished": null,
-      "run_id": null,
-      "exit_code": null,
+      "started": "2026-08-06T02:51:37",
+      "finished": "2026-08-06T03:11:16",
+      "run_id": "2026-08-06_02-51-42_g0_control_s2207",
+      "exit_code": 0,
       "error": "",
-      "steps": []
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 1049.8,
+          "exit_code": 0,
+          "at": "2026-08-06T03:09:06"
+        },
+        {
+          "name": "verify",
+          "seconds": 96.6,
+          "exit_code": 1,
+          "at": "2026-08-06T03:11:16"
+        }
+      ],
+      "owner": "34400@025137",
+      "log": "progress/jobs/j0177.log"
     },
     {
       "task": "Gray-Walk",
@@ -5676,14 +5691,29 @@
       "verify": true,
       "clamped": "",
       "id": "j0178",
-      "state": "queued",
+      "state": "done",
       "created": "2026-08-06T02:37:42",
-      "started": null,
-      "finished": null,
-      "run_id": null,
-      "exit_code": null,
+      "started": "2026-08-06T03:11:16",
+      "finished": "2026-08-06T03:31:14",
+      "run_id": "2026-08-06_03-11-21_g1_spin_s2207",
+      "exit_code": 0,
       "error": "",
-      "steps": []
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 1065.8,
+          "exit_code": 0,
+          "at": "2026-08-06T03:29:02"
+        },
+        {
+          "name": "verify",
+          "seconds": 96.5,
+          "exit_code": 1,
+          "at": "2026-08-06T03:31:14"
+        }
+      ],
+      "owner": "34400@025137",
+      "log": "progress/jobs/j0178.log"
     },
     {
       "task": "Gray-Walk",
@@ -5712,14 +5742,29 @@
       "verify": true,
       "clamped": "",
       "id": "j0179",
-      "state": "queued",
+      "state": "done",
       "created": "2026-08-06T02:37:42",
-      "started": null,
-      "finished": null,
-      "run_id": null,
-      "exit_code": null,
+      "started": "2026-08-06T03:31:15",
+      "finished": "2026-08-06T03:50:54",
+      "run_id": "2026-08-06_03-31-20_g2_dive_s2207",
+      "exit_code": 0,
       "error": "",
-      "steps": []
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 1059.8,
+          "exit_code": 0,
+          "at": "2026-08-06T03:48:54"
+        },
+        {
+          "name": "verify",
+          "seconds": 96.6,
+          "exit_code": 1,
+          "at": "2026-08-06T03:50:54"
+        }
+      ],
+      "owner": "34400@025137",
+      "log": "progress/jobs/j0179.log"
     },
     {
       "task": "Gray-Walk",
@@ -5748,14 +5793,29 @@
       "verify": true,
       "clamped": "",
       "id": "j0180",
-      "state": "queued",
+      "state": "done",
       "created": "2026-08-06T02:37:42",
-      "started": null,
-      "finished": null,
-      "run_id": null,
-      "exit_code": null,
+      "started": "2026-08-06T03:50:54",
+      "finished": "2026-08-06T04:10:34",
+      "run_id": "2026-08-06_03-50-59_g3_swing50_s2207",
+      "exit_code": 0,
       "error": "",
-      "steps": []
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 1049.9,
+          "exit_code": 0,
+          "at": "2026-08-06T04:08:24"
+        },
+        {
+          "name": "verify",
+          "seconds": 96.5,
+          "exit_code": 1,
+          "at": "2026-08-06T04:10:33"
+        }
+      ],
+      "owner": "34400@025137",
+      "log": "progress/jobs/j0180.log"
     },
     {
       "task": "Gray-Walk",
@@ -5786,8 +5846,133 @@
       "verify": true,
       "clamped": "",
       "id": "j0181",
-      "state": "queued",
+      "state": "done",
       "created": "2026-08-06T02:37:42",
+      "started": "2026-08-06T04:10:34",
+      "finished": "2026-08-06T04:30:10",
+      "run_id": "2026-08-06_04-10-39_g4_swingw_s2207",
+      "exit_code": 0,
+      "error": "",
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 1045.7,
+          "exit_code": 0,
+          "at": "2026-08-06T04:27:59"
+        },
+        {
+          "name": "verify",
+          "seconds": 94.6,
+          "exit_code": 1,
+          "at": "2026-08-06T04:30:10"
+        }
+      ],
+      "owner": "34400@025137",
+      "log": "progress/jobs/j0181.log"
+    },
+    {
+      "task": "Gray-Walk",
+      "name": "gc_1301",
+      "note": "Seed 1301. The gait confirm, 6 Aug 2026: spin_share 0.10 + dive_ends + swing_target 0.05 together, picked from the 2b probes. g3 lifted the feet 11 mm and removed every dive; g2 turned the 29-second dive-lock into an 11-step stumble; g1 cut turn wander 28% for free. Read all eleven criteria plus verify --gait-diag. Fresh seeds, full length, because that is what a confirm is.",
+      "num_envs": 5000,
+      "seed": 1301,
+      "iterations": 1500,
+      "stop_at": 0.965,
+      "no_video": false,
+      "rewards": {},
+      "ramps": {},
+      "turn_std": null,
+      "upright_std": null,
+      "gyro_noise": null,
+      "no_heading_obs": false,
+      "with_off_track": false,
+      "crab_share": null,
+      "spin_share": 0.1,
+      "dive_ends": true,
+      "swing_target": 0.05,
+      "narrow_dials": "",
+      "push_speed": null,
+      "push_spin": null,
+      "film": true,
+      "verify": true,
+      "clamped": "",
+      "id": "j0182",
+      "state": "running",
+      "created": "2026-08-06T04:42:52",
+      "started": "2026-08-06T04:42:55",
+      "finished": null,
+      "run_id": "2026-08-06_04-43-00_gc_1301",
+      "exit_code": null,
+      "error": "",
+      "steps": [],
+      "owner": "34400@025137",
+      "log": "progress/jobs/j0182.log"
+    },
+    {
+      "task": "Gray-Walk",
+      "name": "gc_4507",
+      "note": "Seed 4507. The gait confirm, 6 Aug 2026: spin_share 0.10 + dive_ends + swing_target 0.05 together, picked from the 2b probes. g3 lifted the feet 11 mm and removed every dive; g2 turned the 29-second dive-lock into an 11-step stumble; g1 cut turn wander 28% for free. Read all eleven criteria plus verify --gait-diag. Fresh seeds, full length, because that is what a confirm is.",
+      "num_envs": 5000,
+      "seed": 4507,
+      "iterations": 1500,
+      "stop_at": 0.965,
+      "no_video": false,
+      "rewards": {},
+      "ramps": {},
+      "turn_std": null,
+      "upright_std": null,
+      "gyro_noise": null,
+      "no_heading_obs": false,
+      "with_off_track": false,
+      "crab_share": null,
+      "spin_share": 0.1,
+      "dive_ends": true,
+      "swing_target": 0.05,
+      "narrow_dials": "",
+      "push_speed": null,
+      "push_spin": null,
+      "film": true,
+      "verify": true,
+      "clamped": "",
+      "id": "j0183",
+      "state": "queued",
+      "created": "2026-08-06T04:42:52",
+      "started": null,
+      "finished": null,
+      "run_id": null,
+      "exit_code": null,
+      "error": "",
+      "steps": []
+    },
+    {
+      "task": "Gray-Walk",
+      "name": "gc_8821",
+      "note": "Seed 8821. The gait confirm, 6 Aug 2026: spin_share 0.10 + dive_ends + swing_target 0.05 together, picked from the 2b probes. g3 lifted the feet 11 mm and removed every dive; g2 turned the 29-second dive-lock into an 11-step stumble; g1 cut turn wander 28% for free. Read all eleven criteria plus verify --gait-diag. Fresh seeds, full length, because that is what a confirm is.",
+      "num_envs": 5000,
+      "seed": 8821,
+      "iterations": 1500,
+      "stop_at": 0.965,
+      "no_video": false,
+      "rewards": {},
+      "ramps": {},
+      "turn_std": null,
+      "upright_std": null,
+      "gyro_noise": null,
+      "no_heading_obs": false,
+      "with_off_track": false,
+      "crab_share": null,
+      "spin_share": 0.1,
+      "dive_ends": true,
+      "swing_target": 0.05,
+      "narrow_dials": "",
+      "push_speed": null,
+      "push_spin": null,
+      "film": true,
+      "verify": true,
+      "clamped": "",
+      "id": "j0184",
+      "state": "queued",
+      "created": "2026-08-06T04:42:52",
       "started": null,
       "finished": null,
       "run_id": null,
