@@ -678,6 +678,30 @@ function scoring(run){
   const tolRows = Object.keys(TOL).filter(k => tol[k] !== null && tol[k] !== undefined);
   const obs = run.observes || [];
 
+  /* The five world dials, as this run drew them. The /dials page reads the
+     SOURCE file, so it shows the task default and every run looks alike -
+     which is no use at all in batch 2 of 1.3.1, where five runs differ in
+     nothing but these ranges. `wide` is recorded per run, not worked out
+     here, so this table cannot disagree with what trained. */
+  const DIAL = {
+    ground_grip:         ["foot grip", "how well a foot holds the floor"],
+    how_heavy:           ["how heavy", "mass and inertia together, scaled"],
+    where_the_weight_is: ["where the weight is", "the trunk centre of mass, in metres"],
+    servo_strength:      ["servo strength", "the P and D gains, scaled"],
+    gearbox_drag:        ["gearbox drag", "friction inside every joint"],
+  };
+  const dials = run.world_dials || [];
+  const dialRow = d => {
+    const parts = Object.entries(d.ranges).map(([k, v]) =>
+      `${k.replace(/_range$/, "").replace(/^ranges$/, "")} ${v[0]} to ${v[1]}`.trim());
+    const meta = DIAL[d.name] || [d.name.replace(/_/g, " "), ""];
+    return `<tr>
+      <td class="k">${esc(meta[0])}</td>
+      <td class="n">${esc(parts.join(", "))}</td>
+      <td>${d.wide ? "wide" : `<b>narrow</b>`}</td>
+      <td class="why">${esc(meta[1])}</td></tr>`;
+  };
+
   /* The ceiling sums the weight each term ENDS on, not the one it starts on.
      `reduce` over `t.weight` counted a term that ramps 0 -> 2.0 as nothing, and
      the whole point of the four lines above is that the two are different. The
@@ -705,6 +729,16 @@ function scoring(run){
             <td class="n">${tol[k]} <span class="faint">${esc(TOL[k][1])}</span></td>
             <td class="why">${esc(TOL[k][2])}</td></tr>`).join("")}
         </table>`) : ""}
+      ${dials.length ? blk("The world it trained in",
+        `${dials.filter(d => d.wide).length} of ${dials.length} wide`, `
+        <table class="t">
+          <tr><th>dial</th><th class="n">range</th><th>set to</th><th>what it is</th></tr>
+          ${dials.map(dialRow).join("")}
+        </table>
+        <div class="why" style="margin-top:5px">The policy is never told any of
+        these. It trains across the range so it cannot depend on one value -
+        none of the five has been measured on the real robot, because the robot
+        is not built.</div>`) : ""}
       ${obs.length ? blk("What the policy read", obs.length, `
         <table class="t"><tr><td class="chips">${obs.map(o =>
           `<span>${esc(o.replace(/_/g, " "))}</span>`).join("")}

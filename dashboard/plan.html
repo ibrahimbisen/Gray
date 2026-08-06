@@ -124,7 +124,14 @@ const batchTable = (sub) => {
         : `<tr><td class="k">${esc(r.n || "")}</td><td class="k">${esc(r.stage || "")}</td>
              <td class="why">${esc(r.code || "")}</td>
              <td class="n">${esc(r.runs || "")}</td>
-             <td class="why">${esc(r.asks || "")}</td></tr>`).join("")}
+             <td class="why">${esc(r.asks || "")}</td></tr>${
+           /* A batch that has run carries its ANSWER on the row below it. The
+              table asked eleven questions and showed no answers, so a batch
+              that had already been decided read exactly like one that had not
+              started - and the whole point of the stop rows is to say which
+              decisions are still open. */
+           r.done ? `<tr><td></td><td colspan="4" class="why">
+             <b style="color:var(--s1)">answered</b> &nbsp;${esc(r.done)}</td></tr>` : ""}`).join("")}
     </table></div>
     ${sub.batches_note ? `<p class="why small" style="margin:8px 0 0;max-width:78ch">${
       esc(sub.batches_note)}</p>` : ""}

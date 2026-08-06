@@ -245,6 +245,12 @@ def read_run(folder: Path) -> dict:
         #               two days.
         "ramps": meta.get("ramps", []),
         "tolerances": meta.get("tolerances", {}),
+        #   world_dials the five ranges the run drew its world from. /dials
+        #               reads the source file and so shows the task default;
+        #               this is what THIS run actually trained in. Absent
+        #               before 5 Aug 2026, so the block does not draw on
+        #               older runs rather than claiming a default for them.
+        "world_dials": meta.get("world_dials", []),
         "observes": meta.get("observes", []),
     }
 

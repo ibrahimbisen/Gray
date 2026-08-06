@@ -475,12 +475,19 @@ def score_pass(raw, spec, torch, *, seconds, robots, target, label=""):
              float(turn_err.mean()), spec["bar_turn_err"], "le",
              float(turn_err.max()), "{:.3f} rad/s", "rad/s",
              f"worst {float(turn_err.max()):.3f} rad/s{tag}"),
-            ("turn_wander",
-             f"stayed within {spec['bar_turn_wander_m']:.2f} m of the spot",
-             float(wander.mean()), spec["bar_turn_wander_m"], "le",
-             float(wander.max()), "{:.2f} m", "m",
-             f"worst {float(wander.max()):.2f} m{tag}"),
         ]
+        # "Stayed on the spot" only means something if the robot was told to stay
+        # on it. With --test-turn-speed the leg is an ARC: the robot is ordered
+        # to travel, so distance from the start is obedience, not error, and the
+        # check is dropped rather than reported as a huge failure. Turn rate is
+        # still measured, and it is the number the arc exists to get.
+        if not leg["vx"] and not leg["vy"]:
+            checks.append(
+                ("turn_wander",
+                 f"stayed within {spec['bar_turn_wander_m']:.2f} m of the spot",
+                 float(wander.mean()), spec["bar_turn_wander_m"], "le",
+                 float(wander.max()), "{:.2f} m", "m",
+                 f"worst {float(wander.max()):.2f} m{tag}"))
         per_robot = {
             "command": [leg["vx"], leg["vy"], leg["wz"]],
             "alive": [bool(x) for x in alive.tolist()],
@@ -660,9 +667,40 @@ def main() -> int:
                     help="print the result and write nothing to the run - for "
                          "measuring a policy against a bar that does not exist "
                          "yet")
+    # WHERE the test is taken, as opposed to what it has to reach. A bar says
+    # how well the robot must turn; this says how fast it is asked to. They were
+    # the same edit until 5 Aug 2026, and that hid the fault this exists to
+    # find: `test_turn` sat at 1.00 rad/s, the exact edge of WALK_TURN, so the
+    # policy was scored at the one turn rate it had almost never practised -
+    # about 3.5% of draws. A bar cannot be judged sensible until the point it
+    # is measured at can be moved on its own.
+    #
+    # FORCES --no-record. A verdict written against a moved test point would
+    # claim the stage bar while measuring something else, and the run record
+    # would carry no sign of it.
+    ap.add_argument("--test-turn", type=float,
+                    help="rad/s for the turning pass, instead of the task's. "
+                         "Implies --no-record.")
+    ap.add_argument("--test-side", type=float,
+                    help="m/s for the sideways pass, instead of the task's. "
+                         "Implies --no-record.")
+    ap.add_argument("--test-turn-speed", type=float,
+                    help="m/s forward DURING the turning pass, making it an arc "
+                         "instead of a spin from standstill. The bar uses 0. "
+                         "Implies --no-record.")
     args = ap.parse_args()
 
-    spec = TASKS[args.task]
+    spec = dict(TASKS[args.task])
+    spec.setdefault("test_turn_speed", 0.0)
+    moved = []
+    for key, val in (("test_turn", args.test_turn), ("test_side", args.test_side),
+                     ("test_turn_speed", args.test_turn_speed)):
+        if val is not None:
+            moved.append(f"{key} {spec[key]} -> {val}")
+            spec[key] = val
+    if moved:
+        args.no_record = True
+        print(f"test point   {' and '.join(moved)} - not recorded")
     seconds = args.seconds or spec["seconds"]
     exp_root = LOG_ROOT / spec["experiment"]
     if not exp_root.is_dir():
@@ -835,7 +873,17 @@ def main() -> int:
             {"label": "sideways", "kind": "crab",
              "vx": 0.0, "vy": spec["test_side"], "wz": 0.0},
             {"label": "turning", "kind": "spin",
-             "vx": 0.0, "vy": 0.0, "wz": spec["test_turn"]},
+             # `test_turn_speed` is 0 for the stage bar: a spin from standstill.
+             # It exists because that is NOT the only way a robot turns, and the
+             # owner reported on 6 Aug 2026 that Gray turns well when driven -
+             # driving means turning WHILE MOVING, which nothing here measured.
+             # A pure spin needs |vx| and |vy| both near zero at the same time,
+             # which the command draw produces about once in 80 - the same
+             # exposure fault the crab share was added to fix. Being able to
+             # measure the arc separately is how that gets told apart from the
+             # robot being unable to rotate.
+             "vx": spec.get("test_turn_speed", 0.0), "vy": 0.0,
+             "wz": spec["test_turn"]},
         ]
     else:
         legs = [None]

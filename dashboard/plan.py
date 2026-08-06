@@ -114,9 +114,11 @@ PROJECT = [
                "the next largest is the range that run is sampled over, and the rest "
                "are checked or measured rather than trained. Live counts are on the "
                "stage 2 page - they are read from the CSV, never written down here.",
-        "headline": "At PLAN.md 1.2.2 - it walks straight and turns at half the rate "
-                    "it is told. R2 getting up not started. R3 foot-on-object, jumping "
-                    "and seeing are shelved, each with the thing that un-shelves it.",
+        "headline": "At PLAN.md 1.2.7/1.3.1 - it walks straight and turns at three "
+                    "quarters of the rate it is told; the open faults are foot lift "
+                    "and a nose-down collapse. R2 getting up not started. R3 "
+                    "foot-on-object, jumping and seeing are shelved, each with the "
+                    "thing that un-shelves it.",
         "page": "/stage2",
     },
     {
@@ -1176,8 +1178,11 @@ FORWARD = {
     "lede": "One pattern, applied twice: train it, harden it, measure it. "
             "Locomotion first, then getting up. Then join them. Then the "
             "sensors, twice - once to keep what you had, once to use them. "
-            "Where we are: 1.2.2 - it walks straight, and it turns at half "
-            "the rate it is told to.",
+            "Where we are: the 1.2.7 gate is open, and 1.3.1 batches 1 and 2 "
+            "are answered - the dials are innocent, and the robot turns at "
+            "three quarters of the rate it is told. The open faults are the "
+            "gait's: feet that barely lift, and a nose-down collapse after a "
+            "short walk.",
     "shape": [
         "Two things get tuned, and they fight each other. The REWARD says what "
         "good means. The RANGE says where it has to be good. Widening the range "
@@ -1508,12 +1513,42 @@ FORWARD = {
               "batches": [
                   {"n": "1", "stage": "1.3.1", "runs": "3 x 1500",
                    "code": "make the five dials wider",
-                   "asks": "does the 1.2 config still pass in a wider world"},
+                   "asks": "does the 1.2 config still pass in a wider world",
+                   "done": "All 3 seeds failed, on the same 4 criteria - "
+                           "forward drift, sideways drift, turn rate, turn "
+                           "wander. Read at the time as the wider world "
+                           "costing the robot its heading. THAT READ WAS "
+                           "WRONG; batch 2 disproved it."},
                   {"stop": "did it hold, or which dial broke it"},
-                  {"n": "2", "stage": "1.3.1", "runs": "4 x 550",
-                   "code": "only if batch 1 failed - retune",
-                   "asks": "which dial broke it"},
-                  {"stop": "retune again, or make that one dial narrower"},
+                  {"n": "2", "stage": "1.3.1", "runs": "6 x 550",
+                   "code": "--narrow-dials, to set a dial back per run",
+                   "asks": "which of the five costs the heading. One seed, "
+                           "one dial wide per run, plus an all-narrow control",
+                   "done": "NONE OF THEM. The all-narrow control failed too, "
+                           "at 0.292 rad/s of turn error - the same as the "
+                           "five wide runs, which spread 0.264 to 0.336. The "
+                           "dials are innocent. The turn numbers from before "
+                           "1.2 closed were measured by a verify that pinned "
+                           "the turn command to ZERO, so they never tested "
+                           "turning at all: q3_long_s8821 is on record at "
+                           "0.083 and measures 0.280 under today's verify, "
+                           "from the same checkpoint. The first read of that "
+                           "was 'turning has never passed'. WRONG WAY UP. The "
+                           "robot turns - at about three quarters of any rate "
+                           "it is asked, measured at three points (told 0.5 "
+                           "it does 0.38, told 0.7 it does 0.50-0.55, told "
+                           "1.0 about 0.72), both ways, evenly, and the owner "
+                           "confirmed it on the stick on 6 Aug. What was "
+                           "never tested is THE BAR's one case: a spin on "
+                           "the spot at 1.00 rad/s, a command the training "
+                           "draw produces about once in 80 attempts. An "
+                           "unpractised case, not a lost skill."},
+                  {"stop": "the turn bar tests 1.00 rad/s, the very edge of "
+                           "the trained box - widen the box, or move the bar. "
+                           "DECIDED 6 Aug: neither. Keep the bar and train "
+                           "the case - a pure-spin share in the command draw, "
+                           "the same fix the crab share was. That is the g1 "
+                           "probe of the gait batch below."},
                   {"n": "3", "stage": "1.3.2", "runs": "4 x 550",
                    "code": "ground that tilts",
                    "asks": "at what slope does it stop walking"},
@@ -1557,7 +1592,8 @@ FORWARD = {
                   "drift is not measurable, so it only throws away the clearly "
                   "bad half. Batches 3, 5 and 6 are ladders: raise one number "
                   "until it fails, write down where, and no decision is needed "
-                  "inside them. Batch 2 may never happen.",
+                  "inside them. Batch 2 was the one that might never happen. "
+                  "Batch 1 failed 3 seeds out of 3, so it happens.",
               },
              {"id": "1.4", "name": "Measure",
               "goal": "Write down what it can actually do. Nothing is trained.",

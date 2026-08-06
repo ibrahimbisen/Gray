@@ -849,6 +849,28 @@ def off_track_obs(env, command_name: str = "walk"):
 # ---------------------------------------------------------------------------
 
 
+# PLAN.md 1.3.1 - the five world dials, at their WIDE values. The narrow values
+# they replace live in gray/tasks/push_env_cfg.py and are read off the config at
+# build time, never copied. See walk_env_cfg below for why each number moved.
+WIDE_DIALS = {
+    # 0.25, not 0.4. Below 0.3 the robot had no answer to a smooth wet floor at
+    # all, because it had never seen one. 1.4 is rubber on dry concrete.
+    "ground_grip": {"ranges": (0.25, 1.4)},
+    # +/-30%, not +/-20%. The mass is a CAD number. Fasteners, glue, wiring and
+    # a battery that is not yet chosen all land on top of it.
+    "how_heavy": {"alpha_range": (-0.3, 0.3)},
+    # +/-25 mm, not +/-15. Where the battery and the boards actually end up once
+    # the robot is wired is the largest single unknown in the model.
+    "where_the_weight_is": {"ranges": (-0.025, 0.025)},
+    # +/-40%, not +/-30%. A hobby servo's internal gains are sealed and
+    # unpublished, so the values in robot.yaml are a guess about a guess.
+    "servo_strength": {"kp_range": (0.6, 1.4), "kd_range": (0.6, 1.4)},
+    # Wider both ways. A fresh gearbox and a worn one are not the same machine,
+    # and Gray will be both.
+    "gearbox_drag": {"ranges": (0.003, 0.05)},
+}
+
+
 def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     cfg = push_env_cfg(play=play)
 
@@ -876,23 +898,8 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # Batch 1 of 1.3 asks the only question that matters here - does the config
     # that closed 1.2 still pass with all five at these values - and if it does
     # not, batch 2 finds which one broke it.
-    for name, params in {
-        # 0.25, not 0.4. Below 0.3 the robot had no answer to a smooth wet floor
-        # at all, because it had never seen one. 1.4 is rubber on dry concrete.
-        "ground_grip": {"ranges": (0.25, 1.4)},
-        # +/-30%, not +/-20%. The mass is a CAD number. Fasteners, glue, wiring
-        # and a battery that is not yet chosen all land on top of it.
-        "how_heavy": {"alpha_range": (-0.3, 0.3)},
-        # +/-25 mm, not +/-15. Where the battery and the boards actually end up
-        # once the robot is wired is the largest single unknown in the model.
-        "where_the_weight_is": {"ranges": (-0.025, 0.025)},
-        # +/-40%, not +/-30%. A hobby servo's internal gains are sealed and
-        # unpublished, so the values in robot.yaml are a guess about a guess.
-        "servo_strength": {"kp_range": (0.6, 1.4), "kd_range": (0.6, 1.4)},
-        # Wider both ways. A fresh gearbox and a worn one are not the same
-        # machine, and Gray will be both.
-        "gearbox_drag": {"ranges": (0.003, 0.05)},
-    }.items():
+    narrow = {}
+    for name, params in WIDE_DIALS.items():
         term = cfg.events.get(name)
         if term is None:
             raise RuntimeError(
@@ -900,7 +907,15 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
                 f"event. It is defined in gray/tasks/push_env_cfg.py - if it "
                 f"was renamed there, this loop silently widens nothing and the "
                 f"whole step measures the old world under a new name.")
+        # Keep what the dial was BEFORE it is widened, so `--narrow-dials` can
+        # put one back. Recorded here rather than written out a second time: a
+        # copied table drifts from push_env_cfg the first time somebody edits
+        # one and not the other, and a run would then name a narrow dial it
+        # never trained on. Batch 2 of 1.3.1 turns exactly four of these back
+        # per run, so a wrong value there is a wrong answer, not a slow one.
+        narrow[name] = {k: term.params[k] for k in params}
         term.params.update(params)
+    cfg.narrow_dials = narrow
 
     # 1.1.6 - the handover. Added 4 Aug 2026, DURING step 1 and not during step
     # 3, because it is a training-set change and no runtime rule can add one

@@ -83,6 +83,19 @@
    height attributes outright. Every ring came out a small circle at the top-left
    corner of the control it was supposed to surround. page.css's names are
    global, and SVG shares the namespace. */
+/* AFTER `.ctl.on`, so a control that is both assigned and planned reads as
+   planned - which is the more surprising of the two and the one worth seeing.
+   Same specificity, so source order decides it, and that is deliberate. */
+.diagram .ctl.planned { stroke:var(--warn); stroke-width:2.2;
+                        stroke-dasharray:7 5; }
+.diagram .ctl.planned .keynum { fill:var(--warn); }
+/* The callout says what is planned, in the same amber as the outline it belongs
+   to. It used to read "free" in grey, which was wrong twice over: the control is
+   spoken for, and the ring said something was coming without saying what. */
+.diagram .name.planned, .diagram .fn.planned { fill:var(--warn); }
+.diagram .name.planned { font-weight:var(--w-bold); }
+/* Kept for the legend line, which is a <line> and not a control - it still has
+   to show what the amber dash means. */
 .diagram .planring { fill:none; stroke:var(--warn); stroke-width:1.6;
                      stroke-dasharray:7 5; pointer-events:none; }
 .diagram .plantxt { fill:var(--warn); font-size:var(--t-data); }
@@ -293,21 +306,24 @@
          which at the real screen size is where the glass is - there is no bare
          plastic on a Switch's front. That is honest anyway: these five do not
          exist on the object, and drawing them off the body says so. -->
+    <!-- 10 units apart, not 28. They are one row of five, and a gap wide enough
+         to read as a separator made them look like five unrelated things spread
+         across the top of the drawing. -->
     <g class="ctl" data-pick="control" data-name="1" tabindex="0">
-      <rect x="491" y="194" width="62" height="24" rx="5"/>
-      <text class="keynum" x="522" y="210" text-anchor="middle">1</text></g>
+      <rect x="527" y="194" width="62" height="24" rx="5"/>
+      <text class="keynum" x="558" y="210" text-anchor="middle">1</text></g>
     <g class="ctl" data-pick="control" data-name="2" tabindex="0">
-      <rect x="581" y="194" width="62" height="24" rx="5"/>
-      <text class="keynum" x="612" y="210" text-anchor="middle">2</text></g>
+      <rect x="599" y="194" width="62" height="24" rx="5"/>
+      <text class="keynum" x="630" y="210" text-anchor="middle">2</text></g>
     <g class="ctl" data-pick="control" data-name="3" tabindex="0">
       <rect x="671" y="194" width="62" height="24" rx="5"/>
       <text class="keynum" x="702" y="210" text-anchor="middle">3</text></g>
     <g class="ctl" data-pick="control" data-name="4" tabindex="0">
-      <rect x="761" y="194" width="62" height="24" rx="5"/>
-      <text class="keynum" x="792" y="210" text-anchor="middle">4</text></g>
+      <rect x="743" y="194" width="62" height="24" rx="5"/>
+      <text class="keynum" x="774" y="210" text-anchor="middle">4</text></g>
     <g class="ctl" data-pick="control" data-name="5" tabindex="0">
-      <rect x="851" y="194" width="62" height="24" rx="5"/>
-      <text class="keynum" x="882" y="210" text-anchor="middle">5</text></g>
+      <rect x="815" y="194" width="62" height="24" rx="5"/>
+      <text class="keynum" x="846" y="210" text-anchor="middle">5</text></g>
     <!-- One shared line above them: five separate callouts in that strip would
          collide, and there is nothing else up there. -->
     <text class="fn free" x="702" y="176" text-anchor="middle"
@@ -723,22 +739,46 @@ function drawPlanned(s) {
   const box = el("plans");
   box.textContent = "";
   const rows = (s.wanted || []).filter(w => w.where_control);
+
+  /* The control's OWN outline turns amber. It used to get a second dashed ring
+     drawn around it, so a planned control wore two outlines - its grey one and
+     an amber one 7 units outside it - which reads as a selection halo rather
+     than as a state of the control. One shape, one outline, three states.
+
+     Cleared BEFORE the early return, not after. This runs again after every
+     save, and taking the last plan off a control has to take the colour and the
+     wording with it - which the old placement, below a `return`, would not
+     have done. */
+  for (const el of document.querySelectorAll(".diagram .planned"))
+    el.classList.remove("planned");
   if (!rows.length) return;
 
-  const seen = new Set();
+  const seen = new Map();
   rows.forEach(w => {
-    if (seen.has(w.where_control)) return;
-    seen.add(w.where_control);
-    const target = document.querySelector(
-      `.diagram [data-pick][data-name="${w.where_control}"]`);
-    if (!target) return;
-    const b = target.getBBox();
-    box.appendChild(svgEl("rect", {
-      class: "planring", x: b.x - 7, y: b.y - 7,
-      width: b.width + 14, height: b.height + 14,
-      rx: Math.min(14, (b.height + 14) / 2),
-    }));
+    if (!seen.has(w.where_control)) seen.set(w.where_control, []);
+    seen.get(w.where_control).push(w.name);
   });
+
+  for (const [control, names] of seen) {
+    const target = document.querySelector(
+      `.diagram [data-pick][data-name="${control}"]`);
+    if (target) target.classList.add("planned");
+
+    /* And SAY what is planned, where the control's callout already is. A free
+       control with an amber outline told you something was coming and made you
+       hunt the list underneath for which. The word "free" was also just wrong:
+       the control is spoken for, it simply cannot do the job yet.
+
+       `.free` comes off, `.planned` goes on, so the line is amber and reads
+       against the outline that is now the same colour. */
+    const fn = el("fn-" + control);
+    if (!fn) continue;
+    fn.classList.remove("free");
+    fn.classList.add("planned");
+    fn.textContent = (fn.getAttribute("data-pre") || "") + names.join(" · ");
+    const lab = el("lab-" + control);
+    if (lab) { lab.classList.remove("free"); lab.classList.add("planned"); }
+  }
 
   /* The strip between the grips, under the console, is the only clear space
      big enough - and it is in the middle, where the eye already is. */

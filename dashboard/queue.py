@@ -133,6 +133,7 @@ DEFAULTS: dict[str, Any] = {
     "no_heading_obs": False,  # train blind, the pre-4-Aug 48-input policy
     "with_off_track": False,  # ADD the cross-track input; off by default, it lost ground
     "crab_share": None,       # share of draws that are a PURE sideways step
+    "narrow_dials": "",       # world dials put back to the Gray-Push range, or "all"
     "push_speed": None,     # [min, max] m/s, or None to leave alone
     "push_spin": None,      # [min, max] rad/s
     "film": True,           # film checkpoints alongside training
@@ -474,7 +475,7 @@ def _clean(spec: dict) -> dict:
     """
     job = dict(DEFAULTS)
 
-    for key in ("task", "name", "note"):
+    for key in ("task", "name", "note", "narrow_dials"):
         if spec.get(key) is not None:
             job[key] = str(spec[key])
     for key in ("no_video", "film", "verify", "no_heading_obs", "with_off_track"):
@@ -783,6 +784,8 @@ def train_argv(job: dict) -> list[str]:
     # added, and the run would train at 0.15 under a name saying 0.
     if job.get("crab_share") is not None:
         argv += ["--crab-share", str(_as_float(job["crab_share"], 0.0))]
+    if job.get("narrow_dials"):
+        argv += ["--narrow-dials", str(job["narrow_dials"])]
 
     # Every knob that is set must have produced a flag. This is not paranoia: on
     # 4 Aug 2026 six runs - five hours of card time - trained the identical
@@ -806,6 +809,7 @@ def train_argv(job: dict) -> list[str]:
                       ("no_heading_obs", "--no-heading-obs"),
                       ("with_off_track", "--with-off-track"),
                       ("crab_share", "--crab-share"),
+                      ("narrow_dials", "--narrow-dials"),
                       ("push_speed", "--push-speed"),
                       ("push_spin", "--push-spin")):
         asked = (job.get(key) is not None if key in zero_means_something

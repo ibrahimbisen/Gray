@@ -295,6 +295,33 @@ def reward_ceiling(rewards) -> float:
     return sum(t.weight for t in rewards.values() if t.weight > 0)
 
 
+def world_dials(env_cfg) -> list[dict]:
+    """The five world dials, as this run will actually draw them.
+
+    One entry per dial: the range it draws from, and whether that is the wide
+    value or the narrow one. `wide` is decided by comparing against WIDE_DIALS
+    rather than by trusting the `--narrow-dials` argument, so a dial changed by
+    any other route still reports itself correctly.
+
+    Returns an empty list for a task that has no dials, which is every task but
+    the walk. Nothing downstream may assume the block is there.
+    """
+    try:
+        from gray.tasks.walk_env_cfg import WIDE_DIALS  # noqa: PLC0415
+    except ImportError:
+        return []
+
+    out = []
+    for name, wide in WIDE_DIALS.items():
+        term = getattr(env_cfg, "events", {}).get(name)
+        if term is None:
+            continue
+        drawn = {k: tuple(term.params[k]) for k in wide}
+        out.append({"name": name, "ranges": drawn,
+                    "wide": drawn == {k: tuple(v) for k, v in wide.items()}})
+    return out
+
+
 def bridge(run_dir: Path, log_dir: Path, stop: threading.Event,
            target: float = 0.0) -> None:
     """Feed the dashboard, and stop training once the reward has nothing left to win."""
@@ -389,6 +416,14 @@ def main() -> int:
                          "turned out to cost turn accuracy, so it has to be "
                          "variable to be measured - 0 switches it off entirely "
                          "and gives the draw mix as it was before 5 Aug 2026.")
+    ap.add_argument("--narrow-dials", default="",
+                    help="put named world dials back to their Gray-Push values, "
+                         "comma separated, or 'all'. The walk task widens all "
+                         "five - see WIDE_DIALS in gray/tasks/walk_env_cfg.py. "
+                         "Batch 1 of PLAN 1.3.1 widened them together and failed "
+                         "all three seeds on the four heading criteria, so this "
+                         "exists to run them one at a time against a narrow "
+                         "control and find which one costs the heading.")
     ap.add_argument("--with-off-track", action="store_true",
                     help="ADD the cross-track input, making the observation 50 "
                          "wide instead of 49. Off by default because it lost "
@@ -468,6 +503,22 @@ def main() -> int:
         was = walk_cmd.rel_crab_envs
         walk_cmd.rel_crab_envs = args.crab_share
         print(f"command mix   pure sideways share: {was} -> {args.crab_share}")
+    if args.narrow_dials:
+        # `narrow_dials` is set by walk_env_cfg while it widens them, so it holds
+        # the value each dial actually had, not a second copy of the table.
+        was = getattr(cfg.env, "narrow_dials", None)
+        if not was:
+            raise SystemExit(f"{args.task} has no widened world dials to narrow")
+        wanted = (list(was) if args.narrow_dials.strip() == "all" else
+                  [n.strip() for n in args.narrow_dials.split(",") if n.strip()])
+        unknown = [n for n in wanted if n not in was]
+        if unknown:
+            raise SystemExit(
+                f"no such world dial: {', '.join(unknown)}. "
+                f"The five are: {', '.join(was)}")
+        for name in wanted:
+            cfg.env.events[name].params.update(was[name])
+        print(f"world dials   back to the narrow range: {', '.join(wanted)}")
     if args.with_off_track:
         from mjlab.managers import ObservationTermCfg  # noqa: PLC0415
 
@@ -610,6 +661,12 @@ def main() -> int:
             "gyro_walk_rad_per_s": getattr(cfg.env.commands.get("walk"),
                                            "gyro_walk_rad_per_s", None),
         },
+        # The world the run trained in, read off the live config. Added 5 Aug
+        # 2026, and it is not a nicety: /dials reads the SOURCE file, so it
+        # shows the task default and every run looks alike. Batch 2 of PLAN
+        # 1.3.1 is five runs that differ in NOTHING BUT these five ranges, and
+        # without this the only record of which was which is a job note.
+        "world_dials": world_dials(cfg.env),
         # WHAT the policy reads, by name. Not how many numbers - that needs a
         # built env and this runs before one exists. The names are the useful
         # part anyway: a saved policy is a fixed-size mapping, so two runs whose
