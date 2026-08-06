@@ -48,3 +48,5 @@ operable program or batch file.
 [09:29:16] paused - not taking new jobs
 [09:33:12] j0187  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 10.0
 [09:33:17] j0187  -> progress/runs/2026-08-06_09-33-17_s3_10deg_s2207
+[09:39:28] j0187  FAILED (exit 4294967295)
+[09:39:28] paused - not taking new jobs

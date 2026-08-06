@@ -998,7 +998,14 @@ def slope_terrain(deg: float) -> TerrainEntityCfg:
             sub_terrains={"slope": HfPyramidSlopedTerrainCfg(
                 slope_range=(grade, grade),
                 platform_width=1.5,
-                horizontal_scale=0.1,
+                # 0.25 m cells, not the 0.1 default. The default's 160x160
+                # grid cost 55 SECONDS an iteration at 5000 robots - a 9
+                # hour rung - because heightfield collision pays per nearby
+                # cell. A uniform incline is the same shape at any
+                # resolution; 64x64 is plenty for a robot with a 0.3 m
+                # footprint, and rough ground (batch 5) will pick its own
+                # scale on its own budget.
+                horizontal_scale=0.25,
                 vertical_scale=0.005,
             )},
         ),
