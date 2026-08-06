@@ -36,3 +36,8 @@ operable program or batch file.
 [07:21:07] j0184  verify exited 1 - training kept, the bar was not met or could not be read
 [07:21:07] j0184  done
 [07:21:07] idle - 0 queued
+[09:26:19] runner 9836@092619 up. interpreter: C:\Users\Bisen\Desktop\Gray\.venv\Scripts\python.exe
+[09:26:19] queue: progress\queue.json
+[09:26:19] idle - 0 queued
+[09:26:28] j0185  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 4.0
+[09:26:33] j0185  -> progress/runs/2026-08-06_09-26-33_s1_4deg_s2207
