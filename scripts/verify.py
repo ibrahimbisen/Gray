@@ -283,6 +283,67 @@ def report_drift(log_dir: Path, cfg) -> list[str]:
         if name not in cfg.rewards:
             drift.append(f"  {name:<9}was a scoring term then, and is not now")
 
+    # Weights are not the only thing that moves a task, and until 6 Aug 2026
+    # they were the only thing compared - the gait work changes reward PARAMS
+    # (the swing target), TERMINATIONS (a dive ends the attempt) and the
+    # command DRAW (the spin share), and every one of those would have scored
+    # an older policy against a changed task without a word of warning.
+    def plain(params: dict) -> dict:
+        """Only the plain numbers. Strings, asset configs and sensor handles
+        serialise differently between the live config and the yaml record, so
+        comparing them reports drift that never happened."""
+        keep = {}
+        for k, v in dict(params).items():
+            if isinstance(v, bool):
+                continue
+            if isinstance(v, (int, float)):
+                keep[k] = round(float(v), 6)
+            elif (isinstance(v, (list, tuple)) and v
+                    and all(isinstance(x, (int, float)) for x in v)):
+                keep[k] = [round(float(x), 6) for x in v]
+        return keep
+
+    for name, term in cfg.rewards.items():
+        old_p = plain((old_rew.get(name) or {}).get("params") or {})
+        new_p = plain(term.params)
+        moved = {k for k in old_p if k in new_p and old_p[k] != new_p[k]}
+        if moved:
+            for k in sorted(moved):
+                drift.append(f"  {name:<9}{k}: trained {old_p[k]}   "
+                             f"testing {new_p[k]}")
+
+    old_term = set(was.get("terminations") or {})
+    new_term = set(cfg.terminations)
+    if old_term:
+        for name in sorted(new_term - old_term):
+            drift.append(f"  {name:<9}ends an attempt now, and did not when "
+                         f"this run trained")
+        for name in sorted(old_term - new_term):
+            drift.append(f"  {name:<9}ended an attempt then, and does not now")
+
+    # The draw mix and the box. rel_standing_envs is NOT compared - main() has
+    # already zeroed it for the test by the time this runs, so comparing it
+    # would cry drift on every single run.
+    old_walk = (was.get("commands") or {}).get("walk") or {}
+    new_walk = cfg.commands.get("walk")
+    if old_walk and new_walk is not None:
+        for field in ("rel_straight_envs", "rel_crab_envs", "rel_spin_envs",
+                      "straight_min_speed", "crab_min_speed", "spin_min_rate"):
+            before, now = old_walk.get(field), getattr(new_walk, field, None)
+            if (isinstance(before, (int, float)) and not isinstance(before, bool)
+                    and isinstance(now, (int, float))
+                    and abs(before - now) > 1e-9):
+                drift.append(f"  draw     {field}: trained {before}   "
+                             f"testing {now}")
+        old_box = old_walk.get("ranges") or {}
+        for field in ("lin_vel_x", "lin_vel_y", "ang_vel_z"):
+            before = old_box.get(field)
+            now = getattr(getattr(new_walk, "ranges", None), field, None)
+            if before is not None and now is not None \
+                    and numbers(before) != numbers(tuple(now)):
+                drift.append(f"  box      {field}: trained {numbers(before)}   "
+                             f"testing {numbers(tuple(now))}")
+
     if drift:
         print("WARNING - the task has changed since this run was trained:")
         print("\n".join(drift))
@@ -304,9 +365,16 @@ def report_drift(log_dir: Path, cfg) -> list[str]:
 # also meant a robot that swung half a metre out and came back scored zero drift.
 SAMPLE_EVERY = 50
 
+# Nose-down beyond this is counted as a dive, in radians. 0.20 rad is 11.5
+# degrees - past every pitch the posture command can ask for during a test
+# (verify pins it level), and past the wobble of a clean gait, but well short
+# of the 45.8 degree tilt that ends an episode. NOSE DOWN IS NEGATIVE,
+# measured by scripts/measure_pitch_sign.py on 6 Aug 2026.
+DIVE_RAD = 0.20
+
 
 def run_pass(env, robot, origins, policy, torch, *, seconds, robots, target,
-             device, leg=None, cmd=None):
+             device, leg=None, cmd=None, diag=False):
     """One measured episode, handed back unreduced.
 
     Nothing is averaged in here on purpose. The walk test runs this four times -
@@ -336,6 +404,33 @@ def run_pass(env, robot, origins, policy, torch, *, seconds, robots, target,
         # and both passes would silently be a third and fourth copy of "stand
         # still going forwards at 0".
         cmd.rel_straight_envs = 1.0 if leg["kind"] == "straight" else 0.0
+
+    # The gait collection, only under --gait-diag. Four things a film shows and
+    # no recorded number does: SIGNED pitch (error_pitch is an absolute value,
+    # so "nose down" was invisible to every chart), the height each swing
+    # actually peaks at (the reward stores only its cost), dives, and when the
+    # first fall comes - training is 20 s long, and stable-inside-the-horizon
+    # is not stable.
+    gait = None
+    if diag:
+        from gray.tasks.posture_command import trunk_pitch_roll  # noqa: PLC0415
+
+        feet = env.unwrapped.scene["feet"]
+        foot_ids, foot_names = robot.find_sites(".*_foot")
+        zeros4 = torch.zeros(robots, len(foot_ids), device=device)
+        gait = {
+            "trunk_pitch_roll": trunk_pitch_roll,
+            "feet": feet, "foot_ids": foot_ids, "foot_names": foot_names,
+            # The same latch swing_height in the task keeps: track a foot's
+            # peak while it is airborne, bank it on the step it lands.
+            "peak": zeros4.clone(), "peak_sum": zeros4.clone(),
+            "peak_n": zeros4.clone(), "peak_max": zeros4.clone(),
+            "pitch_sum": torch.zeros(robots, device=device),
+            "pitch_min": torch.full((robots,), 99.0, device=device),
+            "pitch_max": torch.full((robots,), -99.0, device=device),
+            "dive_steps": torch.zeros(robots, device=device),
+            "first_fall": torch.full((robots,), -1.0, device=device),
+        }
 
     obs, _ = env.reset()
     heights, uprights, path = [], [], []
@@ -372,9 +467,35 @@ def run_pass(env, robot, origins, policy, torch, *, seconds, robots, target,
                     path.append(
                         (robot.data.root_link_pos_w[:, :2] - origins[:, :2]).clone())
             fell |= (up < 0.7) | (h < target * 0.55)
+            if gait is not None:
+                pitch, _roll = gait["trunk_pitch_roll"](robot)
+                gait["pitch_sum"] += pitch
+                gait["pitch_min"] = torch.minimum(gait["pitch_min"], pitch)
+                gait["pitch_max"] = torch.maximum(gait["pitch_max"], pitch)
+                gait["dive_steps"] += (pitch < -DIVE_RAD).float()
+                gait["first_fall"] = torch.where(
+                    fell & (gait["first_fall"] < 0),
+                    torch.full_like(gait["first_fall"], (step + 1) / 50.0),
+                    gait["first_fall"])
+                feet_h = (robot.data.site_pos_w[:, gait["foot_ids"], 2]
+                          - origins[:, 2].unsqueeze(1))
+                in_air = gait["feet"].data.found == 0
+                gait["peak"] = torch.where(
+                    in_air, torch.maximum(gait["peak"], feet_h), gait["peak"])
+                # A pure read of the air-time state - the task's own terms are
+                # its writers, and they run inside env.step above.
+                landed = gait["feet"].compute_first_contact(
+                    dt=env.unwrapped.step_dt)
+                gait["peak_sum"] += gait["peak"] * landed.float()
+                gait["peak_n"] += landed.float()
+                gait["peak_max"] = torch.maximum(
+                    gait["peak_max"], gait["peak"] * landed.float())
+                gait["peak"] = torch.where(
+                    landed, torch.zeros_like(gait["peak"]), gait["peak"])
 
     end_xy = (robot.data.root_link_pos_w[:, :2] - origins[:, :2]).clone()
     return {
+        "gait": gait,
         "heights": torch.stack(heights),
         "uprights": torch.stack(uprights),
         "vx_b": torch.stack(vx_b) if vx_b else None,
@@ -608,6 +729,55 @@ def worse_of(rows_a, rows_b):
     return out
 
 
+def gait_stats(raw, torch, *, seconds) -> dict:
+    """Reduce one pass's gait collection to per-robot numbers, and say them.
+
+    Signs are kept - that is the entire point. `error_pitch` in the metrics is
+    an absolute value, so nothing recorded before this could show which WAY
+    the trunk pitched. Nose down is NEGATIVE (measured, see
+    scripts/measure_pitch_sign.py).
+    """
+    g = raw["gait"]
+    steps = float(seconds * 50)
+    pitch_mean = g["pitch_sum"] / steps
+    peak_mean = g["peak_sum"] / torch.clamp(g["peak_n"], min=1.0)
+    trunk_min = raw["heights"].min(dim=0).values
+    fell_n = int(raw["fell"].sum())
+    first = g["first_fall"][g["first_fall"] > 0]
+
+    def deg(x: float) -> str:
+        return f"{x * 57.2958:+.1f} deg"
+
+    dived = int((g["dive_steps"] > 0).sum())
+    print(f"    pitch       mean {deg(float(pitch_mean.mean()))}   "
+          f"worst dive {deg(float(g['pitch_min'].min()))}   "
+          f"(nose down is negative)")
+    print(f"    swing peak  mean {float(peak_mean.mean()) * 1000:.1f} mm   "
+          f"highest {float(g['peak_max'].max()) * 1000:.1f} mm")
+    print(f"    dives       {dived} of {len(trunk_min)} robots past "
+          f"{DIVE_RAD * 57.2958:.1f} deg nose-down; worst spent "
+          f"{int(g['dive_steps'].max())} steps there")
+    print(f"    trunk       lowest {float(trunk_min.min()) * 1000:.1f} mm")
+    print(f"    falls       {fell_n} of {len(trunk_min)}"
+          + (f", earliest at {float(first.min()):.1f} s" if len(first) else ""))
+
+    return {
+        "pitch_mean_rad": [round(x, 4) for x in pitch_mean.tolist()],
+        "pitch_min_rad": [round(x, 4) for x in g["pitch_min"].tolist()],
+        "pitch_max_rad": [round(x, 4) for x in g["pitch_max"].tolist()],
+        "dive_steps": [int(x) for x in g["dive_steps"].tolist()],
+        "dive_threshold_rad": DIVE_RAD,
+        "first_fall_s": [round(x, 2) for x in g["first_fall"].tolist()],
+        "min_trunk_height_m": [round(x, 4) for x in trunk_min.tolist()],
+        "feet": list(g["foot_names"]),
+        "swing_peak_mean_m": [[round(x, 4) for x in row]
+                              for row in peak_mean.tolist()],
+        "swing_peak_max_m": [[round(x, 4) for x in row]
+                             for row in g["peak_max"].tolist()],
+        "swing_count": [[int(x) for x in row] for row in g["peak_n"].tolist()],
+    }
+
+
 def _dump_diagnostic(root, run_id, switched_off, per_robot, paths, ckpt,
                      robots, seconds) -> None:
     """Write a diagnostic run's numbers somewhere they cannot be mistaken for a verdict.
@@ -626,6 +796,8 @@ def _dump_diagnostic(root, run_id, switched_off, per_robot, paths, ckpt,
         parts.append("same-start")
     if "norecord" in switched_off:
         parts.append("measured")
+    if "gait" in switched_off:
+        parts.append("gait")
     path = out / f"{run_id}__{'_'.join(parts) or 'off'}.json"
     path.write_text(json.dumps({
         "run": run_id, "checkpoint": str(ckpt).replace("\\", "/"),
@@ -688,6 +860,21 @@ def main() -> int:
                     help="m/s forward DURING the turning pass, making it an arc "
                          "instead of a spin from standstill. The bar uses 0. "
                          "Implies --no-record.")
+    # The gait, measured. Added 6 Aug 2026, the day the owner's film beat the
+    # instruments: feet that barely lift, a nose that points down, a collapse a
+    # short way into a walk - and not one recorded number could show any of it.
+    # error_pitch is an absolute value, the reward stores only the cost of a
+    # swing and not its height, and nothing anywhere writes down WHEN a robot
+    # fell, only whether. These two switches are those instruments.
+    ap.add_argument("--gait-diag", action="store_true",
+                    help="collect signed pitch, swing peak heights, dives and "
+                         "first-fall times per pass, print them, and write "
+                         "them into the diagnostic file. Implies --no-record.")
+    ap.add_argument("--ladder", action="store_true",
+                    help="replace the four passes with a forward speed ladder "
+                         "- 0.15 / 0.25 / 0.35, plus 0.45 which is OUTSIDE "
+                         "the trained box and labelled as such - to find the "
+                         "speed the dive starts at. Implies --gait-diag.")
     args = ap.parse_args()
 
     spec = dict(TASKS[args.task])
@@ -701,6 +888,11 @@ def main() -> int:
     if moved:
         args.no_record = True
         print(f"test point   {' and '.join(moved)} - not recorded")
+    if args.ladder:
+        args.gait_diag = True
+    if args.gait_diag:
+        args.no_record = True
+        print("gait diagnostic - measured, not judged, not recorded")
     seconds = args.seconds or spec["seconds"]
     exp_root = LOG_ROOT / spec["experiment"]
     if not exp_root.is_dir():
@@ -888,6 +1080,21 @@ def main() -> int:
     else:
         legs = [None]
 
+    # The speed ladder. Same pass machinery, different questions: at which
+    # commanded speed does the nose-dive start, and does it start INSIDE the
+    # trained box or only past its edge. 0.45 is past the edge on purpose and
+    # says so in its label - outside the box a fall proves nothing about the
+    # policy, only about where the box ends, and the pilot HUD makes the same
+    # distinction with the same words.
+    if spec.get("walk") and args.ladder:
+        box_hi = float(cmd.ranges.lin_vel_x[1])
+        legs = []
+        for v in (0.15, 0.25, 0.35, 0.45):
+            out = v > box_hi + 1e-9
+            legs.append({"label": f"fwd_{v:.2f}" + ("_OUT_OF_BOX" if out else ""),
+                         "kind": "straight", "vx": v, "vy": 0.0, "wz": 0.0,
+                         "out_of_box": out})
+
     print(f"task        {args.task}")
     print(f"checkpoint  {ckpt.relative_to(ROOT)}")
     print(f"tested      {args.robots} robots, {seconds:.0f} s each"
@@ -911,12 +1118,18 @@ def main() -> int:
                 print(f"pass        {label} at {held}")
             raw = run_pass(env, robot, origins, policy, torch,
                            seconds=seconds, robots=args.robots, target=target,
-                           device="cuda:0", leg=leg, cmd=cmd)
+                           device="cuda:0", leg=leg, cmd=cmd,
+                           diag=args.gait_diag)
             rows, dump = score_pass(raw, spec, torch, seconds=seconds,
                                     robots=args.robots, target=target, label=label)
             checks = rows if checks is None else worse_of(checks, rows)
             if dump:
                 per_robot[label] = dump
+            if raw.get("gait") is not None:
+                stats = gait_stats(raw, torch, seconds=seconds)
+                if leg and leg.get("out_of_box"):
+                    stats["out_of_box"] = True
+                per_robot.setdefault(label, {}).update(stats)
             if raw["path"] is not None:
                 paths[label] = {
                     "command": [leg["vx"], leg["vy"], leg["wz"]],
@@ -960,7 +1173,9 @@ def main() -> int:
         why = (f"diagnostic run ({', '.join(switched_off)} switched off)"
                if switched_off else "--no-record: measured, not judged")
         print(f"\nnot recorded - {why}")
-        _dump_diagnostic(ROOT, log_dir.name, switched_off or ["norecord"],
+        tags = (switched_off or ["norecord"]) \
+            + (["gait"] if args.gait_diag else [])
+        _dump_diagnostic(ROOT, log_dir.name, tags,
                          per_robot, paths, ckpt, args.robots, seconds)
         env.close()
         return 0 if passed else 1
