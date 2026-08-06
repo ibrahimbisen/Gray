@@ -452,10 +452,16 @@ def run_pass(env, robot, origins, policy, torch, *, seconds, robots, target,
     start_heading = robot.data.heading_w.clone()
     path.append(start_xy.clone())
 
+    # Heights are measured above the LOCAL ground, not the env origin - on
+    # the flat floor the two are the same number, on the slope batches only
+    # the first one means anything. Same table read the task's terms use.
+    from gray.tasks.walk_env_cfg import ground_height_under  # noqa: PLC0415
+
     with torch.inference_mode():
         for step in range(int(seconds * 50)):
             obs = env.step(policy(obs))[0]
-            h = robot.data.root_link_pos_w[:, 2] - origins[:, 2]
+            root = robot.data.root_link_pos_w
+            h = root[:, 2] - ground_height_under(env.unwrapped, root[:, :2])
             up = -robot.data.projected_gravity_b[:, 2]   # 1.0 is dead level
             heights.append(h.clone())
             uprights.append(up.clone())
@@ -477,8 +483,9 @@ def run_pass(env, robot, origins, policy, torch, *, seconds, robots, target,
                     fell & (gait["first_fall"] < 0),
                     torch.full_like(gait["first_fall"], (step + 1) / 50.0),
                     gait["first_fall"])
-                feet_h = (robot.data.site_pos_w[:, gait["foot_ids"], 2]
-                          - origins[:, 2].unsqueeze(1))
+                sites = robot.data.site_pos_w[:, gait["foot_ids"], :]
+                feet_h = sites[..., 2] - ground_height_under(
+                    env.unwrapped, sites[..., :2])
                 in_air = gait["feet"].data.found == 0
                 gait["peak"] = torch.where(
                     in_air, torch.maximum(gait["peak"], feet_h), gait["peak"])

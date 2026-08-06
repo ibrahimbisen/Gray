@@ -4,14 +4,14 @@
   "stage": 5,
   "stage_name": "Walk",
   "task": "Gray-Walk",
-  "status": "failed",
+  "status": "finished",
   "bar": "Walks 5 m without falling, holds commanded speed within 0.05 m/s, and drifts less than 100 mm sideways over 20 s.",
-  "started": "2026-08-06T09:26:33",
-  "finished": "2026-08-06T09:27:30",
-  "iterations_target": 550,
+  "started": "2026-08-06T09:32:12",
+  "finished": "2026-08-06T09:32:56",
+  "iterations_target": 3,
   "num_envs": 5000,
   "num_steps_per_env": 24,
-  "seed": 2207,
+  "seed": 1,
   "notes": "5000 robots at once, 50 Hz control.",
   "scoring": [
     {
@@ -271,7 +271,7 @@
     "rel_crab_envs": 0.15,
     "rel_spin_envs": 0.1,
     "swing_target_m": 0.05,
-    "slope_deg": 4.0
+    "slope_deg": 7.0
   },
   "world_dials": [
     {

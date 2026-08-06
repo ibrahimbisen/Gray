@@ -41,3 +41,10 @@ operable program or batch file.
 [09:26:19] idle - 0 queued
 [09:26:28] j0185  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 4.0
 [09:26:33] j0185  -> progress/runs/2026-08-06_09-26-33_s1_4deg_s2207
+[09:28:04] j0185  FAILED (exit 1)
+[09:28:04] j0186  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 7.0
+[09:28:09] j0186  -> progress/runs/2026-08-06_09-28-09_s2_7deg_s2207
+[09:29:16] j0186  FAILED (exit 1)
+[09:29:16] paused - not taking new jobs
+[09:33:12] j0187  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 10.0
+[09:33:17] j0187  -> progress/runs/2026-08-06_09-33-17_s3_10deg_s2207

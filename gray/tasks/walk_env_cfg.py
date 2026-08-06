@@ -63,12 +63,7 @@ from mjlab.managers import (
     RewardTermCfg,
     TerminationTermCfg,
 )
-from mjlab.sensor import (
-    ContactSensorCfg,
-    ObjRef,
-    RingPatternCfg,
-    TerrainHeightSensorCfg,
-)
+from mjlab.sensor import ContactSensorCfg
 from mjlab.sensor.contact_sensor import ContactMatch
 from mjlab.terrains import (
     HfPyramidSlopedTerrainCfg,
@@ -384,30 +379,80 @@ def stepping(env, sensor_name: str = "feet", lo: float = 0.10, hi: float = 0.45,
     return mid * told_to_move.float()
 
 
-def _foot_height(env, asset_cfg) -> torch.Tensor:
-    """Each foot's height above the LOCAL ground, from the raycast scan.
+def ground_height_under(env, xy: torch.Tensor) -> torch.Tensor:
+    """The ground surface's height at world (x, y). Any leading shape.
 
-    Until 6 Aug 2026 this was site z minus the env origin's z - identical on a
-    flat floor, and wrong by the full height of the hill on anything else. The
-    walk scene now carries a foot_height_scan (one ray ring under each foot
-    site), so the number is right on the slope batches too. The env-origin
-    subtraction stays as the fallback for an env built without the sensor.
+    On the flat floor this is zero everywhere - the same number subtracting
+    the env origin's z always gave. On a heightfield (the slope batches) it
+    is a bilinear read of the model's own grid: the same data the physics
+    collides against, so the number cannot disagree with the world.
+
+    A table read, not a sensor, on purpose. The first version used mjlab's
+    raycast TerrainHeightSensor, which ran at 64 robots and died with CUDA
+    719 launch failures at 5000 - s1_4deg_s2207 is the run it killed. A
+    static world's height does not need rays.
     """
-    try:
-        return env.scene["foot_height_scan"].data.heights
-    except KeyError:
-        asset = env.scene[asset_cfg.name]
-        return (asset.data.site_pos_w[:, asset_cfg.site_ids, 2]
-                - env.scene.env_origins[:, 2].unsqueeze(1))
+    cache = getattr(env, "_gray_ground", None)
+    if cache is None:
+        import mujoco  # noqa: PLC0415
+        import numpy as np  # noqa: PLC0415
+
+        m = env.sim.mj_model
+        hf_geoms = np.flatnonzero(m.geom_type == mujoco.mjtGeom.mjGEOM_HFIELD)
+        if len(hf_geoms) == 0:
+            cache = None
+            env._gray_ground = (None,)
+        else:
+            gid = int(hf_geoms[0])
+            hid = int(m.geom_dataid[gid])
+            nrow = int(m.hfield_nrow[hid])
+            ncol = int(m.hfield_ncol[hid])
+            adr = int(m.hfield_adr[hid])
+            rx, ry, z_top, _z_base = (float(v) for v in m.hfield_size[hid])
+            grid = torch.tensor(
+                m.hfield_data[adr:adr + nrow * ncol], device=env.device,
+                dtype=torch.float32).reshape(nrow, ncol) * z_top
+            px, py, pz = (float(v) for v in m.geom_pos[gid])
+            cache = (grid, px - rx, py - ry, 2 * rx, 2 * ry, pz, nrow, ncol)
+            env._gray_ground = (cache,)
+    else:
+        cache = cache[0]
+
+    if cache is None:
+        return torch.zeros(xy.shape[:-1], device=xy.device, dtype=xy.dtype)
+
+    grid, x0, y0, sx, sy, pz, nrow, ncol = cache
+    # MuJoCo heightfields: data is [nrow, ncol], rows along y, columns
+    # along x, spanning the size rectangle centred on the geom.
+    u = ((xy[..., 0] - x0) / sx * (ncol - 1)).clamp(0, ncol - 1)
+    v = ((xy[..., 1] - y0) / sy * (nrow - 1)).clamp(0, nrow - 1)
+    u0 = u.floor().long()
+    v0 = v.floor().long()
+    u1 = (u0 + 1).clamp(max=ncol - 1)
+    v1 = (v0 + 1).clamp(max=nrow - 1)
+    fu = (u - u0.float()).to(xy.dtype)
+    fv = (v - v0.float()).to(xy.dtype)
+    top = grid[v0, u0] * (1 - fu) + grid[v0, u1] * fu
+    bot = grid[v1, u0] * (1 - fu) + grid[v1, u1] * fu
+    return pz + top * (1 - fv) + bot * fv
+
+
+def _foot_height(env, asset_cfg) -> torch.Tensor:
+    """Each foot's height above the LOCAL ground.
+
+    Until 6 Aug 2026 this was site z minus the env origin's z - identical on
+    a flat floor, and wrong by the full height of the hill on anything else.
+    """
+    asset = env.scene[asset_cfg.name]
+    pos = asset.data.site_pos_w[:, asset_cfg.site_ids, :]
+    return pos[..., 2] - ground_height_under(env, pos[..., :2])
 
 
 def _trunk_height(env, asset_cfg: SceneEntityCfg = ROBOT) -> torch.Tensor:
     """The trunk's height above the LOCAL ground - same story as _foot_height."""
-    try:
-        return env.scene["trunk_height_scan"].data.heights[:, 0]
-    except KeyError:
-        asset = env.scene[asset_cfg.name]
-        return asset.data.root_link_pos_w[:, 2] - env.scene.env_origins[:, 2]
+    asset = env.scene[asset_cfg.name]
+    pos = asset.data.root_link_pos_w
+    return pos[:, 2] - ground_height_under(env, pos[:, :2])
 
 
 def trunk_below_minimum(env, minimum_height: float) -> torch.Tensor:
@@ -994,33 +1039,12 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # reads it until --dive-ends installs the termination above. base_link is
     # the trunk's one geom; the hips are their own geoms and stay out of it,
     # so a deep crouch does not read as a crash.
-    cfg.scene.sensors = tuple(cfg.scene.sensors) + (
-        ContactSensorCfg(
-            name="trunk",
-            primary=ContactMatch(mode="geom", pattern=("base_link",),
-                                 entity="robot"),
-            fields=("found",),
-        ),
-        # Height above the LOCAL ground, by raycast - one ring under each
-        # foot site and one under the trunk. On the flat floor these read
-        # the same numbers the env-origin subtraction always gave, so
-        # nothing trained before 6 Aug 2026 changes meaning; on the slope
-        # batches they are the difference between measuring the gait and
-        # measuring the hill. go1's rough config is the pattern.
-        TerrainHeightSensorCfg(
-            name="foot_height_scan",
-            frame=tuple(ObjRef(type="site", name=s, entity="robot")
-                        for s in ("fr_foot", "fl_foot", "br_foot", "bl_foot")),
-            pattern=RingPatternCfg.single_ring(radius=0.03, num_samples=4),
-            reduction="min",
-        ),
-        TerrainHeightSensorCfg(
-            name="trunk_height_scan",
-            frame=(ObjRef(type="body", name="base_link", entity="robot"),),
-            pattern=RingPatternCfg.single_ring(radius=0.05, num_samples=4),
-            reduction="min",
-        ),
-    )
+    cfg.scene.sensors = tuple(cfg.scene.sensors) + (ContactSensorCfg(
+        name="trunk",
+        primary=ContactMatch(mode="geom", pattern=("base_link",),
+                             entity="robot"),
+        fields=("found",),
+    ),)
 
     # `collapsed` moves onto the trunk scan in the walk task: height above
     # the ground under the robot, not above the env origin. Identical on the
