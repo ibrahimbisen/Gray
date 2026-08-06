@@ -58,3 +58,15 @@ operable program or batch file.
 [09:58:56] j0189  FAILED (exit 4294967295)
 [09:58:56] j0193  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 4.0
 [09:59:01] j0193  -> progress/runs/2026-08-06_09-59-01_s1_4deg_s2207
+[10:29:45] j0193  verify exited 1 - training kept, the bar was not met or could not be read
+[10:29:45] j0193  done
+[10:29:45] j0194  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 7.0
+[10:29:50] j0194  -> progress/runs/2026-08-06_10-29-50_s2_7deg_s2207
+[10:31:05] j0194  FAILED (exit 4294967295)
+[10:31:05] paused - not taking new jobs
+[10:39:30] j0197  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 4.0
+[10:39:35] j0197  -> progress/runs/2026-08-06_10-39-35_s1_4deg_s2207
+[10:39:49] runner 25584@103949 up. interpreter: C:\Users\Bisen\Desktop\Gray\.venv\Scripts\python.exe
+[10:39:49] queue: progress\queue.json
+[10:39:49] j0197  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 4.0 --init-from 2026-08-06_04-43-00_gc_1301
+[10:39:54] j0197  -> progress/runs/2026-08-06_10-39-54_s1_4deg_s2207

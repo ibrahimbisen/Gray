@@ -54,14 +54,24 @@ ITERATIONS = 550
 SEED = 2207
 ANGLES = (4.0, 7.0, 10.0, 14.0)
 
+# The flat winner every rung continues from. From-scratch was tried first
+# and taught the wrong lesson: the first s1_4deg trained 550 iterations and
+# learned exactly one safe move - stand on the spawn platform and never
+# walk (0.065 m in its flat verify). The flat winner walks the same hill
+# imperfectly but immediately - 33 of 64 dive on the 4 deg descent, which
+# is a thing training can fix, where frozen is not.
+INIT_FROM = "2026-08-06_04-43-00_gc_1301"
+
 WHY = ("PLAN 1.3.2 batch 3, the slope ladder: one angle per run, everything "
-       "else the task as it stands with the gait winners landed. Read falls "
+       "else the task as it stands with the gait winners landed, each rung "
+       f"continuing from the flat winner {INIT_FROM}. Read falls "
        "and ground_covered at 550, then verify --gait-diag --slope-deg on "
        "the checkpoint. The stop row picks the angle batch 4 holds at "
        "1500 x 3 seeds.")
 
 BATCH = [
     {"name": f"s{n + 1}_{int(deg)}deg_s{SEED}", "slope_deg": deg,
+     "init_from": INIT_FROM,
      "note": f"Rung {n + 1} of 4: a {deg:g} degree slope, about "
              f"{deg * 1.75:.0f}% grade. " + WHY}
     for n, deg in enumerate(ANGLES)

@@ -1599,7 +1599,13 @@ FORWARD = {
                            "with film on the recorder renders every step - "
                            "35 s an iteration, 14x the physics. The ladder "
                            "reads numbers; whether the slope CONFIRM pays "
-                           "the render price is its stop row's question",
+                           "the render price is its stop row's question. "
+                           "And every rung CONTINUES FROM THE FLAT WINNER "
+                           "(--init-from gc_1301): the first from-scratch "
+                           "rung learned one safe move in 550 iterations - "
+                           "stand on the spawn platform, never walk. "
+                           "Hardening continues from the trained thing; "
+                           "that is what the plan's shape always said",
                    "asks": "at what slope does it stop walking"},
                   {"stop": "which angle to hold for the confirming runs"},
                   {"n": "4", "stage": "1.3.2", "runs": "3 x 1500",

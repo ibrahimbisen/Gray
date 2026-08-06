@@ -137,6 +137,7 @@ DEFAULTS: dict[str, Any] = {
     "dive_ends": False,       # trunk contact ends the attempt (nose_dived)
     "swing_target": None,     # metres a swing is scored against; None keeps 0.035
     "slope_deg": None,        # tilt of the ground; None/0 is the flat floor
+    "init_from": "",          # run to continue from; "" starts from scratch
     "narrow_dials": "",       # world dials put back to the Gray-Push range, or "all"
     "push_speed": None,     # [min, max] m/s, or None to leave alone
     "push_spin": None,      # [min, max] rad/s
@@ -479,7 +480,7 @@ def _clean(spec: dict) -> dict:
     """
     job = dict(DEFAULTS)
 
-    for key in ("task", "name", "note", "narrow_dials"):
+    for key in ("task", "name", "note", "narrow_dials", "init_from"):
         if spec.get(key) is not None:
             job[key] = str(spec[key])
     for key in ("no_video", "film", "verify", "no_heading_obs", "with_off_track",
@@ -799,6 +800,8 @@ def train_argv(job: dict) -> list[str]:
         argv += ["--swing-target", str(_as_float(job["swing_target"], 0.0))]
     if job.get("slope_deg"):
         argv += ["--slope-deg", str(_as_float(job["slope_deg"], 0.0))]
+    if job.get("init_from"):
+        argv += ["--init-from", str(job["init_from"])]
     if job.get("narrow_dials"):
         argv += ["--narrow-dials", str(job["narrow_dials"])]
 
@@ -828,6 +831,7 @@ def train_argv(job: dict) -> list[str]:
                       ("dive_ends", "--dive-ends"),
                       ("swing_target", "--swing-target"),
                       ("slope_deg", "--slope-deg"),
+                      ("init_from", "--init-from"),
                       ("narrow_dials", "--narrow-dials"),
                       ("push_speed", "--push-speed"),
                       ("push_spin", "--push-spin")):

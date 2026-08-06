@@ -441,8 +441,18 @@ def main() -> int:
                          "angle, every robot on its own copy, spawned on the "
                          "flat platform at its top. PLAN 1.3.2 batch 3, the "
                          "slope ladder. 0 keeps the plane. The height terms "
-                         "and `collapsed` read the ground by raycast, so they "
-                         "mean the same thing on the hill as on the floor.")
+                         "and `collapsed` read the ground from the "
+                         "heightfield table, so they mean the same thing on "
+                         "the hill as on the floor.")
+    ap.add_argument("--init-from", default="", metavar="RUN",
+                    help="continue from this run's newest checkpoint instead "
+                         "of starting from scratch. Hardening continues from "
+                         "the trained walker: the first 4 deg rung trained "
+                         "from scratch, and 550 iterations under the dive "
+                         "termination taught it exactly one safe move - "
+                         "stand on the spawn platform and never walk. The "
+                         "flat winner walks the same hill imperfectly but "
+                         "immediately; it has something to improve.")
     ap.add_argument("--narrow-dials", default="",
                     help="put named world dials back to their Gray-Push values, "
                          "comma separated, or 'all'. The walk task widens all "
@@ -559,6 +569,11 @@ def main() -> int:
         apply_slope(cfg.env, args.slope_deg)
         print(f"terrain       a {args.slope_deg:g} deg slope instead of the "
               f"flat floor")
+    if args.init_from:
+        cfg.agent.resume = True
+        cfg.agent.load_run = args.init_from
+        print(f"init          continuing from {args.init_from}, its newest "
+              f"checkpoint")
     if args.narrow_dials:
         # `narrow_dials` is set by walk_env_cfg while it widens them, so it holds
         # the value each dial actually had, not a second copy of the table.
@@ -732,6 +747,10 @@ def main() -> int:
             # rungs differ in nothing else.
             "slope_deg": float(args.slope_deg) or None,
         },
+        # The run this one continued from, or None for from-scratch. A
+        # fine-tuned run and a fresh one cannot be compared as equals, and
+        # without this field nothing on the record says which is which.
+        "init_from": args.init_from or None,
         # The world the run trained in, read off the live config. Added 5 Aug
         # 2026, and it is not a nicety: /dials reads the SOURCE file, so it
         # shows the task default and every run looks alike. Batch 2 of PLAN
