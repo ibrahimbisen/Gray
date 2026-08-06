@@ -70,3 +70,18 @@ operable program or batch file.
 [10:39:49] queue: progress\queue.json
 [10:39:49] j0197  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 4.0 --init-from 2026-08-06_04-43-00_gc_1301
 [10:39:54] j0197  -> progress/runs/2026-08-06_10-39-54_s1_4deg_s2207
+[11:19:05] j0197  verify exited 1 - training kept, the bar was not met or could not be read
+[11:19:05] j0197  done
+[11:19:05] j0198  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 7.0 --init-from 2026-08-06_04-43-00_gc_1301
+[11:19:10] j0198  -> progress/runs/2026-08-06_11-19-10_s2_7deg_s2207
+[12:21:32] j0198  verify exited 1 - training kept, the bar was not met or could not be read
+[12:21:32] j0198  done
+[12:21:32] j0199  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 10.0 --init-from 2026-08-06_04-43-00_gc_1301
+[12:21:37] j0199  -> progress/runs/2026-08-06_12-21-37_s3_10deg_s2207
+[12:58:55] j0199  verify exited 1 - training kept, the bar was not met or could not be read
+[12:58:55] j0199  done
+[12:58:55] j0200  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 14.0 --init-from 2026-08-06_04-43-00_gc_1301
+[12:59:00] j0200  -> progress/runs/2026-08-06_12-59-00_s4_14deg_s2207
+[13:37:55] j0200  verify exited 1 - training kept, the bar was not met or could not be read
+[13:37:55] j0200  done
+[13:37:55] idle - 0 queued

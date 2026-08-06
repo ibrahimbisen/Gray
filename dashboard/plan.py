@@ -1606,8 +1606,29 @@ FORWARD = {
                            "stand on the spawn platform, never walk. "
                            "Hardening continues from the trained thing; "
                            "that is what the plan's shape always said",
-                   "asks": "at what slope does it stop walking"},
-                  {"stop": "which angle to hold for the confirming runs"},
+                   "asks": "at what slope does it stop walking",
+                   "done": "IT DOES NOT, INSIDE THIS LADDER - and that is "
+                           "the finding. Every rung stays up: 97, 95, 88, "
+                           "97 percent alive over 30 s at 4, 7, 10 and 14 "
+                           "deg. What degrades instead is DISTANCE, "
+                           "smoothly: 2.35, 3.60, 1.64, 1.39 m against a "
+                           "5.0 m flat bar, and in training ground_covered "
+                           "0.56, 0.50, 0.40, 0.37. The robot does not fall "
+                           "off the hill, it stops climbing it - and the "
+                           "worst pass is always BACKWARD or SIDEWAYS, "
+                           "never forward. 550 warm iterations per rung is "
+                           "also short: 4 deg had not converged either. The "
+                           "cliff is past 14 deg or past this run length, "
+                           "and this ladder cannot say which."},
+                  {"stop": "which angle to hold for the confirming runs. "
+                           "PICKED 6 Aug: 10 deg. It is the steepest rung "
+                           "that shows real strain - the only sub-90% "
+                           "survival, 8 of 64 down on a sideways traverse - "
+                           "so it is where 1500 iterations buy something "
+                           "measurable, and 18% grade covers any ground a "
+                           "3.1 kg robot is asked to work on. 14 deg is not "
+                           "harder in the numbers, which is itself a reason "
+                           "to distrust reading it at 550."},
                   {"n": "4", "stage": "1.3.2", "runs": "3 x 1500",
                    "code": "slope held at that angle",
                    "asks": "all eleven criteria, on a slope"},
