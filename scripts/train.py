@@ -416,6 +416,26 @@ def main() -> int:
                          "turned out to cost turn accuracy, so it has to be "
                          "variable to be measured - 0 switches it off entirely "
                          "and gives the draw mix as it was before 5 Aug 2026.")
+    ap.add_argument("--spin-share", type=float, default=None,
+                    help="the share of commands drawn as a PURE turn on the "
+                         "spot, 0 to 1. The task default is 0.0 - an "
+                         "independent draw produces a pure spin about once in "
+                         "80, which is why the 1.00 rad/s spin bar was never "
+                         "passed by a robot that turns well driven. The g1 "
+                         "probe of the gait batch runs this at 0.10.")
+    ap.add_argument("--dive-ends", action="store_true",
+                    help="install the nose_dived termination: the trunk shell "
+                         "touching anything ends the attempt, and fell_over "
+                         "pays its -40 for it. The trunk contact sensor is "
+                         "always on; this makes it terminal. The g2 probe of "
+                         "the gait batch - the owner's films show a nose-down "
+                         "collapse that today costs the policy nothing.")
+    ap.add_argument("--swing-target", type=float, default=0.0, metavar="M",
+                    help="the height a swing is scored against, in metres, on "
+                         "BOTH dragging and swing_height. The task uses 0.035, "
+                         "chosen when 35 mm matched the stage 3 bar. The g3 "
+                         "probe runs 0.05: a foot with 35 mm in hand has "
+                         "nothing left for ground that is not a floor.")
     ap.add_argument("--narrow-dials", default="",
                     help="put named world dials back to their Gray-Push values, "
                          "comma separated, or 'all'. The walk task widens all "
@@ -503,6 +523,29 @@ def main() -> int:
         was = walk_cmd.rel_crab_envs
         walk_cmd.rel_crab_envs = args.crab_share
         print(f"command mix   pure sideways share: {was} -> {args.crab_share}")
+    if args.spin_share is not None:
+        walk_cmd = cfg.env.commands.get("walk")
+        if walk_cmd is None or not hasattr(walk_cmd, "rel_spin_envs"):
+            raise SystemExit(f"{args.task} has no spin share to set")
+        was = walk_cmd.rel_spin_envs
+        walk_cmd.rel_spin_envs = args.spin_share
+        print(f"command mix   pure spin share: {was} -> {args.spin_share}")
+    if args.dive_ends:
+        from gray.tasks.walk_env_cfg import dive_termination  # noqa: PLC0415
+
+        if "trunk" not in {s.name for s in getattr(cfg.env.scene, "sensors", ())}:
+            raise SystemExit(f"{args.task} has no trunk contact sensor to read")
+        cfg.env.terminations["nose_dived"] = dive_termination()
+        print("termination   nose_dived: trunk contact ends the attempt")
+    if args.swing_target:
+        was = None
+        for name in ("dragging", "swing_height"):
+            term = cfg.env.rewards.get(name)
+            if term is None:
+                raise SystemExit(f"{args.task} has no '{name}' term to retarget")
+            was = term.params["target"]
+            term.params["target"] = args.swing_target
+        print(f"tolerance     swing target: {was} -> {args.swing_target} m")
     if args.narrow_dials:
         # `narrow_dials` is set by walk_env_cfg while it widens them, so it holds
         # the value each dial actually had, not a second copy of the table.
@@ -660,6 +703,18 @@ def main() -> int:
                                      "gyro_bias_rad", None),
             "gyro_walk_rad_per_s": getattr(cfg.env.commands.get("walk"),
                                            "gyro_walk_rad_per_s", None),
+            # The draw mix, recorded since 6 Aug 2026. The g1 spin probe
+            # differs from its control in NOTHING but rel_spin_envs, and
+            # before this the only record of that was the job note.
+            "rel_crab_envs": getattr(cfg.env.commands.get("walk"),
+                                     "rel_crab_envs", None),
+            "rel_spin_envs": getattr(cfg.env.commands.get("walk"),
+                                     "rel_spin_envs", None),
+            # The swing target, for the same reason: g3 differs from its
+            # control in nothing but this number.
+            "swing_target_m": (
+                float(cfg.env.rewards["swing_height"].params["target"])
+                if "swing_height" in cfg.env.rewards else None),
         },
         # The world the run trained in, read off the live config. Added 5 Aug
         # 2026, and it is not a nicety: /dials reads the SOURCE file, so it

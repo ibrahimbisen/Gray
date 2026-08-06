@@ -273,6 +273,19 @@ class StraightLineVelocityCommand(UniformVelocityCommand):
         lo, hi = self.cfg.ranges.lin_vel_y
         self._pin(env_ids[crab], 1, lo, hi, self.cfg.crab_min_speed)
 
+        # Spin: turning on the spot, added 6 Aug 2026 - the third payment on
+        # the same lesson. The three velocities are drawn independently, so a
+        # PURE spin - turn, no travel - needs |vx| AND |vy| under 0.05 at the
+        # same time: about one draw in 80. The turn bar scores nothing else,
+        # and scores it at 1.00 rad/s, the edge of the range. The robot was
+        # never unable to turn - driven, it turns at about three quarters of
+        # any rate it is asked - it had just never practised turning WITHOUT
+        # travel. Exposure, not ability, exactly as with the crab above.
+        spin = (roll >= s + self.cfg.rel_crab_envs) & \
+            (roll < s + self.cfg.rel_crab_envs + self.cfg.rel_spin_envs)
+        lo, hi = self.cfg.ranges.ang_vel_z
+        self._pin(env_ids[spin], 2, lo, hi, self.cfg.spin_min_rate)
+
 
 @dataclass
 class StraightLineVelocityCommandCfg(UniformVelocityCommandCfg):
@@ -292,6 +305,15 @@ class StraightLineVelocityCommandCfg(UniformVelocityCommandCfg):
     # of the range, so a crab draw is not pushed to the edge more often than a
     # straight one is. Still well clear of the 0.05 gate.
     crab_min_speed: float = 0.06
+    # The share that gets a PURE TURN command - the third exposure fix, same
+    # shape as the two above. An independent draw produces a pure spin about
+    # once in 80. 0.0 here so no other task changes behaviour; the walk task
+    # carries the field and --spin-share on train.py sets it for a probe.
+    rel_spin_envs: float = 0.0
+    # The floor for the spin share, in rad/s. Below about 0.3 a turn command
+    # is a stand with a wobble - the 0.05 gate reads it as movement but the
+    # feet barely have to step to satisfy it.
+    spin_min_rate: float = 0.30
     # What counts as "told to hold a line": SPEED OF TRAVEL above this in any
     # direction, and turn below it. Same 0.05 the reward gate used, in one place
     # now. It required the travel to be forward until 4 Aug 2026, which switched

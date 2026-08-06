@@ -59,7 +59,10 @@ from mjlab.managers import (
     EventTermCfg,
     ObservationTermCfg,
     RewardTermCfg,
+    TerminationTermCfg,
 )
+from mjlab.sensor import ContactSensorCfg
+from mjlab.sensor.contact_sensor import ContactMatch
 from mjlab.tasks.velocity import mdp as vmdp
 
 from mjlab.managers import SceneEntityCfg
@@ -874,12 +877,46 @@ WIDE_DIALS = {
 }
 
 
+def dive_termination() -> TerminationTermCfg:
+    """The nose-dive, made terminal: the trunk touching anything ends the attempt.
+
+    Contact rather than a pitch window, on purpose. The trunk shell meeting the
+    floor is the physical event the owner films - it is true whichever way a
+    sign convention points, and it catches a sideways collapse the same as a
+    dive. `fell_over` already pays -40 on any termination, so the price arrives
+    with no new reward term.
+
+    Built by a function, not shared as a module constant: config objects are
+    mutable, and one instance passed into two builds is one build editing the
+    other.
+
+    Installed by train.py's --dive-ends for the g2 probe of the gait batch
+    (6 Aug 2026). If the probe reads well, the confirm runs land it here as a
+    task default beside tipped_over and collapsed.
+    """
+    return TerminationTermCfg(func=vmdp.illegal_contact,
+                              params={"sensor_name": "trunk"})
+
+
 def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     cfg = push_env_cfg(play=play)
 
     # A first walk has enough to deal with. The randomised ground, mass and servo
     # gains stay; only the shoving stops.
     cfg.events.pop("shove", None)
+
+    # A contact sensor on the trunk shell, beside the feet one the stand task
+    # declares. The sensor is ALWAYS here - it is free, and a sensor that only
+    # exists on some runs is a diagnostic nobody can compare - but nothing
+    # reads it until --dive-ends installs the termination above. base_link is
+    # the trunk's one geom; the hips are their own geoms and stay out of it,
+    # so a deep crouch does not read as a crash.
+    cfg.scene.sensors = tuple(cfg.scene.sensors) + (ContactSensorCfg(
+        name="trunk",
+        primary=ContactMatch(mode="geom", pattern=("base_link",),
+                             entity="robot"),
+        fields=("found",),
+    ),)
 
     # PLAN.md 1.3.1 - the five dials, made wider. 5 Aug 2026.
     #
@@ -1016,6 +1053,14 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
             # code and the flag are kept for a future attempt.
             rel_straight_envs=0.5,
             rel_crab_envs=0.15,
+            # The pure-spin share. 0.0 until the g1 probe reads well - an
+            # independent draw makes a pure spin about once in 80, which is
+            # why the turn bar (a spin on the spot at 1.00 rad/s) has never
+            # been passed by a robot that demonstrably turns when driven.
+            # Decided 6 Aug 2026: train the case rather than move the bar.
+            # The probe drives 0.10 through --spin-share; this stays the
+            # written-down default until the confirm runs land it.
+            rel_spin_envs=0.0,
             straight_min_speed=0.10,
             ranges=vmdp.UniformVelocityCommandCfg.Ranges(
                 lin_vel_x=WALK_SPEED, lin_vel_y=WALK_SIDE, ang_vel_z=WALK_TURN),

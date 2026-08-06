@@ -680,41 +680,34 @@ PHASES = [
 ]
 
 NEXT_UP = {
-    "title": "PLAN.md 1.2.2  Make it turn at the rate it is told",
-    "why": "1.1 passed on 4 Aug on three seeds it had never seen, so the robot "
-           "walks straight, forward and backward. The same day verify learned to "
-           "test the other half of the command box - crabbing sideways and turning "
-           "on the spot - which the policy had been TRAINED on since 3 Aug and which "
-           "nothing had ever graded. Those three passing seeds turn at about half the "
-           "rate they are told to: 0.44 to 0.51 rad/s of error against a 1.0 rad/s "
-           "command, against a new 0.20 bar. That is what this step closes.",
+    "title": "The gait batch  Fix what the films show",
+    "why": "1.3.1 batches 1 and 2 answered their question - the dials are "
+           "innocent - and turning was never the fault: the robot turns at "
+           "about three quarters of any rate it is asked, and the bar tests a "
+           "spin the draw almost never produced. What the films show instead: "
+           "feet that barely clear the floor against a 35 mm target, a nose a "
+           "few degrees down in every forward walk, and a nose-down collapse "
+           "after a short walk that today costs the policy nothing. verify "
+           "--gait-diag measures all of it since 6 Aug. Five probes, one "
+           "lever each; the winners together on three seeds; then terrain.",
     "before": [
-        {"task": "1.2.1  Grade sideways and turning - DONE 4 Aug", "who": "code",
-         "note": "Verify runs four passes now, not two, and carries five new bars. It "
-                 "cost nothing to find because it needs no training: the three "
-                 "finished 1.1 policies were re-scored in minutes, with --no-record so "
-                 "the measurement could not overwrite the verdicts that closed 1.1."},
-        {"task": "1.2.2  Batch 1, the turn band and weight", "who": "code",
-         "note": "4 runs, 5000 robots, 550 iterations. turn_std 0.80 or 0.40 crossed "
-                 "with track_turn 1.0 or 3.0. At std 0.80 the 0.5 rad/s error the "
-                 "robot actually makes still pays 0.68 of 1.0, so turning correctly is "
-                 "worth 0.32 against terms that all charge more for turning harder - "
-                 "under-turning is simply cheaper. This is the same trap as TRACK_STD, "
-                 "in the other direction, for the second time."},
-        {"task": "1.2.3  Score the path on a sideways command", "who": "code",
-         "note": "Crab comes in 20 to 34 deg off the line. `wandering`, `veering` and "
-                 "the `off_line` input are all gated on `_straight_now()`, so on a "
-                 "crab command the policy is asked to hold a line it is neither shown "
-                 "nor charged for missing - exactly what forward walking was doing "
-                 "before it could sense its heading. Needs a code change and a wider "
-                 "observation, so it is its own batch."},
-        {"task": "Close step 1.2's gate", "who": "code",
-         "note": "All eleven criteria pass, on unseen seeds. NINE of eleven today - "
-                 "the six straight-line ones, crab distance, crab speed and turn "
-                 "wander. The two that fail are crab drift, at 19.9 to 34.1 deg "
-                 "against 4.0, and turn rate, at 0.44 to 0.51 rad/s against 0.20. Two "
-                 "faults, two different fixes, one batch each. Only then does 1.3 turn "
-                 "the dials up."},
+        {"task": "Point the instruments at the gait - DONE 6 Aug", "who": "code",
+         "note": "verify --gait-diag and --ladder: signed pitch (error_pitch "
+                 "threw the sign away before any chart), swing peak heights, "
+                 "dive counts, first-fall times, and a forward speed ladder "
+                 "with one rung past the box. The attitude signs are measured "
+                 "now, not asserted - nose down and right-side down are both "
+                 "NEGATIVE, by scripts/measure_pitch_sign.py."},
+        {"task": "The gait batch, 2b - five probes", "who": "code",
+         "note": "g0 control, g1 spin share 0.10, g2 the trunk touching "
+                 "ground ends the attempt, g3 swing target 50 mm, g4 "
+                 "swing_height weight -1.0. One lever per run, 550 "
+                 "iterations, seed 2207 - scripts/queue_13c.py."},
+        {"task": "Confirm, 2c - the winners together", "who": "code",
+         "note": "3 x 1500 on fresh seeds, all eleven criteria plus the gait "
+                 "numbers. The winners land in the task as defaults, and "
+                 "1.3.2 begins - slopes first, then rough ground, and the "
+                 "clearance terms move onto the terrain height sensor."},
         {"task": "Sit down and list the parts", "who": "owner",
          "note": "Slicer grams per printed part, plus the exact battery, Pi, boards, "
                  "pots and fasteners. Closes the largest guess in stage 1 and needs no "
@@ -1549,6 +1542,30 @@ FORWARD = {
                            "the case - a pure-spin share in the command draw, "
                            "the same fix the crab share was. That is the g1 "
                            "probe of the gait batch below."},
+                  # The gait batch, inserted 6 Aug 2026 after the owner's
+                  # films showed three faults no instrument recorded: feet
+                  # that barely lift, a nose that points down walking
+                  # forward, a nose-down collapse after a short walk. The
+                  # instruments came first - verify --gait-diag and --ladder
+                  # measure signed pitch, swing peaks, dives and first-fall
+                  # times - and these runs are the first read with them.
+                  {"n": "2b", "stage": "gait", "runs": "5 x 550",
+                   "code": "queue_13c.py - one lever per run",
+                   "asks": "which lever lifts the feet, which stops the "
+                           "nose-down dive, and does a 10% pure-spin share "
+                           "cut the turn error. g1 spin share, g2 the trunk "
+                           "touching ground ends the attempt, g3 swing "
+                           "target 35 to 50 mm, g4 swing_height weight "
+                           "-0.25 to -1.0, plus an all-default control at "
+                           "the same length"},
+                  {"stop": "pick the winning combination, read with verify "
+                           "--gait-diag against g0_control"},
+                  {"n": "2c", "stage": "gait", "runs": "3 x 1500",
+                   "code": "the winning levers together",
+                   "asks": "all eleven criteria plus the gait numbers, on "
+                           "three fresh seeds - then the winners land in "
+                           "the task as defaults"},
+                  {"stop": "the gait holds, or one lever needs another pass"},
                   {"n": "3", "stage": "1.3.2", "runs": "4 x 550",
                    "code": "ground that tilts",
                    "asks": "at what slope does it stop walking"},
@@ -1584,8 +1601,8 @@ FORWARD = {
                    "asks": "the policy that goes on the robot"},
               ],
               "batches_note":
-                  "About 116 runs and 53 hours of card time. Batches 1 to 8 are "
-                  "about 15 hours and end with a robot that PASSES. Batches 9 "
+                  "About 124 runs and 57 hours of card time. Batches 1 to 8 are "
+                  "about 19 hours and end with a robot that PASSES. Batches 9 "
                   "to 11 are about 38 hours and end with the BEST one; they are "
                   "optional, and they only pay if you want margin rather than a "
                   "pass. Batch 9 cannot pick a winner - at 550 iterations crab "
@@ -1593,7 +1610,12 @@ FORWARD = {
                   "bad half. Batches 3, 5 and 6 are ladders: raise one number "
                   "until it fails, write down where, and no decision is needed "
                   "inside them. Batch 2 was the one that might never happen. "
-                  "Batch 1 failed 3 seeds out of 3, so it happens.",
+                  "Batch 1 failed 3 seeds out of 3, so it happens. The gait "
+                  "batch (2b, 2c) was inserted 6 Aug, when the owner's films "
+                  "showed faults in the gait itself that no criterion in the "
+                  "eleven measures - it goes before terrain because a foot "
+                  "that clears 35 mm and a nose that digs in have no chance "
+                  "on a slope.",
               },
              {"id": "1.4", "name": "Measure",
               "goal": "Write down what it can actually do. Nothing is trained.",
@@ -2193,6 +2215,10 @@ def dials() -> dict:
         # and the whole explanation was that a pure crab turned up about once in
         # 350 draws. A share the page does not show is a share nobody checks.
         ("crab", r"rel_crab_envs\s*=\s*([\d.]+)"),
+        # The pure-spin share, added 6 Aug 2026 - the third exposure fix. A
+        # pure spin comes up about once in 80 independent draws, and the turn
+        # bar tests nothing else. Same lesson, third payment.
+        ("spin", r"rel_spin_envs\s*=\s*([\d.]+)"),
     ):
         hit = re.search(pattern, wsrc)
         mix[key] = float(hit.group(1)) if hit else None

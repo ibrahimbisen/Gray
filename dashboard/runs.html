@@ -673,6 +673,15 @@ function scoring(run){
       "a fixed error on the heading the POLICY reads, per episode"],
     gyro_walk_rad_per_s:["heading sensor drift", "rad/rt-s",
       "how far that reading wanders. 0 is a perfect gyro, which the robot has not got"],
+    /* The draw mix, recorded per run since 6 Aug 2026. The g1 spin probe
+       differs from its control in nothing but rel_spin_envs, so without
+       these two rows the runs would be indistinguishable on this page. */
+    rel_crab_envs:      ["pure sideways share", "of draws",
+      "how often a command is a pure crab. The task uses 0.15"],
+    rel_spin_envs:      ["pure spin share", "of draws",
+      "how often a command is a pure turn on the spot. 0 before 6 Aug 2026"],
+    swing_target_m:     ["swing height target", "m",
+      "the height dragging and swing_height score a foot against. 0.035 before 6 Aug 2026"],
   };
   const tol = run.tolerances || {};
   const tolRows = Object.keys(TOL).filter(k => tol[k] !== null && tol[k] !== undefined);

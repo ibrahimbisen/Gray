@@ -133,6 +133,9 @@ DEFAULTS: dict[str, Any] = {
     "no_heading_obs": False,  # train blind, the pre-4-Aug 48-input policy
     "with_off_track": False,  # ADD the cross-track input; off by default, it lost ground
     "crab_share": None,       # share of draws that are a PURE sideways step
+    "spin_share": None,       # share of draws that are a PURE turn on the spot
+    "dive_ends": False,       # trunk contact ends the attempt (nose_dived)
+    "swing_target": None,     # metres a swing is scored against; None keeps 0.035
     "narrow_dials": "",       # world dials put back to the Gray-Push range, or "all"
     "push_speed": None,     # [min, max] m/s, or None to leave alone
     "push_spin": None,      # [min, max] rad/s
@@ -478,7 +481,8 @@ def _clean(spec: dict) -> dict:
     for key in ("task", "name", "note", "narrow_dials"):
         if spec.get(key) is not None:
             job[key] = str(spec[key])
-    for key in ("no_video", "film", "verify", "no_heading_obs", "with_off_track"):
+    for key in ("no_video", "film", "verify", "no_heading_obs", "with_off_track",
+                "dive_ends"):
         if spec.get(key) is not None:
             job[key] = _as_bool(spec[key])
     for key in ("num_envs", "iterations", "seed"):
@@ -486,7 +490,8 @@ def _clean(spec: dict) -> dict:
             job[key] = _as_int(spec[key], DEFAULTS[key])
     if spec.get("stop_at") is not None:
         job["stop_at"] = _as_float(spec["stop_at"], DEFAULTS["stop_at"])
-    for key in ("turn_std", "upright_std", "crab_share"):
+    for key in ("turn_std", "upright_std", "crab_share", "spin_share",
+                "swing_target"):
         if spec.get(key) is not None:
             job[key] = _as_float(spec[key], 0.0)
     # NOTE the pair fields are listed here AND in train_argv, and they have to
@@ -784,6 +789,13 @@ def train_argv(job: dict) -> list[str]:
     # added, and the run would train at 0.15 under a name saying 0.
     if job.get("crab_share") is not None:
         argv += ["--crab-share", str(_as_float(job["crab_share"], 0.0))]
+    # Same rule, same reason: 0 switches the spin share off, so `is not None`.
+    if job.get("spin_share") is not None:
+        argv += ["--spin-share", str(_as_float(job["spin_share"], 0.0))]
+    if job.get("dive_ends"):
+        argv += ["--dive-ends"]
+    if job.get("swing_target"):
+        argv += ["--swing-target", str(_as_float(job["swing_target"], 0.0))]
     if job.get("narrow_dials"):
         argv += ["--narrow-dials", str(job["narrow_dials"])]
 
@@ -802,13 +814,16 @@ def train_argv(job: dict) -> list[str]:
     # `zero_means_something` names the fields where 0 is a real setting rather
     # than "unset", so the check below tests them with `is not None`. Get this
     # wrong and the guard is blind to exactly the run it exists to protect.
-    zero_means_something = ("crab_share",)
+    zero_means_something = ("crab_share", "spin_share")
     for key, flag in (("turn_std", "--turn-std"),
                       ("upright_std", "--upright-std"),
                       ("gyro_noise", "--gyro-noise"),
                       ("no_heading_obs", "--no-heading-obs"),
                       ("with_off_track", "--with-off-track"),
                       ("crab_share", "--crab-share"),
+                      ("spin_share", "--spin-share"),
+                      ("dive_ends", "--dive-ends"),
+                      ("swing_target", "--swing-target"),
                       ("narrow_dials", "--narrow-dials"),
                       ("push_speed", "--push-speed"),
                       ("push_spin", "--push-spin")):
