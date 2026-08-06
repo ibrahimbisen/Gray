@@ -142,7 +142,22 @@ def _robot_cfg() -> EntityCfg:
     pose, height = _stance()
 
     def spec() -> mujoco.MjSpec:
-        return mujoco.MjSpec.from_file(str(MJCF))
+        s = mujoco.MjSpec.from_file(str(MJCF))
+        # THE ROBOT BRINGS ITS OWN FLOOR, and the scene already has one.
+        # gray.xml carries `<geom name="floor" type="plane" material="grid">`
+        # because it has to stand on something when opened on its own in the
+        # MuJoCo viewer. Inside a scene it is a second ground surface: an
+        # INFINITE, SOLID plane at z=0, on top of whatever terrain the scene
+        # built. Coplanar with the flat floor it only caused the striped
+        # flicker the owner spotted on 6 Aug 2026 - two surfaces fighting for
+        # the same pixels. On real terrain it is worse than cosmetic: the
+        # playground's bowl sinks to -390 mm, so the plane floors it over and
+        # the robot walks across an invisible lid.
+        #
+        # Removed here rather than in the XML, so the file stays openable on
+        # its own - which is what the floor is there for.
+        s.delete(s.geom("floor"))
+        return s
 
     return EntityCfg(
         init_state=EntityCfg.InitialStateCfg(
