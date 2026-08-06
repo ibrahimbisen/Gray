@@ -6,70 +6,39 @@ each time it comes up.
 
 ---
 
-## 1. Stop a run when the reward reaches 96.5% of its ceiling
+## 1. A run trains its full schedule. There is no early stop.
 
-**The rule.** Training stops as soon as the mean reward reaches 96.5% of the most
-it could possibly score. It does not run out its remaining iterations.
+**The rule.** A run trains every iteration it was asked for. Nothing ends it
+early except a person, a crash, or the queue runner being told to stop.
 
-**Why there is a ceiling at all.** Every positive scoring term is capped at 1.0
-and is multiplied by its weight and by the timestep, then summed over the
-episode. So the largest score an episode can reach is:
+**What was here before, and why it is gone** (owner's call, 6 Aug 2026).
+Training used to stop as soon as the mean reward reached 96.5% of the most an
+episode could score — the sum of the positive weights times the episode length.
+The argument was that at the ceiling every positive term is maxed, so the rest
+of the schedule is polish. `--stop-at` was the dial, and it defaulted to on.
 
-```
-ceiling  =  (sum of the positive weights)  ×  (episode length in seconds)
-```
+**The argument was wrong in one specific way: the reward is not what a run is
+judged on.** Rule 2 says a stage is passed by its bar, not by its curve — and
+the stop watched the curve. A walk policy sits at 96.5% of its ceiling while
+drifting 5 degrees off its line and turning at three quarters of the rate it
+was told, because those two faults cost a sliver of a total dominated by
+staying upright and moving at all. The stop fired on a number nobody grades,
+and ended runs that were still improving on the numbers everybody grades.
 
-For the stand task: (height 2.0 + posture 1.5 + still 1.0 + alive 0.5) × 10 s = **50.0**
+**It also made run lengths incomparable.** Two runs of the same config stopped
+at different iterations, so a difference between them could be the change under
+test or could be the 200 iterations one of them never trained. Every batch since
+1.3 had to switch the stop off by hand to be readable at all, which is the sign
+of a default pointing the wrong way.
 
-**Do not read a ceiling off this page.** It is a property of whatever the weights
-are today, and the weights change — the push ceiling was 100.0 when this was
-written and is 78.0 now, because the task gained terms since. `scripts/train.py`
-computes it from the task's own weights and prints it as the run starts:
+**What replaces it.** Nothing automatic. Ask for the iterations you want; read
+the curve afterwards; and if the numbers are still climbing at the end, continue
+the run with `--init-from` rather than guessing longer next time. Continuing
+costs only the extra iterations, so the choice of length is never final.
 
-```
-reward        ceiling 78.0 (3.9/s over 20 s)
-              stopping at 96% of it = 75.3
-```
-
-That printed line is the number the run actually used. A ceiling written down
-here would be a second copy that goes quietly out of date, and a stop threshold
-computed from a stale ceiling either cuts a run short or never fires.
-
-**Why that means stop.** At that point every positive term is essentially maxed —
-the robot is at the right height, level, still, in the right pose, and has not
-fallen. The only headroom left is in the penalties, which are worth a fraction
-of a point between them. Training on is polishing something already measured as
-done.
-
-**Why 96.5 and not 99.** The last few percent are the slowest to earn and buy
-the least: the curve flattens hard near the ceiling, so the difference between
-96.5% and 99% can be hundreds of iterations. It is a judgement, not a law — it is
-a dial (`--stop-at`) precisely because the right number may turn out to differ per
-stage, and a stage that fails its bar after stopping early is telling us to raise
-the number rather than to distrust the rule.
-
-**Why it moved from 98 to 96.5** (owner's call, 3 Aug 2026). push_v4 shows what
-98% was costing. It reached 97.6 of a 100.0 ceiling at iteration ~700 and was
-still at 97.64 at iteration 938 — flat for 234 iterations, with zero falls and
-full-length episodes the whole way. It never reached 98, so it would have run all
-1500 iterations to buy nothing. At 96.5 it stops around iteration 700 and the
-remaining 800 go to the next run in the queue instead.
-
-**What the evidence looked like.** The stand run finished at 49.93 of a 50.0
-ceiling — 99.86% — and had been flat there for hundreds of iterations. It
-reached zero falls at roughly iteration 110 of 600. The last 490 iterations
-bought a policy that was already passing its bar.
-
-**The honest caveat.** Reward near its ceiling does not prove robustness. A
-policy can be maxing every term in the conditions it was trained on and still be
-fragile outside them. So the rule is stop training, **not** stop checking: the
-run still has to pass `scripts/verify.py`, which measures the bar's own numbers
-over the full duration across many robots. A stage is passed by the verifier, not
-by the reward curve.
-
-**In practice.** `scripts/train.py` computes the ceiling from the task's own
-weights and episode length, prints it at the start, and stops when the reward
-reaches 99% of it. `--stop-at 0` runs the full schedule instead.
+**The cost of this decision, stated plainly.** Runs that converge early now burn
+card time to the end of their schedule. That is the price of never again asking
+"did this run stop because it was finished, or because the reward flattened?"
 
 ---
 

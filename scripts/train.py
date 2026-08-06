@@ -285,16 +285,6 @@ def sync_once(run_dir: Path, log_dir: Path) -> None:
         print(f"[bridge] {type(exc).__name__}: {exc}", flush=True)
 
 
-def reward_ceiling(rewards) -> float:
-    """The most an episode could possibly score.
-
-    Every positive term is capped at 1.0, weighted, multiplied by the timestep
-    and summed over the episode - so the largest reachable total is the positive
-    weights times the episode length. See RULES.md, rule 1.
-    """
-    return sum(t.weight for t in rewards.values() if t.weight > 0)
-
-
 def world_dials(env_cfg) -> list[dict]:
     """The five world dials, as this run will actually draw them.
 
@@ -322,28 +312,21 @@ def world_dials(env_cfg) -> list[dict]:
     return out
 
 
-def bridge(run_dir: Path, log_dir: Path, stop: threading.Event,
-           target: float = 0.0) -> None:
-    """Feed the dashboard, and stop training once the reward has nothing left to win."""
+def bridge(run_dir: Path, log_dir: Path, stop: threading.Event) -> None:
+    """Feed the dashboard while training runs.
+
+    IT USED TO END THE RUN TOO. A run stopped when the training reward
+    reached 96.5% of the theoretical ceiling - every positive term at its
+    maximum at once - on the grounds that the rest was polish. Deleted on
+    6 Aug 2026, on the owner's call, and the reason is worth keeping: the
+    reward is not what the run is judged on. A policy reaches 96.5% of the
+    ceiling while still drifting 5 degrees off its line and turning at three
+    quarters of the commanded rate, because those faults cost a sliver of
+    the total. The stop fired on a number nobody grades and ended runs that
+    were still improving on the numbers everybody grades.
+    """
     while not stop.is_set():
         sync_once(run_dir, log_dir)
-        if target:
-            try:
-                _, rows = read_scalars(log_dir)
-                latest = rows[-1].get("reward") if rows else None
-                if latest is not None and latest >= target:
-                    print(f"\n[stop] reward {latest:.2f} reached the {target:.2f} "
-                          f"target - every positive term is maxed, so the rest of the "
-                          f"schedule would only polish. See RULES.md rule 1.",
-                          flush=True)
-                    stop.set()
-                    # rsl_rl has no way to be asked to stop mid-learn, so raise
-                    # into the main thread. The last checkpoint is at most 25
-                    # iterations behind, and training's own finally block runs.
-                    _thread.interrupt_main()
-                    return
-            except Exception as exc:  # noqa: BLE001
-                print(f"[stop] could not read the reward: {exc}", flush=True)
         stop.wait(10.0)
 
 
@@ -358,9 +341,6 @@ def main() -> int:
                     help="0 uses the task's own default")
     ap.add_argument("--name", default="")
     ap.add_argument("--no-video", action="store_true")
-    ap.add_argument("--stop-at", type=float, default=0.965, metavar="FRACTION",
-                    help="stop once the reward reaches this fraction of the most it "
-                         "could score. 0 runs the full schedule. See RULES.md rule 1.")
     ap.add_argument("--push-speed", type=float, nargs=2, metavar=("MIN", "MAX"),
                     help="how hard the shoves are, m/s of instant trunk speed. "
                          "On 1.99 kg, 1 m/s is about 2.0 N-s.")
@@ -436,6 +416,19 @@ def main() -> int:
                          "chosen when 35 mm matched the stage 3 bar. The g3 "
                          "probe runs 0.05: a foot with 35 mm in hand has "
                          "nothing left for ground that is not a floor.")
+    ap.add_argument("--mixed-ground", action="store_true",
+                    help="train on every ground at once - flat, gentle and "
+                         "steep hills, a bowl, rough ground and waves, "
+                         "sixteen patches with the robots spread across all "
+                         "of them. One policy for all of it. Use this, not "
+                         "--slope-deg, unless the question is about one "
+                         "specific angle.")
+    ap.add_argument("--payload-kg", type=float, default=0.0, metavar="KG",
+                    help="randomise 0 to this much extra load on the trunk, "
+                         "per attempt. The servos have about 1.0 kg of "
+                         "headroom left - the knee already holds 55% of its "
+                         "stall standing - so above that the robot is being "
+                         "asked to carry what it cannot hold.")
     ap.add_argument("--slope-deg", type=float, default=0.0, metavar="DEG",
                     help="replace the flat floor with a 16 m pyramid at this "
                          "angle, every robot on its own copy, spawned on the "
@@ -563,12 +556,24 @@ def main() -> int:
             was = term.params["target"]
             term.params["target"] = args.swing_target
         print(f"tolerance     swing target: {was} -> {args.swing_target} m")
-    if args.slope_deg:
+    if args.mixed_ground:
+        from gray.tasks.walk_env_cfg import apply_mixed_ground  # noqa: PLC0415
+
+        apply_mixed_ground(cfg.env)
+        print("terrain       every ground at once - flat, hills, a bowl, "
+              "rough ground, waves")
+    elif args.slope_deg:
         from gray.tasks.walk_env_cfg import apply_slope  # noqa: PLC0415
 
         apply_slope(cfg.env, args.slope_deg)
         print(f"terrain       a {args.slope_deg:g} deg slope instead of the "
               f"flat floor")
+    if args.payload_kg:
+        from gray.tasks.walk_env_cfg import apply_payload  # noqa: PLC0415
+
+        apply_payload(cfg.env, args.payload_kg)
+        print(f"payload       0 to {args.payload_kg:g} kg on the trunk, drawn "
+              f"per attempt")
     if args.init_from:
         cfg.agent.resume = True
         cfg.agent.load_run = args.init_from
@@ -746,6 +751,8 @@ def main() -> int:
             # The ground's tilt. 0 is the flat floor; the slope ladder's
             # rungs differ in nothing else.
             "slope_deg": float(args.slope_deg) or None,
+            "mixed_ground": bool(args.mixed_ground) or None,
+            "payload_kg": float(args.payload_kg) or None,
         },
         # The run this one continued from, or None for from-scratch. A
         # fine-tuned run and a fresh one cannot be compared as equals, and
@@ -766,16 +773,8 @@ def main() -> int:
                                    "terms", {}) or {}),
     }, indent=2))
 
-    ceiling = reward_ceiling(cfg.env.rewards) * cfg.env.episode_length_s
-    target = ceiling * args.stop_at if args.stop_at else 0.0
-
     print(f"training      {args.task} - {meta['name']}")
-    print(f"              {args.num_envs} robots, up to {iterations} iterations")
-    print(f"reward        ceiling {ceiling:.1f} "
-          f"({reward_ceiling(cfg.env.rewards):.1f}/s over "
-          f"{cfg.env.episode_length_s:.0f} s)")
-    print(f"              stopping at {args.stop_at:.0%} of it = {target:.1f}"
-          if target else "              running the full schedule")
+    print(f"              {args.num_envs} robots, {iterations} iterations")
     print(f"dashboard     http://127.0.0.1:8000  ->  {run_id}")
     print(f"tensorboard   tensorboard --logdir {LOG_ROOT}\n")
 
@@ -790,7 +789,7 @@ def main() -> int:
             return
         found["dir"] = log_dir
         print(f"[bridge] following {log_dir}", flush=True)
-        bridge(run_dir, log_dir, stop, target)
+        bridge(run_dir, log_dir, stop)
 
     threading.Thread(target=watch, daemon=True).start()
 
@@ -798,9 +797,9 @@ def main() -> int:
     try:
         launch_training(task_id=args.task, args=cfg)
     except KeyboardInterrupt:
-        # Either Ctrl-C, or the reward hit its target and the bridge interrupted
-        # us deliberately. Those are opposite outcomes and must not read the same.
-        status = "reached target" if stop.is_set() else "cancelled"
+        # Ctrl-C, or the runner asking for a stop. Nothing else interrupts
+        # training since the early stop was deleted on 6 Aug 2026.
+        status = "cancelled"
     except Exception:
         status = "failed"
         raise

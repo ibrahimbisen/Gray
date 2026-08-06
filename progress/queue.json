@@ -1,6 +1,6 @@
 {
   "paused": true,
-  "next_id": 207,
+  "next_id": 210,
   "jobs": [
     {
       "task": "Gray-Push",
@@ -38,7 +38,7 @@
         }
       ],
       "log": "progress/jobs/j0006.log",
-      "command": "python scripts/train.py Gray-Push --num-envs 3072 --iterations 1500 --name push_m3100 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Push --num-envs 3072 --iterations 1500 --name push_m3100",
       "cannot_run": ""
     },
     {
@@ -79,7 +79,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0007.log",
-      "command": "python scripts/train.py Gray-Stand --num-envs 3072 --iterations 600 --name stand_m3100 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Stand --num-envs 3072 --iterations 600 --name stand_m3100",
       "cannot_run": ""
     },
     {
@@ -120,7 +120,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0008.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_a --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_a",
       "cannot_run": ""
     },
     {
@@ -163,7 +163,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0009.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_b --stop-at 0.965 --reward leg_swing=1.8",
+      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_b --reward leg_swing=1.8",
       "cannot_run": ""
     },
     {
@@ -201,7 +201,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0021.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_f --stop-at 0.965 --reward wandering=-4.0 --reward track_turn=2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_f --reward wandering=-4.0 --reward track_turn=2.0",
       "cannot_run": ""
     },
     {
@@ -242,7 +242,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0022.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_g --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_g",
       "cannot_run": ""
     },
     {
@@ -286,7 +286,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0010.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_c --stop-at 0.965 --reward track_speed=3.0 --reward ground_covered=1.5",
+      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_c --reward track_speed=3.0 --reward ground_covered=1.5",
       "cannot_run": ""
     },
     {
@@ -321,7 +321,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0023.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_h --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_h",
       "cannot_run": ""
     },
     {
@@ -356,7 +356,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0024.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 6400 --iterations 3000 --name walk_m3100_h --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 6400 --iterations 3000 --name walk_m3100_h",
       "cannot_run": ""
     },
     {
@@ -391,7 +391,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0025.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 6000 --iterations 3000 --name walk_m3100_h --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 6000 --iterations 3000 --name walk_m3100_h",
       "cannot_run": ""
     },
     {
@@ -426,7 +426,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0026.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5500 --iterations 3000 --name walk_m3100_h --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5500 --iterations 3000 --name walk_m3100_h",
       "cannot_run": ""
     },
     {
@@ -454,7 +454,7 @@
       "steps": [],
       "owner": "31132@061706",
       "log": "progress/jobs/j0019.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 6000 --name walk_m3100_d --stop-at 0.99",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 6000 --name walk_m3100_d",
       "cannot_run": ""
     },
     {
@@ -483,7 +483,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 3000 --name walk_m3100_e --stop-at 0.965 --reward dragging=-4.0 --reward swing_height=-0.5",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 3000 --name walk_m3100_e --reward dragging=-4.0 --reward swing_height=-0.5",
       "cannot_run": ""
     },
     {
@@ -511,7 +511,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Stand --num-envs 4500 --iterations 3 --name w00_smoke --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Stand --num-envs 4500 --iterations 3 --name w00_smoke",
       "cannot_run": ""
     },
     {
@@ -539,7 +539,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w01_seedfloor --seed 42 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w01_seedfloor --seed 42",
       "cannot_run": ""
     },
     {
@@ -567,7 +567,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w02_seedfloor --seed 7 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w02_seedfloor --seed 7",
       "cannot_run": ""
     },
     {
@@ -595,7 +595,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w03_seedfloor --seed 1234 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w03_seedfloor --seed 1234",
       "cannot_run": ""
     },
     {
@@ -626,7 +626,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w11_wvs --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-0.5",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w11_wvs --reward wandering=-1.0 --reward skidding=-0.5",
       "cannot_run": ""
     },
     {
@@ -657,7 +657,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w12_wvS --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w12_wvS --reward wandering=-1.0 --reward skidding=-2.0",
       "cannot_run": ""
     },
     {
@@ -695,7 +695,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w13_wVs --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w13_wVs --reward wandering=-1.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -733,7 +733,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w14_wVS --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w14_wVS --reward wandering=-1.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -764,7 +764,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w15_Wvs --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-0.5",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w15_Wvs --reward wandering=-3.0 --reward skidding=-0.5",
       "cannot_run": ""
     },
     {
@@ -795,7 +795,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w16_WvS --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w16_WvS --reward wandering=-3.0 --reward skidding=-2.0",
       "cannot_run": ""
     },
     {
@@ -833,7 +833,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w17_WVs --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w17_WVs --reward wandering=-3.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -871,7 +871,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w18_WVS --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w18_WVS --reward wandering=-3.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -902,7 +902,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w21_spd2.0x1.0 --stop-at 0.965 --reward track_speed=2.0 --reward ground_covered=1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w21_spd2.0x1.0 --reward track_speed=2.0 --reward ground_covered=1.0",
       "cannot_run": ""
     },
     {
@@ -933,7 +933,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w22_spd4.0x1.0 --stop-at 0.965 --reward track_speed=4.0 --reward ground_covered=1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w22_spd4.0x1.0 --reward track_speed=4.0 --reward ground_covered=1.0",
       "cannot_run": ""
     },
     {
@@ -964,7 +964,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w23_spd2.0x2.0 --stop-at 0.965 --reward track_speed=2.0 --reward ground_covered=2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w23_spd2.0x2.0 --reward track_speed=2.0 --reward ground_covered=2.0",
       "cannot_run": ""
     },
     {
@@ -995,7 +995,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w24_spd4.0x2.0 --stop-at 0.965 --reward track_speed=4.0 --reward ground_covered=2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w24_spd4.0x2.0 --reward track_speed=4.0 --reward ground_covered=2.0",
       "cannot_run": ""
     },
     {
@@ -1023,7 +1023,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 3 --name w00_smoke --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 3 --name w00_smoke",
       "cannot_run": ""
     },
     {
@@ -1051,7 +1051,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w01_seedfloor --seed 42 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w01_seedfloor --seed 42",
       "cannot_run": ""
     },
     {
@@ -1079,7 +1079,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w02_seedfloor --seed 7 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w02_seedfloor --seed 7",
       "cannot_run": ""
     },
     {
@@ -1107,7 +1107,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w03_seedfloor --seed 1234 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w03_seedfloor --seed 1234",
       "cannot_run": ""
     },
     {
@@ -1138,7 +1138,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w11_wvs --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-0.5",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w11_wvs --reward wandering=-1.0 --reward skidding=-0.5",
       "cannot_run": ""
     },
     {
@@ -1169,7 +1169,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w12_wvS --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w12_wvS --reward wandering=-1.0 --reward skidding=-2.0",
       "cannot_run": ""
     },
     {
@@ -1207,7 +1207,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w13_wVs --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w13_wVs --reward wandering=-1.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -1245,7 +1245,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w14_wVS --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w14_wVS --reward wandering=-1.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -1276,7 +1276,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w15_Wvs --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-0.5",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w15_Wvs --reward wandering=-3.0 --reward skidding=-0.5",
       "cannot_run": ""
     },
     {
@@ -1307,7 +1307,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w16_WvS --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w16_WvS --reward wandering=-3.0 --reward skidding=-2.0",
       "cannot_run": ""
     },
     {
@@ -1345,7 +1345,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w17_WVs --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w17_WVs --reward wandering=-3.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -1383,7 +1383,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w18_WVS --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w18_WVS --reward wandering=-3.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -1414,7 +1414,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w21_spd2.0x1.0 --stop-at 0.965 --reward track_speed=2.0 --reward ground_covered=1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w21_spd2.0x1.0 --reward track_speed=2.0 --reward ground_covered=1.0",
       "cannot_run": ""
     },
     {
@@ -1445,7 +1445,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w22_spd4.0x1.0 --stop-at 0.965 --reward track_speed=4.0 --reward ground_covered=1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w22_spd4.0x1.0 --reward track_speed=4.0 --reward ground_covered=1.0",
       "cannot_run": ""
     },
     {
@@ -1476,7 +1476,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w23_spd2.0x2.0 --stop-at 0.965 --reward track_speed=2.0 --reward ground_covered=2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w23_spd2.0x2.0 --reward track_speed=2.0 --reward ground_covered=2.0",
       "cannot_run": ""
     },
     {
@@ -1507,7 +1507,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w24_spd4.0x2.0 --stop-at 0.965 --reward track_speed=4.0 --reward ground_covered=2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w24_spd4.0x2.0 --reward track_speed=4.0 --reward ground_covered=2.0",
       "cannot_run": ""
     },
     {
@@ -1544,7 +1544,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0061.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 3 --name w00_smoke --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 3 --name w00_smoke",
       "cannot_run": ""
     },
     {
@@ -1587,7 +1587,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0062.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w01_seedfloor --seed 42 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w01_seedfloor --seed 42",
       "cannot_run": ""
     },
     {
@@ -1624,7 +1624,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0063.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w02_seedfloor --seed 7 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w02_seedfloor --seed 7",
       "cannot_run": ""
     },
     {
@@ -1652,7 +1652,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w03_seedfloor --seed 1234 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w03_seedfloor --seed 1234",
       "cannot_run": ""
     },
     {
@@ -1683,7 +1683,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w11_wvs --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-0.5",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w11_wvs --reward wandering=-1.0 --reward skidding=-0.5",
       "cannot_run": ""
     },
     {
@@ -1714,7 +1714,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w12_wvS --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w12_wvS --reward wandering=-1.0 --reward skidding=-2.0",
       "cannot_run": ""
     },
     {
@@ -1752,7 +1752,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w13_wVs --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w13_wVs --reward wandering=-1.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -1790,7 +1790,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w14_wVS --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w14_wVS --reward wandering=-1.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -1821,7 +1821,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w15_Wvs --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-0.5",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w15_Wvs --reward wandering=-3.0 --reward skidding=-0.5",
       "cannot_run": ""
     },
     {
@@ -1852,7 +1852,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w16_WvS --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w16_WvS --reward wandering=-3.0 --reward skidding=-2.0",
       "cannot_run": ""
     },
     {
@@ -1890,7 +1890,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w17_WVs --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w17_WVs --reward wandering=-3.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -1928,7 +1928,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w18_WVS --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w18_WVS --reward wandering=-3.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -1959,7 +1959,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w21_spd2.0x1.0 --stop-at 0.965 --reward track_speed=2.0 --reward ground_covered=1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w21_spd2.0x1.0 --reward track_speed=2.0 --reward ground_covered=1.0",
       "cannot_run": ""
     },
     {
@@ -1990,7 +1990,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w22_spd4.0x1.0 --stop-at 0.965 --reward track_speed=4.0 --reward ground_covered=1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w22_spd4.0x1.0 --reward track_speed=4.0 --reward ground_covered=1.0",
       "cannot_run": ""
     },
     {
@@ -2021,7 +2021,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w23_spd2.0x2.0 --stop-at 0.965 --reward track_speed=2.0 --reward ground_covered=2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w23_spd2.0x2.0 --reward track_speed=2.0 --reward ground_covered=2.0",
       "cannot_run": ""
     },
     {
@@ -2052,7 +2052,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w24_spd4.0x2.0 --stop-at 0.965 --reward track_speed=4.0 --reward ground_covered=2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w24_spd4.0x2.0 --reward track_speed=4.0 --reward ground_covered=2.0",
       "cannot_run": ""
     },
     {
@@ -2095,7 +2095,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0077.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name r0a_floor --seed 42 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name r0a_floor --seed 42",
       "cannot_run": ""
     },
     {
@@ -2138,7 +2138,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0078.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name r0b_floor --seed 7 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name r0b_floor --seed 7",
       "cannot_run": ""
     },
     {
@@ -2181,7 +2181,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0079.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name r0c_floor --seed 1234 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name r0c_floor --seed 1234",
       "cannot_run": ""
     },
     {
@@ -2221,7 +2221,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0080.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1a_control --seed 42 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1a_control --seed 42",
       "cannot_run": ""
     },
     {
@@ -2267,7 +2267,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0099.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1a_both --seed 42 --stop-at 0.965 --turn-std 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1a_both --seed 42 --turn-std 0.15",
       "cannot_run": ""
     },
     {
@@ -2313,7 +2313,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0100.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1b_control --seed 42 --stop-at 0.965 --no-heading-obs",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1b_control --seed 42 --no-heading-obs",
       "cannot_run": ""
     },
     {
@@ -2359,7 +2359,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0101.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1c_heading --seed 42 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1c_heading --seed 42",
       "cannot_run": ""
     },
     {
@@ -2405,7 +2405,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0102.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1d_turn --seed 42 --stop-at 0.965 --turn-std 0.15 --no-heading-obs",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1d_turn --seed 42 --turn-std 0.15 --no-heading-obs",
       "cannot_run": ""
     },
     {
@@ -2451,7 +2451,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0103.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1e_turn30 --seed 42 --stop-at 0.965 --turn-std 0.3",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1e_turn30 --seed 42 --turn-std 0.3",
       "cannot_run": ""
     },
     {
@@ -2497,7 +2497,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0104.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1f_both_s7 --seed 7 --stop-at 0.965 --turn-std 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1f_both_s7 --seed 7 --turn-std 0.15",
       "cannot_run": ""
     },
     {
@@ -2543,7 +2543,7 @@
       ],
       "owner": "10872@105306",
       "log": "progress/jobs/j0105.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r2a_blind --seed 42 --stop-at 0.965 --no-heading-obs",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r2a_blind --seed 42 --no-heading-obs",
       "cannot_run": ""
     },
     {
@@ -2589,7 +2589,7 @@
       ],
       "owner": "10872@105306",
       "log": "progress/jobs/j0106.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r2b_blind_s7 --seed 7 --stop-at 0.965 --no-heading-obs",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r2b_blind_s7 --seed 7 --no-heading-obs",
       "cannot_run": ""
     },
     {
@@ -2635,7 +2635,7 @@
       ],
       "owner": "10872@105306",
       "log": "progress/jobs/j0108.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 1000 --name r2d_oldcfg_blind --seed 42 --stop-at 0.965 --no-heading-obs",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 1000 --name r2d_oldcfg_blind --seed 42 --no-heading-obs",
       "cannot_run": ""
     },
     {
@@ -2681,7 +2681,7 @@
       ],
       "owner": "10872@105306",
       "log": "progress/jobs/j0109.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1000 --name r2e_turn15 --seed 42 --stop-at 0.965 --turn-std 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1000 --name r2e_turn15 --seed 42 --turn-std 0.15",
       "cannot_run": ""
     },
     {
@@ -2727,7 +2727,7 @@
       ],
       "owner": "10872@105306",
       "log": "progress/jobs/j0110.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1000 --name r2f_turn15_s7 --seed 7 --stop-at 0.965 --turn-std 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1000 --name r2f_turn15_s7 --seed 7 --turn-std 0.15",
       "cannot_run": ""
     },
     {
@@ -2795,7 +2795,7 @@
       ],
       "owner": "10872@105306",
       "log": "progress/jobs/j0111.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 750 --name r3a_smooth --seed 42 --stop-at 0.965 --reward jitter=-0.05 --reward hard_landing=-0.05 --ramp twitching=-0.05,-0.125,-0.25,-0.25 --ramp rocking=-0.06,-0.15,-0.36,-0.6 --ramp shaking=-0.002,-0.006,-0.012,-0.02",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 750 --name r3a_smooth --seed 42 --reward jitter=-0.05 --reward hard_landing=-0.05 --ramp twitching=-0.05,-0.125,-0.25,-0.25 --ramp rocking=-0.06,-0.15,-0.36,-0.6 --ramp shaking=-0.002,-0.006,-0.012,-0.02",
       "cannot_run": ""
     },
     {
@@ -2863,7 +2863,7 @@
       ],
       "owner": "10872@105306",
       "log": "progress/jobs/j0112.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 750 --name r3b_smooth_hard --seed 42 --stop-at 0.965 --reward jitter=-0.15 --reward hard_landing=-0.2 --ramp twitching=-0.15,-0.375,-0.75,-0.75 --ramp rocking=-0.16,-0.4,-0.96,-1.6 --ramp shaking=-0.005,-0.015,-0.03,-0.05",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 750 --name r3b_smooth_hard --seed 42 --reward jitter=-0.15 --reward hard_landing=-0.2 --ramp twitching=-0.15,-0.375,-0.75,-0.75 --ramp rocking=-0.16,-0.4,-0.96,-1.6 --ramp shaking=-0.005,-0.015,-0.03,-0.05",
       "cannot_run": ""
     },
     {
@@ -2931,7 +2931,7 @@
       ],
       "owner": "10872@105306",
       "log": "progress/jobs/j0113.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 750 --name r3c_smooth_s7 --seed 7 --stop-at 0.965 --reward jitter=-0.05 --reward hard_landing=-0.05 --ramp twitching=-0.05,-0.125,-0.25,-0.25 --ramp rocking=-0.06,-0.15,-0.36,-0.6 --ramp shaking=-0.002,-0.006,-0.012,-0.02",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 750 --name r3c_smooth_s7 --seed 7 --reward jitter=-0.05 --reward hard_landing=-0.05 --ramp twitching=-0.05,-0.125,-0.25,-0.25 --ramp rocking=-0.06,-0.15,-0.36,-0.6 --ramp shaking=-0.002,-0.006,-0.012,-0.02",
       "cannot_run": ""
     },
     {
@@ -2972,7 +2972,7 @@
       ],
       "owner": "13216@153013",
       "log": "progress/jobs/j0114.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r4a_tilt --seed 42 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r4a_tilt --seed 42",
       "cannot_run": ""
     },
     {
@@ -3013,7 +3013,7 @@
       ],
       "owner": "13216@153013",
       "log": "progress/jobs/j0115.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r4a_tilt --seed 42 --stop-at 0.965 --upright-std 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r4a_tilt --seed 42 --upright-std 0.15",
       "cannot_run": ""
     },
     {
@@ -3060,7 +3060,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0116.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r4a_tilt --seed 42 --stop-at 0.965 --upright-std 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r4a_tilt --seed 42 --upright-std 0.15",
       "cannot_run": ""
     },
     {
@@ -3107,7 +3107,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0117.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r4b_tilt_s7 --seed 7 --stop-at 0.965 --upright-std 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r4b_tilt_s7 --seed 7 --upright-std 0.15",
       "cannot_run": ""
     },
     {
@@ -3154,7 +3154,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0118.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r5a_final_s99 --seed 99 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r5a_final_s99 --seed 99",
       "cannot_run": ""
     },
     {
@@ -3201,7 +3201,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0119.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r5b_final_s314 --seed 314 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r5b_final_s314 --seed 314",
       "cannot_run": ""
     },
     {
@@ -3248,7 +3248,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0120.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r5c_final_s2718 --seed 2718 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r5c_final_s2718 --seed 2718",
       "cannot_run": ""
     },
     {
@@ -3297,7 +3297,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0121.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t1_stock --stop-at 0.965 --reward track_turn=1.0 --turn-std 0.8",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t1_stock --reward track_turn=1.0 --turn-std 0.8",
       "cannot_run": ""
     },
     {
@@ -3346,7 +3346,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0122.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t2_band --stop-at 0.965 --reward track_turn=1.0 --turn-std 0.4",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t2_band --reward track_turn=1.0 --turn-std 0.4",
       "cannot_run": ""
     },
     {
@@ -3395,7 +3395,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0123.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t3_pay --stop-at 0.965 --reward track_turn=3.0 --turn-std 0.8",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t3_pay --reward track_turn=3.0 --turn-std 0.8",
       "cannot_run": ""
     },
     {
@@ -3444,7 +3444,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0124.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t4_band_pay --stop-at 0.965 --reward track_turn=3.0 --turn-std 0.4",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t4_band_pay --reward track_turn=3.0 --turn-std 0.4",
       "cannot_run": ""
     },
     {
@@ -3493,7 +3493,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0125.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t5_pay5 --stop-at 0.965 --reward track_turn=5.0 --turn-std 0.8",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t5_pay5 --reward track_turn=5.0 --turn-std 0.8",
       "cannot_run": ""
     },
     {
@@ -3542,7 +3542,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0126.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t6_pay8 --stop-at 0.965 --reward track_turn=8.0 --turn-std 0.8",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t6_pay8 --reward track_turn=8.0 --turn-std 0.8",
       "cannot_run": ""
     },
     {
@@ -3591,7 +3591,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0127.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t7_wide5 --stop-at 0.965 --reward track_turn=5.0 --turn-std 1.2",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t7_wide5 --reward track_turn=5.0 --turn-std 1.2",
       "cannot_run": ""
     },
     {
@@ -3640,7 +3640,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0128.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t8_pay5_s7 --seed 7 --stop-at 0.965 --reward track_turn=5.0 --turn-std 0.8",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t8_pay5_s7 --seed 7 --reward track_turn=5.0 --turn-std 0.8",
       "cannot_run": ""
     },
     {
@@ -3681,7 +3681,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0129.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 512 --iterations 3 --name c00_smoke --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 512 --iterations 3 --name c00_smoke",
       "cannot_run": ""
     },
     {
@@ -3725,7 +3725,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0130.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c1_fix --stop-at 0.965 --reward veering=-0.2 --reward wandering=-1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c1_fix --reward veering=-0.2 --reward wandering=-1.0",
       "cannot_run": ""
     },
     {
@@ -3769,7 +3769,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0131.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c2_veer --stop-at 0.965 --reward veering=-0.6 --reward wandering=-1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c2_veer --reward veering=-0.6 --reward wandering=-1.0",
       "cannot_run": ""
     },
     {
@@ -3813,7 +3813,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0132.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c3_wander --stop-at 0.965 --reward veering=-0.2 --reward wandering=-3.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c3_wander --reward veering=-0.2 --reward wandering=-3.0",
       "cannot_run": ""
     },
     {
@@ -3857,7 +3857,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0133.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c4_both --stop-at 0.965 --reward veering=-0.6 --reward wandering=-3.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c4_both --reward veering=-0.6 --reward wandering=-3.0",
       "cannot_run": ""
     },
     {
@@ -3901,7 +3901,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0134.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c5_fix_s7 --seed 7 --stop-at 0.965 --reward veering=-0.2 --reward wandering=-1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c5_fix_s7 --seed 7 --reward veering=-0.2 --reward wandering=-1.0",
       "cannot_run": ""
     },
     {
@@ -3957,7 +3957,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0135.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c1_fix --stop-at 0.965 --reward wandering=-1.0 --ramp veering=-0.2,-0.5,-1.2,-2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c1_fix --reward wandering=-1.0 --ramp veering=-0.2,-0.5,-1.2,-2.0",
       "cannot_run": ""
     },
     {
@@ -4013,7 +4013,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0136.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c2_veer --stop-at 0.965 --reward wandering=-1.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c2_veer --reward wandering=-1.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -4069,7 +4069,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0137.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c3_wander --stop-at 0.965 --reward wandering=-3.0 --ramp veering=-0.2,-0.5,-1.2,-2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c3_wander --reward wandering=-3.0 --ramp veering=-0.2,-0.5,-1.2,-2.0",
       "cannot_run": ""
     },
     {
@@ -4125,7 +4125,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0138.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c4_both --stop-at 0.965 --reward wandering=-3.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c4_both --reward wandering=-3.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -4181,7 +4181,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0139.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c5_fix_s7 --seed 7 --stop-at 0.965 --reward wandering=-1.0 --ramp veering=-0.2,-0.5,-1.2,-2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c5_fix_s7 --seed 7 --reward wandering=-1.0 --ramp veering=-0.2,-0.5,-1.2,-2.0",
       "cannot_run": ""
     },
     {
@@ -4228,7 +4228,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0140.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g1_close_s1301 --seed 1301 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g1_close_s1301 --seed 1301",
       "cannot_run": ""
     },
     {
@@ -4275,7 +4275,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0141.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g2_close_s4507 --seed 4507 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g2_close_s4507 --seed 4507",
       "cannot_run": ""
     },
     {
@@ -4322,7 +4322,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0144.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g1_close_s1301 --seed 1301 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g1_close_s1301 --seed 1301",
       "cannot_run": ""
     },
     {
@@ -4369,7 +4369,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0145.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g2_close_s4507 --seed 4507 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g2_close_s4507 --seed 4507",
       "cannot_run": ""
     },
     {
@@ -4416,7 +4416,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0146.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g3_close_s8821 --seed 8821 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g3_close_s8821 --seed 8821",
       "cannot_run": ""
     },
     {
@@ -4465,7 +4465,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0147.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g4_wander6 --stop-at 0.965 --reward wandering=-6.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g4_wander6 --reward wandering=-6.0",
       "cannot_run": ""
     },
     {
@@ -4512,7 +4512,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0148.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name h1_gate_s1301 --seed 1301 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name h1_gate_s1301 --seed 1301",
       "cannot_run": ""
     },
     {
@@ -4559,7 +4559,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0149.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name h2_gate_s4507 --seed 4507 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name h2_gate_s4507 --seed 4507",
       "cannot_run": ""
     },
     {
@@ -4606,7 +4606,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0150.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name h3_gate_s8821 --seed 8821 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name h3_gate_s8821 --seed 8821",
       "cannot_run": ""
     },
     {
@@ -4654,7 +4654,7 @@
       ],
       "owner": "38120@035819",
       "log": "progress/jobs/j0151.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name m1_mix_s1301 --seed 1301 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name m1_mix_s1301 --seed 1301",
       "cannot_run": ""
     },
     {
@@ -4702,7 +4702,7 @@
       ],
       "owner": "38120@035819",
       "log": "progress/jobs/j0152.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name m2_mix_s4507 --seed 4507 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name m2_mix_s4507 --seed 4507",
       "cannot_run": ""
     },
     {
@@ -4750,7 +4750,7 @@
       ],
       "owner": "38120@035819",
       "log": "progress/jobs/j0153.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name o1_track_s1301 --seed 1301 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name o1_track_s1301 --seed 1301",
       "cannot_run": ""
     },
     {
@@ -4798,7 +4798,7 @@
       ],
       "owner": "38120@035819",
       "log": "progress/jobs/j0154.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name o2_track_s4507 --seed 4507 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name o2_track_s4507 --seed 4507",
       "cannot_run": ""
     },
     {
@@ -4849,7 +4849,7 @@
       ],
       "owner": "30072@052200",
       "log": "progress/jobs/j0155.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name n1_control --seed 1301 --stop-at 0.965 --reward wandering=-3.0 --crab-share 0.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name n1_control --seed 1301 --reward wandering=-3.0 --crab-share 0.0",
       "cannot_run": ""
     },
     {
@@ -4900,7 +4900,7 @@
       ],
       "owner": "30072@052200",
       "log": "progress/jobs/j0156.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name n2_track --seed 1301 --stop-at 0.965 --reward wandering=-1.0 --crab-share 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name n2_track --seed 1301 --reward wandering=-1.0 --crab-share 0.15",
       "cannot_run": ""
     },
     {
@@ -4951,7 +4951,7 @@
       ],
       "owner": "30072@052200",
       "log": "progress/jobs/j0157.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name n3_track_nocrab --seed 1301 --stop-at 0.965 --reward wandering=-1.0 --crab-share 0.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name n3_track_nocrab --seed 1301 --reward wandering=-1.0 --crab-share 0.0",
       "cannot_run": ""
     },
     {
@@ -5002,7 +5002,7 @@
       ],
       "owner": "30072@052200",
       "log": "progress/jobs/j0158.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name n4_w1 --seed 1301 --stop-at 0.965 --reward wandering=-1.0 --crab-share 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name n4_w1 --seed 1301 --reward wandering=-1.0 --crab-share 0.15",
       "cannot_run": ""
     },
     {
@@ -5051,7 +5051,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0159.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name p1_revert_s1301 --seed 1301 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name p1_revert_s1301 --seed 1301",
       "cannot_run": ""
     },
     {
@@ -5100,7 +5100,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0160.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name p2_revert_s4507 --seed 4507 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name p2_revert_s4507 --seed 4507",
       "cannot_run": ""
     },
     {
@@ -5149,7 +5149,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0161.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name p3_revert_s8821 --seed 8821 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name p3_revert_s8821 --seed 8821",
       "cannot_run": ""
     },
     {
@@ -5198,7 +5198,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0162.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name q1_long_s1301 --seed 1301 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name q1_long_s1301 --seed 1301",
       "cannot_run": ""
     },
     {
@@ -5247,7 +5247,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0163.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name q2_long_s4507 --seed 4507 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name q2_long_s4507 --seed 4507",
       "cannot_run": ""
     },
     {
@@ -5296,7 +5296,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0164.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name q3_long_s8821 --seed 8821 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name q3_long_s8821 --seed 8821",
       "cannot_run": ""
     },
     {
@@ -5345,7 +5345,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0165.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1_crab_s1301 --seed 1301 --stop-at 0.965 --crab-share 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1_crab_s1301 --seed 1301 --crab-share 0.15",
       "cannot_run": ""
     },
     {
@@ -5394,7 +5394,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0166.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r2_crab_s4507 --seed 4507 --stop-at 0.965 --crab-share 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r2_crab_s4507 --seed 4507 --crab-share 0.15",
       "cannot_run": ""
     },
     {
@@ -5443,7 +5443,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0167.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r3_crab_s8821 --seed 8821 --stop-at 0.965 --crab-share 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r3_crab_s8821 --seed 8821 --crab-share 0.15",
       "cannot_run": ""
     },
     {
@@ -5492,7 +5492,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0168.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name d1_wide_s2207 --seed 2207 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name d1_wide_s2207 --seed 2207",
       "cannot_run": ""
     },
     {
@@ -5541,7 +5541,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0169.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name d2_wide_s6653 --seed 6653 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name d2_wide_s6653 --seed 6653",
       "cannot_run": ""
     },
     {
@@ -5590,7 +5590,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0170.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name d3_wide_s9410 --seed 9410 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name d3_wide_s9410 --seed 9410",
       "cannot_run": ""
     },
     {
@@ -5640,7 +5640,7 @@
       ],
       "owner": "31212@201037",
       "log": "progress/jobs/j0171.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f0_control_s2207 --seed 2207 --stop-at 0.0 --narrow-dials all",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f0_control_s2207 --seed 2207 --narrow-dials all",
       "cannot_run": ""
     },
     {
@@ -5690,7 +5690,7 @@
       ],
       "owner": "31212@201037",
       "log": "progress/jobs/j0172.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f1_grip_s2207 --seed 2207 --stop-at 0.0 --narrow-dials how_heavy,where_the_weight_is,servo_strength,gearbox_drag",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f1_grip_s2207 --seed 2207 --narrow-dials how_heavy,where_the_weight_is,servo_strength,gearbox_drag",
       "cannot_run": ""
     },
     {
@@ -5740,7 +5740,7 @@
       ],
       "owner": "31212@201037",
       "log": "progress/jobs/j0173.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f2_mass_s2207 --seed 2207 --stop-at 0.0 --narrow-dials ground_grip,where_the_weight_is,servo_strength,gearbox_drag",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f2_mass_s2207 --seed 2207 --narrow-dials ground_grip,where_the_weight_is,servo_strength,gearbox_drag",
       "cannot_run": ""
     },
     {
@@ -5790,7 +5790,7 @@
       ],
       "owner": "31212@201037",
       "log": "progress/jobs/j0174.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f3_com_s2207 --seed 2207 --stop-at 0.0 --narrow-dials ground_grip,how_heavy,servo_strength,gearbox_drag",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f3_com_s2207 --seed 2207 --narrow-dials ground_grip,how_heavy,servo_strength,gearbox_drag",
       "cannot_run": ""
     },
     {
@@ -5840,7 +5840,7 @@
       ],
       "owner": "31212@201037",
       "log": "progress/jobs/j0175.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f4_servo_s2207 --seed 2207 --stop-at 0.0 --narrow-dials ground_grip,how_heavy,where_the_weight_is,gearbox_drag",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f4_servo_s2207 --seed 2207 --narrow-dials ground_grip,how_heavy,where_the_weight_is,gearbox_drag",
       "cannot_run": ""
     },
     {
@@ -5890,7 +5890,7 @@
       ],
       "owner": "31212@201037",
       "log": "progress/jobs/j0176.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f5_drag_s2207 --seed 2207 --stop-at 0.0 --narrow-dials ground_grip,how_heavy,where_the_weight_is,servo_strength",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f5_drag_s2207 --seed 2207 --narrow-dials ground_grip,how_heavy,where_the_weight_is,servo_strength",
       "cannot_run": ""
     },
     {
@@ -5943,7 +5943,7 @@
       ],
       "owner": "34400@025137",
       "log": "progress/jobs/j0177.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g0_control_s2207 --seed 2207 --stop-at 0.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g0_control_s2207 --seed 2207",
       "cannot_run": ""
     },
     {
@@ -5996,7 +5996,7 @@
       ],
       "owner": "34400@025137",
       "log": "progress/jobs/j0178.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g1_spin_s2207 --seed 2207 --stop-at 0.0 --spin-share 0.1",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g1_spin_s2207 --seed 2207 --spin-share 0.1",
       "cannot_run": ""
     },
     {
@@ -6049,7 +6049,7 @@
       ],
       "owner": "34400@025137",
       "log": "progress/jobs/j0179.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g2_dive_s2207 --seed 2207 --stop-at 0.0 --dive-ends",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g2_dive_s2207 --seed 2207 --dive-ends",
       "cannot_run": ""
     },
     {
@@ -6102,7 +6102,7 @@
       ],
       "owner": "34400@025137",
       "log": "progress/jobs/j0180.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g3_swing50_s2207 --seed 2207 --stop-at 0.0 --swing-target 0.05",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g3_swing50_s2207 --seed 2207 --swing-target 0.05",
       "cannot_run": ""
     },
     {
@@ -6157,7 +6157,7 @@
       ],
       "owner": "34400@025137",
       "log": "progress/jobs/j0181.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g4_swingw_s2207 --seed 2207 --stop-at 0.0 --reward swing_height=-1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g4_swingw_s2207 --seed 2207 --reward swing_height=-1.0",
       "cannot_run": ""
     },
     {
@@ -6210,7 +6210,7 @@
       ],
       "owner": "34400@025137",
       "log": "progress/jobs/j0182.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name gc_1301 --seed 1301 --stop-at 0.965 --spin-share 0.1 --dive-ends --swing-target 0.05",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name gc_1301 --seed 1301 --spin-share 0.1 --dive-ends --swing-target 0.05",
       "cannot_run": ""
     },
     {
@@ -6263,7 +6263,7 @@
       ],
       "owner": "34400@025137",
       "log": "progress/jobs/j0183.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name gc_4507 --seed 4507 --stop-at 0.965 --spin-share 0.1 --dive-ends --swing-target 0.05",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name gc_4507 --seed 4507 --spin-share 0.1 --dive-ends --swing-target 0.05",
       "cannot_run": ""
     },
     {
@@ -6316,7 +6316,7 @@
       ],
       "owner": "34400@025137",
       "log": "progress/jobs/j0184.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name gc_8821 --seed 8821 --stop-at 0.965 --spin-share 0.1 --dive-ends --swing-target 0.05",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name gc_8821 --seed 8821 --spin-share 0.1 --dive-ends --swing-target 0.05",
       "cannot_run": ""
     },
     {
@@ -6364,7 +6364,7 @@
       ],
       "owner": "9836@092619",
       "log": "progress/jobs/j0185.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --slope-deg 4.0",
       "cannot_run": ""
     },
     {
@@ -6412,7 +6412,7 @@
       ],
       "owner": "9836@092619",
       "log": "progress/jobs/j0186.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 7.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --slope-deg 7.0",
       "cannot_run": ""
     },
     {
@@ -6458,7 +6458,7 @@
           "at": "2026-08-06T09:38:59"
         }
       ],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 10.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --slope-deg 10.0",
       "cannot_run": "",
       "owner": "9836@092619",
       "log": "progress/jobs/j0187.log"
@@ -6506,7 +6506,7 @@
           "at": "2026-08-06T09:48:55"
         }
       ],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 14.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --slope-deg 14.0",
       "cannot_run": "",
       "owner": "9836@092619",
       "log": "progress/jobs/j0188.log"
@@ -6554,7 +6554,7 @@
           "at": "2026-08-06T09:58:25"
         }
       ],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --slope-deg 4.0",
       "cannot_run": "",
       "owner": "9836@092619",
       "log": "progress/jobs/j0189.log"
@@ -6595,7 +6595,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 7.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --slope-deg 7.0",
       "cannot_run": ""
     },
     {
@@ -6634,7 +6634,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 10.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --slope-deg 10.0",
       "cannot_run": ""
     },
     {
@@ -6673,7 +6673,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 14.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --slope-deg 14.0",
       "cannot_run": ""
     },
     {
@@ -6725,7 +6725,7 @@
           "at": "2026-08-06T10:29:45"
         }
       ],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --slope-deg 4.0",
       "cannot_run": "",
       "owner": "9836@092619",
       "log": "progress/jobs/j0193.log"
@@ -6773,7 +6773,7 @@
           "at": "2026-08-06T10:31:04"
         }
       ],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 7.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --slope-deg 7.0",
       "cannot_run": "",
       "owner": "9836@092619",
       "log": "progress/jobs/j0194.log"
@@ -6814,7 +6814,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 10.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --slope-deg 10.0",
       "cannot_run": ""
     },
     {
@@ -6853,7 +6853,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 14.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --slope-deg 14.0",
       "cannot_run": ""
     },
     {
@@ -6906,7 +6906,7 @@
           "at": "2026-08-06T11:19:05"
         }
       ],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 4.0 --init-from 2026-08-06_04-43-00_gc_1301",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --slope-deg 4.0 --init-from 2026-08-06_04-43-00_gc_1301",
       "cannot_run": "",
       "owner": "25584@103949",
       "log": "progress/jobs/j0197.log"
@@ -6961,7 +6961,7 @@
           "at": "2026-08-06T12:21:32"
         }
       ],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 7.0 --init-from 2026-08-06_04-43-00_gc_1301",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --slope-deg 7.0 --init-from 2026-08-06_04-43-00_gc_1301",
       "cannot_run": "",
       "owner": "25584@103949",
       "log": "progress/jobs/j0198.log"
@@ -7016,7 +7016,7 @@
           "at": "2026-08-06T12:58:55"
         }
       ],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 10.0 --init-from 2026-08-06_04-43-00_gc_1301",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --slope-deg 10.0 --init-from 2026-08-06_04-43-00_gc_1301",
       "cannot_run": "",
       "owner": "25584@103949",
       "log": "progress/jobs/j0199.log"
@@ -7071,7 +7071,7 @@
           "at": "2026-08-06T13:37:55"
         }
       ],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 14.0 --init-from 2026-08-06_04-43-00_gc_1301",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --slope-deg 14.0 --init-from 2026-08-06_04-43-00_gc_1301",
       "cannot_run": "",
       "owner": "25584@103949",
       "log": "progress/jobs/j0200.log"
@@ -7122,7 +7122,7 @@
       ],
       "owner": "25584@103949",
       "log": "progress/jobs/j0201.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name sc_1301 --seed 1301 --stop-at 0.965 --slope-deg 10.0 --init-from 2026-08-06_04-43-00_gc_1301",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name sc_1301 --seed 1301 --slope-deg 10.0 --init-from 2026-08-06_04-43-00_gc_1301",
       "cannot_run": ""
     },
     {
@@ -7162,7 +7162,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name sc_4507 --seed 4507 --stop-at 0.965 --slope-deg 10.0 --init-from 2026-08-06_04-43-00_gc_1301",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name sc_4507 --seed 4507 --slope-deg 10.0 --init-from 2026-08-06_04-43-00_gc_1301",
       "cannot_run": ""
     },
     {
@@ -7202,13 +7202,222 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name sc_8821 --seed 8821 --stop-at 0.965 --slope-deg 10.0 --init-from 2026-08-06_04-43-00_gc_1301",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name sc_8821 --seed 8821 --slope-deg 10.0 --init-from 2026-08-06_04-43-00_gc_1301",
+      "cannot_run": ""
+    },
+    {
+      "task": "Gray-Walk",
+      "name": "L1_1301",
+      "note": "Seed 1301, continuing 2026-08-06_04-43-00_gc_1301. THE locomotion batch, 6 Aug 2026. One world with everything in it: speed to 0.9 m/s, hills up and down, rough ground, gravel by its effects, and 0 to 1 kg of payload. 5500 iterations, no early stop. Read against the owner's revised bars - forward drift 7 deg, crab drift 15 deg, a full turn in 12 s, 50 cm of turn wander - plus a speed ladder, a slope test and a payload ladder measured on the finished policy.",
+      "num_envs": 5000,
+      "seed": 1301,
+      "iterations": 5500,
+      "no_video": false,
+      "rewards": {},
+      "ramps": {},
+      "turn_std": null,
+      "upright_std": null,
+      "gyro_noise": null,
+      "no_heading_obs": false,
+      "with_off_track": false,
+      "crab_share": null,
+      "spin_share": null,
+      "dive_ends": false,
+      "swing_target": null,
+      "slope_deg": null,
+      "mixed_ground": true,
+      "payload_kg": 1.0,
+      "init_from": "2026-08-06_04-43-00_gc_1301",
+      "narrow_dials": "",
+      "push_speed": null,
+      "push_spin": null,
+      "film": false,
+      "verify": true,
+      "clamped": "",
+      "id": "j0207",
+      "state": "queued",
+      "created": "2026-08-06T17:33:05",
+      "started": null,
+      "finished": null,
+      "run_id": null,
+      "exit_code": null,
+      "error": "",
+      "steps": []
+    },
+    {
+      "task": "Gray-Walk",
+      "name": "L2_4507",
+      "note": "Seed 4507, continuing 2026-08-06_05-34-25_gc_4507. THE locomotion batch, 6 Aug 2026. One world with everything in it: speed to 0.9 m/s, hills up and down, rough ground, gravel by its effects, and 0 to 1 kg of payload. 5500 iterations, no early stop. Read against the owner's revised bars - forward drift 7 deg, crab drift 15 deg, a full turn in 12 s, 50 cm of turn wander - plus a speed ladder, a slope test and a payload ladder measured on the finished policy.",
+      "num_envs": 5000,
+      "seed": 4507,
+      "iterations": 5500,
+      "no_video": false,
+      "rewards": {},
+      "ramps": {},
+      "turn_std": null,
+      "upright_std": null,
+      "gyro_noise": null,
+      "no_heading_obs": false,
+      "with_off_track": false,
+      "crab_share": null,
+      "spin_share": null,
+      "dive_ends": false,
+      "swing_target": null,
+      "slope_deg": null,
+      "mixed_ground": true,
+      "payload_kg": 1.0,
+      "init_from": "2026-08-06_05-34-25_gc_4507",
+      "narrow_dials": "",
+      "push_speed": null,
+      "push_spin": null,
+      "film": false,
+      "verify": true,
+      "clamped": "",
+      "id": "j0208",
+      "state": "queued",
+      "created": "2026-08-06T17:33:05",
+      "started": null,
+      "finished": null,
+      "run_id": null,
+      "exit_code": null,
+      "error": "",
+      "steps": []
+    },
+    {
+      "task": "Gray-Walk",
+      "name": "L3_8821",
+      "note": "Seed 8821, continuing 2026-08-06_06-28-32_gc_8821. THE locomotion batch, 6 Aug 2026. One world with everything in it: speed to 0.9 m/s, hills up and down, rough ground, gravel by its effects, and 0 to 1 kg of payload. 5500 iterations, no early stop. Read against the owner's revised bars - forward drift 7 deg, crab drift 15 deg, a full turn in 12 s, 50 cm of turn wander - plus a speed ladder, a slope test and a payload ladder measured on the finished policy.",
+      "num_envs": 5000,
+      "seed": 8821,
+      "iterations": 5500,
+      "no_video": false,
+      "rewards": {},
+      "ramps": {},
+      "turn_std": null,
+      "upright_std": null,
+      "gyro_noise": null,
+      "no_heading_obs": false,
+      "with_off_track": false,
+      "crab_share": null,
+      "spin_share": null,
+      "dive_ends": false,
+      "swing_target": null,
+      "slope_deg": null,
+      "mixed_ground": true,
+      "payload_kg": 1.0,
+      "init_from": "2026-08-06_06-28-32_gc_8821",
+      "narrow_dials": "",
+      "push_speed": null,
+      "push_spin": null,
+      "film": false,
+      "verify": true,
+      "clamped": "",
+      "id": "j0209",
+      "state": "queued",
+      "created": "2026-08-06T17:33:05",
+      "started": null,
+      "finished": null,
+      "run_id": null,
+      "exit_code": null,
+      "error": "",
+      "steps": []
+    }
+  ],
+  "counts": {
+    "queued": 0,
+    "running": 0,
+    "done": 91,
+    "failed": 15,
+    "cancelled": 61,
+    "skipped": 0
+  },
+  "queued": [],
+  "running": null,
+  "history": [
+    {
+      "task": "Gray-Walk",
+      "name": "sc_8821",
+      "note": "Seed 8821. PLAN 1.3.2 batch 4, the slope confirm at 10 deg - the angle the ladder picked as the one that strains without breaking (88% alive, 8 of 64 down on a sideways traverse; every other rung cleared 95%). Warm-started from the flat winner 2026-08-06_04-43-00_gc_1301, like every rung. Read the eleven criteria on the FLAT, where the bar lives, and the hill numbers with verify --gait-diag --slope-deg 10. Films on: three runs is a small render bill for the thing that closes a step.",
+      "num_envs": 5000,
+      "seed": 8821,
+      "iterations": 1500,
+      "stop_at": 0.965,
+      "no_video": false,
+      "rewards": {},
+      "ramps": {},
+      "turn_std": null,
+      "upright_std": null,
+      "gyro_noise": null,
+      "no_heading_obs": false,
+      "with_off_track": false,
+      "crab_share": null,
+      "spin_share": null,
+      "dive_ends": false,
+      "swing_target": null,
+      "slope_deg": 10.0,
+      "init_from": "2026-08-06_04-43-00_gc_1301",
+      "narrow_dials": "",
+      "push_speed": null,
+      "push_spin": null,
+      "film": true,
+      "verify": true,
+      "clamped": "",
+      "id": "j0203",
+      "state": "cancelled",
+      "created": "2026-08-06T13:49:48",
+      "started": null,
+      "finished": null,
+      "run_id": null,
+      "exit_code": null,
+      "error": "",
+      "steps": [],
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name sc_8821 --seed 8821 --slope-deg 10.0 --init-from 2026-08-06_04-43-00_gc_1301",
+      "cannot_run": ""
+    },
+    {
+      "task": "Gray-Walk",
+      "name": "sc_4507",
+      "note": "Seed 4507. PLAN 1.3.2 batch 4, the slope confirm at 10 deg - the angle the ladder picked as the one that strains without breaking (88% alive, 8 of 64 down on a sideways traverse; every other rung cleared 95%). Warm-started from the flat winner 2026-08-06_04-43-00_gc_1301, like every rung. Read the eleven criteria on the FLAT, where the bar lives, and the hill numbers with verify --gait-diag --slope-deg 10. Films on: three runs is a small render bill for the thing that closes a step.",
+      "num_envs": 5000,
+      "seed": 4507,
+      "iterations": 1500,
+      "stop_at": 0.965,
+      "no_video": false,
+      "rewards": {},
+      "ramps": {},
+      "turn_std": null,
+      "upright_std": null,
+      "gyro_noise": null,
+      "no_heading_obs": false,
+      "with_off_track": false,
+      "crab_share": null,
+      "spin_share": null,
+      "dive_ends": false,
+      "swing_target": null,
+      "slope_deg": 10.0,
+      "init_from": "2026-08-06_04-43-00_gc_1301",
+      "narrow_dials": "",
+      "push_speed": null,
+      "push_spin": null,
+      "film": true,
+      "verify": true,
+      "clamped": "",
+      "id": "j0202",
+      "state": "cancelled",
+      "created": "2026-08-06T13:49:48",
+      "started": null,
+      "finished": null,
+      "run_id": null,
+      "exit_code": null,
+      "error": "",
+      "steps": [],
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name sc_4507 --seed 4507 --slope-deg 10.0 --init-from 2026-08-06_04-43-00_gc_1301",
       "cannot_run": ""
     },
     {
       "task": "Gray-Walk",
       "name": "sc_1301",
-      "note": "Seed 1301. PLAN 1.3.2 batch 4, the slope confirm at 10 deg - the angle the ladder picked as the one that strains without breaking (88% alive, 8 of 64 down on a sideways traverse; every other rung cleared 95%). Warm-started from the flat winner 2026-08-06_04-43-00_gc_1301, like every rung. Read the eleven criteria on the FLAT, where the bar lives, and the hill numbers with verify --gait-diag --slope-deg 10. Films OFF during training - on a heightfield the recorder costs 30.5 s an iteration, a 12 hour run - and taken from the finished checkpoint afterwards instead.",
+      "note": "Seed 1301. PLAN 1.3.2 batch 4, the slope confirm at 10 deg - the angle the ladder picked as the one that strains without breaking (88% alive, 8 of 64 down on a sideways traverse; every other rung cleared 95%). Warm-started from the flat winner 2026-08-06_04-43-00_gc_1301, like every rung. Read the eleven criteria on the FLAT, where the bar lives, and the hill numbers with verify --gait-diag --slope-deg 10. Films on: three runs is a small render bill for the thing that closes a step.",
       "num_envs": 5000,
       "seed": 1301,
       "iterations": 1500,
@@ -7230,236 +7439,30 @@
       "narrow_dials": "",
       "push_speed": null,
       "push_spin": null,
-      "film": false,
-      "verify": true,
-      "clamped": "",
-      "id": "j0204",
-      "state": "queued",
-      "created": "2026-08-06T15:50:35",
-      "started": null,
-      "finished": null,
-      "run_id": null,
-      "exit_code": null,
-      "error": "",
-      "steps": []
-    },
-    {
-      "task": "Gray-Walk",
-      "name": "sc_4507",
-      "note": "Seed 4507. PLAN 1.3.2 batch 4, the slope confirm at 10 deg - the angle the ladder picked as the one that strains without breaking (88% alive, 8 of 64 down on a sideways traverse; every other rung cleared 95%). Warm-started from the flat winner 2026-08-06_04-43-00_gc_1301, like every rung. Read the eleven criteria on the FLAT, where the bar lives, and the hill numbers with verify --gait-diag --slope-deg 10. Films OFF during training - on a heightfield the recorder costs 30.5 s an iteration, a 12 hour run - and taken from the finished checkpoint afterwards instead.",
-      "num_envs": 5000,
-      "seed": 4507,
-      "iterations": 1500,
-      "stop_at": 0.965,
-      "no_video": false,
-      "rewards": {},
-      "ramps": {},
-      "turn_std": null,
-      "upright_std": null,
-      "gyro_noise": null,
-      "no_heading_obs": false,
-      "with_off_track": false,
-      "crab_share": null,
-      "spin_share": null,
-      "dive_ends": false,
-      "swing_target": null,
-      "slope_deg": 10.0,
-      "init_from": "2026-08-06_04-43-00_gc_1301",
-      "narrow_dials": "",
-      "push_speed": null,
-      "push_spin": null,
-      "film": false,
-      "verify": true,
-      "clamped": "",
-      "id": "j0205",
-      "state": "queued",
-      "created": "2026-08-06T15:50:35",
-      "started": null,
-      "finished": null,
-      "run_id": null,
-      "exit_code": null,
-      "error": "",
-      "steps": []
-    },
-    {
-      "task": "Gray-Walk",
-      "name": "sc_8821",
-      "note": "Seed 8821. PLAN 1.3.2 batch 4, the slope confirm at 10 deg - the angle the ladder picked as the one that strains without breaking (88% alive, 8 of 64 down on a sideways traverse; every other rung cleared 95%). Warm-started from the flat winner 2026-08-06_04-43-00_gc_1301, like every rung. Read the eleven criteria on the FLAT, where the bar lives, and the hill numbers with verify --gait-diag --slope-deg 10. Films OFF during training - on a heightfield the recorder costs 30.5 s an iteration, a 12 hour run - and taken from the finished checkpoint afterwards instead.",
-      "num_envs": 5000,
-      "seed": 8821,
-      "iterations": 1500,
-      "stop_at": 0.965,
-      "no_video": false,
-      "rewards": {},
-      "ramps": {},
-      "turn_std": null,
-      "upright_std": null,
-      "gyro_noise": null,
-      "no_heading_obs": false,
-      "with_off_track": false,
-      "crab_share": null,
-      "spin_share": null,
-      "dive_ends": false,
-      "swing_target": null,
-      "slope_deg": 10.0,
-      "init_from": "2026-08-06_04-43-00_gc_1301",
-      "narrow_dials": "",
-      "push_speed": null,
-      "push_spin": null,
-      "film": false,
-      "verify": true,
-      "clamped": "",
-      "id": "j0206",
-      "state": "queued",
-      "created": "2026-08-06T15:50:35",
-      "started": null,
-      "finished": null,
-      "run_id": null,
-      "exit_code": null,
-      "error": "",
-      "steps": []
-    }
-  ],
-  "counts": {
-    "queued": 2,
-    "running": 1,
-    "done": 91,
-    "failed": 15,
-    "cancelled": 58,
-    "skipped": 0
-  },
-  "queued": [
-    {
-      "task": "Gray-Walk",
-      "name": "sc_4507",
-      "note": "Seed 4507. PLAN 1.3.2 batch 4, the slope confirm at 10 deg - the angle the ladder picked as the one that strains without breaking (88% alive, 8 of 64 down on a sideways traverse; every other rung cleared 95%). Warm-started from the flat winner 2026-08-06_04-43-00_gc_1301, like every rung. Read the eleven criteria on the FLAT, where the bar lives, and the hill numbers with verify --gait-diag --slope-deg 10. Films on: three runs is a small render bill for the thing that closes a step.",
-      "num_envs": 5000,
-      "seed": 4507,
-      "iterations": 1500,
-      "stop_at": 0.965,
-      "no_video": false,
-      "rewards": {},
-      "ramps": {},
-      "turn_std": null,
-      "upright_std": null,
-      "gyro_noise": null,
-      "no_heading_obs": false,
-      "with_off_track": false,
-      "crab_share": null,
-      "spin_share": null,
-      "dive_ends": false,
-      "swing_target": null,
-      "slope_deg": 10.0,
-      "init_from": "2026-08-06_04-43-00_gc_1301",
-      "narrow_dials": "",
-      "push_speed": null,
-      "push_spin": null,
       "film": true,
       "verify": true,
       "clamped": "",
-      "id": "j0202",
+      "id": "j0201",
       "state": "cancelled",
       "created": "2026-08-06T13:49:48",
-      "started": null,
+      "started": "2026-08-06T13:49:49",
       "finished": null,
-      "run_id": null,
+      "run_id": "2026-08-06_13-49-54_sc_1301",
       "exit_code": null,
       "error": "",
-      "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name sc_4507 --seed 4507 --stop-at 0.965 --slope-deg 10.0 --init-from 2026-08-06_04-43-00_gc_1301",
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 7118.9,
+          "exit_code": 4294967295,
+          "at": "2026-08-06T15:48:28"
+        }
+      ],
+      "owner": "25584@103949",
+      "log": "progress/jobs/j0201.log",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name sc_1301 --seed 1301 --slope-deg 10.0 --init-from 2026-08-06_04-43-00_gc_1301",
       "cannot_run": ""
     },
-    {
-      "task": "Gray-Walk",
-      "name": "sc_8821",
-      "note": "Seed 8821. PLAN 1.3.2 batch 4, the slope confirm at 10 deg - the angle the ladder picked as the one that strains without breaking (88% alive, 8 of 64 down on a sideways traverse; every other rung cleared 95%). Warm-started from the flat winner 2026-08-06_04-43-00_gc_1301, like every rung. Read the eleven criteria on the FLAT, where the bar lives, and the hill numbers with verify --gait-diag --slope-deg 10. Films on: three runs is a small render bill for the thing that closes a step.",
-      "num_envs": 5000,
-      "seed": 8821,
-      "iterations": 1500,
-      "stop_at": 0.965,
-      "no_video": false,
-      "rewards": {},
-      "ramps": {},
-      "turn_std": null,
-      "upright_std": null,
-      "gyro_noise": null,
-      "no_heading_obs": false,
-      "with_off_track": false,
-      "crab_share": null,
-      "spin_share": null,
-      "dive_ends": false,
-      "swing_target": null,
-      "slope_deg": 10.0,
-      "init_from": "2026-08-06_04-43-00_gc_1301",
-      "narrow_dials": "",
-      "push_speed": null,
-      "push_spin": null,
-      "film": true,
-      "verify": true,
-      "clamped": "",
-      "id": "j0203",
-      "state": "cancelled",
-      "created": "2026-08-06T13:49:48",
-      "started": null,
-      "finished": null,
-      "run_id": null,
-      "exit_code": null,
-      "error": "",
-      "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name sc_8821 --seed 8821 --stop-at 0.965 --slope-deg 10.0 --init-from 2026-08-06_04-43-00_gc_1301",
-      "cannot_run": ""
-    }
-  ],
-  "running": {
-    "task": "Gray-Walk",
-    "name": "sc_1301",
-    "note": "Seed 1301. PLAN 1.3.2 batch 4, the slope confirm at 10 deg - the angle the ladder picked as the one that strains without breaking (88% alive, 8 of 64 down on a sideways traverse; every other rung cleared 95%). Warm-started from the flat winner 2026-08-06_04-43-00_gc_1301, like every rung. Read the eleven criteria on the FLAT, where the bar lives, and the hill numbers with verify --gait-diag --slope-deg 10. Films on: three runs is a small render bill for the thing that closes a step.",
-    "num_envs": 5000,
-    "seed": 1301,
-    "iterations": 1500,
-    "stop_at": 0.965,
-    "no_video": false,
-    "rewards": {},
-    "ramps": {},
-    "turn_std": null,
-    "upright_std": null,
-    "gyro_noise": null,
-    "no_heading_obs": false,
-    "with_off_track": false,
-    "crab_share": null,
-    "spin_share": null,
-    "dive_ends": false,
-    "swing_target": null,
-    "slope_deg": 10.0,
-    "init_from": "2026-08-06_04-43-00_gc_1301",
-    "narrow_dials": "",
-    "push_speed": null,
-    "push_spin": null,
-    "film": true,
-    "verify": true,
-    "clamped": "",
-    "id": "j0201",
-    "state": "cancelled",
-    "created": "2026-08-06T13:49:48",
-    "started": "2026-08-06T13:49:49",
-    "finished": null,
-    "run_id": "2026-08-06_13-49-54_sc_1301",
-    "exit_code": null,
-    "error": "",
-    "steps": [
-      {
-        "name": "train",
-        "seconds": 7118.9,
-        "exit_code": 4294967295,
-        "at": "2026-08-06T15:48:28"
-      }
-    ],
-    "owner": "25584@103949",
-    "log": "progress/jobs/j0201.log",
-    "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name sc_1301 --seed 1301 --stop-at 0.965 --slope-deg 10.0 --init-from 2026-08-06_04-43-00_gc_1301",
-    "cannot_run": ""
-  },
-  "history": [
     {
       "task": "Gray-Walk",
       "name": "s4_14deg_s2207",
@@ -7510,7 +7513,7 @@
           "at": "2026-08-06T13:37:55"
         }
       ],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 14.0 --init-from 2026-08-06_04-43-00_gc_1301",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --slope-deg 14.0 --init-from 2026-08-06_04-43-00_gc_1301",
       "cannot_run": "",
       "owner": "25584@103949",
       "log": "progress/jobs/j0200.log"
@@ -7565,7 +7568,7 @@
           "at": "2026-08-06T12:58:55"
         }
       ],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 10.0 --init-from 2026-08-06_04-43-00_gc_1301",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --slope-deg 10.0 --init-from 2026-08-06_04-43-00_gc_1301",
       "cannot_run": "",
       "owner": "25584@103949",
       "log": "progress/jobs/j0199.log"
@@ -7620,7 +7623,7 @@
           "at": "2026-08-06T12:21:32"
         }
       ],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 7.0 --init-from 2026-08-06_04-43-00_gc_1301",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --slope-deg 7.0 --init-from 2026-08-06_04-43-00_gc_1301",
       "cannot_run": "",
       "owner": "25584@103949",
       "log": "progress/jobs/j0198.log"
@@ -7675,7 +7678,7 @@
           "at": "2026-08-06T11:19:05"
         }
       ],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 4.0 --init-from 2026-08-06_04-43-00_gc_1301",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --slope-deg 4.0 --init-from 2026-08-06_04-43-00_gc_1301",
       "cannot_run": "",
       "owner": "25584@103949",
       "log": "progress/jobs/j0197.log"
@@ -7716,7 +7719,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 14.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --slope-deg 14.0",
       "cannot_run": ""
     },
     {
@@ -7755,7 +7758,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 10.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --slope-deg 10.0",
       "cannot_run": ""
     },
     {
@@ -7801,7 +7804,7 @@
           "at": "2026-08-06T10:31:04"
         }
       ],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 7.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --slope-deg 7.0",
       "cannot_run": "",
       "owner": "9836@092619",
       "log": "progress/jobs/j0194.log"
@@ -7855,7 +7858,7 @@
           "at": "2026-08-06T10:29:45"
         }
       ],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --slope-deg 4.0",
       "cannot_run": "",
       "owner": "9836@092619",
       "log": "progress/jobs/j0193.log"
@@ -7896,7 +7899,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 14.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --slope-deg 14.0",
       "cannot_run": ""
     },
     {
@@ -7935,7 +7938,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 10.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --slope-deg 10.0",
       "cannot_run": ""
     },
     {
@@ -7974,7 +7977,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 7.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --slope-deg 7.0",
       "cannot_run": ""
     },
     {
@@ -8020,7 +8023,7 @@
           "at": "2026-08-06T09:58:25"
         }
       ],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --slope-deg 4.0",
       "cannot_run": "",
       "owner": "9836@092619",
       "log": "progress/jobs/j0189.log"
@@ -8068,7 +8071,7 @@
           "at": "2026-08-06T09:48:55"
         }
       ],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 14.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s4_14deg_s2207 --seed 2207 --slope-deg 14.0",
       "cannot_run": "",
       "owner": "9836@092619",
       "log": "progress/jobs/j0188.log"
@@ -8116,7 +8119,7 @@
           "at": "2026-08-06T09:38:59"
         }
       ],
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 10.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s3_10deg_s2207 --seed 2207 --slope-deg 10.0",
       "cannot_run": "",
       "owner": "9836@092619",
       "log": "progress/jobs/j0187.log"
@@ -8166,7 +8169,7 @@
       ],
       "owner": "9836@092619",
       "log": "progress/jobs/j0186.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 7.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s2_7deg_s2207 --seed 2207 --slope-deg 7.0",
       "cannot_run": ""
     },
     {
@@ -8214,7 +8217,7 @@
       ],
       "owner": "9836@092619",
       "log": "progress/jobs/j0185.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --stop-at 0.0 --slope-deg 4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name s1_4deg_s2207 --seed 2207 --slope-deg 4.0",
       "cannot_run": ""
     },
     {
@@ -8267,7 +8270,7 @@
       ],
       "owner": "34400@025137",
       "log": "progress/jobs/j0184.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name gc_8821 --seed 8821 --stop-at 0.965 --spin-share 0.1 --dive-ends --swing-target 0.05",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name gc_8821 --seed 8821 --spin-share 0.1 --dive-ends --swing-target 0.05",
       "cannot_run": ""
     },
     {
@@ -8320,7 +8323,7 @@
       ],
       "owner": "34400@025137",
       "log": "progress/jobs/j0183.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name gc_4507 --seed 4507 --stop-at 0.965 --spin-share 0.1 --dive-ends --swing-target 0.05",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name gc_4507 --seed 4507 --spin-share 0.1 --dive-ends --swing-target 0.05",
       "cannot_run": ""
     },
     {
@@ -8373,7 +8376,7 @@
       ],
       "owner": "34400@025137",
       "log": "progress/jobs/j0182.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name gc_1301 --seed 1301 --stop-at 0.965 --spin-share 0.1 --dive-ends --swing-target 0.05",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name gc_1301 --seed 1301 --spin-share 0.1 --dive-ends --swing-target 0.05",
       "cannot_run": ""
     },
     {
@@ -8428,7 +8431,7 @@
       ],
       "owner": "34400@025137",
       "log": "progress/jobs/j0181.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g4_swingw_s2207 --seed 2207 --stop-at 0.0 --reward swing_height=-1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g4_swingw_s2207 --seed 2207 --reward swing_height=-1.0",
       "cannot_run": ""
     },
     {
@@ -8481,7 +8484,7 @@
       ],
       "owner": "34400@025137",
       "log": "progress/jobs/j0180.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g3_swing50_s2207 --seed 2207 --stop-at 0.0 --swing-target 0.05",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g3_swing50_s2207 --seed 2207 --swing-target 0.05",
       "cannot_run": ""
     },
     {
@@ -8534,7 +8537,7 @@
       ],
       "owner": "34400@025137",
       "log": "progress/jobs/j0179.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g2_dive_s2207 --seed 2207 --stop-at 0.0 --dive-ends",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g2_dive_s2207 --seed 2207 --dive-ends",
       "cannot_run": ""
     },
     {
@@ -8587,7 +8590,7 @@
       ],
       "owner": "34400@025137",
       "log": "progress/jobs/j0178.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g1_spin_s2207 --seed 2207 --stop-at 0.0 --spin-share 0.1",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g1_spin_s2207 --seed 2207 --spin-share 0.1",
       "cannot_run": ""
     },
     {
@@ -8640,7 +8643,7 @@
       ],
       "owner": "34400@025137",
       "log": "progress/jobs/j0177.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g0_control_s2207 --seed 2207 --stop-at 0.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g0_control_s2207 --seed 2207",
       "cannot_run": ""
     },
     {
@@ -8690,7 +8693,7 @@
       ],
       "owner": "31212@201037",
       "log": "progress/jobs/j0176.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f5_drag_s2207 --seed 2207 --stop-at 0.0 --narrow-dials ground_grip,how_heavy,where_the_weight_is,servo_strength",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f5_drag_s2207 --seed 2207 --narrow-dials ground_grip,how_heavy,where_the_weight_is,servo_strength",
       "cannot_run": ""
     },
     {
@@ -8740,7 +8743,7 @@
       ],
       "owner": "31212@201037",
       "log": "progress/jobs/j0175.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f4_servo_s2207 --seed 2207 --stop-at 0.0 --narrow-dials ground_grip,how_heavy,where_the_weight_is,gearbox_drag",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f4_servo_s2207 --seed 2207 --narrow-dials ground_grip,how_heavy,where_the_weight_is,gearbox_drag",
       "cannot_run": ""
     },
     {
@@ -8790,7 +8793,7 @@
       ],
       "owner": "31212@201037",
       "log": "progress/jobs/j0174.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f3_com_s2207 --seed 2207 --stop-at 0.0 --narrow-dials ground_grip,how_heavy,servo_strength,gearbox_drag",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f3_com_s2207 --seed 2207 --narrow-dials ground_grip,how_heavy,servo_strength,gearbox_drag",
       "cannot_run": ""
     },
     {
@@ -8840,7 +8843,7 @@
       ],
       "owner": "31212@201037",
       "log": "progress/jobs/j0173.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f2_mass_s2207 --seed 2207 --stop-at 0.0 --narrow-dials ground_grip,where_the_weight_is,servo_strength,gearbox_drag",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f2_mass_s2207 --seed 2207 --narrow-dials ground_grip,where_the_weight_is,servo_strength,gearbox_drag",
       "cannot_run": ""
     },
     {
@@ -8890,7 +8893,7 @@
       ],
       "owner": "31212@201037",
       "log": "progress/jobs/j0172.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f1_grip_s2207 --seed 2207 --stop-at 0.0 --narrow-dials how_heavy,where_the_weight_is,servo_strength,gearbox_drag",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f1_grip_s2207 --seed 2207 --narrow-dials how_heavy,where_the_weight_is,servo_strength,gearbox_drag",
       "cannot_run": ""
     },
     {
@@ -8940,7 +8943,7 @@
       ],
       "owner": "31212@201037",
       "log": "progress/jobs/j0171.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f0_control_s2207 --seed 2207 --stop-at 0.0 --narrow-dials all",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name f0_control_s2207 --seed 2207 --narrow-dials all",
       "cannot_run": ""
     },
     {
@@ -8989,7 +8992,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0170.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name d3_wide_s9410 --seed 9410 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name d3_wide_s9410 --seed 9410",
       "cannot_run": ""
     },
     {
@@ -9038,7 +9041,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0169.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name d2_wide_s6653 --seed 6653 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name d2_wide_s6653 --seed 6653",
       "cannot_run": ""
     },
     {
@@ -9087,7 +9090,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0168.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name d1_wide_s2207 --seed 2207 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name d1_wide_s2207 --seed 2207",
       "cannot_run": ""
     },
     {
@@ -9136,7 +9139,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0167.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r3_crab_s8821 --seed 8821 --stop-at 0.965 --crab-share 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r3_crab_s8821 --seed 8821 --crab-share 0.15",
       "cannot_run": ""
     },
     {
@@ -9185,7 +9188,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0166.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r2_crab_s4507 --seed 4507 --stop-at 0.965 --crab-share 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r2_crab_s4507 --seed 4507 --crab-share 0.15",
       "cannot_run": ""
     },
     {
@@ -9234,7 +9237,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0165.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1_crab_s1301 --seed 1301 --stop-at 0.965 --crab-share 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1_crab_s1301 --seed 1301 --crab-share 0.15",
       "cannot_run": ""
     },
     {
@@ -9283,7 +9286,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0164.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name q3_long_s8821 --seed 8821 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name q3_long_s8821 --seed 8821",
       "cannot_run": ""
     },
     {
@@ -9332,7 +9335,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0163.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name q2_long_s4507 --seed 4507 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name q2_long_s4507 --seed 4507",
       "cannot_run": ""
     },
     {
@@ -9381,7 +9384,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0162.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name q1_long_s1301 --seed 1301 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name q1_long_s1301 --seed 1301",
       "cannot_run": ""
     },
     {
@@ -9430,7 +9433,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0161.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name p3_revert_s8821 --seed 8821 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name p3_revert_s8821 --seed 8821",
       "cannot_run": ""
     },
     {
@@ -9479,7 +9482,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0160.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name p2_revert_s4507 --seed 4507 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name p2_revert_s4507 --seed 4507",
       "cannot_run": ""
     },
     {
@@ -9528,7 +9531,7 @@
       ],
       "owner": "32576@064326",
       "log": "progress/jobs/j0159.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name p1_revert_s1301 --seed 1301 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name p1_revert_s1301 --seed 1301",
       "cannot_run": ""
     },
     {
@@ -9579,7 +9582,7 @@
       ],
       "owner": "30072@052200",
       "log": "progress/jobs/j0158.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name n4_w1 --seed 1301 --stop-at 0.965 --reward wandering=-1.0 --crab-share 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name n4_w1 --seed 1301 --reward wandering=-1.0 --crab-share 0.15",
       "cannot_run": ""
     },
     {
@@ -9630,7 +9633,7 @@
       ],
       "owner": "30072@052200",
       "log": "progress/jobs/j0157.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name n3_track_nocrab --seed 1301 --stop-at 0.965 --reward wandering=-1.0 --crab-share 0.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name n3_track_nocrab --seed 1301 --reward wandering=-1.0 --crab-share 0.0",
       "cannot_run": ""
     },
     {
@@ -9681,7 +9684,7 @@
       ],
       "owner": "30072@052200",
       "log": "progress/jobs/j0156.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name n2_track --seed 1301 --stop-at 0.965 --reward wandering=-1.0 --crab-share 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name n2_track --seed 1301 --reward wandering=-1.0 --crab-share 0.15",
       "cannot_run": ""
     },
     {
@@ -9732,7 +9735,7 @@
       ],
       "owner": "30072@052200",
       "log": "progress/jobs/j0155.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name n1_control --seed 1301 --stop-at 0.965 --reward wandering=-3.0 --crab-share 0.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name n1_control --seed 1301 --reward wandering=-3.0 --crab-share 0.0",
       "cannot_run": ""
     },
     {
@@ -9780,7 +9783,7 @@
       ],
       "owner": "38120@035819",
       "log": "progress/jobs/j0154.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name o2_track_s4507 --seed 4507 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name o2_track_s4507 --seed 4507",
       "cannot_run": ""
     },
     {
@@ -9828,7 +9831,7 @@
       ],
       "owner": "38120@035819",
       "log": "progress/jobs/j0153.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name o1_track_s1301 --seed 1301 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name o1_track_s1301 --seed 1301",
       "cannot_run": ""
     },
     {
@@ -9876,7 +9879,7 @@
       ],
       "owner": "38120@035819",
       "log": "progress/jobs/j0152.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name m2_mix_s4507 --seed 4507 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name m2_mix_s4507 --seed 4507",
       "cannot_run": ""
     },
     {
@@ -9924,7 +9927,7 @@
       ],
       "owner": "38120@035819",
       "log": "progress/jobs/j0151.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name m1_mix_s1301 --seed 1301 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name m1_mix_s1301 --seed 1301",
       "cannot_run": ""
     },
     {
@@ -9971,7 +9974,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0150.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name h3_gate_s8821 --seed 8821 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name h3_gate_s8821 --seed 8821",
       "cannot_run": ""
     },
     {
@@ -10018,7 +10021,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0149.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name h2_gate_s4507 --seed 4507 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name h2_gate_s4507 --seed 4507",
       "cannot_run": ""
     },
     {
@@ -10065,7 +10068,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0148.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name h1_gate_s1301 --seed 1301 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name h1_gate_s1301 --seed 1301",
       "cannot_run": ""
     },
     {
@@ -10114,7 +10117,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0147.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g4_wander6 --stop-at 0.965 --reward wandering=-6.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g4_wander6 --reward wandering=-6.0",
       "cannot_run": ""
     },
     {
@@ -10161,7 +10164,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0146.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g3_close_s8821 --seed 8821 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g3_close_s8821 --seed 8821",
       "cannot_run": ""
     },
     {
@@ -10208,7 +10211,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0145.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g2_close_s4507 --seed 4507 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g2_close_s4507 --seed 4507",
       "cannot_run": ""
     },
     {
@@ -10255,7 +10258,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0144.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g1_close_s1301 --seed 1301 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g1_close_s1301 --seed 1301",
       "cannot_run": ""
     },
     {
@@ -10302,7 +10305,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0141.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g2_close_s4507 --seed 4507 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g2_close_s4507 --seed 4507",
       "cannot_run": ""
     },
     {
@@ -10349,7 +10352,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0140.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g1_close_s1301 --seed 1301 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name g1_close_s1301 --seed 1301",
       "cannot_run": ""
     },
     {
@@ -10405,7 +10408,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0139.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c5_fix_s7 --seed 7 --stop-at 0.965 --reward wandering=-1.0 --ramp veering=-0.2,-0.5,-1.2,-2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c5_fix_s7 --seed 7 --reward wandering=-1.0 --ramp veering=-0.2,-0.5,-1.2,-2.0",
       "cannot_run": ""
     },
     {
@@ -10461,7 +10464,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0138.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c4_both --stop-at 0.965 --reward wandering=-3.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c4_both --reward wandering=-3.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -10517,7 +10520,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0137.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c3_wander --stop-at 0.965 --reward wandering=-3.0 --ramp veering=-0.2,-0.5,-1.2,-2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c3_wander --reward wandering=-3.0 --ramp veering=-0.2,-0.5,-1.2,-2.0",
       "cannot_run": ""
     },
     {
@@ -10573,7 +10576,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0136.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c2_veer --stop-at 0.965 --reward wandering=-1.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c2_veer --reward wandering=-1.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -10629,7 +10632,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0135.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c1_fix --stop-at 0.965 --reward wandering=-1.0 --ramp veering=-0.2,-0.5,-1.2,-2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c1_fix --reward wandering=-1.0 --ramp veering=-0.2,-0.5,-1.2,-2.0",
       "cannot_run": ""
     },
     {
@@ -10673,7 +10676,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0134.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c5_fix_s7 --seed 7 --stop-at 0.965 --reward veering=-0.2 --reward wandering=-1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c5_fix_s7 --seed 7 --reward veering=-0.2 --reward wandering=-1.0",
       "cannot_run": ""
     },
     {
@@ -10717,7 +10720,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0133.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c4_both --stop-at 0.965 --reward veering=-0.6 --reward wandering=-3.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c4_both --reward veering=-0.6 --reward wandering=-3.0",
       "cannot_run": ""
     },
     {
@@ -10761,7 +10764,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0132.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c3_wander --stop-at 0.965 --reward veering=-0.2 --reward wandering=-3.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c3_wander --reward veering=-0.2 --reward wandering=-3.0",
       "cannot_run": ""
     },
     {
@@ -10805,7 +10808,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0131.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c2_veer --stop-at 0.965 --reward veering=-0.6 --reward wandering=-1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c2_veer --reward veering=-0.6 --reward wandering=-1.0",
       "cannot_run": ""
     },
     {
@@ -10849,7 +10852,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0130.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c1_fix --stop-at 0.965 --reward veering=-0.2 --reward wandering=-1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name c1_fix --reward veering=-0.2 --reward wandering=-1.0",
       "cannot_run": ""
     },
     {
@@ -10890,7 +10893,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0129.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 512 --iterations 3 --name c00_smoke --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 512 --iterations 3 --name c00_smoke",
       "cannot_run": ""
     },
     {
@@ -10939,7 +10942,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0128.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t8_pay5_s7 --seed 7 --stop-at 0.965 --reward track_turn=5.0 --turn-std 0.8",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t8_pay5_s7 --seed 7 --reward track_turn=5.0 --turn-std 0.8",
       "cannot_run": ""
     },
     {
@@ -10988,7 +10991,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0127.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t7_wide5 --stop-at 0.965 --reward track_turn=5.0 --turn-std 1.2",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t7_wide5 --reward track_turn=5.0 --turn-std 1.2",
       "cannot_run": ""
     },
     {
@@ -11037,7 +11040,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0126.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t6_pay8 --stop-at 0.965 --reward track_turn=8.0 --turn-std 0.8",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t6_pay8 --reward track_turn=8.0 --turn-std 0.8",
       "cannot_run": ""
     },
     {
@@ -11086,7 +11089,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0125.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t5_pay5 --stop-at 0.965 --reward track_turn=5.0 --turn-std 0.8",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t5_pay5 --reward track_turn=5.0 --turn-std 0.8",
       "cannot_run": ""
     },
     {
@@ -11135,7 +11138,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0124.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t4_band_pay --stop-at 0.965 --reward track_turn=3.0 --turn-std 0.4",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t4_band_pay --reward track_turn=3.0 --turn-std 0.4",
       "cannot_run": ""
     },
     {
@@ -11184,7 +11187,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0123.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t3_pay --stop-at 0.965 --reward track_turn=3.0 --turn-std 0.8",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t3_pay --reward track_turn=3.0 --turn-std 0.8",
       "cannot_run": ""
     },
     {
@@ -11233,7 +11236,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0122.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t2_band --stop-at 0.965 --reward track_turn=1.0 --turn-std 0.4",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t2_band --reward track_turn=1.0 --turn-std 0.4",
       "cannot_run": ""
     },
     {
@@ -11282,7 +11285,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0121.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t1_stock --stop-at 0.965 --reward track_turn=1.0 --turn-std 0.8",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 550 --name t1_stock --reward track_turn=1.0 --turn-std 0.8",
       "cannot_run": ""
     },
     {
@@ -11329,7 +11332,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0120.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r5c_final_s2718 --seed 2718 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r5c_final_s2718 --seed 2718",
       "cannot_run": ""
     },
     {
@@ -11376,7 +11379,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0119.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r5b_final_s314 --seed 314 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r5b_final_s314 --seed 314",
       "cannot_run": ""
     },
     {
@@ -11423,7 +11426,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0118.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r5a_final_s99 --seed 99 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r5a_final_s99 --seed 99",
       "cannot_run": ""
     },
     {
@@ -11470,7 +11473,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0117.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r4b_tilt_s7 --seed 7 --stop-at 0.965 --upright-std 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r4b_tilt_s7 --seed 7 --upright-std 0.15",
       "cannot_run": ""
     },
     {
@@ -11517,7 +11520,7 @@
       ],
       "owner": "14816@164407",
       "log": "progress/jobs/j0116.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r4a_tilt --seed 42 --stop-at 0.965 --upright-std 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r4a_tilt --seed 42 --upright-std 0.15",
       "cannot_run": ""
     },
     {
@@ -11558,7 +11561,7 @@
       ],
       "owner": "13216@153013",
       "log": "progress/jobs/j0115.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r4a_tilt --seed 42 --stop-at 0.965 --upright-std 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r4a_tilt --seed 42 --upright-std 0.15",
       "cannot_run": ""
     },
     {
@@ -11599,7 +11602,7 @@
       ],
       "owner": "13216@153013",
       "log": "progress/jobs/j0114.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r4a_tilt --seed 42 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name r4a_tilt --seed 42",
       "cannot_run": ""
     },
     {
@@ -11667,7 +11670,7 @@
       ],
       "owner": "10872@105306",
       "log": "progress/jobs/j0113.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 750 --name r3c_smooth_s7 --seed 7 --stop-at 0.965 --reward jitter=-0.05 --reward hard_landing=-0.05 --ramp twitching=-0.05,-0.125,-0.25,-0.25 --ramp rocking=-0.06,-0.15,-0.36,-0.6 --ramp shaking=-0.002,-0.006,-0.012,-0.02",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 750 --name r3c_smooth_s7 --seed 7 --reward jitter=-0.05 --reward hard_landing=-0.05 --ramp twitching=-0.05,-0.125,-0.25,-0.25 --ramp rocking=-0.06,-0.15,-0.36,-0.6 --ramp shaking=-0.002,-0.006,-0.012,-0.02",
       "cannot_run": ""
     },
     {
@@ -11735,7 +11738,7 @@
       ],
       "owner": "10872@105306",
       "log": "progress/jobs/j0112.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 750 --name r3b_smooth_hard --seed 42 --stop-at 0.965 --reward jitter=-0.15 --reward hard_landing=-0.2 --ramp twitching=-0.15,-0.375,-0.75,-0.75 --ramp rocking=-0.16,-0.4,-0.96,-1.6 --ramp shaking=-0.005,-0.015,-0.03,-0.05",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 750 --name r3b_smooth_hard --seed 42 --reward jitter=-0.15 --reward hard_landing=-0.2 --ramp twitching=-0.15,-0.375,-0.75,-0.75 --ramp rocking=-0.16,-0.4,-0.96,-1.6 --ramp shaking=-0.005,-0.015,-0.03,-0.05",
       "cannot_run": ""
     },
     {
@@ -11803,7 +11806,7 @@
       ],
       "owner": "10872@105306",
       "log": "progress/jobs/j0111.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 750 --name r3a_smooth --seed 42 --stop-at 0.965 --reward jitter=-0.05 --reward hard_landing=-0.05 --ramp twitching=-0.05,-0.125,-0.25,-0.25 --ramp rocking=-0.06,-0.15,-0.36,-0.6 --ramp shaking=-0.002,-0.006,-0.012,-0.02",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 750 --name r3a_smooth --seed 42 --reward jitter=-0.05 --reward hard_landing=-0.05 --ramp twitching=-0.05,-0.125,-0.25,-0.25 --ramp rocking=-0.06,-0.15,-0.36,-0.6 --ramp shaking=-0.002,-0.006,-0.012,-0.02",
       "cannot_run": ""
     },
     {
@@ -11849,7 +11852,7 @@
       ],
       "owner": "10872@105306",
       "log": "progress/jobs/j0110.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1000 --name r2f_turn15_s7 --seed 7 --stop-at 0.965 --turn-std 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1000 --name r2f_turn15_s7 --seed 7 --turn-std 0.15",
       "cannot_run": ""
     },
     {
@@ -11895,7 +11898,7 @@
       ],
       "owner": "10872@105306",
       "log": "progress/jobs/j0109.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1000 --name r2e_turn15 --seed 42 --stop-at 0.965 --turn-std 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1000 --name r2e_turn15 --seed 42 --turn-std 0.15",
       "cannot_run": ""
     },
     {
@@ -11941,7 +11944,7 @@
       ],
       "owner": "10872@105306",
       "log": "progress/jobs/j0108.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 1000 --name r2d_oldcfg_blind --seed 42 --stop-at 0.965 --no-heading-obs",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 1000 --name r2d_oldcfg_blind --seed 42 --no-heading-obs",
       "cannot_run": ""
     },
     {
@@ -11987,7 +11990,7 @@
       ],
       "owner": "10872@105306",
       "log": "progress/jobs/j0106.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r2b_blind_s7 --seed 7 --stop-at 0.965 --no-heading-obs",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r2b_blind_s7 --seed 7 --no-heading-obs",
       "cannot_run": ""
     },
     {
@@ -12033,7 +12036,7 @@
       ],
       "owner": "10872@105306",
       "log": "progress/jobs/j0105.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r2a_blind --seed 42 --stop-at 0.965 --no-heading-obs",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r2a_blind --seed 42 --no-heading-obs",
       "cannot_run": ""
     },
     {
@@ -12079,7 +12082,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0104.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1f_both_s7 --seed 7 --stop-at 0.965 --turn-std 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1f_both_s7 --seed 7 --turn-std 0.15",
       "cannot_run": ""
     },
     {
@@ -12125,7 +12128,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0103.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1e_turn30 --seed 42 --stop-at 0.965 --turn-std 0.3",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1e_turn30 --seed 42 --turn-std 0.3",
       "cannot_run": ""
     },
     {
@@ -12171,7 +12174,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0102.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1d_turn --seed 42 --stop-at 0.965 --turn-std 0.15 --no-heading-obs",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1d_turn --seed 42 --turn-std 0.15 --no-heading-obs",
       "cannot_run": ""
     },
     {
@@ -12217,7 +12220,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0101.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1c_heading --seed 42 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1c_heading --seed 42",
       "cannot_run": ""
     },
     {
@@ -12263,7 +12266,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0100.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1b_control --seed 42 --stop-at 0.965 --no-heading-obs",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1b_control --seed 42 --no-heading-obs",
       "cannot_run": ""
     },
     {
@@ -12309,7 +12312,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0099.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1a_both --seed 42 --stop-at 0.965 --turn-std 0.15",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1a_both --seed 42 --turn-std 0.15",
       "cannot_run": ""
     },
     {
@@ -12349,7 +12352,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0080.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1a_control --seed 42 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 1500 --name r1a_control --seed 42",
       "cannot_run": ""
     },
     {
@@ -12392,7 +12395,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0079.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name r0c_floor --seed 1234 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name r0c_floor --seed 1234",
       "cannot_run": ""
     },
     {
@@ -12435,7 +12438,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0078.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name r0b_floor --seed 7 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name r0b_floor --seed 7",
       "cannot_run": ""
     },
     {
@@ -12478,7 +12481,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0077.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name r0a_floor --seed 42 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name r0a_floor --seed 42",
       "cannot_run": ""
     },
     {
@@ -12509,7 +12512,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w24_spd4.0x2.0 --stop-at 0.965 --reward track_speed=4.0 --reward ground_covered=2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w24_spd4.0x2.0 --reward track_speed=4.0 --reward ground_covered=2.0",
       "cannot_run": ""
     },
     {
@@ -12540,7 +12543,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w23_spd2.0x2.0 --stop-at 0.965 --reward track_speed=2.0 --reward ground_covered=2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w23_spd2.0x2.0 --reward track_speed=2.0 --reward ground_covered=2.0",
       "cannot_run": ""
     },
     {
@@ -12571,7 +12574,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w22_spd4.0x1.0 --stop-at 0.965 --reward track_speed=4.0 --reward ground_covered=1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w22_spd4.0x1.0 --reward track_speed=4.0 --reward ground_covered=1.0",
       "cannot_run": ""
     },
     {
@@ -12602,7 +12605,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w21_spd2.0x1.0 --stop-at 0.965 --reward track_speed=2.0 --reward ground_covered=1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w21_spd2.0x1.0 --reward track_speed=2.0 --reward ground_covered=1.0",
       "cannot_run": ""
     },
     {
@@ -12640,7 +12643,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w18_WVS --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w18_WVS --reward wandering=-3.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -12678,7 +12681,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w17_WVs --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w17_WVs --reward wandering=-3.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -12709,7 +12712,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w16_WvS --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w16_WvS --reward wandering=-3.0 --reward skidding=-2.0",
       "cannot_run": ""
     },
     {
@@ -12740,7 +12743,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w15_Wvs --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-0.5",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w15_Wvs --reward wandering=-3.0 --reward skidding=-0.5",
       "cannot_run": ""
     },
     {
@@ -12778,7 +12781,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w14_wVS --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w14_wVS --reward wandering=-1.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -12816,7 +12819,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w13_wVs --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w13_wVs --reward wandering=-1.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -12847,7 +12850,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w12_wvS --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w12_wvS --reward wandering=-1.0 --reward skidding=-2.0",
       "cannot_run": ""
     },
     {
@@ -12878,7 +12881,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w11_wvs --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-0.5",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w11_wvs --reward wandering=-1.0 --reward skidding=-0.5",
       "cannot_run": ""
     },
     {
@@ -12906,7 +12909,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w03_seedfloor --seed 1234 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w03_seedfloor --seed 1234",
       "cannot_run": ""
     },
     {
@@ -12943,7 +12946,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0063.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w02_seedfloor --seed 7 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w02_seedfloor --seed 7",
       "cannot_run": ""
     },
     {
@@ -12986,7 +12989,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0062.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w01_seedfloor --seed 42 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w01_seedfloor --seed 42",
       "cannot_run": ""
     },
     {
@@ -13023,7 +13026,7 @@
       ],
       "owner": "12136@221831",
       "log": "progress/jobs/j0061.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 3 --name w00_smoke --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 3 --name w00_smoke",
       "cannot_run": ""
     },
     {
@@ -13054,7 +13057,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w24_spd4.0x2.0 --stop-at 0.965 --reward track_speed=4.0 --reward ground_covered=2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w24_spd4.0x2.0 --reward track_speed=4.0 --reward ground_covered=2.0",
       "cannot_run": ""
     },
     {
@@ -13085,7 +13088,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w23_spd2.0x2.0 --stop-at 0.965 --reward track_speed=2.0 --reward ground_covered=2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w23_spd2.0x2.0 --reward track_speed=2.0 --reward ground_covered=2.0",
       "cannot_run": ""
     },
     {
@@ -13116,7 +13119,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w22_spd4.0x1.0 --stop-at 0.965 --reward track_speed=4.0 --reward ground_covered=1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w22_spd4.0x1.0 --reward track_speed=4.0 --reward ground_covered=1.0",
       "cannot_run": ""
     },
     {
@@ -13147,7 +13150,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w21_spd2.0x1.0 --stop-at 0.965 --reward track_speed=2.0 --reward ground_covered=1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w21_spd2.0x1.0 --reward track_speed=2.0 --reward ground_covered=1.0",
       "cannot_run": ""
     },
     {
@@ -13185,7 +13188,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w18_WVS --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w18_WVS --reward wandering=-3.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -13223,7 +13226,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w17_WVs --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w17_WVs --reward wandering=-3.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -13254,7 +13257,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w16_WvS --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w16_WvS --reward wandering=-3.0 --reward skidding=-2.0",
       "cannot_run": ""
     },
     {
@@ -13285,7 +13288,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w15_Wvs --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-0.5",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w15_Wvs --reward wandering=-3.0 --reward skidding=-0.5",
       "cannot_run": ""
     },
     {
@@ -13323,7 +13326,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w14_wVS --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w14_wVS --reward wandering=-1.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -13361,7 +13364,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w13_wVs --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w13_wVs --reward wandering=-1.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -13392,7 +13395,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w12_wvS --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w12_wvS --reward wandering=-1.0 --reward skidding=-2.0",
       "cannot_run": ""
     },
     {
@@ -13423,7 +13426,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w11_wvs --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-0.5",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w11_wvs --reward wandering=-1.0 --reward skidding=-0.5",
       "cannot_run": ""
     },
     {
@@ -13451,7 +13454,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w03_seedfloor --seed 1234 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w03_seedfloor --seed 1234",
       "cannot_run": ""
     },
     {
@@ -13479,7 +13482,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w02_seedfloor --seed 7 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w02_seedfloor --seed 7",
       "cannot_run": ""
     },
     {
@@ -13507,7 +13510,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w01_seedfloor --seed 42 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w01_seedfloor --seed 42",
       "cannot_run": ""
     },
     {
@@ -13535,7 +13538,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 3 --name w00_smoke --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 3 --name w00_smoke",
       "cannot_run": ""
     },
     {
@@ -13566,7 +13569,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w24_spd4.0x2.0 --stop-at 0.965 --reward track_speed=4.0 --reward ground_covered=2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w24_spd4.0x2.0 --reward track_speed=4.0 --reward ground_covered=2.0",
       "cannot_run": ""
     },
     {
@@ -13597,7 +13600,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w23_spd2.0x2.0 --stop-at 0.965 --reward track_speed=2.0 --reward ground_covered=2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w23_spd2.0x2.0 --reward track_speed=2.0 --reward ground_covered=2.0",
       "cannot_run": ""
     },
     {
@@ -13628,7 +13631,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w22_spd4.0x1.0 --stop-at 0.965 --reward track_speed=4.0 --reward ground_covered=1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w22_spd4.0x1.0 --reward track_speed=4.0 --reward ground_covered=1.0",
       "cannot_run": ""
     },
     {
@@ -13659,7 +13662,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w21_spd2.0x1.0 --stop-at 0.965 --reward track_speed=2.0 --reward ground_covered=1.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w21_spd2.0x1.0 --reward track_speed=2.0 --reward ground_covered=1.0",
       "cannot_run": ""
     },
     {
@@ -13697,7 +13700,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w18_WVS --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w18_WVS --reward wandering=-3.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -13735,7 +13738,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w17_WVs --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w17_WVs --reward wandering=-3.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -13766,7 +13769,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w16_WvS --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w16_WvS --reward wandering=-3.0 --reward skidding=-2.0",
       "cannot_run": ""
     },
     {
@@ -13797,7 +13800,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w15_Wvs --stop-at 0.965 --reward wandering=-3.0 --reward skidding=-0.5",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w15_Wvs --reward wandering=-3.0 --reward skidding=-0.5",
       "cannot_run": ""
     },
     {
@@ -13835,7 +13838,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w14_wVS --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w14_wVS --reward wandering=-1.0 --reward skidding=-2.0 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -13873,7 +13876,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w13_wVs --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w13_wVs --reward wandering=-1.0 --reward skidding=-0.5 --ramp veering=-0.4,-1.0,-2.4,-4.0",
       "cannot_run": ""
     },
     {
@@ -13904,7 +13907,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w12_wvS --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w12_wvS --reward wandering=-1.0 --reward skidding=-2.0",
       "cannot_run": ""
     },
     {
@@ -13935,7 +13938,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w11_wvs --stop-at 0.965 --reward wandering=-1.0 --reward skidding=-0.5",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w11_wvs --reward wandering=-1.0 --reward skidding=-0.5",
       "cannot_run": ""
     },
     {
@@ -13963,7 +13966,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w03_seedfloor --seed 1234 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w03_seedfloor --seed 1234",
       "cannot_run": ""
     },
     {
@@ -13991,7 +13994,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w02_seedfloor --seed 7 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w02_seedfloor --seed 7",
       "cannot_run": ""
     },
     {
@@ -14019,7 +14022,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w01_seedfloor --seed 42 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --name w01_seedfloor --seed 42",
       "cannot_run": ""
     },
     {
@@ -14047,7 +14050,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Stand --num-envs 4500 --iterations 3 --name w00_smoke --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Stand --num-envs 4500 --iterations 3 --name w00_smoke",
       "cannot_run": ""
     },
     {
@@ -14076,7 +14079,7 @@
       "exit_code": null,
       "error": "",
       "steps": [],
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 3000 --name walk_m3100_e --stop-at 0.965 --reward dragging=-4.0 --reward swing_height=-0.5",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 3000 --name walk_m3100_e --reward dragging=-4.0 --reward swing_height=-0.5",
       "cannot_run": ""
     },
     {
@@ -14104,7 +14107,7 @@
       "steps": [],
       "owner": "31132@061706",
       "log": "progress/jobs/j0019.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 6000 --name walk_m3100_d --stop-at 0.99",
+      "command": "python scripts/train.py Gray-Walk --num-envs 4500 --iterations 6000 --name walk_m3100_d",
       "cannot_run": ""
     },
     {
@@ -14139,7 +14142,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0026.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 5500 --iterations 3000 --name walk_m3100_h --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 5500 --iterations 3000 --name walk_m3100_h",
       "cannot_run": ""
     },
     {
@@ -14174,7 +14177,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0025.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 6000 --iterations 3000 --name walk_m3100_h --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 6000 --iterations 3000 --name walk_m3100_h",
       "cannot_run": ""
     },
     {
@@ -14209,7 +14212,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0024.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 6400 --iterations 3000 --name walk_m3100_h --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 6400 --iterations 3000 --name walk_m3100_h",
       "cannot_run": ""
     },
     {
@@ -14244,7 +14247,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0023.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_h --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_h",
       "cannot_run": ""
     },
     {
@@ -14288,7 +14291,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0010.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_c --stop-at 0.965 --reward track_speed=3.0 --reward ground_covered=1.5",
+      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_c --reward track_speed=3.0 --reward ground_covered=1.5",
       "cannot_run": ""
     },
     {
@@ -14329,7 +14332,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0022.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_g --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_g",
       "cannot_run": ""
     },
     {
@@ -14367,7 +14370,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0021.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_f --stop-at 0.965 --reward wandering=-4.0 --reward track_turn=2.0",
+      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_f --reward wandering=-4.0 --reward track_turn=2.0",
       "cannot_run": ""
     },
     {
@@ -14410,7 +14413,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0009.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_b --stop-at 0.965 --reward leg_swing=1.8",
+      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_b --reward leg_swing=1.8",
       "cannot_run": ""
     },
     {
@@ -14451,7 +14454,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0008.log",
-      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_a --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Walk --num-envs 3072 --iterations 3000 --name walk_m3100_a",
       "cannot_run": ""
     },
     {
@@ -14492,7 +14495,7 @@
       ],
       "owner": "31132@061706",
       "log": "progress/jobs/j0007.log",
-      "command": "python scripts/train.py Gray-Stand --num-envs 3072 --iterations 600 --name stand_m3100 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Stand --num-envs 3072 --iterations 600 --name stand_m3100",
       "cannot_run": ""
     },
     {
@@ -14531,7 +14534,7 @@
         }
       ],
       "log": "progress/jobs/j0006.log",
-      "command": "python scripts/train.py Gray-Push --num-envs 3072 --iterations 1500 --name push_m3100 --stop-at 0.965",
+      "command": "python scripts/train.py Gray-Push --num-envs 3072 --iterations 1500 --name push_m3100",
       "cannot_run": ""
     }
   ],
@@ -14547,7 +14550,6 @@
     "num_envs": 4500,
     "seed": 0,
     "iterations": 0,
-    "stop_at": 0.965,
     "no_video": false,
     "rewards": {},
     "ramps": {},
@@ -14561,6 +14563,8 @@
     "dive_ends": false,
     "swing_target": null,
     "slope_deg": null,
+    "mixed_ground": false,
+    "payload_kg": null,
     "init_from": "",
     "narrow_dials": "",
     "push_speed": null,
@@ -14571,9 +14575,9 @@
   "env_ceiling": 5000,
   "runner": {
     "alive": true,
-    "age_s": 1.1,
+    "age_s": 1.6,
     "pid": 25584,
-    "at": "2026-08-06T15:48:28",
+    "at": "2026-08-06T17:33:03",
     "hint": ""
   }
 }

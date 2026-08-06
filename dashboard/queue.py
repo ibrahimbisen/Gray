@@ -123,7 +123,6 @@ DEFAULTS: dict[str, Any] = {
     "num_envs": 4500,
     "seed": 0,              # 0 = the task's own (42). Vary it to measure noise.
     "iterations": 0,        # 0 = the task's own default
-    "stop_at": 0.965,       # RULES.md rule 1
     "no_video": False,
     "rewards": {},          # term -> weight, overriding the task
     "ramps": {},            # ramped term -> [w0, w1, w2, w3] for its curriculum
@@ -137,6 +136,8 @@ DEFAULTS: dict[str, Any] = {
     "dive_ends": False,       # trunk contact ends the attempt (nose_dived)
     "swing_target": None,     # metres a swing is scored against; None keeps 0.035
     "slope_deg": None,        # tilt of the ground; None/0 is the flat floor
+    "mixed_ground": False,    # every ground at once - flat, hills, rough, waves
+    "payload_kg": None,       # extra load drawn on the trunk, 0 to this
     "init_from": "",          # run to continue from; "" starts from scratch
     "narrow_dials": "",       # world dials put back to the Gray-Push range, or "all"
     "push_speed": None,     # [min, max] m/s, or None to leave alone
@@ -484,16 +485,14 @@ def _clean(spec: dict) -> dict:
         if spec.get(key) is not None:
             job[key] = str(spec[key])
     for key in ("no_video", "film", "verify", "no_heading_obs", "with_off_track",
-                "dive_ends"):
+                "dive_ends", "mixed_ground"):
         if spec.get(key) is not None:
             job[key] = _as_bool(spec[key])
     for key in ("num_envs", "iterations", "seed"):
         if spec.get(key) is not None:
             job[key] = _as_int(spec[key], DEFAULTS[key])
-    if spec.get("stop_at") is not None:
-        job["stop_at"] = _as_float(spec["stop_at"], DEFAULTS["stop_at"])
     for key in ("turn_std", "upright_std", "crab_share", "spin_share",
-                "swing_target", "slope_deg"):
+                "swing_target", "slope_deg", "payload_kg"):
         if spec.get(key) is not None:
             job[key] = _as_float(spec[key], 0.0)
     # NOTE the pair fields are listed here AND in train_argv, and they have to
@@ -535,7 +534,6 @@ def _clean(spec: dict) -> dict:
     if job["task"] not in TASKS:
         job["task"] = DEFAULTS["task"]
     job["iterations"] = max(0, job["iterations"])
-    job["stop_at"] = min(max(job["stop_at"], 0.0), 1.0)
 
     # Robots on the card, against the ceiling scripts/probe_envs.py measured.
     # Clamped rather than rejected - a job that silently does not exist is worse
@@ -751,7 +749,6 @@ def train_argv(job: dict) -> list[str]:
         argv += ["--no-video"]
     if job.get("seed"):
         argv += ["--seed", str(_as_int(job["seed"], 0))]
-    argv += ["--stop-at", str(_as_float(job.get("stop_at"), DEFAULTS["stop_at"]))]
     # `.items()` only if it really is a mapping. _clean guarantees that for
     # anything added from now on, but a queue.json written before it did would
     # otherwise raise here - and load() calls this for EVERY job, so one bad
@@ -798,6 +795,10 @@ def train_argv(job: dict) -> list[str]:
         argv += ["--dive-ends"]
     if job.get("swing_target"):
         argv += ["--swing-target", str(_as_float(job["swing_target"], 0.0))]
+    if job.get("mixed_ground"):
+        argv += ["--mixed-ground"]
+    if job.get("payload_kg"):
+        argv += ["--payload-kg", str(_as_float(job["payload_kg"], 0.0))]
     if job.get("slope_deg"):
         argv += ["--slope-deg", str(_as_float(job["slope_deg"], 0.0))]
     if job.get("init_from"):
@@ -831,6 +832,8 @@ def train_argv(job: dict) -> list[str]:
                       ("dive_ends", "--dive-ends"),
                       ("swing_target", "--swing-target"),
                       ("slope_deg", "--slope-deg"),
+                      ("mixed_ground", "--mixed-ground"),
+                      ("payload_kg", "--payload-kg"),
                       ("init_from", "--init-from"),
                       ("narrow_dials", "--narrow-dials"),
                       ("push_speed", "--push-speed"),

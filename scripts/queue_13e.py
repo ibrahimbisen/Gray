@@ -98,9 +98,7 @@ def main() -> None:
         # three runs is the stop row's question.
         spec = {"task": "Gray-Walk", "film": False, "verify": True,
                 "num_envs": ROBOTS, "iterations": ITERATIONS, "seed": SEED,
-                # Off for the same reason every ladder turns it off: an early
-                # stop would make run length a second variable between rungs.
-                "stop_at": 0.0, **job}
+                **job}
         cleaned = queue._clean(dict(queue.DEFAULTS, **spec))
         print(f"  {job['name']:16} {queue.command_line(cleaned)}")
         if not args.dry_run:

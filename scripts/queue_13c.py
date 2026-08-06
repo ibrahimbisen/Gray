@@ -130,9 +130,7 @@ def main() -> None:
     for job in BATCH:
         spec = {"task": "Gray-Walk", "film": True, "verify": True,
                 "num_envs": ROBOTS, "iterations": ITERATIONS, "seed": SEED,
-                # Off on purpose: an early stop would make the run length a
-                # second variable. Same rule as batch 2.
-                "stop_at": 0.0, **job}
+                **job}
         cleaned = queue._clean(dict(queue.DEFAULTS, **spec))
         print(f"  {job['name']:18} {queue.command_line(cleaned)}")
         if not args.dry_run:

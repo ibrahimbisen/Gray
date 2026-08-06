@@ -318,8 +318,7 @@ function jobRow(j, i, n){
     <td class="n tnum">${i + 1}</td>
     <td><b>${esc(j.name || j.task)}</b>
       <div class="sub">${esc(j.task)} &middot; ${j.num_envs} robots${
-        j.iterations ? ` &middot; ${j.iterations} iterations` : ""} &middot; stop at ${
-        Math.round(j.stop_at * 100)}%</div>
+        j.iterations ? ` &middot; ${j.iterations} iterations` : ""}</div>
       ${j.note ? `<div class="sub">${esc(j.note)}</div>` : ""}
       ${Object.keys(j.rewards || {}).length ? `<div class="sub">${
         Object.entries(j.rewards).map(([k, v]) =>
@@ -379,9 +378,6 @@ function queuePanel(){
         <div class="f"><label>Iterations</label>
           <input id="j_iters" type="number" value="${d.iterations}" min="0">
           <div class="hint">0 = the task default</div></div>
-        <div class="f"><label>Stop at</label>
-          <input id="j_stop" type="number" value="${d.stop_at}" step="0.005" min="0" max="1">
-          <div class="hint">fraction of the reward ceiling &mdash; RULES.md rule 1</div></div>
         <div class="f wide"><label>Why this run exists</label>
           <input id="j_note" placeholder="what this one is testing"></div>
         <div class="f wide"><label>Reward overrides</label>
@@ -432,7 +428,7 @@ function wireQueue(){
         task: g("j_task").value, name: g("j_name").value.trim(),
         note: g("j_note").value.trim(),
         num_envs: +g("j_envs").value, iterations: +g("j_iters").value,
-        stop_at: +g("j_stop").value, rewards,
+        rewards,
         film: g("j_film").checked, verify: g("j_verify").checked,
       },
     }, load);

@@ -98,7 +98,16 @@ SWING_JOINTS = SceneEntityCfg("robot", joint_names=(".*thigh", ".*calf"))
 # these, and nothing outside them means anything: the policy interpolates between
 # things it has seen and produces nonsense past the edge, the same way a curve fit
 # does. Widened 3 Aug 2026 - see the note under WALK_SPEED.
-WALK_SPEED = (-0.35, 0.35)    # m/s, negative is backward
+# -0.5 to 0.9 since 6 Aug 2026, up from +/-0.35. The owner's rule: train wider
+# than you drive, so the speed you use every day sits in the middle of what the
+# robot knows rather than at its edge. 0.9 m/s is about 3 km/h.
+#
+# NOT 7 km/h, which is what was asked for. 1.94 m/s on 0.2 m legs is a gallop:
+# roughly 13 steps a second per leg against a 50 Hz control loop, which is four
+# commands per step, and peak torques two to three times standing on a knee
+# already holding 55% of its stall. 0.9 is the honest stretch; the speed ladder
+# after the run says what it actually reached.
+WALK_SPEED = (-0.5, 0.9)      # m/s, negative is backward
 WALK_SIDE = (-0.20, 0.20)     # m/s sideways
 WALK_TURN = (-1.00, 1.00)     # rad/s about the vertical
 
@@ -1068,6 +1077,92 @@ def playground_terrain() -> TerrainEntityCfg:
             },
         ),
     )
+
+
+def training_terrain() -> TerrainEntityCfg:
+    """Every ground the robot must handle, in one world, for TRAINING.
+
+    The playground above is laid out for a person to walk around. This one is
+    laid out for 5000 robots to train in at once: six big patches, one per
+    ground, with the robots spread across all of them. So at any moment the
+    batch is learning every ground in parallel, and ONE policy comes out.
+
+    THE PATCH COUNT IS THE COST, measured 6 Aug 2026. Sixteen patches of 8 m
+    ran at 50 SECONDS an iteration against the flat floor's 2.4 - a 76 hour
+    run - because every heightfield in the world is a collision candidate for
+    every robot geom, so the bill scales with how many patches exist, not
+    with how far any robot is from them. Six big patches carry the same six
+    grounds at a fraction of the price, and a 12 m patch is more ground than
+    a robot covers in a 20 s attempt anyway.
+
+    GRAVEL, stated honestly: this gives the SHAPE of gravel - bumps of the
+    right size - and the task's grip dial already draws anything from ice to
+    dry concrete. Stones that roll and slide under a foot are not simulated.
+    Only the real robot settles that one.
+    """
+    return TerrainEntityCfg(
+        terrain_type="generator",
+        terrain_generator=TerrainGeneratorCfg(
+            seed=0,
+            size=(12.0, 12.0),
+            # One column per ground, difficulty rising along the two rows.
+            curriculum=True,
+            num_rows=2,
+            difficulty_range=(0.3, 1.0),
+            border_width=4.0,
+            # THREE GROUNDS, not six. A pyramid patch is a hill from every
+            # side, so it is uphill AND downhill AND a traverse - the bowl
+            # was the same lesson upside down, and the waves were rough
+            # ground with a longer wavelength. Both were dropped when the
+            # patch count turned out to be what costs the run its hours.
+            # Difficulty rises along the two rows, so each ground appears
+            # gentle and hard.
+            sub_terrains={
+                "flat": BoxFlatTerrainCfg(proportion=3.0),
+                "slope": HfPyramidSlopedTerrainCfg(
+                    proportion=3.0, slope_range=(0.07, 0.27),
+                    platform_width=2.0, horizontal_scale=0.3),
+                "rough": HfRandomUniformTerrainCfg(
+                    proportion=3.0, noise_range=(0.0, 0.045),
+                    noise_step=0.005, downsampled_scale=0.35,
+                    horizontal_scale=0.25, scale_with_difficulty=True),
+            },
+        ),
+    )
+
+
+def apply_mixed_ground(cfg: ManagerBasedRlEnvCfg) -> None:
+    """Put the walk task on the training terrain, with its house rules."""
+    cfg.scene.terrain = training_terrain()
+    # A robot that slid off the patch grid is not learning the ground any
+    # more, and a tumbled robot grinding against the rim is the most
+    # expensive contact state the solver can be handed. Truncated, not
+    # failed: leaving a 40 m world is the world ending, not the robot.
+    cfg.terminations["out_of_bounds"] = TerminationTermCfg(
+        func=vmdp.out_of_terrain_bounds, params={"margin": 0.3},
+        time_out=True)
+
+
+def apply_payload(cfg: ManagerBasedRlEnvCfg, kg: float) -> None:
+    """Randomise up to `kg` of extra load on the trunk, per attempt.
+
+    pseudo_inertia on base_link, not body_mass, for the reason push_env_cfg
+    already gives about the mass dial: body_mass makes a robot heavier
+    without making it harder to swing, which is not a thing that happens.
+    Scaling the trunk's own mass and inertia together is what bolting a
+    battery to it actually does.
+
+    The ceiling is arithmetic, not appetite. The knee holds 1.08 N-m of a
+    1.96 N-m stall just standing at 3.1 kg. Roughly 1 kg is what is left
+    before standing alone exceeds the servo, so nothing above that is asked
+    for here - a robot ordered to carry what it cannot hold fails whatever
+    it does, and teaches the policy to hedge.
+    """
+    trunk_kg = 1.984  # gray/config/robot.yaml, the trunk's own mass
+    cfg.events["payload"] = EventTermCfg(
+        func=mdp.dr.pseudo_inertia, mode="reset",
+        params={"alpha_range": (0.0, kg / trunk_kg),
+                "asset_cfg": SceneEntityCfg("robot", body_names=("base_link",))})
 
 
 def apply_slope(cfg: ManagerBasedRlEnvCfg, deg: float) -> None:
