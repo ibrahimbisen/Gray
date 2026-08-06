@@ -142,7 +142,10 @@ POSE_HEIGHT = (0.15, 0.25)    # m, trunk off the ground
 # nothing. A bias no term charges for and no metric records is invisible until
 # somebody watches the video.
 POSE_PITCH = (-0.14, 0.26)    # rad, nose down NEGATIVE: 8 deg down, 15 deg up
-POSE_ROLL = (-0.35, 0.35)     # rad, right side down positive: +/- 20 deg
+POSE_ROLL = (-0.35, 0.35)     # rad, right side down NEGATIVE: +/- 20 deg
+# (Roll sign measured 6 Aug 2026, scripts/measure_pitch_sign.py - the comment
+# here said positive, the same wrong way round as the pitch one had been. The
+# range is symmetric, so unlike pitch nothing was ever trained lopsided.)
 
 # The band the tracking reward falls off over. See the module docstring - this is
 # the single most important number in the file. docs/REWARDS.md puts it at

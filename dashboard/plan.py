@@ -2107,11 +2107,14 @@ _COMMAND_DIALS = (
     # GO - which is what unblocked sit, crouch, crawl, bow, stretch and lean.
     ("POSE_HEIGHT", "height", "m",
      "How far off the ground to hold the trunk."),
+    # Both signs MEASURED on 6 Aug 2026 by scripts/measure_pitch_sign.py: a
+    # known attitude is written into the sim and proven with foot heights,
+    # then read back. This row said the opposite of both until then.
     ("POSE_PITCH", "pitch", "rad",
-     "Nose down is positive. Limited by joint travel, and lopsided: the stance "
+     "Nose down is negative. Limited by joint travel, and lopsided: the stance "
      "rakes the legs forward, which spends travel that nose-down needs."),
     ("POSE_ROLL", "roll", "rad",
-     "Right side down is positive."),
+     "Right side down is negative."),
 )
 
 # (event name in the task, label, unit, what it is, how to read the range out)

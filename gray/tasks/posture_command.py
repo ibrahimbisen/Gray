@@ -11,7 +11,7 @@ the command vector did not have. This adds it:
 
     height   how far off the ground to hold the trunk, in metres
     pitch    nose down NEGATIVE, nose up positive, in radians
-    roll     right side down positive, in radians
+    roll     right side down negative, in radians (measured 6 Aug 2026)
 
 These two lines said "nose down positive" until 5 Aug 2026 and the code has
 always done the opposite - `trunk_pitch_roll` below reads pitch as
@@ -146,7 +146,7 @@ class PostureCommandCfg(CommandTermCfg):
     class Ranges:
         height: tuple[float, float]
         pitch: tuple[float, float]     # radians, nose down NEGATIVE
-        roll: tuple[float, float]      # radians, right side down positive
+        roll: tuple[float, float]      # radians, right side down negative
 
     # These defaults carried the same swapped pitch signs as walk_env_cfg's
     # POSE_PITCH until 5 Aug 2026. The walk task overrides all three, so the
