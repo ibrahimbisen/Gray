@@ -450,6 +450,19 @@ def run_pass(env, robot, origins, policy, torch, *, seconds, robots, target,
 
         feet = env.unwrapped.scene["feet"]
         foot_ids, foot_names = robot.find_sites(".*_foot")
+        # Per-leg stance, added 7 Aug 2026 on the owner's design: walk a long
+        # way at one speed and record how far out and how far IN each leg
+        # goes, not just its average. The average hid this - the two diagonals
+        # differ by about 3 degrees of mean hip angle, which is nothing, while
+        # the legs plainly sit in different places. Extremes and foot position
+        # are where an asymmetry that size actually lives.
+        from gray.tasks.walk_env_cfg import (  # noqa: PLC0415
+            HIP_ORDER, HIP_OUTWARD)
+
+        hip_ids = [robot.find_joints(n)[0][0] for n in HIP_ORDER]
+        hip_sign = torch.tensor(HIP_OUTWARD, device=device)
+        # The four feet in HIP_ORDER, so every table below reads in one order.
+        foot_of_hip = [foot_names.index(n[:2] + "_foot") for n in HIP_ORDER]
         zeros4 = torch.zeros(robots, len(foot_ids), device=device)
         gait = {
             "trunk_pitch_roll": trunk_pitch_roll,
@@ -458,6 +471,14 @@ def run_pass(env, robot, origins, policy, torch, *, seconds, robots, target,
             # peak while it is airborne, bank it on the step it lands.
             "peak": zeros4.clone(), "peak_sum": zeros4.clone(),
             "peak_n": zeros4.clone(), "peak_max": zeros4.clone(),
+            "hip_ids": hip_ids, "hip_sign": hip_sign,
+            "foot_of_hip": foot_of_hip, "hip_names": list(HIP_ORDER),
+            "hip_sum": zeros4.clone(),
+            "hip_out": torch.full((robots, 4), -99.0, device=device),
+            "hip_in": torch.full((robots, 4), 99.0, device=device),
+            "side_sum": zeros4.clone(),
+            "side_out": torch.full((robots, 4), -99.0, device=device),
+            "side_in": torch.full((robots, 4), 99.0, device=device),
             "pitch_sum": torch.zeros(robots, device=device),
             "pitch_min": torch.full((robots,), 99.0, device=device),
             "pitch_max": torch.full((robots,), -99.0, device=device),
@@ -526,6 +547,25 @@ def run_pass(env, robot, origins, policy, torch, *, seconds, robots, target,
                 # its writers, and they run inside env.step above.
                 landed = gait["feet"].compute_first_contact(
                     dt=env.unwrapped.step_dt)
+                # Hip angle in the OUTWARD frame - bigger always means wider,
+                # on all four legs, whichever way that leg's frame points.
+                hip = robot.data.joint_pos[:, gait["hip_ids"]] * gait["hip_sign"]
+                gait["hip_sum"] += hip
+                gait["hip_out"] = torch.maximum(gait["hip_out"], hip)
+                gait["hip_in"] = torch.minimum(gait["hip_in"], hip)
+                # And where the foot ACTUALLY sits, sideways, in the robot's
+                # own frame. The hip angle is one joint of three; this is the
+                # whole leg's answer, which is what an eye sees.
+                d = (robot.data.site_pos_w[:, gait["foot_of_hip"], :2]
+                     - robot.data.root_link_pos_w[:, None, :2])
+                h = robot.data.heading_w[:, None]
+                side = -d[..., 0] * torch.sin(h) + d[..., 1] * torch.cos(h)
+                # Left legs sit at positive side, right legs at negative, so
+                # the magnitude is "how far from the centreline" for all four.
+                side = torch.abs(side)
+                gait["side_sum"] += side
+                gait["side_out"] = torch.maximum(gait["side_out"], side)
+                gait["side_in"] = torch.minimum(gait["side_in"], side)
                 gait["peak_sum"] += gait["peak"] * landed.float()
                 gait["peak_n"] += landed.float()
                 gait["peak_max"] = torch.maximum(
@@ -798,6 +838,23 @@ def gait_stats(raw, torch, *, seconds) -> dict:
           f"{DIVE_RAD * 57.2958:.1f} deg nose-down; worst spent "
           f"{int(g['dive_steps'].max())} steps there")
     print(f"    trunk       lowest {float(trunk_min.min()) * 1000:.1f} mm")
+    if "hip_sum" in g:
+        hip_mean = (g["hip_sum"] / steps).mean(dim=0) * 57.2958
+        hip_out = g["hip_out"].mean(dim=0) * 57.2958
+        hip_in = g["hip_in"].mean(dim=0) * 57.2958
+        side_mean = (g["side_sum"] / steps).mean(dim=0) * 1000
+        side_out = g["side_out"].mean(dim=0) * 1000
+        print(f"    {'leg':<8}{'hip mean':>10}{'widest':>9}{'tightest':>10}"
+              f"{'foot out':>11}{'foot widest':>13}")
+        for i, name in enumerate(g["hip_names"]):
+            print(f"    {name[:2].upper():<8}{hip_mean[i]:>+9.1f}d"
+                  f"{hip_out[i]:>+8.1f}d{hip_in[i]:>+9.1f}d"
+                  f"{side_mean[i]:>9.0f} mm{side_out[i]:>11.0f} mm")
+        # The fault the owner reported, as one number: the two diagonals a
+        # trot swings together, against each other.
+        gap = abs(float(side_mean[0] + side_mean[3] - side_mean[1]
+                        - side_mean[2]) / 2)
+        print(f"    diagonals   FR+BL against FL+BR: {gap:.0f} mm apart")
     print(f"    falls       {fell_n} of {len(trunk_min)}"
           + (f", earliest at {float(first.min()):.1f} s" if len(first) else ""))
 

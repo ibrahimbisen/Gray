@@ -794,26 +794,31 @@ def even_stance(env, command_name: str = "walk", asset_cfg=HIP_JOINTS):
     avg = torch.where(fresh, out, avg + (out - avg) / FILTER_STEPS)
     env._gray_hip_avg = avg.detach()
 
-    # ONE DIAGONAL AGAINST THE OTHER, and not each leg against the mean of
-    # the four. The first version charged every leg's deviation from the
-    # average, and it cost crab drift 14.1 deg -> 24.5 deg in 500 iterations,
-    # because CRABBING IS AN ASYMMETRIC HIP STANCE BY CONSTRUCTION: to travel
-    # sideways the right legs reach out while the left legs tuck in, which in
-    # this frame is a large spread and was being billed as a fault. The term
-    # was fighting a command the robot had been given.
+    # EACH LEG AGAINST THE AVERAGE OF THE FOUR. This is the form that catches
+    # the fault, and it took two wrong versions to get here:
     #
-    # The fault actually reported is one DIAGONAL living wider than the other
-    # - front-right with back-left, the pair a trot swings together. Written
-    # as the difference between the two diagonal averages, a crab cancels: it
-    # puts one right leg and one left leg in each diagonal, so both averages
-    # move together and their difference does not. A common shift - all four
-    # legs wider, as in a turn - cancels for the same reason.
-    fr_bl = (avg[:, 0] + avg[:, 3]) / 2.0
-    fl_br = (avg[:, 1] + avg[:, 2]) / 2.0
-    spread = torch.abs(fr_bl - fl_br)
-    moving = torch.norm(env.command_manager.get_command(command_name)[:, :3],
-                        dim=1)
-    return spread * (moving > MOVING).float()
+    #   per-leg, ungated   cost crab drift 14.1 deg -> 24.5 in 500 iterations.
+    #                      Crabbing IS an asymmetric stance - to travel
+    #                      sideways the right legs reach out while the left
+    #                      tuck in - so the term billed the robot for obeying
+    #                      a command it had been given.
+    #   per-diagonal       safe for crabbing and useless: it charged 0.015% of
+    #                      the reward. Measurement said why. The fault is ONE
+    #                      leg, not a pair - back-right sat 26 mm further under
+    #                      the body than front-right - and averaging that leg
+    #                      with its diagonal partner hides it. The diagonal gap
+    #                      read 11 mm where the leg-to-leg gap was 26.
+    #
+    # So: per-leg, and GATED to straight-line travel instead. Forward or
+    # backward only - no sideways component, no turn - because those two are
+    # the commands a symmetric stance is wrong for. `_on_a_line` cannot be the
+    # gate: it counts a crab as a line, by design, since 4 Aug 2026.
+    spread = torch.mean(torch.abs(avg - avg.mean(dim=1, keepdim=True)), dim=1)
+    cmd = env.command_manager.get_command(command_name)
+    straight = ((torch.abs(cmd[:, 0]) > MOVING)
+                & (torch.abs(cmd[:, 1]) < MOVING)
+                & (torch.abs(cmd[:, 2]) < MOVING))
+    return spread * straight.float()
 
 
 def leg_swing(env, target: float, command_name: str = "walk",
@@ -1677,16 +1682,18 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # term that pays for the thighs and calves actually swinging through a stride.
     cfg.rewards["leg_swing"] = RewardTermCfg(
         func=leg_swing, weight=1.0, params={"target": SWING_SPREAD})
-    # -0.5, sized against the ~13.5 points a second the positive terms are
-    # worth: about 3-4% of what is earned. The rule this obeys is CARRY's -
-    # a term under about 1% of earned reward cannot change a gait, which is
-    # what left swing_height doing nothing at -0.25 for a week.
+    # -3.0, and the number is measured rather than guessed. At -0.5 this term
+    # charged 0.0275 of a 189-point reward - 0.015%, against CARRY's rule that
+    # under about 1% cannot change a gait. The stance spread it is charging is
+    # roughly 0.05 rad, so -3.0 puts it near 1% and in the same league as
+    # `wandering`, which does move things.
     #
-    # AND NOT MORE, for a reason with teeth: the cheapest perfectly symmetric
-    # robot is a stationary one. At -2.0 this would start beating track_speed
-    # at +2.0, and standing still would become a way to win. Symmetry must
-    # never be worth more than moving.
-    cfg.rewards["even_stance"] = RewardTermCfg(func=even_stance, weight=-0.5)
+    # THE CEILING, for whoever raises it next: the cheapest perfectly
+    # symmetric robot is a stationary one. Past track_speed at +2.0, standing
+    # still starts to win. Symmetry must never be worth more than moving, and
+    # the gate below is not a substitute for that - it only decides WHEN this
+    # is charged, not how much.
+    cfg.rewards["even_stance"] = RewardTermCfg(func=even_stance, weight=-3.0)
     # Buzzing, raised from -0.01 with the rest of the smoothness set. It was
     # 0.0125 points, a third of one percent of what the robot earns.
     cfg.rewards["jitter"] = RewardTermCfg(func=mdp.action_acc_l2, weight=-0.05)

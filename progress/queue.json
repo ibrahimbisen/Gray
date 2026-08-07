@@ -7762,14 +7762,33 @@
       "verify": true,
       "clamped": "",
       "id": "j0218",
-      "state": "running",
+      "state": "done",
       "created": "2026-08-07T02:57:32",
       "started": "2026-08-07T02:57:35",
-      "finished": null,
+      "finished": "2026-08-07T03:20:03",
       "run_id": "2026-08-07_02-57-40_A3_diag_1301",
-      "exit_code": null,
+      "exit_code": 0,
       "error": "",
-      "steps": [],
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 1210.5,
+          "exit_code": 0,
+          "at": "2026-08-07T03:17:45"
+        },
+        {
+          "name": "verify",
+          "seconds": 118.8,
+          "exit_code": 1,
+          "at": "2026-08-07T03:19:44"
+        },
+        {
+          "name": "film",
+          "seconds": 18.1,
+          "exit_code": 0,
+          "at": "2026-08-07T03:20:03"
+        }
+      ],
       "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name A3_diag_1301 --no-video --seed 1301 --init-from 2026-08-07_01-59-55_A1_flat_1301",
       "cannot_run": "",
       "owner": "19768@024114",
