@@ -129,10 +129,18 @@ class Filmer:
                          map_location="cuda:0")
         policy = self.runner.get_inference_policy(device="cuda:0")
 
-        obs, _ = self.env.reset()
+        # THE RESET IS INSIDE inference_mode WITH THE ROLLOUT, and it has to be.
+        # mjlab rebinds its command metrics every step (`self.metrics[k] = ...`)
+        # and zeroes them IN PLACE on reset. A step taken inside inference mode
+        # therefore leaves those buffers as inference tensors, which the next
+        # reset cannot write to from outside - so every clip after the FIRST one
+        # raised "Inplace update to inference tensor outside InferenceMode" and
+        # was swallowed by the caller's `except` as a skipped checkpoint. A run
+        # filmed for an hour came out with exactly one clip in it.
         self.lookat = None      # each clip frames its own start
         frames = []
         with torch.inference_mode():
+            obs, _ = self.env.reset()
             for _ in range(int(self.seconds * 50)):
                 obs = self.env.step(policy(obs))[0]
                 sim = self.env.unwrapped.sim.data

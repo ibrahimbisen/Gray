@@ -150,7 +150,12 @@ def main() -> None:
         raise SystemExit(f"no such checkpoint: {ckpt}")
 
     cases = parse_cases(args.cases)
-    out_dir = Path(args.out) if args.out else (log_dir / "drive")
+    # Resolved against the repo root, not the shell's directory. drive.json
+    # records each clip as a path relative to ROOT, so a bare `--out clips`
+    # used to render the first film and then die on `relative_to(ROOT)` with
+    # the clip already on disk and no drive.json to say what it measured.
+    out_dir = (ROOT / args.out) if args.out else (log_dir / "drive")
+    out_dir = out_dir.resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"run         {log_dir.name}")
@@ -225,13 +230,21 @@ def main() -> None:
         cmd.ranges.lin_vel_y = (case["vy"], case["vy"])
         cmd.ranges.ang_vel_z = (case["yaw"], case["yaw"])
 
-        obs, _ = env.reset()
-        start_xy = (robot.data.root_link_pos_w[:, :2] - origins[:, :2]).clone()
-        start_h = robot.data.heading_w.clone()
-        fell = torch.zeros(args.robots, dtype=torch.bool, device="cuda:0")
-
+        # THE RESET IS INSIDE inference_mode WITH THE ROLLOUT, and it has to be.
+        # mjlab rebinds its command metrics every step (`self.metrics[k] = ...`)
+        # and zeroes them IN PLACE on reset. A step taken inside inference mode
+        # therefore leaves those buffers as inference tensors, which the next
+        # reset cannot write to from outside - so case 2 of any multi-case drive
+        # died in mjlab's command_manager with "Inplace update to inference
+        # tensor outside InferenceMode". Training never saw it because rsl_rl
+        # resets from inside its own rollout block, exactly as this now does.
         frames, lookat = [], None
         with torch.inference_mode():
+            obs, _ = env.reset()
+            start_xy = (robot.data.root_link_pos_w[:, :2] - origins[:, :2]).clone()
+            start_h = robot.data.heading_w.clone()
+            fell = torch.zeros(args.robots, dtype=torch.bool, device="cuda:0")
+
             for _ in range(int(args.seconds * 50)):
                 obs = env.step(policy(obs))[0]
                 fell |= (-robot.data.projected_gravity_b[:, 2]) < 0.5
