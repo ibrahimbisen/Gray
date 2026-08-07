@@ -121,14 +121,16 @@ disagree with what the robot actually trained on.
 <img src="Overview/Test.gif" width="260"/>
 
 **In simulation.** Run 182, the most recent walk run, at three points in its training.
-Each clip is 8 seconds. The camera follows the robot and holds the start of the walk
-in shot, so the ground shows how far the robot moved.
+Each clip is 8 seconds. A pinned command drives the robot forward at 0.49 m/s, which is
+70 percent of its 0.7 m/s top command. The camera trails the robot, so the ground shows
+the distance covered.
 
 <img src="docs/media/walk-iter-7550.gif" width="230"/> <img src="docs/media/walk-iter-7700.gif" width="230"/> <img src="docs/media/walk-iter-7896.gif" width="230"/>
 
 Run 182 tests a penalty that holds the hips near their home angle. It did not pass the
-walk criteria. These clips show the newest policy, not the best one. The table at the
-top of this page comes from two other policies.
+walk criteria, so these clips show the newest policy, not the best one. Over 8 robots it
+covers 2.2 to 3.3 m in the 8 seconds, and none of them fall. The table at the top of this
+page comes from two other policies.
 
 **The earlier attempt**, at three points in its training. This software stack used a bad
 CAD export, and the git tag `archive/attempt-1` holds it. The robot in these clips is the
