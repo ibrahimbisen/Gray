@@ -794,11 +794,23 @@ def even_stance(env, command_name: str = "walk", asset_cfg=HIP_JOINTS):
     avg = torch.where(fresh, out, avg + (out - avg) / FILTER_STEPS)
     env._gray_hip_avg = avg.detach()
 
-    # Mean absolute deviation, not the largest: one leg 10 deg wide and three
-    # even should cost less than all four scattered, and `max` cannot tell
-    # those apart. The gradient reaches every leg this way, rather than only
-    # whichever is worst this step.
-    spread = torch.mean(torch.abs(avg - avg.mean(dim=1, keepdim=True)), dim=1)
+    # ONE DIAGONAL AGAINST THE OTHER, and not each leg against the mean of
+    # the four. The first version charged every leg's deviation from the
+    # average, and it cost crab drift 14.1 deg -> 24.5 deg in 500 iterations,
+    # because CRABBING IS AN ASYMMETRIC HIP STANCE BY CONSTRUCTION: to travel
+    # sideways the right legs reach out while the left legs tuck in, which in
+    # this frame is a large spread and was being billed as a fault. The term
+    # was fighting a command the robot had been given.
+    #
+    # The fault actually reported is one DIAGONAL living wider than the other
+    # - front-right with back-left, the pair a trot swings together. Written
+    # as the difference between the two diagonal averages, a crab cancels: it
+    # puts one right leg and one left leg in each diagonal, so both averages
+    # move together and their difference does not. A common shift - all four
+    # legs wider, as in a turn - cancels for the same reason.
+    fr_bl = (avg[:, 0] + avg[:, 3]) / 2.0
+    fl_br = (avg[:, 1] + avg[:, 2]) / 2.0
+    spread = torch.abs(fr_bl - fl_br)
     moving = torch.norm(env.command_manager.get_command(command_name)[:, :3],
                         dim=1)
     return spread * (moving > MOVING).float()

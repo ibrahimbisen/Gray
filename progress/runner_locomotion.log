@@ -19,3 +19,12 @@
 [02:14:41] j0216  verify exited 1 - training kept, the bar was not met or could not be read
 [02:14:41] j0216  done
 [02:14:41] idle - 0 queued
+[02:41:14] runner 19768@024114 up. interpreter: C:\Users\Bisen\Desktop\Gray\.venv\Scripts\python.exe
+[02:41:14] queue: progress\queue.json
+[02:41:14] j0217  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name A2_even_1301 --no-video --seed 1301 --init-from 2026-08-07_01-59-55_A1_flat_1301
+[02:41:19] j0217  -> progress/runs/2026-08-07_02-41-19_A2_even_1301
+[02:56:23] j0217  verify exited 1 - training kept, the bar was not met or could not be read
+[02:56:37] j0217  done
+[02:56:37] idle - 0 queued
+[02:57:35] j0218  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name A3_diag_1301 --no-video --seed 1301 --init-from 2026-08-07_01-59-55_A1_flat_1301
+[02:57:41] j0218  -> progress/runs/2026-08-07_02-57-40_A3_diag_1301
