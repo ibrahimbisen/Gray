@@ -858,7 +858,33 @@ def gait_stats(raw, torch, *, seconds) -> dict:
     print(f"    falls       {fell_n} of {len(trunk_min)}"
           + (f", earliest at {float(first.min()):.1f} s" if len(first) else ""))
 
+    # The per-leg table, SAVED and not only printed. Added 7 Aug 2026: the
+    # owner asked how far a hip had ever been angled and the answer was in a
+    # terminal that had scrolled, because these five numbers were printed and
+    # thrown away. They are per-LEG, not per-robot, so they sit under their
+    # own names beside the per-robot lists.
+    hips = {}
+    if "hip_sum" in g:
+        hips = {
+            "hip_names": list(g["hip_names"]),
+            "hip_mean_deg": [round(x, 2) for x in
+                             ((g["hip_sum"] / steps).mean(dim=0)
+                              * 57.2958).tolist()],
+            "hip_widest_deg": [round(x, 2) for x in
+                               (g["hip_out"].mean(dim=0) * 57.2958).tolist()],
+            "hip_widest_ever_deg": [round(x, 2) for x in
+                                    (g["hip_out"].max(dim=0).values
+                                     * 57.2958).tolist()],
+            "hip_tightest_deg": [round(x, 2) for x in
+                                 (g["hip_in"].mean(dim=0) * 57.2958).tolist()],
+            "hip_tightest_ever_deg": [round(x, 2) for x in
+                                      (g["hip_in"].min(dim=0).values
+                                       * 57.2958).tolist()],
+            "foot_out_mm": [round(x, 1) for x in
+                            ((g["side_sum"] / steps).mean(dim=0) * 1000).tolist()],
+        }
     return {
+        **hips,
         "pitch_mean_rad": [round(x, 4) for x in pitch_mean.tolist()],
         "pitch_min_rad": [round(x, 4) for x in g["pitch_min"].tolist()],
         "pitch_max_rad": [round(x, 4) for x in g["pitch_max"].tolist()],
@@ -895,6 +921,10 @@ def _dump_diagnostic(root, run_id, switched_off, per_robot, paths, ckpt,
         parts.append("measured")
     if "gait" in switched_off:
         parts.append("gait")
+    # Which single dial was left free. Named in the filename because the whole
+    # point of the pass is comparing one dial against another, and two files
+    # that differ only in their contents are two files nobody can tell apart.
+    parts += [t for t in switched_off if t.startswith("vary-")]
     parts += [t for t in switched_off if t.startswith("slope")]
     path = out / f"{run_id}__{'_'.join(parts) or 'off'}.json"
     path.write_text(json.dumps({
@@ -922,6 +952,17 @@ def main() -> int:
     ap.add_argument("--same-start", action="store_true",
                     help="every robot starts in the same pose and heading: no "
                          "spawn nudge")
+    ap.add_argument("--vary-only", metavar="DIAL",
+                    help="freeze every world dial EXCEPT this one, and the "
+                         "shoves with them. --same-robot proves the spread "
+                         "in heading is the body the policy cannot feel; this "
+                         "says WHICH body fact does it, one dial at a time. "
+                         "That matters because the five cost different "
+                         "amounts to narrow: the robot has one centre of "
+                         "mass, measurable off the CAD, while its foot grip "
+                         "is a genuine unknown. One of the five: "
+                         "ground_grip, how_heavy, where_the_weight_is, "
+                         "servo_strength, gearbox_drag")
     # Measure without judging. The bar is the world as it is, so this is NOT a
     # diagnostic switch - nothing is made easier and every number is real. What
     # it does is refuse to write a verdict onto the run.
@@ -1095,10 +1136,16 @@ def main() -> int:
     #   Then a heading input buys much less and the gait is what needs work.
     #
     # Switching the draws off separates them, in minutes, with no training.
+    DIALS = ("ground_grip", "how_heavy", "where_the_weight_is",
+             "servo_strength", "gearbox_drag")
     switched_off = []
     if args.same_robot:
-        switched_off += ["ground_grip", "how_heavy", "where_the_weight_is",
-                         "servo_strength", "gearbox_drag", "shove"]
+        switched_off += [*DIALS, "shove"]
+    if args.vary_only:
+        if args.vary_only not in DIALS:
+            raise SystemExit(f"no such world dial: {args.vary_only}. "
+                             f"The five are: {', '.join(DIALS)}")
+        switched_off += [d for d in DIALS if d != args.vary_only] + ["shove"]
     if args.same_start:
         switched_off += ["nudge_pose", "nudge_base"]
     switched_off = [n for n in switched_off if env_cfg.events.pop(n, None) is not None]
@@ -1288,6 +1335,7 @@ def main() -> int:
                if switched_off else "--no-record: measured, not judged")
         print(f"\nnot recorded - {why}")
         tags = (switched_off or ["norecord"]) \
+            + ([f"vary-{args.vary_only}"] if args.vary_only else []) \
             + (["gait"] if args.gait_diag else []) \
             + ([f"slope{args.slope_deg:g}"] if args.slope_deg else [])
         _dump_diagnostic(ROOT, log_dir.name, tags,

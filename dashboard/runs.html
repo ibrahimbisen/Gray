@@ -680,9 +680,24 @@ function scoring(run){
       "the height dragging and swing_height score a foot against. 0.035 before 6 Aug 2026"],
     slope_deg:          ["ground tilt", "deg",
       "the slope the run trained on. Absent or 0 is the flat floor"],
+    /* Recorded per run since 7 Aug 2026. Both moved in the last three days and
+       neither was on the record, so reading a run's drift meant guessing which
+       box and which termination it had. */
+    speed_box_ms:       ["forward speed box", "m/s",
+      "the slowest and fastest forward command drawn. The policy is nonsense past the edge"],
+    nose_dived:         ["a dive ends the attempt", "",
+      "whether the trunk touching the floor is terminal. Off before 6 Aug 2026"],
+    hip_curve_deg:      ["hip cost curve", "deg",
+      "free out, serious out, free in, serious in, cap. Absent when hips_home is off"],
   };
   const tol = run.tolerances || {};
   const tolRows = Object.keys(TOL).filter(k => tol[k] !== null && tol[k] !== undefined);
+  /* Not every tolerance is one number any more. A range is a pair and a
+     termination is a yes or a no; both would otherwise print as raw JavaScript
+     ("-0.45,0.7" and "false"), which is the kind of small ugliness that makes a
+     reader distrust the rest of the table. */
+  const tolValue = v => Array.isArray(v) ? v.join(" to ")
+                      : typeof v === "boolean" ? (v ? "yes" : "no") : v;
   const obs = run.observes || [];
 
   /* The five world dials, as this run drew them. The /dials page reads the
@@ -733,7 +748,7 @@ function scoring(run){
           <tr><th>term</th><th class="n">value</th><th>what it decides</th></tr>
           ${tolRows.map(k => `<tr>
             <td class="k">${esc(TOL[k][0])}</td>
-            <td class="n">${tol[k]} <span class="faint">${esc(TOL[k][1])}</span></td>
+            <td class="n">${tolValue(tol[k])} <span class="faint">${esc(TOL[k][1])}</span></td>
             <td class="why">${esc(TOL[k][2])}</td></tr>`).join("")}
         </table>`) : ""}
       ${dials.length ? blk("The world it trained in",

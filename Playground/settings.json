@@ -16,8 +16,8 @@
   },
   "full": {
     "fwd": 1.0,
-    "side": 0.2,
-    "turn": 1.0
+    "side": 0.5,
+    "turn": 2.0
   },
   "deadzone": 0.12
 }

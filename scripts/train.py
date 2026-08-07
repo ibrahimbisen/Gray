@@ -398,24 +398,42 @@ def main() -> int:
                          "and gives the draw mix as it was before 5 Aug 2026.")
     ap.add_argument("--spin-share", type=float, default=None,
                     help="the share of commands drawn as a PURE turn on the "
-                         "spot, 0 to 1. The task default is 0.0 - an "
-                         "independent draw produces a pure spin about once in "
-                         "80, which is why the 1.00 rad/s spin bar was never "
-                         "passed by a robot that turns well driven. The g1 "
-                         "probe of the gait batch runs this at 0.10.")
+                         "spot, 0 to 1. The task default is 0.10, landed by "
+                         "the gait confirm on 6 Aug 2026 - an independent draw "
+                         "produces a pure spin about once in 80, which is why "
+                         "the 1.00 rad/s spin bar was never passed by a robot "
+                         "that turns well driven. Pass 0 to switch it off.")
     ap.add_argument("--dive-ends", action="store_true",
                     help="install the nose_dived termination: the trunk shell "
                          "touching anything ends the attempt, and fell_over "
                          "pays its -40 for it. The trunk contact sensor is "
-                         "always on; this makes it terminal. The g2 probe of "
-                         "the gait batch - the owner's films show a nose-down "
-                         "collapse that today costs the policy nothing.")
+                         "always on; this makes it terminal. A task DEFAULT "
+                         "since 6 Aug 2026, so this flag now re-installs what "
+                         "is already there. Use --no-dive-ends to remove it.")
+    ap.add_argument("--no-dive-ends", action="store_true",
+                    help="remove the nose_dived termination the walk task "
+                         "installs by default. One arm of the straightness "
+                         "bisect of 7 Aug 2026: three things landed together "
+                         "on 6 Aug and forward drift went from 3.72 to 5.20 "
+                         "deg on the same seed at the same length, so each one "
+                         "gets a run with itself switched off.")
     ap.add_argument("--swing-target", type=float, default=0.0, metavar="M",
                     help="the height a swing is scored against, in metres, on "
-                         "BOTH dragging and swing_height. The task uses 0.035, "
-                         "chosen when 35 mm matched the stage 3 bar. The g3 "
-                         "probe runs 0.05: a foot with 35 mm in hand has "
-                         "nothing left for ground that is not a floor.")
+                         "BOTH dragging and swing_height. The task uses 0.05 "
+                         "since 6 Aug 2026, up from 0.035: a foot with 35 mm "
+                         "in hand has nothing left for ground that is not a "
+                         "floor. Pass 0.035 to put the old target back.")
+    ap.add_argument("--speed-hi", type=float, default=None, metavar="MS",
+                    help="the fastest FORWARD command the policy is trained "
+                         "on, in m/s. The task box is -0.45 to 0.7. Raising "
+                         "this is the only way to make the robot faster, and "
+                         "it has a cliff: 0.9 taught a policy to stand still, "
+                         "because an unreachable command pays less than not "
+                         "trying. Moves the top of the box only.")
+    ap.add_argument("--speed-lo", type=float, default=None, metavar="MS",
+                    help="the fastest BACKWARD command, as a negative number "
+                         "in m/s. The task box bottoms out at -0.45. Moves the "
+                         "bottom of the box only.")
     ap.add_argument("--mixed-ground", action="store_true",
                     help="train on every ground at once - flat, gentle and "
                          "steep hills, a bowl, rough ground and waves, "
@@ -547,6 +565,29 @@ def main() -> int:
             raise SystemExit(f"{args.task} has no trunk contact sensor to read")
         cfg.env.terminations["nose_dived"] = dive_termination()
         print("termination   nose_dived: trunk contact ends the attempt")
+    if args.no_dive_ends:
+        if args.dive_ends:
+            raise SystemExit("--dive-ends and --no-dive-ends are opposites; "
+                             "pass one of them")
+        if cfg.env.terminations.pop("nose_dived", None) is None:
+            raise SystemExit(f"{args.task} has no nose_dived termination to "
+                             f"remove")
+        print("termination   nose_dived REMOVED - a trunk on the floor no "
+              "longer ends the attempt")
+    if args.speed_hi is not None or args.speed_lo is not None:
+        walk_cmd = cfg.env.commands.get("walk")
+        if walk_cmd is None or not hasattr(walk_cmd, "ranges"):
+            raise SystemExit(f"{args.task} has no speed box to set")
+        lo, hi = walk_cmd.ranges.lin_vel_x
+        want_lo = args.speed_lo if args.speed_lo is not None else lo
+        want_hi = args.speed_hi if args.speed_hi is not None else hi
+        if want_lo >= want_hi:
+            raise SystemExit(f"the speed box would be empty: {want_lo} to "
+                             f"{want_hi} m/s. --speed-lo is the BACKWARD end "
+                             f"and is normally negative")
+        walk_cmd.ranges.lin_vel_x = (want_lo, want_hi)
+        print(f"command box   forward speed: {lo} to {hi} -> {want_lo} to "
+              f"{want_hi} m/s")
     if args.swing_target:
         was = None
         for name in ("dragging", "swing_height"):
@@ -692,6 +733,22 @@ def main() -> int:
                          for s in c.params["stages"]]}
              for name, c in sorted(ramped.items())]
 
+    # The shape of hips_home, as five degrees: free-out, hard-out, free-in,
+    # hard-in, cap. None when the term is switched off, so a run that was not
+    # charged for its hips does not claim a curve it never trained under.
+    hip_curve = None
+    term = cfg.env.rewards.get("hips_home")
+    if term is not None and term.weight:
+        # Named imports, not `from gray.tasks import walk_env_cfg` - that name
+        # is the task-BUILDER function in the package, not the module, and the
+        # attribute lookup fails at the end of a run rather than the start.
+        from gray.tasks.walk_env_cfg import (  # noqa: PLC0415
+            HIP_COST_CAP, HIP_FREE_IN_DEG, HIP_FREE_OUT_DEG,
+            HIP_HARD_IN_DEG, HIP_HARD_OUT_DEG)
+
+        hip_curve = [HIP_FREE_OUT_DEG, HIP_HARD_OUT_DEG,
+                     HIP_FREE_IN_DEG, HIP_HARD_IN_DEG, HIP_COST_CAP]
+
     run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + f"_{run_name}"
     run_dir = RUNS / run_id
     (run_dir / "videos").mkdir(parents=True, exist_ok=True)
@@ -748,6 +805,25 @@ def main() -> int:
             "swing_target_m": (
                 float(cfg.env.rewards["swing_height"].params["target"])
                 if "swing_height" in cfg.env.rewards else None),
+            # THE SPEED BOX, recorded since 7 Aug 2026, and it is not a
+            # nicety. Reading the drift of every run on disk that night, the
+            # box was the leading suspect for a 3.72 -> 5.20 deg regression
+            # and NOTHING on the record said which runs had which box. It had
+            # moved three times in three days. A number that decides how a run
+            # is read belongs in the run's own file.
+            "speed_box_ms": (
+                [float(v) for v in cfg.env.commands["walk"].ranges.lin_vel_x]
+                if "walk" in cfg.env.commands else None),
+            # THE SHAPE OF hips_home, as five degrees: free-out, hard-out,
+            # free-in, hard-in, cap. Recorded because the owner asked "is the
+            # new cap in place?" and the only way to answer was to compare a
+            # file's modification time against a run's start time. A curve that
+            # decides what a run was trained to do belongs in that run's file.
+            "hip_curve_deg": hip_curve,
+            # Whether a trunk on the floor ends the attempt. A task default
+            # since 6 Aug 2026 and removable since 7 Aug, so its presence is
+            # now a per-run fact rather than a property of the source file.
+            "nose_dived": "nose_dived" in cfg.env.terminations,
             # The ground's tilt. 0 is the flat floor; the slope ladder's
             # rungs differ in nothing else.
             "slope_deg": float(args.slope_deg) or None,

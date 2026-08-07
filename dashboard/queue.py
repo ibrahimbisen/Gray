@@ -111,8 +111,49 @@ TASKS = ("Gray-Stand", "Gray-Push", "Gray-Walk")
 # of them. Watch the first run of the night - 5000 is 11% more memory on a 12 GB
 # card than the 4500 every run so far has used, and the failure mode is an
 # out-of-memory abort in the first minute rather than anything subtle.
-CARD_ENV_CEILING = 5000
-FILMING_ENV_CEILING = CARD_ENV_CEILING
+#
+# 9000 SINCE 7 AUG 2026, and the table above is not wrong so much as measured in
+# a different world: every row of it had THE RENDERER LOADED. Films have been off
+# since 6 Aug, because a heightfield frame costs about 1.4 s to draw and had
+# wrecked three batches at 30 s an iteration. Re-measured without it by
+# scripts/scale_test.py, 20 iterations a size, flat ground:
+#
+#     robots    GPU memory    s per iteration    robots per second
+#      5000       5326 MiB         1.70                2,949
+#      6000       6170 MiB         1.74                3,458
+#      7000       6899 MiB         1.77                3,950
+#      8000       7756 MiB         2.20                3,638   <- noise, see below
+#      9000       8482 MiB         2.01                4,488
+#     10000       9340 MiB         2.09                4,794
+#     11000      10103 MiB         2.28                4,829
+#
+# THE RENDERER WAS THE WHOLE STORY. 4500 robots WITH it took 10.6 GB; 5000
+# WITHOUT it takes 5.3. About six gigabytes - more than the entire physics
+# simulation - went on offscreen framebuffers and a second copy of the scene to
+# draw into. That is also why opening a viewer beside a run used to kill the
+# machine: there was under a gigabyte free.
+#
+# AND THE OLD CONCLUSION INVERTS. The 4500-era table said throughput was
+# sub-linear because the card was "already pinned at 100%". It was pinned at 100%
+# because it was drawing pictures. With the renderer gone, memory is almost
+# perfectly linear at ~800 MiB per 1000 robots while TIME barely moves: doubling
+# 5000 -> 10000 costs 23% more per iteration and returns 63% more experience per
+# second. The card was never compute-bound at these sizes.
+#
+# WHERE THE KNEE IS. 10000 -> 11000 costs 763 MiB and 9% more time for 0.7% more
+# throughput. Past that, more robots buy only a less noisy gradient, which is a
+# real thing but no longer free.
+#
+# WHY 9000 AND NOT 11000, on the owner's call: it takes 96% of the best
+# throughput measured, and leaves 3.8 GB spare. That headroom is not spare
+# capacity, it is the terrain budget - every row above is FLAT ground, and
+# heightfields want roughly 15-20% more. At 11000 a hill run would need about
+# 12.1 GB of a 12.3 GB card and would die mid-run.
+#
+# The 8000 row is measurement noise - 2.20 s cannot sit above 9000's 2.01 s. A
+# 20-iteration window is short. The trend either side of it is sound.
+CARD_ENV_CEILING = 11000
+FILMING_ENV_CEILING = 5000
 
 # A job, with every field defaulted. Anything the UI does not send falls back to
 # the same value train.py would have used on its own.
@@ -120,10 +161,17 @@ DEFAULTS: dict[str, Any] = {
     "task": "Gray-Walk",
     "name": "",             # run name; train.py derives one if blank
     "note": "",             # why this run exists, in the owner's words
-    "num_envs": 4500,
+    "num_envs": 9000,       # owner's call, 7 Aug 2026 - see the table above
     "seed": 0,              # 0 = the task's own (42). Vary it to measure noise.
     "iterations": 0,        # 0 = the task's own default
-    "no_video": False,
+    # FILMS OFF BY DEFAULT SINCE 7 AUG 2026, and it takes BOTH of these - `film`
+    # below and `no_video` here are two separate switches, and setting only one
+    # has cost this project three batches at 30 s an iteration. The renderer is
+    # about 6 GB of the card and 1.4 s a frame on a heightfield, which is why
+    # a filmed job is clamped to FILMING_ENV_CEILING while an unfilmed one may
+    # use 9000. Use `film_after` to record the SAME videos off the saved
+    # checkpoints once training has finished and the card is free again.
+    "no_video": True,
     "rewards": {},          # term -> weight, overriding the task
     "ramps": {},            # ramped term -> [w0, w1, w2, w3] for its curriculum
     "turn_std": None,       # track_turn's tolerance in rad/s; None keeps 0.80
@@ -134,7 +182,10 @@ DEFAULTS: dict[str, Any] = {
     "crab_share": None,       # share of draws that are a PURE sideways step
     "spin_share": None,       # share of draws that are a PURE turn on the spot
     "dive_ends": False,       # trunk contact ends the attempt (nose_dived)
-    "swing_target": None,     # metres a swing is scored against; None keeps 0.035
+    "no_dive_ends": False,    # REMOVE nose_dived, which the walk task installs
+    "speed_hi": None,         # fastest forward command in m/s; None keeps 0.7
+    "speed_lo": None,         # fastest backward command, negative; None keeps -0.45
+    "swing_target": None,     # metres a swing is scored against; None keeps 0.05
     "slope_deg": None,        # tilt of the ground; None/0 is the flat floor
     "film_after": 0,          # film 1 in N checkpoints AFTER training; 25 iters each
     "mixed_ground": False,    # every ground at once - flat, hills, rough, waves
@@ -143,7 +194,7 @@ DEFAULTS: dict[str, Any] = {
     "narrow_dials": "",       # world dials put back to the Gray-Push range, or "all"
     "push_speed": None,     # [min, max] m/s, or None to leave alone
     "push_spin": None,      # [min, max] rad/s
-    "film": True,           # film checkpoints alongside training
+    "film": False,          # the OTHER film switch - see no_video above
     "verify": True,         # score against the stage bar when it finishes
 }
 
@@ -486,7 +537,7 @@ def _clean(spec: dict) -> dict:
         if spec.get(key) is not None:
             job[key] = str(spec[key])
     for key in ("no_video", "film", "verify", "no_heading_obs", "with_off_track",
-                "dive_ends", "mixed_ground"):
+                "dive_ends", "no_dive_ends", "mixed_ground"):
         if spec.get(key) is not None:
             job[key] = _as_bool(spec[key])
     # film_after is read by the RUNNER, not by train.py, so it is deliberately
@@ -495,7 +546,8 @@ def _clean(spec: dict) -> dict:
         if spec.get(key) is not None:
             job[key] = _as_int(spec[key], DEFAULTS[key])
     for key in ("turn_std", "upright_std", "crab_share", "spin_share",
-                "swing_target", "slope_deg", "payload_kg"):
+                "swing_target", "slope_deg", "payload_kg",
+                "speed_hi", "speed_lo"):
         if spec.get(key) is not None:
             job[key] = _as_float(spec[key], 0.0)
     # NOTE the pair fields are listed here AND in train_argv, and they have to
@@ -796,6 +848,14 @@ def train_argv(job: dict) -> list[str]:
         argv += ["--spin-share", str(_as_float(job["spin_share"], 0.0))]
     if job.get("dive_ends"):
         argv += ["--dive-ends"]
+    if job.get("no_dive_ends"):
+        argv += ["--no-dive-ends"]
+    if job.get("speed_hi") is not None:
+        argv += ["--speed-hi", str(_as_float(job["speed_hi"], 0.0))]
+    # `is not None` again, and here 0.0 is the interesting value: a speed_lo of
+    # zero means "never command a backward step", which is a real experiment.
+    if job.get("speed_lo") is not None:
+        argv += ["--speed-lo", str(_as_float(job["speed_lo"], 0.0))]
     if job.get("swing_target"):
         argv += ["--swing-target", str(_as_float(job["swing_target"], 0.0))]
     if job.get("mixed_ground"):
@@ -824,7 +884,7 @@ def train_argv(job: dict) -> list[str]:
     # `zero_means_something` names the fields where 0 is a real setting rather
     # than "unset", so the check below tests them with `is not None`. Get this
     # wrong and the guard is blind to exactly the run it exists to protect.
-    zero_means_something = ("crab_share", "spin_share")
+    zero_means_something = ("crab_share", "spin_share", "speed_lo")
     for key, flag in (("turn_std", "--turn-std"),
                       ("upright_std", "--upright-std"),
                       ("gyro_noise", "--gyro-noise"),
@@ -833,6 +893,9 @@ def train_argv(job: dict) -> list[str]:
                       ("crab_share", "--crab-share"),
                       ("spin_share", "--spin-share"),
                       ("dive_ends", "--dive-ends"),
+                      ("no_dive_ends", "--no-dive-ends"),
+                      ("speed_hi", "--speed-hi"),
+                      ("speed_lo", "--speed-lo"),
                       ("swing_target", "--swing-target"),
                       ("slope_deg", "--slope-deg"),
                       ("mixed_ground", "--mixed-ground"),

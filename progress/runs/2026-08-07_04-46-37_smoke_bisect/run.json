@@ -1,0 +1,355 @@
+{
+  "name": "Walk",
+  "purpose": "Go where it is told at 0.15-0.35 m/s and stop when told to stop. Stages 3 and 4 are skipped on purpose - this is a straight test of how much a policy picks up in a fixed amount of training. The one number that decides it is the tracking band: mjlab's default 0.5 m/s would pay this robot 78% of full marks for standing perfectly still, so it is set to 0.15 here.",
+  "stage": 5,
+  "stage_name": "Walk",
+  "task": "Gray-Walk",
+  "status": "finished",
+  "bar": "Walks 5 m without falling, holds commanded speed within 0.05 m/s, and drifts less than 100 mm sideways over 20 s.",
+  "started": "2026-08-07T04:46:37",
+  "finished": "2026-08-07T04:46:43",
+  "iterations_target": 3,
+  "num_envs": 64,
+  "num_steps_per_env": 24,
+  "seed": 1301,
+  "notes": "64 robots at once, 50 Hz control.",
+  "scoring": [
+    {
+      "name": "fell_over",
+      "weight": -40.0,
+      "what": "Fell. By far the largest single number here, and the one thing that ends an attempt."
+    },
+    {
+      "name": "end_stops",
+      "weight": -5.0,
+      "what": "Driving a joint into the last few degrees of its travel. On the real robot that is a servo straining against a hard stop."
+    },
+    {
+      "name": "track_turn",
+      "weight": 5.0,
+      "what": "Turning at the rate it was told to, and not turning when it was not asked to. The best-paid term in the task since 4 Aug 2026 - more than walking at the right speed - because at anything less the robot turned at about half the rate it was told to. Turning costs effort, shaking and joint shock, so it has to be worth more than all of them put together before it happens."
+    },
+    {
+      "name": "wandering",
+      "weight": -3.0,
+      "what": "Drifting off the line it was sent along. Charged whenever it was given a direction to travel in and not told to turn - which since 4 Aug 2026 includes crabbing sideways and diagonals, not just straight ahead. Measured on where the robot has actually ended up rather than which way it is pointing, and PERPENDICULAR TO THE COURSE IT WAS GIVEN, not against world Y - the world-Y version charged a robot spawned at 0.1 rad for 499 mm of drift it never committed, and fought 'veering' for it."
+    },
+    {
+      "name": "track_speed",
+      "weight": 2.0,
+      "what": "Moving at the speed it was told to, measured on a trunk speed averaged over about half a stride rather than the raw one. This is the term that pays for walking at all."
+    },
+    {
+      "name": "dragging",
+      "weight": -2.0,
+      "what": "A foot at the wrong height while it is travelling. This is what stops the dragging leg that shows up in every walking run without it, and it is scored continuously rather than only at touchdown."
+    },
+    {
+      "name": "ground_covered",
+      "weight": 1.0,
+      "what": "Ground actually put behind it, along the direction it was told to go. Speed tracking alone can be satisfied by rocking forwards and backwards, which averages out to the right speed and gets nowhere; this only pays for net progress, so that trick earns nothing. Rewritten 3 Aug 2026 - it measured world X against the magnitude of the command, and so could not pay for backward at all, paid nothing for a crab step, paid nothing to a robot walking perfectly while turned 90 degrees, and paid FULL MARKS to a robot told to stand still that drifted forwards."
+    },
+    {
+      "name": "upright",
+      "weight": 1.0,
+      "what": "Trunk leaning the way it was TOLD to lean, measured off gravity - so it needs no outside reference and works on the real robot from its IMU alone. Scored one attitude, level, until 3 Aug 2026, which meant a commanded lean was a thing the robot got punished for. Level is still here; it is this command at zero."
+    },
+    {
+      "name": "ride_height",
+      "weight": 1.0,
+      "what": "Trunk at the height it was TOLD to hold. Without it the cheapest way to move is to sink onto its belly and crawl. Scored against a fixed 202 mm until 3 Aug 2026, when height became something you can ask for - so this is now what makes 'crouch' and 'stand tall' commands rather than accidents."
+    },
+    {
+      "name": "posture",
+      "weight": 1.0,
+      "what": "Joints near their default pose, but with the tolerance widened once the robot is asked to move. A fixed tolerance is the thing that stops a gait developing at all - it pays the robot to keep its legs where they started, which is the opposite of walking."
+    },
+    {
+      "name": "stepping",
+      "weight": 1.0,
+      "what": "Feet spending a sensible time in the air - long enough to be a step, short enough not to be a hop. This is what turns 'move forwards' into 'walk' rather than 'shuffle'. Pays nothing when the robot was told to stand still: it had no such gate until 3 Aug 2026, and since every term that would charge for marching is itself switched off below MOVING, jogging on the spot was the cheapest way to obey 'stop'."
+    },
+    {
+      "name": "leg_swing",
+      "weight": 1.0,
+      "what": "How far the thighs and calves swing either side of their own average. This is what makes the walk look like a dog rather than a table sliding along - without it the cheapest gait is stiff legs and tiny steps. Capped, so it buys a stride and not a flail."
+    },
+    {
+      "name": "alive",
+      "weight": 0.5,
+      "what": "A small amount for every moment it has not fallen. Stops it ending an attempt early to escape a bad score."
+    },
+    {
+      "name": "skidding",
+      "weight": -0.5,
+      "what": "A foot sliding along the floor while it is carrying weight. Nothing stopped the robot recovering by scuffing its feet across the ground, and that does not survive contact with a real floor: the simulator's friction is a guess, and a policy that leans on sliding is leaning on the guess."
+    },
+    {
+      "name": "swing_height",
+      "weight": -0.25,
+      "what": "How wrong the top of a swing was, scored when the foot lands. Catches a foot that skims the floor and one that is thrown needlessly high, neither of which survives a real floor."
+    },
+    {
+      "name": "veering",
+      "weight": -0.2,
+      "what": "Turning off the heading it was sent along. Different from 'wandering': a robot can hold a perfectly straight line while slowly rotating to face sideways, and this is the term that catches that. Yaw RATE is already scored - this catches the drift that a near-zero rate hides, because a tenth of a degree per step is invisible in the rate and 20 degrees off after twenty seconds. Charged on crab steps too since 4 Aug 2026: keeping still facing forwards while stepping sideways is most of what crabbing IS, and it was the one command where nothing asked for it."
+    },
+    {
+      "name": "landing_speed",
+      "weight": -0.1,
+      "what": "How fast a foot is still falling at the moment it touches. hard_landing charges for the force of the impact; this charges for the approach, which is what a policy can actually do something about - it has to slow the foot BEFORE contact, not react afterwards. Ramped in rather than switched on, because a large landing penalty from step 0 teaches a robot not to put its feet down at all."
+    },
+    {
+      "name": "jitter",
+      "weight": -0.05,
+      "what": "Buzzing - the commanded angle reversing direction from one moment to the next. This looks at the change in the change, so a large smooth movement costs nothing while a small fast shudder is expensive. It is the right way to buy smoothness: push_v3 tried to get it by making 'twitching' 150 times harsher, and that taxed the big fast corrections needed to catch a fall, so the robot stopped catching them."
+    },
+    {
+      "name": "hard_landing",
+      "weight": -0.05,
+      "what": "Slamming a foot down. Printed PLA with no suspension, so this is set harder than the reference value."
+    },
+    {
+      "name": "rocking",
+      "weight": -0.02,
+      "what": "Trunk rolling and pitching. Priced on its own rather than lumped in with turning, so rocking costs whether or not the robot is also holding its heading."
+    },
+    {
+      "name": "twitching",
+      "weight": -0.01,
+      "what": "How much the commanded angles jump between one moment and the next. Smooth commands are the single biggest factor in whether this survives contact with a real servo."
+    },
+    {
+      "name": "shaking",
+      "weight": -0.001,
+      "what": "How hard the trunk is being jolted about, measured as its own acceleration. Smooth joints can still add up to a trunk that hammers, and the trunk is where the IMU and the electronics live."
+    },
+    {
+      "name": "effort",
+      "weight": -0.0002,
+      "what": "What the gait costs in torque. Ramped from almost nothing up to a weight worth about 2 points of 190 - enough to break a tie between two gaits that score the same on everything else, not enough to beat the terms that say where to go. It was 0.036 points until 4 Aug 2026, which is to say it was a comment rather than a constraint. It matters here because the servos are 1.96 N-m and the worst joint already holds 1.08 standing still, and because a trot costs more than a crawl."
+    },
+    {
+      "name": "joint_shock",
+      "weight": -2.5e-07,
+      "what": "Joint acceleration. Footfalls spike it, and a servo gearbox is what absorbs that spike on the real robot."
+    },
+    {
+      "name": "even_stance",
+      "weight": 0.0,
+      "what": "One leg living further out to the side than the other three. Averaged over about a quarter of a second, so a leg that swings wide for one step and comes back costs nothing, while a leg that camps out there is charged the whole time. Added 7 Aug 2026, after the owner drove the robot and saw the front-right and back-left legs thrown out while the other two stayed tucked under. The geometry was measured first and is symmetric to 0.2 mm, so what he was watching was the gait: nothing in the task had ever asked the four legs to match."
+    }
+  ],
+  "ramps": [
+    {
+      "name": "effort",
+      "stages": [
+        {
+          "step": 0,
+          "weight": -0.0002
+        },
+        {
+          "step": 2400,
+          "weight": -0.002
+        },
+        {
+          "step": 6000,
+          "weight": -0.01
+        },
+        {
+          "step": 12000,
+          "weight": -0.02
+        }
+      ]
+    },
+    {
+      "name": "landing_speed",
+      "stages": [
+        {
+          "step": 0,
+          "weight": -0.1
+        },
+        {
+          "step": 2400,
+          "weight": -0.3
+        },
+        {
+          "step": 6000,
+          "weight": -0.6
+        },
+        {
+          "step": 12000,
+          "weight": -0.8
+        }
+      ]
+    },
+    {
+      "name": "rocking",
+      "stages": [
+        {
+          "step": 0,
+          "weight": -0.06
+        },
+        {
+          "step": 2400,
+          "weight": -0.15
+        },
+        {
+          "step": 6000,
+          "weight": -0.36
+        },
+        {
+          "step": 12000,
+          "weight": -0.6
+        }
+      ]
+    },
+    {
+      "name": "shaking",
+      "stages": [
+        {
+          "step": 0,
+          "weight": -0.002
+        },
+        {
+          "step": 2400,
+          "weight": -0.006
+        },
+        {
+          "step": 6000,
+          "weight": -0.012
+        },
+        {
+          "step": 12000,
+          "weight": -0.02
+        }
+      ]
+    },
+    {
+      "name": "twitching",
+      "stages": [
+        {
+          "step": 0,
+          "weight": -0.05
+        },
+        {
+          "step": 2400,
+          "weight": -0.125
+        },
+        {
+          "step": 6000,
+          "weight": -0.25
+        },
+        {
+          "step": 12000,
+          "weight": -0.25
+        }
+      ]
+    },
+    {
+      "name": "veering",
+      "stages": [
+        {
+          "step": 0,
+          "weight": -0.2
+        },
+        {
+          "step": 2400,
+          "weight": -0.5
+        },
+        {
+          "step": 6000,
+          "weight": -1.2
+        },
+        {
+          "step": 12000,
+          "weight": -2.0
+        }
+      ]
+    }
+  ],
+  "tolerances": {
+    "track_turn_std": 0.8,
+    "upright_std": 0.45,
+    "gyro_bias_rad": 0.009,
+    "gyro_walk_rad_per_s": 0.008,
+    "rel_crab_envs": 0.15,
+    "rel_spin_envs": 0.1,
+    "swing_target_m": 0.05,
+    "speed_box_ms": [
+      -0.35,
+      0.35
+    ],
+    "nose_dived": false,
+    "slope_deg": null,
+    "mixed_ground": null,
+    "payload_kg": null
+  },
+  "init_from": null,
+  "world_dials": [
+    {
+      "name": "ground_grip",
+      "ranges": {
+        "ranges": [
+          0.25,
+          1.4
+        ]
+      },
+      "wide": true
+    },
+    {
+      "name": "how_heavy",
+      "ranges": {
+        "alpha_range": [
+          -0.3,
+          0.3
+        ]
+      },
+      "wide": true
+    },
+    {
+      "name": "where_the_weight_is",
+      "ranges": {
+        "ranges": [
+          -0.025,
+          0.025
+        ]
+      },
+      "wide": true
+    },
+    {
+      "name": "servo_strength",
+      "ranges": {
+        "kp_range": [
+          0.6,
+          1.4
+        ],
+        "kd_range": [
+          0.6,
+          1.4
+        ]
+      },
+      "wide": true
+    },
+    {
+      "name": "gearbox_drag",
+      "ranges": {
+        "ranges": [
+          0.003,
+          0.05
+        ]
+      },
+      "wide": true
+    }
+  ],
+  "observes": [
+    "base_ang_vel",
+    "command",
+    "joint_pos",
+    "joint_vel",
+    "last_action",
+    "off_line",
+    "posture",
+    "projected_gravity"
+  ]
+}

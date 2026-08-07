@@ -115,6 +115,56 @@ HIP_JOINTS = SceneEntityCfg("robot", joint_names=HIP_ORDER)
 # in at all.
 HIP_OUTWARD = (-1.0, 1.0, 1.0, -1.0)
 
+# THE SHAPE OF `hips_home`, in degrees, stated by the owner on 7 Aug 2026 after
+# reading the per-leg table off verify --gait-diag --ladder. The stance angle is
+# 0.00 deg on all four hips, measured, so these ARE the numbers that table
+# prints - no offset to reason about.
+#
+#   out to +5      free. A gait needs room; this is not a posture competition.
+#   +5 to +7       very small
+#   +7 to +10      rises slowly
+#   past +10       serious
+#   in to -1.5     free
+#   past -2.5      serious, and fast
+#
+# ASYMMETRIC ON PURPOSE, and the asymmetry is the owner's read of his own films:
+# a leg thrown wide still carries the robot, a leg tucked under the body is the
+# one that looks disabled and has no leverage to push with. So 5 degrees of room
+# outward and 1.5 inward.
+#
+# CUBIC, NOT EXPONENTIAL, and the word matters. A true exp() on a joint that
+# briefly lands somewhere odd returns a number large enough to dominate every
+# other term for that step, and PPO does not recover gracefully from one
+# enormous negative. A cube normalised so the cost is exactly 1.0 at the "this
+# is serious" angle gives the shape asked for - 0.06 at +7, 0.51 at +9, 1.0 at
+# +10, 2.7 at +12 - and the cap stops any single step running away.
+HIP_FREE_OUT_DEG = 5.0
+HIP_HARD_OUT_DEG = 10.0     # cost hits 1.0 per leg here
+HIP_FREE_IN_DEG = 1.5
+HIP_HARD_IN_DEG = 2.5       # cost hits 1.0 per leg here - only 1 deg of ramp
+# Reached at +20 deg out or -4.5 deg in. Both sides saturate at the same value,
+# so neither can drown the other out.
+#
+# 27 AND NOT 8, which was the first number and was too low - the owner asked
+# what happens past +12 and past -3, and the answer was "nothing new". The
+# ladder measured the front-right peaking at +20.0 deg and the back-right at
+# -5.6, so a cap of 8 put BOTH observed extremes on the ceiling and charged the
+# worst leg exactly what it charged a merely bad one. 27 grades the whole range
+# the robot actually reaches.
+#
+# THERE IS STILL A CAP, and removing it is not an option. Uncapped, -5.6 deg
+# costs 69 - the inward ramp is 1 degree wide, so it explodes - which is 82
+# times today's whole-robot average of 0.84 and would drown every other term
+# for that step. PPO does not recover well from one enormous negative.
+#
+# What makes 27 safe rather than reckless is the quarter-second filter: this
+# cost is computed on the AVERAGED hip angle, not the instantaneous one, so a
+# leg has to LIVE at +20 to be charged 27. A leg that flicks out there for one
+# step and comes back barely moves the average. Today's four averages are +9.7,
+# +5.5, -1.7 and +11.8, whose worst leg costs 2.74 - so there is roughly ten
+# times headroom before anything approaches the ceiling.
+HIP_COST_CAP = 27.0
+
 # How fast it is asked to walk. Slow, because 1.96 N-m servos at 50 Hz are not
 # going to run, and because a speed the robot cannot reach is a reward it can
 # never earn.
@@ -373,7 +423,34 @@ WALK_NOTES = {
                    "front-right and back-left legs thrown out while the other two "
                    "stayed tucked under. The geometry was measured first and is "
                    "symmetric to 0.2 mm, so what he was watching was the gait: "
-                   "nothing in the task had ever asked the four legs to match.",
+                   "nothing in the task had ever asked the four legs to match. "
+                   "SUPERSEDED 7 Aug 2026 by 'hips_home', which asks the same "
+                   "question in a form that can also see all four legs splayed "
+                   "at once. Left in the file at weight 0 rather than deleted, "
+                   "because three runs were scored against it and a term that "
+                   "vanishes makes those runs unreadable.",
+    "hips_home": "A hip held away from the angle the robot was designed to stand "
+                 "at. Charges BOTH faults the owner reported - a leg thrown out "
+                 "to the side and a leg tucked in under the body - which is the "
+                 "difference from 'even_stance' above: that one measures each "
+                 "leg against the average of the four, so it cannot see all four "
+                 "legs splaying together, and three of Gray's four do. FREE "
+                 "BANDS, then a cube. Nothing is charged out to +5 degrees or in "
+                 "to -1.5, because a gait needs room and this is not a posture "
+                 "competition. Past that the cost reaches 1.0 per leg at +10 out "
+                 "and at -2.5 in - 0.06 at +7, 0.51 at +9 - and is capped at 8. "
+                 "The bands are the owner's numbers, and they are deliberately "
+                 "lopsided: a leg thrown wide still carries the robot, while a "
+                 "leg tucked under looks disabled and has no leverage to push "
+                 "with. Because the cost falls to exactly zero once the legs are "
+                 "home, its pressure disappears the moment it has done its job - "
+                 "which is what makes a heavier weight safe here than the older "
+                 "term could ever take. Averaged over about a quarter of a "
+                 "second, so a leg that swings wide for one step and comes back "
+                 "costs nothing. Charged only while a straight line is "
+                 "commanded: crabbing sideways REQUIRES an angled stance, and "
+                 "billing the robot for obeying an order is how the first "
+                 "version of the older term cost 10 degrees of crab drift.",
     "wandering": "Drifting off the line it was sent along. Charged whenever it was "
                  "given a direction to travel in and not told to turn - which since "
                  "4 Aug 2026 includes crabbing sideways and diagonals, not just "
@@ -819,6 +896,93 @@ def even_stance(env, command_name: str = "walk", asset_cfg=HIP_JOINTS):
                 & (torch.abs(cmd[:, 1]) < MOVING)
                 & (torch.abs(cmd[:, 2]) < MOVING))
     return spread * straight.float()
+
+
+def hips_home(env, command_name: str = "walk", asset_cfg=HIP_JOINTS):
+    """Any hip angled away from the stance the robot was designed with.
+
+    WHY THIS AND NOT `even_stance`, which is the same complaint answered a
+    different way. `even_stance` charges each leg against the AVERAGE OF THE
+    FOUR, so four legs splayed equally pay nothing - it can only see one leg
+    disagreeing with its brothers, never all four disagreeing with the robot.
+    Three attempts at it traded one fault for another and the owner reported
+    the robot drove worse each time.
+
+    This charges each hip against ITS OWN DEFAULT ANGLE instead. That is the
+    pose in gray.xml, which came off the CAD, and which measure_hip_travel.py
+    showed on 6 Aug 2026 is symmetric to 0.2 mm. So one number buys both
+    things the owner asked for: legs stop being thrown out, AND legs stop
+    being tucked under, because both are distance from home.
+
+    THE SHAPE IS THE OWNER'S, stated on 7 Aug 2026 and written out beside
+    HIP_FREE_OUT_DEG above: free to +5 out and -1.5 in, then a cube that
+    reaches 1.0 per leg at +10 out and at -2.5 in. Free bands matter here.
+    A flat penalty on any angle at all fights the gait everywhere, including
+    where the gait is fine; a free band says "this much is yours" and only
+    charges past it. Past the free band the cube does the rest: 0.06 at +7,
+    0.51 at +9, 1.0 at +10, 2.7 at +12.
+
+    IT MUST KNOW WHICH WAY IS OUT, unlike the first draft of this function.
+    An absolute distance from home cannot tell +5 from -5, and the owner's
+    curve gives 5 degrees of room outward against 1.5 inward - so HIP_OUTWARD
+    goes on first, exactly as `even_stance` does it, and for the same reason:
+    the two diagonals run opposite sign conventions and a term written in the
+    wrong frame measures the CAD export's rotation instead of the stance.
+
+    THE FREE BAND IS ALSO WHAT MAKES A LARGE WEIGHT SAFE. A term that always
+    charges something has to stay small or it distorts everything. This one
+    goes to exactly zero once the legs are home, so its pressure disappears
+    the moment it has done its job. That is the argument for weighing it
+    harder than `even_stance` was ever weighed.
+
+    Averaged over about a quarter of a second, like `even_stance` and for the
+    same reason: a leg that swings wide for one step and comes back is a
+    gait, and a leg that lives out there is the fault. Its own filter state,
+    not that term's - two terms sharing one buffer is one term overwriting
+    the other.
+
+    GATED TO STRAIGHT TRAVEL. Crabbing IS an angled stance - to go sideways
+    the legs on one side reach out while the others tuck in - so charging
+    this while a crab is commanded bills the robot for obeying an order.
+    `_on_a_line` cannot be the gate: it counts a crab as a line, by design.
+
+    THE CEILING, for whoever weighs it: a robot standing perfectly still with
+    neutral hips pays nothing here, so this must never be worth enough to
+    beat `track_speed` at +2.0 and `ground_covered` at +1.0. It is a
+    tie-breaker between gaits that go equally fast, not a reason to go slow.
+    """
+    ids = getattr(env, "_gray_hip_ids", None)
+    robot = env.scene[asset_cfg.name]
+    if ids is None:
+        # Resolved by name, not from asset_cfg.joint_ids - see even_stance for
+        # what a SceneEntityCfg default argument silently does.
+        ids = [robot.find_joints(n)[0][0] for n in HIP_ORDER]
+        env._gray_hip_ids = ids
+    q = robot.data.joint_pos[:, ids]
+    home = robot.data.default_joint_pos[:, ids]
+    sign = torch.tensor(HIP_OUTWARD, device=q.device, dtype=q.dtype)
+    # Positive is OUT, on all four legs, and measured from the stance.
+    out = (q - home) * sign
+
+    avg = getattr(env, "_gray_hip_home_avg", None)
+    if avg is None or avg.shape != out.shape:
+        avg = out.clone()
+    fresh = (env.episode_length_buf <= 1).unsqueeze(1)
+    avg = torch.where(fresh, out, avg + (out - avg) / FILTER_STEPS)
+    env._gray_hip_home_avg = avg.detach()
+
+    d2r = 3.141592653589793 / 180.0
+    over = torch.clamp(avg - HIP_FREE_OUT_DEG * d2r, min=0.0) / (
+        (HIP_HARD_OUT_DEG - HIP_FREE_OUT_DEG) * d2r)
+    under = torch.clamp(-avg - HIP_FREE_IN_DEG * d2r, min=0.0) / (
+        (HIP_HARD_IN_DEG - HIP_FREE_IN_DEG) * d2r)
+    cost = torch.clamp(over.pow(3) + under.pow(3), max=HIP_COST_CAP)
+
+    cmd = env.command_manager.get_command(command_name)
+    straight = ((torch.abs(cmd[:, 0]) > MOVING)
+                & (torch.abs(cmd[:, 1]) < MOVING)
+                & (torch.abs(cmd[:, 2]) < MOVING))
+    return cost.mean(dim=1) * straight.float()
 
 
 def leg_swing(env, target: float, command_name: str = "walk",
@@ -1693,7 +1857,29 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # still starts to win. Symmetry must never be worth more than moving, and
     # the gate below is not a substitute for that - it only decides WHEN this
     # is charged, not how much.
-    cfg.rewards["even_stance"] = RewardTermCfg(func=even_stance, weight=-3.0)
+    # WEIGHT 0 SINCE 7 AUG 2026, and kept rather than deleted because A2, A3
+    # and A4 were scored against it and a term that vanishes makes three runs
+    # unreadable. It had three forms in one day and each traded one fault for
+    # another - ungated cost crab drift 14.1 -> 24.5 deg, per-diagonal charged
+    # 0.015% of the reward, and the per-leg version at -3.0 fixed the back
+    # right while the owner reported the front right thrown further out and
+    # the robot walking at an angle. The flaw is in the question it asks:
+    # measuring each leg against the average of the four cannot see all four
+    # legs splayed together, which is what the ladder shows the robot doing.
+    cfg.rewards["even_stance"] = RewardTermCfg(func=even_stance, weight=0.0)
+    # Its replacement, and OFF until it is measured - added 7 Aug 2026 on the
+    # owner's ask for a term that punishes an angled hip directly. Distance
+    # from the CAD stance rather than from the other legs, so it sees a leg
+    # thrown out AND a leg tucked under, and needs no sign map to do it.
+    #
+    # WHAT IT WILL COST, sized before the probe rather than after. The ladder
+    # on w0_control read hip means of +9.7, +5.5, -1.7 and +11.8 deg, so the
+    # mean distance from home is about 0.13 rad - roughly two and a half times
+    # the 0.05 rad spread `even_stance` was charging. At -3.0 this would be a
+    # far heavier term than that one ever was, which is why the probes start
+    # at -1.0 and -2.0. CARRY's rule is that under about 1% of the reward
+    # cannot change a gait; the ceiling above it is track_speed at +2.0.
+    cfg.rewards["hips_home"] = RewardTermCfg(func=hips_home, weight=0.0)
     # Buzzing, raised from -0.01 with the rest of the smoothness set. It was
     # 0.0125 points, a third of one percent of what the robot earns.
     cfg.rewards["jitter"] = RewardTermCfg(func=mdp.action_acc_l2, weight=-0.05)

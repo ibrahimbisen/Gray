@@ -1,0 +1,33 @@
+[13:34:50] runner 30428@133450 up. interpreter: C:\Users\Bisen\Desktop\Gray\.venv\Scripts\python.exe
+[13:34:50] queue: progress\queue.json
+[13:34:50] paused - not taking new jobs
+[13:35:17] j0244  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 750 --name y2_flatfast_narrow --no-video --seed 1301 --reward even_stance=0.0 --ramp veering=-2.0,-2.0,-3.0,-4.0 --speed-hi 0.9 --init-from 2026-08-07_01-59-55_A1_flat_1301 --narrow-dials where_the_weight_is
+[13:35:22] j0244  -> progress/runs/2026-08-07_13-35-22_y2_flatfast_narrow
+[13:57:31] j0244  verify exited 1 - training kept, the bar was not met or could not be read
+[13:57:31] j0244  done
+[13:57:31] j0247  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 750 --name h1_hips05 --no-video --seed 1301 --reward even_stance=0.0 --reward hips_home=-0.5 --ramp veering=-2.0,-2.0,-3.0,-4.0 --speed-hi 0.9 --init-from 2026-08-07_01-59-55_A1_flat_1301
+[13:57:37] j0247  -> progress/runs/2026-08-07_13-57-36_h1_hips05
+[14:20:34] j0247  verify exited 1 - training kept, the bar was not met or could not be read
+[14:20:34] j0247  done
+[14:20:34] j0248  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 750 --name h2_hips15 --no-video --seed 1301 --reward even_stance=0.0 --reward hips_home=-1.5 --ramp veering=-2.0,-2.0,-3.0,-4.0 --speed-hi 0.9 --init-from 2026-08-07_01-59-55_A1_flat_1301
+[14:20:39] j0248  -> progress/runs/2026-08-07_14-20-39_h2_hips15
+[14:43:39] j0248  verify exited 1 - training kept, the bar was not met or could not be read
+[14:43:39] j0248  done
+[14:43:39] idle - 0 queued
+[15:39:24] j0249  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 9000 --iterations 750 --name h2b_hips15_9k --no-video --seed 1301 --reward even_stance=0.0 --reward hips_home=-1.5 --ramp veering=-2.0,-2.0,-3.0,-4.0 --speed-hi 0.9 --init-from 2026-08-07_01-59-55_A1_flat_1301
+[15:39:29] j0249  -> progress/runs/2026-08-07_15-39-29_h2b_hips15_9k
+[15:40:01] train: cancelled from the dashboard
+[15:40:03] j0249  cancelled
+[15:40:03] j0251  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 10000 --iterations 750 --name h2b_hips15_10k --no-video --seed 1301 --reward even_stance=0.0 --reward hips_home=-1.5 --ramp veering=-2.0,-2.0,-3.0,-4.0 --speed-hi 0.9 --init-from 2026-08-07_01-59-55_A1_flat_1301
+[15:40:09] j0251  -> progress/runs/2026-08-07_15-40-09_h2b_hips15_10k
+[15:41:51] train: cancelled from the dashboard
+[15:41:53] j0251  cancelled
+[15:41:53] j0253  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 9000 --iterations 750 --name h2b_hips15_9k --no-video --seed 1301 --reward even_stance=0.0 --reward hips_home=-1.5 --ramp veering=-2.0,-2.0,-3.0,-4.0 --speed-hi 0.9 --init-from 2026-08-07_01-59-55_A1_flat_1301
+[15:41:58] j0253  -> progress/runs/2026-08-07_15-41-58_h2b_hips15_9k
+[15:54:46] train: cancelled from the dashboard
+[15:54:48] j0253  cancelled
+[15:54:48] j0256  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 9000 --iterations 400 --name h2c_hips15_9k --no-video --seed 1301 --reward even_stance=0.0 --reward hips_home=-1.5 --ramp veering=-2.0,-3.0,-4.0,-4.0 --speed-hi 0.9 --init-from 2026-08-07_01-59-55_A1_flat_1301
+[15:54:54] j0256  -> progress/runs/2026-08-07_15-54-53_h2c_hips15_9k
+[16:10:04] j0256  verify exited 1 - training kept, the bar was not met or could not be read
+[16:10:04] j0256  done
+[16:10:04] paused - not taking new jobs
