@@ -15,9 +15,9 @@
     "unlock": 6
   },
   "full": {
-    "fwd": 0.4,
-    "side": 0.5,
-    "turn": 2.0
+    "fwd": 0.8,
+    "side": 0.2,
+    "turn": 1.0
   },
   "deadzone": 0.12
 }

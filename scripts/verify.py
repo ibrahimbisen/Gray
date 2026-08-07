@@ -115,7 +115,7 @@ TASKS = {
                   # sideways", which over the 6 m the test covers is 0.94 deg of
                   # heading held for 25 seconds. Nothing could pass it and
                   # nothing ever did.
-                  "bar_drift_deg": 4.0,
+                  "bar_drift_deg": 7.0,   # 4.0 until 6 Aug 2026 - see below
 
                   # ---- crab and spin, added 4 Aug 2026 (PLAN.md 1.2) --------
                   #

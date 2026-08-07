@@ -10,3 +10,12 @@
 [23:01:04] j0213  verify exited 1 - training kept, the bar was not met or could not be read
 [23:01:04] j0213  done
 [23:01:05] paused - not taking new jobs
+[01:59:07] j0214  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 5500 --name L2_4507 --no-video --seed 4507 --mixed-ground --payload-kg 1.0 --init-from 2026-08-06_05-34-25_gc_4507
+[01:59:12] j0214  -> progress/runs/2026-08-07_01-59-12_L2_4507
+[01:59:48] train: cancelled from the dashboard
+[01:59:50] j0214  cancelled
+[01:59:50] j0216  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 500 --name A1_flat_1301 --no-video --seed 1301 --init-from 2026-08-06_17-39-50_L1_1301
+[01:59:55] j0216  -> progress/runs/2026-08-07_01-59-55_A1_flat_1301
+[02:14:41] j0216  verify exited 1 - training kept, the bar was not met or could not be read
+[02:14:41] j0216  done
+[02:14:41] idle - 0 queued

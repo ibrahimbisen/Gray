@@ -91,6 +91,30 @@ ROBOT = SceneEntityCfg("robot", body_names=("base_link",))
 # leg sideways, so animating it does nothing for how the walk reads.
 SWING_JOINTS = SceneEntityCfg("robot", joint_names=(".*thigh", ".*calf"))
 
+# The four hips, NAMED IN THIS ORDER, because `even_stance` below has to know
+# which way "out" is on each of them and there is no way to read that off the
+# joint. Measured 6 Aug 2026 by scripts/measure_hip_travel.py: driving each
+# hip to its limits and recording where the FOOT lands, in millimetres.
+#
+#     front-right   out at -40 deg      222 mm from the centreline
+#     front-left    out at +40 deg      222 mm
+#     back-right    out at +40 deg      221 mm
+#     back-left     out at -40 deg      222 mm
+#
+# The four agree to 0.2 mm, so the ROBOT IS SYMMETRIC. What is not symmetric is
+# the sign convention: the two diagonals run opposite ways, because the owner
+# built the robot from one hip part used twice and rotated - so the exported
+# joint frames are rotated with it. Mirrored numbers on mirrored frames
+# describe the same machine, which is why the range table looked wrong and was
+# not. The leg the owner saw thrown wide was the GAIT, not the geometry.
+HIP_ORDER = ("frhip", "flhip", "brhip", "blhip")
+HIP_JOINTS = SceneEntityCfg("robot", joint_names=HIP_ORDER)
+# +1 where a positive angle swings that leg out, -1 where it swings it in, in
+# the order above. Multiplying by this puts all four legs in one frame where
+# "bigger means wider", which is the only frame a symmetry term can be written
+# in at all.
+HIP_OUTWARD = (-1.0, 1.0, 1.0, -1.0)
+
 # How fast it is asked to walk. Slow, because 1.96 N-m servos at 50 Hz are not
 # going to run, and because a speed the robot cannot reach is a reward it can
 # never earn.
@@ -98,16 +122,28 @@ SWING_JOINTS = SceneEntityCfg("robot", joint_names=(".*thigh", ".*calf"))
 # these, and nothing outside them means anything: the policy interpolates between
 # things it has seen and produces nonsense past the edge, the same way a curve fit
 # does. Widened 3 Aug 2026 - see the note under WALK_SPEED.
-# -0.5 to 0.9 since 6 Aug 2026, up from +/-0.35. The owner's rule: train wider
-# than you drive, so the speed you use every day sits in the middle of what the
-# robot knows rather than at its edge. 0.9 m/s is about 3 km/h.
+# -0.45 to 0.7, MEASURED, 6 Aug 2026. The owner's rule is to train wider than
+# you drive - but only as wide as the body goes, and this is the number that
+# taught us where that is.
 #
-# NOT 7 km/h, which is what was asked for. 1.94 m/s on 0.2 m legs is a gallop:
-# roughly 13 steps a second per leg against a 50 Hz control loop, which is four
-# commands per step, and peak torques two to three times standing on a knee
-# already holding 55% of its stall. 0.9 is the honest stretch; the speed ladder
-# after the run says what it actually reached.
-WALK_SPEED = (-0.5, 0.9)      # m/s, negative is backward
+# It was 0.9 for one run. The speed ladder on that run:
+#
+#     told      foot lift    what it did
+#     0.23 m/s    29 mm      walks properly
+#     0.45 m/s    28 mm      walks properly
+#     0.68 m/s    22 mm      still walking
+#     0.90 m/s     4.5 mm    feet stop leaving the ground
+#     1.03 m/s     4.9 mm    covers -0.02 m - it does not move at all
+#
+# A COMMAND IT CANNOT REACH PAYS THE SAME WHATEVER IT DOES, so the cheapest
+# answer is to stop trying, and that is what it learned. The owner found it
+# from the driving seat before any number did: full stick asks 0.83 m/s, which
+# landed in the dead zone, and the robot would not move.
+#
+# 7 km/h was the original ask. 1.94 m/s on 0.2 m legs is a gallop - about 13
+# steps a second per leg against a 50 Hz control loop, on a knee already
+# holding 55% of its stall standing.
+WALK_SPEED = (-0.45, 0.7)     # m/s, negative is backward
 WALK_SIDE = (-0.20, 0.20)     # m/s sideways
 WALK_TURN = (-1.00, 1.00)     # rad/s about the vertical
 
@@ -172,7 +208,26 @@ POSE_ROLL = (-0.35, 0.35)     # rad, right side down NEGATIVE: +/- 20 deg
 # The band the tracking reward falls off over. See the module docstring - this is
 # the single most important number in the file. docs/REWARDS.md puts it at
 # 0.3-0.5x the target speed, against mjlab's borrowed 0.5.
-TRACK_STD = 0.15
+#
+# 0.25, not 0.15, since 6 Aug 2026. 0.15 was chosen against a 0.35 m/s box,
+# where it is 0.43x the top speed and right. Against a box of 0.7 it is 0.21x,
+# and the arithmetic turns nasty at the fast end: a robot told 0.7 and doing
+# 0.45 - which is a real effort - was paid
+#
+#     exp(-(0.25^2) / 0.15^2) = 0.06     of the 2.0 that term is worth
+#
+# while standing still paid 0.00. Six hundredths of a point between a genuine
+# try and not bothering, against penalties for effort and shaking that both
+# fall as the robot slows down. Trying was a bad deal and it learned that.
+# At 0.25 the same near-miss pays 0.37, which is worth chasing.
+#
+# THE CAUTION THAT COMES WITH IT: too wide and standing still starts to pay.
+# mjlab's borrowed 0.5 would give a motionless robot 78% of full marks against
+# a 0.25 m/s command, which is the trap the module docstring is about. At 0.25
+# a motionless robot facing that same command gets 37%, and facing the 0.7 it
+# gets 0.03%. The band has to be read against BOTH ends of the box, and that
+# is what neither 0.5 nor 0.15 did.
+TRACK_STD = 0.25
 
 # The turning band. This is the same trap as the tracking band above, in the
 # other direction, and it cost three runs to find.
@@ -310,6 +365,15 @@ WALK_NOTES = {
                  "average. This is what makes the walk look like a dog rather than "
                  "a table sliding along - without it the cheapest gait is stiff "
                  "legs and tiny steps. Capped, so it buys a stride and not a flail.",
+    "even_stance": "One leg living further out to the side than the other three. "
+                   "Averaged over about a quarter of a second, so a leg that "
+                   "swings wide for one step and comes back costs nothing, while "
+                   "a leg that camps out there is charged the whole time. Added "
+                   "7 Aug 2026, after the owner drove the robot and saw the "
+                   "front-right and back-left legs thrown out while the other two "
+                   "stayed tucked under. The geometry was measured first and is "
+                   "symmetric to 0.2 mm, so what he was watching was the gait: "
+                   "nothing in the task had ever asked the four legs to match.",
     "wandering": "Drifting off the line it was sent along. Charged whenever it was "
                  "given a direction to travel in and not told to turn - which since "
                  "4 Aug 2026 includes crabbing sideways and diagonals, not just "
@@ -679,6 +743,65 @@ def ground_covered(env, command_name: str = "walk"):
     ratio = progress / torch.clamp(asked, min=1e-6)
     return torch.where(moving, torch.clamp(ratio, 0.0, 1.0),
                        torch.zeros_like(ratio))
+
+
+def even_stance(env, command_name: str = "walk", asset_cfg=HIP_JOINTS):
+    """One leg habitually camping wider than the other three.
+
+    THE FAULT THIS EXISTS FOR. The owner drove A1_flat_1301 on 7 Aug 2026 and
+    reported the front-right and back-left legs thrown out sideways while the
+    other two stayed under the body - "almost like the front right leg is
+    disabled and has to drag". Those two are a diagonal pair, which is the
+    pair a trot swings together. The geometry was measured first and is
+    symmetric to 0.2 mm, so this is the gait, and nothing in the task ever
+    asked for a symmetric one.
+
+    AVERAGED, NOT INSTANTANEOUS, and that is the whole design. Legs are at
+    different points in the stride at any moment, so charging for them
+    disagreeing NOW would fight the gait itself - the diagonal pairs are
+    supposed to be opposite. What is charged is each leg's average stance
+    width over the last `FILTER_STEPS` control steps against the average of
+    all four: a leg that swings wide for one step and comes back pays nothing,
+    a leg that lives out there pays continuously.
+
+    Every leg is first put in one frame by HIP_OUTWARD, because the two
+    diagonals run opposite sign conventions - see the note beside it. Without
+    that the term would be measuring the export's rotation rather than the
+    robot's stance.
+
+    Gated on being told to move, like every other gait term here: a robot
+    standing still is not walking lopsided, it is standing.
+    """
+    # THE IDS ARE RESOLVED HERE, BY NAME, and not taken from a SceneEntityCfg
+    # default argument. A SceneEntityCfg is only resolved by the manager when
+    # it is passed in `params`; as a default it stays unresolved and its
+    # `joint_ids` is every joint in the robot. This term asked for four hips
+    # and was handed all twelve, which is how it announced itself - a size
+    # mismatch against HIP_OUTWARD. It would have been silent if the counts
+    # had happened to match.
+    ids = getattr(env, "_gray_hip_ids", None)
+    if ids is None:
+        robot = env.scene[asset_cfg.name]
+        ids = [robot.find_joints(n)[0][0] for n in HIP_ORDER]
+        env._gray_hip_ids = ids
+    q = env.scene[asset_cfg.name].data.joint_pos[:, ids]
+    out = q * torch.tensor(HIP_OUTWARD, device=q.device, dtype=q.dtype)
+
+    avg = getattr(env, "_gray_hip_avg", None)
+    if avg is None or avg.shape != out.shape:
+        avg = out.clone()
+    fresh = (env.episode_length_buf <= 1).unsqueeze(1)
+    avg = torch.where(fresh, out, avg + (out - avg) / FILTER_STEPS)
+    env._gray_hip_avg = avg.detach()
+
+    # Mean absolute deviation, not the largest: one leg 10 deg wide and three
+    # even should cost less than all four scattered, and `max` cannot tell
+    # those apart. The gradient reaches every leg this way, rather than only
+    # whichever is worst this step.
+    spread = torch.mean(torch.abs(avg - avg.mean(dim=1, keepdim=True)), dim=1)
+    moving = torch.norm(env.command_manager.get_command(command_name)[:, :3],
+                        dim=1)
+    return spread * (moving > MOVING).float()
 
 
 def leg_swing(env, target: float, command_name: str = "walk",
@@ -1542,6 +1665,16 @@ def walk_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # term that pays for the thighs and calves actually swinging through a stride.
     cfg.rewards["leg_swing"] = RewardTermCfg(
         func=leg_swing, weight=1.0, params={"target": SWING_SPREAD})
+    # -0.5, sized against the ~13.5 points a second the positive terms are
+    # worth: about 3-4% of what is earned. The rule this obeys is CARRY's -
+    # a term under about 1% of earned reward cannot change a gait, which is
+    # what left swing_height doing nothing at -0.25 for a week.
+    #
+    # AND NOT MORE, for a reason with teeth: the cheapest perfectly symmetric
+    # robot is a stationary one. At -2.0 this would start beating track_speed
+    # at +2.0, and standing still would become a way to win. Symmetry must
+    # never be worth more than moving.
+    cfg.rewards["even_stance"] = RewardTermCfg(func=even_stance, weight=-0.5)
     # Buzzing, raised from -0.01 with the rest of the smoothness set. It was
     # 0.0125 points, a third of one percent of what the robot earns.
     cfg.rewards["jitter"] = RewardTermCfg(func=mdp.action_acc_l2, weight=-0.05)
