@@ -7,3 +7,6 @@
 [17:39:33] paused - not taking new jobs
 [17:39:45] j0213  Gray-Walk  python scripts/train.py Gray-Walk --num-envs 5000 --iterations 5500 --name L1_1301 --no-video --seed 1301 --mixed-ground --payload-kg 1.0 --init-from 2026-08-06_04-43-00_gc_1301
 [17:39:50] j0213  -> progress/runs/2026-08-06_17-39-50_L1_1301
+[23:01:04] j0213  verify exited 1 - training kept, the bar was not met or could not be read
+[23:01:04] j0213  done
+[23:01:05] paused - not taking new jobs

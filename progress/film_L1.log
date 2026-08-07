@@ -1,0 +1,272 @@
+mode     one pass
+tasks    Gray-Push, Gray-Stand, Gray-Walk
+
+[film] following Gray-Walk  2026-08-06_17-39-50_L1_1301
+c:\Users\Bisen\Desktop\Gray\.venv\Lib\site-packages\mjlab\entity\entity.py:154: UserWarning: Actuator config matched 12 joint(s) but the same expressions also match 4 site(s): fr_foot, fl_foot, br_foot, bl_foot. Add a separate config with transmission_type=TransmissionType.SITE if those should be actuated too.
+  self._add_actuators()
+c:\Users\Bisen\Desktop\Gray\.venv\Lib\site-packages\mjlab\scene\scene.py:66: UserWarning: Entity 'robot' has non-default <option> fields (timestep) that will not be propagated by MjSpec.attach(). Use MujocoCfg instead.
+  self._add_entities()
+WARNING: Attach conflict when attaching 'gray' to 'mjlab scene', policy is 'warning'
+timestep: parent has 0.002, child has 0.005, keeping parent value
+
+c:\Users\Bisen\Desktop\Gray\.venv\Lib\site-packages\mjlab\sim\sim.py:252: UserWarning: Attach conflict when attaching 'gray' to 'mjlab scene', policy is 'warning'
+timestep: parent has 0.002, child has 0.005, keeping parent value
+  compiled = spec.compile()
+Warp 1.15.0 initialized:
+   CUDA Toolkit 12.9, Driver 13.2
+   Devices:
+     "cpu"      : "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel"
+     "cuda:0"   : "NVIDIA GeForce RTX 4070 Ti" (12 GiB, sm_89, mempool enabled)
+   Kernel cache:
+     \\?\C:\Users\Bisen\AppData\Local\NVIDIA\warp\Cache\1.15.0
+Module mujoco_warp._src.smooth c4020f1 load on device 'cuda:0' took 3.96 ms  (cached)
+Module _nxn_broadphase__locals__kernel_cd21dc9b cd21dc9 load on device 'cuda:0' took 2.18 ms  (cached)
+Module ccd_kernel_builder__locals__ccd_kernel_16d44bc8 16d44bc load on device 'cuda:0' took 4.87 ms  (cached)
+Module ccd_kernel_builder__locals__ccd_kernel_16d44bc8 141f5ee load on device 'cuda:0' took 4.72 ms  (cached)
+Module _primitive_narrowphase__locals__primitive_narrowphase_e1b4dfa8 e1b4dfa load on device 'cuda:0' took 3.14 ms  (cached)
+Module mujoco_warp._src.constraint 36c8060 load on device 'cuda:0' took 1.36 ms  (cached)
+Module _friction_dof__locals__kernel_0cd98302 0cd9830 load on device 'cuda:0' took 1.62 ms  (cached)
+Module _limit_slide_hinge__locals__kernel_7e77232e 7e77232 load on device 'cuda:0' took 1.70 ms  (cached)
+Module _efc_contact_init__locals__kernel_c85ef7c6 c85ef7c load on device 'cuda:0' took 1.51 ms  (cached)
+Module _efc_contact_jac_dense__locals__kernel_5d1b69cd d78407b load on device 'cuda:0' took 1.95 ms  (cached)
+Module _efc_contact_update__locals__kernel_2d2d1a29 2d2d1a2 load on device 'cuda:0' took 1.68 ms  (cached)
+Module mujoco_warp._src.forward bfd9fb5 load on device 'cuda:0' took 3.03 ms  (cached)
+Module mujoco_warp._src.passive d8c18c6 load on device 'cuda:0' took 3.44 ms  (cached)
+Module mujoco_warp._src.forward b068ad6 load on device 'cuda:0' took 2.79 ms  (cached)
+Module _qfrc_smooth__locals__kernel_3ac7164a 3ac7164 load on device 'cuda:0' took 1.41 ms  (cached)
+Module mujoco_warp._src.support ca784c5 load on device 'cuda:0' took 1.64 ms  (cached)
+Module _tile_cholesky_factorize_solve_block__locals__kernel_68b4ecc8 a76d05b load on device 'cuda:0' took 113.36 ms  (cached)
+Module _solve_init_dof__locals__kernel_03c5735a 03c5735 load on device 'cuda:0' took 2.41 ms  (cached)
+Module mujoco_warp._src.solver 3a105a0 load on device 'cuda:0' took 5.38 ms  (cached)
+Module _solve_init_jaref_kernel__locals__kernel_6f1e1c1b 6f1e1c1 load on device 'cuda:0' took 1.88 ms  (cached)
+Module mul_m_kernel__locals___mul_m_4f80c25f 4f80c25 load on device 'cuda:0' took 1.53 ms  (cached)
+Module _update_constraint_efc__locals__kernel_7b921a6e 7b921a6 load on device 'cuda:0' took 1.65 ms  (cached)
+Module _update_constraint_init_qfrc_constraint_dense__locals__kernel_87c13c1d 87c13c1 load on device 'cuda:0' took 1.57 ms  (cached)
+Module _update_gradient_zero_grad_dot__locals__kernel_ca4acd13 ca4acd1 load on device 'cuda:0' took 2.24 ms  (cached)
+Module _update_gradient_grad__locals__kernel_9e296ebd 9e296eb load on device 'cuda:0' took 1.63 ms  (cached)
+Module _update_gradient_JTDAJ_dense_tiled__locals__kernel_42463c11 f69c7c7 load on device 'cuda:0' took 2.79 ms  (cached)
+Module _update_gradient_cholesky__locals__kernel_80603160 d68f8de load on device 'cuda:0' took 107.69 ms  (cached)
+Module _linesearch_iterative_kernel__locals__kernel_7e52c8ed 4ad8c79 load on device 'cuda:0' took 3.15 ms  (cached)
+Module _update_constraint_efc__locals__kernel_ddea4c95 ddea4c9 load on device 'cuda:0' took 1.63 ms  (cached)
+Module _update_constraint_init_qfrc_constraint_dense__locals__kernel_f58289d3 f58289d load on device 'cuda:0' took 1.78 ms  (cached)
+Module _update_gradient_zero_grad_dot__locals__kernel_819fe036 819fe03 load on device 'cuda:0' took 1.71 ms  (cached)
+Module _update_gradient_grad__locals__kernel_af49475a af49475 load on device 'cuda:0' took 2.35 ms  (cached)
+Module _update_gradient_cholesky__locals__kernel_526e21b7 44ba8ca load on device 'cuda:0' took 103.12 ms  (cached)
+Module mujoco_warp._src.sensor de892d8 load on device 'cuda:0' took 5.18 ms  (cached)
+Module _contact_sort__locals__contact_sort_8d950af1 a76bf05 load on device 'cuda:0' took 2.02 ms  (cached)
+Module mujoco_warp._src.derivative 833f5d0 load on device 'cuda:0' took 2.54 ms  (cached)
+Module _next_time_builder__locals___next_time_8c8bbcbc 8c8bbcb load on device 'cuda:0' took 1.48 ms  (cached)
+Module reset_data__locals__reset_xfrc_applied_aec370af aec370a load on device 'cuda:0' took 1.78 ms  (cached)
+Module reset_data__locals__reset_M_96396a8d 96396a8 load on device 'cuda:0' took 1.39 ms  (cached)
+Module reset_data__locals__reset_mocap_b321694c b321694 load on device 'cuda:0' took 1.50 ms  (cached)
+Module reset_data__locals__reset_contact_88cd7446 88cd744 load on device 'cuda:0' took 1.64 ms  (cached)
+Module reset_data__locals__reset_sleep_1c5b28e7 1c5b28e load on device 'cuda:0' took 1.41 ms  (cached)
+Module reset_data__locals__reset_nworld_1ba8fb6e 1ba8fb6 load on device 'cuda:0' took 1.55 ms  (cached)
+
++---------------------------------+
+|         Base Environment        |
++------------------------+--------+
+| Property               | Value  |
++------------------------+--------+
+| Number of environments | 1      |
+| Environment device     | cuda:0 |
+| Environment seed       | None   |
+| Physics step-size      | 0.005  |
+| Environment step-size  | 0.02   |
++------------------------+--------+
+
+[INFO] <EventManager> contains 1 active terms.
++-------------------------------------+
+| Active Event Terms in Mode: 'reset' |
++--------+----------------------------+
+| Index  | Name                       |
++--------+----------------------------+
+|   0    | reset                      |
+|   1    | nudge_pose                 |
+|   2    | nudge_base                 |
+|   3    | ground_grip                |
+|   4    | how_heavy                  |
+|   5    | where_the_weight_is        |
+|   6    | servo_strength             |
+|   7    | gearbox_drag               |
++--------+----------------------------+
++-----------------------------+
+| Domain Randomization Fields |
++-------+---------------------+
+| Index | Field Name          |
++-------+---------------------+
+|   0   | geom_friction       |
+|   1   | body_mass           |
+|   2   | body_ipos           |
+|   3   | body_inertia        |
+|   4   | body_iquat          |
+|   5   | body_subtreemass    |
+|   6   | dof_invweight0      |
+|   7   | body_invweight0     |
+|   8   | tendon_length0      |
+|   9   | tendon_invweight0   |
+|   10  | actuator_acc0       |
+|   11  | actuator_gainprm    |
+|   12  | actuator_biasprm    |
+|   13  | dof_frictionloss    |
++-------+---------------------+
+
+[INFO] <CommandManager> contains 2 active terms.
++-----------------------------------------------+
+|              Active Command Terms             |
++-------+---------+-----------------------------+
+| Index | Name    |             Type            |
++-------+---------+-----------------------------+
+|   0   | walk    | StraightLineVelocityCommand |
+|   1   | posture |        PostureCommand       |
++-------+---------+-----------------------------+
+
+[INFO] <ActionManager> contains 1 active terms.
++---------------------------------+
+| Active Action Terms (shape: 12) |
++--------+---------+--------------+
+| Index  | Name    |    Dimension |
++--------+---------+--------------+
+|   0    | joints  |           12 |
++--------+---------+--------------+
+
+[INFO] <ObservationManager> contains 2 groups.
++-----------------------------------------------------------+
+| Active Observation Terms in Group: 'actor' (shape: (49,)) |
++-----------+----------------------------------+------------+
+|   Index   | Name                             |   Shape    |
++-----------+----------------------------------+------------+
+|     0     | projected_gravity                |    (3,)    |
+|     1     | base_ang_vel                     |    (3,)    |
+|     2     | joint_pos                        |   (12,)    |
+|     3     | joint_vel                        |   (12,)    |
+|     4     | last_action                      |   (12,)    |
+|     5     | command                          |    (3,)    |
+|     6     | posture                          |    (3,)    |
+|     7     | off_line                         |    (1,)    |
++-----------+----------------------------------+------------+
++------------------------------------------------------------+
+| Active Observation Terms in Group: 'critic' (shape: (53,)) |
++-----------+----------------------------------+-------------+
+|   Index   | Name                             |    Shape    |
++-----------+----------------------------------+-------------+
+|     0     | projected_gravity                |     (3,)    |
+|     1     | base_ang_vel                     |     (3,)    |
+|     2     | joint_pos                        |    (12,)    |
+|     3     | joint_vel                        |    (12,)    |
+|     4     | last_action                      |    (12,)    |
+|     5     | base_lin_vel                     |     (3,)    |
+|     6     | base_height                      |     (1,)    |
+|     7     | command                          |     (3,)    |
+|     8     | posture                          |     (3,)    |
+|     9     | off_line                         |     (1,)    |
++-----------+----------------------------------+-------------+
+
+[INFO] <TerminationManager> contains 4 active terms.
++--------------------------------+
+|    Active Termination Terms    |
++-------+-------------+----------+
+| Index | Name        | Time Out |
++-------+-------------+----------+
+|   0   | time_out    |   True   |
+|   1   | tipped_over |  False   |
+|   2   | collapsed   |  False   |
+|   3   | nose_dived  |  False   |
++-------+-------------+----------+
+
+[INFO] <RewardManager> contains 24 active terms.
++-----------------------------------+
+|        Active Reward Terms        |
++-------+----------------+----------+
+| Index | Name           |   Weight |
++-------+----------------+----------+
+|   0   | alive          |      0.5 |
+|   1   | fell_over      |    -40.0 |
+|   2   | effort         |  -0.0002 |
+|   3   | twitching      |    -0.01 |
+|   4   | end_stops      |     -5.0 |
+|   5   | skidding       |     -0.5 |
+|   6   | jitter         |    -0.05 |
+|   7   | track_speed    |      2.0 |
+|   8   | track_turn     |      5.0 |
+|   9   | ground_covered |      1.0 |
+|   10  | wandering      |     -3.0 |
+|   11  | veering        |     -0.2 |
+|   12  | upright        |      1.0 |
+|   13  | ride_height    |      1.0 |
+|   14  | posture        |      1.0 |
+|   15  | stepping       |      1.0 |
+|   16  | leg_swing      |      1.0 |
+|   17  | dragging       |     -2.0 |
+|   18  | swing_height   |    -0.25 |
+|   19  | hard_landing   |    -0.05 |
+|   20  | rocking        |    -0.02 |
+|   21  | shaking        |   -0.001 |
+|   22  | joint_shock    | -2.5e-07 |
+|   23  | landing_speed  |     -0.1 |
++-------+----------------+----------+
+
+[INFO] <CurriculumManager> contains 6 active terms.
++------------------------------+
+|   Active Curriculum Terms    |
++-------+----------------------+
+| Index | Name                 |
++-------+----------------------+
+|   0   | ease_in_smoothness   |
+|   1   | ease_in_steadiness   |
+|   2   | ease_in_shake        |
+|   3   | ease_in_straightness |
+|   4   | ease_in_effort       |
+|   5   | ease_in_landing      |
++-------+----------------------+
+
+[INFO] <NullMetricsManager> (inactive)
+[INFO] <NullRecorderManager> (inactive)
+Module mujoco_warp._src.io 466491b load on device 'cuda:0' took 3.30 ms  (cached)
+Module _tile_cholesky_factorize_block__locals__kernel_fa388143 0201c7b load on device 'cuda:0' took 80.11 ms  (cached)
+Module _tile_cholesky_solve_block__locals__kernel_2d57800b bf36a3f load on device 'cuda:0' took 81.01 ms  (cached)
+--------------------------------------------------------------------------------
+Resolved observation sets: 
+	 actor :  ('actor',)
+	 critic :  ('critic',)
+--------------------------------------------------------------------------------
+Actor Model: MLPModel(
+  (obs_normalizer): EmpiricalNormalization()
+  (distribution): GaussianDistribution()
+  (mlp): MLP(
+    (0): Linear(in_features=49, out_features=256, bias=True)
+    (1): ELU(alpha=1.0)
+    (2): Linear(in_features=256, out_features=128, bias=True)
+    (3): ELU(alpha=1.0)
+    (4): Linear(in_features=128, out_features=64, bias=True)
+    (5): ELU(alpha=1.0)
+    (6): Linear(in_features=64, out_features=12, bias=True)
+  )
+)
+Critic Model: MLPModel(
+  (obs_normalizer): EmpiricalNormalization()
+  (mlp): MLP(
+    (0): Linear(in_features=53, out_features=256, bias=True)
+    (1): ELU(alpha=1.0)
+    (2): Linear(in_features=256, out_features=128, bias=True)
+    (3): ELU(alpha=1.0)
+    (4): Linear(in_features=128, out_features=64, bias=True)
+    (5): ELU(alpha=1.0)
+    (6): Linear(in_features=64, out_features=1, bias=True)
+  )
+)
+[film] built environment for Gray-Walk
+  iteration  1500  ->  iter_1500.mp4  (300 frames)
+  iteration  2000  skipped: RuntimeError: Inplace update to inference tensor outside InferenceMode is not allowe
+  iteration  2500  skipped: RuntimeError: Inplace update to inference tensor outside InferenceMode is not allowe
+  iteration  3000  skipped: RuntimeError: Inplace update to inference tensor outside InferenceMode is not allowe
+  iteration  3500  skipped: RuntimeError: Inplace update to inference tensor outside InferenceMode is not allowe
+  iteration  4000  skipped: RuntimeError: Inplace update to inference tensor outside InferenceMode is not allowe
+  iteration  4500  skipped: RuntimeError: Inplace update to inference tensor outside InferenceMode is not allowe
+  iteration  5000  skipped: RuntimeError: Inplace update to inference tensor outside InferenceMode is not allowe
+  iteration  5500  skipped: RuntimeError: Inplace update to inference tensor outside InferenceMode is not allowe
+  iteration  6000  skipped: RuntimeError: Inplace update to inference tensor outside InferenceMode is not allowe
+  iteration  6500  skipped: RuntimeError: Inplace update to inference tensor outside InferenceMode is not allowe
+  iteration  6998  skipped: RuntimeError: Inplace update to inference tensor outside InferenceMode is not allowe
+
+Reload the dashboard to see them.

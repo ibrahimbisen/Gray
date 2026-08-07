@@ -102,6 +102,7 @@ const PAGES = [
   ["/plan",    "Plan",    "what we are doing next, and why"],
   ["/train",   "Train",   "what it is being taught"],
   ["/dials",   "Dials",   "every number that gets varied, and what it was"],
+  ["/config",  "Config",  "every number that can be changed, and where it lives"],
   ["/robot",   "Robot",   "is the physical model right"],
   ["/controller", "Controller", "what each control does, and what is still free"],
   ["/summary", "Summary", "how the whole thing works"],

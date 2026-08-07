@@ -40,14 +40,15 @@ from urllib.parse import parse_qs, unquote
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from dashboard import controls, live, plan, progress, queue, runs, skills  # noqa: E402
+from dashboard import (  # noqa: E402
+    config, controls, live, plan, progress, queue, runs, skills)
 from tools import check_urdf  # noqa: E402
 
 # Modules whose contents the pages are built from. The HTML is re-read on every
 # request, but these are imported once at startup - so editing a reward
 # description or a status rule and seeing no change on the page is a trap that
 # looks like a bug in the page. Reload them when the file on disk moves.
-_WATCHED = (skills, plan, runs, queue, progress, live, controls)
+_WATCHED = (skills, plan, runs, queue, progress, live, controls, config)
 
 # poser is imported lazily - it pulls in numpy and holds the MuJoCo model - so it
 # cannot be named above. It is watched by module name instead, and appears here
@@ -392,6 +393,11 @@ def dials_state() -> dict:
     return {**plan.dials(), "nav": nav_state()}
 
 
+def config_state() -> dict:
+    """Every number that CAN be changed, parsed from the files that own it."""
+    return {**config.state(), "nav": nav_state()}
+
+
 def controls_state() -> dict:
     """What each pad control does, and what is still free."""
     return {**controls.read(), "nav": nav_state()}
@@ -641,6 +647,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             text = log.read_text(encoding="utf-8", errors="replace")
             return self._send(
                 json.dumps({"text": text[-40000:]}).encode(), "application/json")
+        if path == "/api/config":
+            _reload_if_edited()
+            return self._send(json.dumps(config_state()).encode(),
+                              "application/json")
         if path == "/api/dials":
             _reload_if_edited()
             return self._send(json.dumps(dials_state()).encode(), "application/json")

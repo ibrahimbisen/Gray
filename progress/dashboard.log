@@ -1,0 +1,23 @@
+Now        http://127.0.0.1:8001/           what is happening right now
+Runs       http://127.0.0.1:8001/runs       how did that run go
+Plan       http://127.0.0.1:8001/plan       what we are doing next, and why
+Train      http://127.0.0.1:8001/train      what it is being taught
+Dials      http://127.0.0.1:8001/dials      every number that gets varied, and what it was
+Config     http://127.0.0.1:8001/config     every number that can be changed, and where it lives
+Robot      http://127.0.0.1:8001/robot      is the physical model right
+Controller http://127.0.0.1:8001/controller what each control does, and what is still free
+Summary    http://127.0.0.1:8001/summary    how the whole thing works
+Ctrl-C to stop.
+[server] /api/config
+Traceback (most recent call last):
+  File "C:\Users\Bisen\Desktop\Gray\dashboard\server.py", line 447, in handle_one_request
+    super().handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Bisen\AppData\Roaming\uv\python\cpython-3.13-windows-x86_64-none\Lib\http\server.py", line 435, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "C:\Users\Bisen\Desktop\Gray\dashboard\server.py", line 651, in do_GET
+    self._reload()
+    ^^^^^^^^^^^^
+AttributeError: 'Handler' object has no attribute '_reload'
+

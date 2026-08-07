@@ -7492,14 +7492,27 @@
       "verify": true,
       "clamped": "",
       "id": "j0213",
-      "state": "running",
+      "state": "done",
       "created": "2026-08-06T17:39:36",
       "started": "2026-08-06T17:39:45",
-      "finished": null,
+      "finished": "2026-08-06T23:01:04",
       "run_id": "2026-08-06_17-39-50_L1_1301",
-      "exit_code": null,
+      "exit_code": 0,
       "error": "",
-      "steps": [],
+      "steps": [
+        {
+          "name": "train",
+          "seconds": 19170.9,
+          "exit_code": 0,
+          "at": "2026-08-06T22:59:16"
+        },
+        {
+          "name": "verify",
+          "seconds": 108.8,
+          "exit_code": 1,
+          "at": "2026-08-06T23:01:04"
+        }
+      ],
       "command": "python scripts/train.py Gray-Walk --num-envs 5000 --iterations 5500 --name L1_1301 --no-video --seed 1301 --mixed-ground --payload-kg 1.0 --init-from 2026-08-06_04-43-00_gc_1301",
       "cannot_run": "",
       "owner": "9864@173437",

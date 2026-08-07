@@ -205,11 +205,44 @@ TASKS = {
                   # only honest when there is something passing to measure.
                   #     r5: 0.05  0.03  0.03  - twice the worst of the three,
                   #     which catches a regression without failing on luck.
+                  #
+                  # ---------------------------------------------------------
+                  # FOUR BARS MOVED ON 6 AUG 2026, on the owner's call, after
+                  # driving the robot and reading every bar out loud. The
+                  # reasoning above is kept because it is how each number was
+                  # reached; what changed is not the measurement but what the
+                  # robot is FOR. In the owner's words, three of these were
+                  # "false tests" - they measure a way the robot will never be
+                  # asked to move.
+                  #
+                  #   drift        4.0 -> 7.0 deg. "I am holding the
+                  #                controller. I steer it constantly. A slow
+                  #                curve over a hundred metres does not
+                  #                matter." Lower is still better; this is
+                  #                what counts as passing.
+                  #   side_drift   5.0 -> 15.0 deg. "I am not going to be
+                  #                crabbing almost at all."
+                  #   turn_err     0.20 -> 0.45 rad/s. Against the 1.00 rad/s
+                  #                command that is a full circle in about
+                  #                11.5 s, and the owner's line was "under 10
+                  #                or 11 or 12 seconds is fine, because I will
+                  #                be rotating WHILE walking, not on the
+                  #                spot".
+                  #   turn_wander  0.10 -> 0.50 m. "I only turn one full turn
+                  #                at a time, not for 25 seconds."
+                  #
+                  # The seven not listed did not move. They are the ones that
+                  # say it walks at all: staying up, ride height, uprightness,
+                  # distance, and the two speed tolerances. A bar loosened
+                  # because the test was wrong is a correction; a bar loosened
+                  # because the robot cannot reach it is a lie, and none of
+                  # these were the second kind - the robot was already inside
+                  # three of the four when they moved.
                   "bar_side_distance_m": 3.75,
                   "bar_side_speed_err": 0.05,
-                  "bar_side_drift_deg": 5.0,
-                  "bar_turn_err": 0.20,      # rad/s, mean absolute
-                  "bar_turn_wander_m": 0.10},
+                  "bar_side_drift_deg": 15.0,
+                  "bar_turn_err": 0.45,      # rad/s, mean absolute
+                  "bar_turn_wander_m": 0.50},
 }
 
 
@@ -1109,7 +1142,11 @@ def main() -> int:
     if spec.get("walk") and args.ladder:
         box_hi = float(cmd.ranges.lin_vel_x[1])
         legs = []
-        for v in (0.15, 0.25, 0.35, 0.45):
+        # Rungs scaled to whatever the box is, plus one past its edge. Fixed
+        # rungs stopped meaning anything the day the box went from 0.35 to
+        # 0.9 - three of the four sat in the slowest third of it.
+        rungs = [round(box_hi * f, 2) for f in (0.25, 0.5, 0.75, 1.0, 1.15)]
+        for v in rungs:
             out = v > box_hi + 1e-9
             legs.append({"label": f"fwd_{v:.2f}" + ("_OUT_OF_BOX" if out else ""),
                          "kind": "straight", "vx": v, "vy": 0.0, "wz": 0.0,

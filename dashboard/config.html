@@ -1,0 +1,114 @@
+<!-- Every number that can be changed. Nothing on this page is written twice:
+     the values are parsed out of the files that own them each time it is
+     drawn, so a knob added to train.py or a constant renamed in the task
+     shows up here without anyone remembering to come and edit it. -->
+<title>Config &middot; Gray</title>
+<link rel="stylesheet" href="/page.css">
+<div id="nav"></div>
+
+<main class="wrap">
+  <h1>Everything you can change</h1>
+  <p class="lede" id="lede">Reading&hellip;</p>
+
+  <section>
+    <h2>The command box <span class="sub">what it can be TOLD to do</span></h2>
+    <p class="why">Widen these and the robot practises more; widen them past
+      what it can physically do and it learns to stop trying, because a command
+      it cannot reach pays the same whatever it does. That is what happened at
+      0.9 m/s on 6 August.</p>
+    <table class="t" id="t_box"></table>
+  </section>
+
+  <section>
+    <h2>The gait <span class="sub">what a good step looks like</span></h2>
+    <table class="t" id="t_gait"></table>
+  </section>
+
+  <section>
+    <h2>The bars <span class="sub">what counts as passing &middot;
+      scripts/verify.py</span></h2>
+    <p class="why">These decide pass or fail. They are not what the robot is
+      trained on &mdash; the weights below are.</p>
+    <table class="t" id="t_bars"></table>
+  </section>
+
+  <section>
+    <h2>What it is paid for <span class="sub">read from the newest run,
+      not written down here</span></h2>
+    <p class="why">Weights are the whole of what the robot is trying to do. A
+      term worth under about 1% of the total cannot change a gait, however
+      sensible it sounds.</p>
+    <table class="t" id="t_weights"></table>
+  </section>
+
+  <section>
+    <h2>The world it trains in <span class="sub">from the newest run</span></h2>
+    <table class="t" id="t_world"></table>
+  </section>
+
+  <section>
+    <h2>Per-run switches <span class="sub">scripts/train.py</span></h2>
+    <p class="why">Everything here can be set on one run without editing a
+      file, and the queue carries all of them. This is the list to reach for
+      before changing a constant above.</p>
+    <table class="t" id="t_flags"></table>
+  </section>
+</main>
+
+<script src="/page.js"></script>
+<script>
+/* esc, get, mountNav and navState all come from page.js - the whole point of
+   that file is that no page carries its own copy. */
+const BOX = ["WALK_SPEED", "WALK_SIDE", "WALK_TURN",
+             "POSE_HEIGHT", "POSE_PITCH", "POSE_ROLL"];
+
+function rows(el, head, list) {
+  document.getElementById(el).innerHTML =
+    `<tr>${head.map(h => `<th${h[1] ? ` class="${h[1]}"` : ""}>${h[0]}</th>`).join("")}</tr>`
+    + list.join("");
+}
+
+get("/api/config").then(d => {
+  mountNav("/config", navState(d.nav));
+  document.getElementById("lede").textContent =
+    `${d.constants.length} constants, ${d.flags.length} per-run switches, `
+    + `${d.bars.length} bars and ${d.weights.length} scoring terms. `
+    + `Weights and world read from ${d.from_run || "no run yet"}.`;
+
+  const box = d.constants.filter(c => BOX.includes(c.name));
+  const gait = d.constants.filter(c => !BOX.includes(c.name));
+  const cRow = c => `<tr><td class="k">${esc(c.name)}</td>
+    <td class="n">${esc(c.value)} <span class="faint">${esc(c.unit)}</span></td>
+    <td class="why">${esc(c.what)}</td></tr>`;
+
+  rows("t_box", [["what"], ["range", "n"], ["what it decides"]], box.map(cRow));
+  rows("t_gait", [["what"], ["value", "n"], ["what it decides"]], gait.map(cRow));
+
+  rows("t_bars", [["bar"], ["value", "n"], ["what it means"]],
+    d.bars.map(b => `<tr><td class="k">${esc(b.name)}</td>
+      <td class="n">${esc(b.value)}</td>
+      <td class="why">${esc(b.what)}</td></tr>`));
+
+  /* Sorted by size, because that is the order they matter in. */
+  const w = [...d.weights].sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight));
+  rows("t_weights", [["term"], ["weight", "n"], ["what it pays for"]],
+    w.map(t => `<tr><td class="k">${esc(t.name)}</td>
+      <td class="n">${t.weight > 0 ? "+" : ""}${esc(t.weight)}</td>
+      <td class="why">${esc(t.what)}</td></tr>`));
+
+  const tol = Object.entries(d.tolerances || {})
+    .filter(([, v]) => v !== null && v !== undefined)
+    .map(([k, v]) => `<tr><td class="k">${esc(k)}</td>
+      <td class="n">${esc(v)}</td><td class="why">recorded on the run</td></tr>`);
+  rows("t_world", [["dial"], ["range", "n"], ["set to"]],
+    (d.world_dials || []).map(x => `<tr><td class="k">${esc(x.name)}</td>
+      <td class="n">${esc(Object.values(x.ranges || {}).map(r =>
+        Array.isArray(r) ? r.join(" to ") : r).join(" &middot; "))}</td>
+      <td class="why">${x.wide ? "wide" : "narrow"}</td></tr>`).concat(tol));
+
+  rows("t_flags", [["switch"], ["default", "n"], ["what it does"]],
+    d.flags.map(f => `<tr><td class="k">${esc(f.flag)}</td>
+      <td class="n">${esc(f.default)}</td>
+      <td class="why">${esc(f.help)}</td></tr>`));
+});
+</script>
